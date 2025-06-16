@@ -23,6 +23,7 @@
     "@nestjs/common": "^11.1.0",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.0",
+    "@nestjs/mapped-types": "*",
     "@nestjs/platform-express": "^11.1.0",
     "@nestjs/typeorm": "^11.0.0",
     "better-auth": "^1.2.7",
