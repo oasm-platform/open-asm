@@ -55,7 +55,8 @@ const isProd = process.env.NODE_ENV === 'production';
 export class AuthModule implements NestModule, OnModuleInit {
   private logger = new Logger(AuthModule.name);
   constructor(
-    @Inject(AUTH_INSTANCE_KEY) private readonly auth: Auth,
+    @Inject(AUTH_INSTANCE_KEY)
+    private readonly auth: Auth,
     @Inject(DiscoveryService)
     private discoveryService: DiscoveryService,
     @Inject(MetadataScanner)
