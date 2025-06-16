@@ -1,12 +1,12 @@
+import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { CanActivate, ExecutionContext } from '@nestjs/common';
 
-import { AUTH_INSTANCE_KEY } from './symbols';
-import { APIError } from 'better-auth/api';
 import type { getSession } from 'better-auth/api';
-import { fromNodeHeaders } from 'better-auth/node';
+import { APIError } from 'better-auth/api';
 import type { Auth } from 'better-auth/auth';
+import { fromNodeHeaders } from 'better-auth/node';
+import { AUTH_INSTANCE_KEY } from '../constants/app.constants';
 
 /**
  * Type representing a valid user session after authentication
