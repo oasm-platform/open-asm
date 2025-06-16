@@ -7,7 +7,7 @@ export const databaseConnectionConfig = {
   user: DB_USERNAME,
   username: DB_USERNAME,
   password: DB_PASSWORD,
-  port: parseInt(DB_PORT || '5432', 10),
+  port: parseInt(DB_PORT || '5432', 5432),
   database: DB_NAME,
   ssl: Boolean(DB_SSL === 'true'),
 };
