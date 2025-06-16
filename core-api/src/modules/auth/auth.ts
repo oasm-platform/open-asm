@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { openAPI } from 'better-auth/plugins';
+import { randomUUID } from 'crypto';
 import { Pool } from 'pg';
 import { databaseConnectionConfig } from 'src/database/database-config';
 
@@ -10,6 +11,11 @@ export const auth = betterAuth({
       path: '/docs',
     }),
   ],
+  advanced: {
+    database: {
+      generateId: () => randomUUID(),
+    },
+  },
   emailAndPassword: {
     enabled: true,
   },
