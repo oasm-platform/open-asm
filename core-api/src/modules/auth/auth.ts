@@ -16,7 +16,11 @@ const database = new Pool({
 
 export const auth = betterAuth({
   database,
-  plugins: [openAPI()],
+  plugins: [
+    openAPI({
+      path: '/docs',
+    }),
+  ],
   emailAndPassword: {
     enabled: true,
   },

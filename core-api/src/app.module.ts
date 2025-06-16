@@ -2,8 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { AppController } from './app.controller';
-import { AuthModule } from './auth/auth.module';
 import { AppService } from './app.service';
+import { CombineModule } from './modules/combine.module';
 
 @Module({
   imports: [
@@ -11,9 +11,7 @@ import { AppService } from './app.service';
       envFilePath: `.env`,
       isGlobal: true,
     }),
-    AuthModule.forRoot({
-      disableExceptionFilter: true,
-    }),
+    CombineModule,
   ],
   controllers: [AppController],
   providers: [AppService],
