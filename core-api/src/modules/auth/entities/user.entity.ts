@@ -1,4 +1,5 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
+import { Role } from 'src/common/enums/enum';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { Account } from './account.entity';
 import { Session } from './session.entity';
@@ -16,6 +17,9 @@ export class User extends BaseEntity {
 
   @Column('text', { nullable: true })
   image?: string;
+
+  @Column({ type: 'enum', enum: Role, default: Role.USER })
+  role: Role;
 
   @OneToMany(() => Session, (session) => session.user)
   sessions: Session[];
