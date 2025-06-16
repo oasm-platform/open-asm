@@ -1,22 +1,11 @@
 import { betterAuth } from 'better-auth';
 import { openAPI } from 'better-auth/plugins';
 import { Pool } from 'pg';
-import { Role } from 'src/common/enum';
-
-const { DB_HOST, DB_USERNAME, DB_PASSWORD, DB_PORT, DB_NAME, DB_SSL } =
-  process.env;
-
-const database = new Pool({
-  host: DB_HOST,
-  user: DB_USERNAME,
-  password: DB_PASSWORD,
-  port: parseInt(DB_PORT || '5432', 10),
-  database: DB_NAME,
-  ssl: Boolean(DB_SSL === 'true'),
-});
+import { Role } from 'src/common/enums/enum';
+import { databaseConnectionConfig } from 'src/database/database-config';
 
 export const auth = betterAuth({
-  database,
+  database: new Pool(databaseConnectionConfig),
   plugins: [
     openAPI({
       path: '/docs',
