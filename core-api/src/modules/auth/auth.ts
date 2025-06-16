@@ -15,6 +15,22 @@ export const auth = betterAuth({
     database: {
       generateId: () => randomUUID(),
     },
+    cookies: {
+      session_token: {
+        name: 'session',
+        attributes: {
+          httpOnly: true,
+          secure: true,
+        },
+      },
+    },
+  },
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 5,
+    storage: 'memory',
+    modelName: 'auth-rate-limit',
   },
   emailAndPassword: {
     enabled: true,
