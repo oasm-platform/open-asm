@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import 'dotenv/config';
@@ -11,6 +12,10 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api', { exclude: ['/api/auth/{*path}', '/'] });
 
-  await app.listen(process.env.PORT ?? DEFAULT_PORT);
+  const port = process.env.PORT ?? DEFAULT_PORT;
+  await app.listen(port);
+
+  const logger = new Logger('Application');
+  logger.log(`Application is running on port ${port}`);
 }
 bootstrap();

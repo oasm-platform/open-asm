@@ -1,0 +1,17 @@
+version: '3'
+
+tasks:
+  dev:
+    cmds:
+      - npm run start:dev
+    env:
+      NODE_ENV: 'development'
+  build:
+    cmds:
+      - npm run build
+  prod:
+    cmds:
+      - npm run start:prod
+    env:
+      NODE_ENV: 'production'
+  install: npm install

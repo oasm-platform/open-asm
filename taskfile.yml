@@ -1,0 +1,20 @@
+version: "3"
+
+includes:
+  api:
+    taskfile: ./core-api/taskfile.yml
+    dir: ./core-api
+
+tasks:
+  dev:
+    deps:
+      - api:dev
+  build:
+    deps:
+      - api:build
+  prod:
+    deps:
+      - api:prod
+  install:
+    deps:
+      - api:install
