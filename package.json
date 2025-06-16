@@ -1,0 +1,18 @@
+{
+  "name": "open-asm",
+  "version": "0.0.1",
+  "description": "Open-source platform for cybersecurity Attack Surface Management (ASM). Built to help security teams identify, monitor, and manage external assets and exposure.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oasm-platform/open-asm.git"
+  },
+  "author": "oasm-platform",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/oasm-platform/open-asm/issues"
+  },
+  "homepage": "https://github.com/oasm-platform/open-asm#readme"
+}
