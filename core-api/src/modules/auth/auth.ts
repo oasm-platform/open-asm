@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { openAPI } from 'better-auth/plugins';
 import { Pool } from 'pg';
+import { Role } from 'src/common/enum';
 
 const { DB_HOST, DB_USERNAME, DB_PASSWORD, DB_PORT, DB_NAME, DB_SSL } =
   process.env;
@@ -33,7 +34,7 @@ export const auth = betterAuth({
     additionalFields: {
       role: {
         type: 'string',
-        defaultValue: 'user',
+        defaultValue: Role.USER,
       },
     },
   },
