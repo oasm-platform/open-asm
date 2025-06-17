@@ -1,14 +1,14 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import { AppModule } from './app.module';
 import {
   AUTH_INSTANCE_KEY,
   DEFAULT_PORT,
 } from './common/constants/app.constants';
-import * as cookieParser from 'cookie-parser';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AuthGuard } from './common/guards/auth.guard';
 
 async function bootstrap() {
@@ -39,7 +39,7 @@ async function bootstrap() {
   // Configure global prefix
   app.setGlobalPrefix('api', { exclude: ['/api/auth/{*path}', '/'] });
 
-  // Show Swagger UI in development: http://localhost:3000/api/swagger
+  // Show Swagger UI in development: http://localhost:3000/api/docs
   const config = new DocumentBuilder()
     .setTitle('OASM API')
     .setDescription(
@@ -48,7 +48,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/swagger', app, documentFactory, {
+  SwaggerModule.setup('api/docs', app, documentFactory, {
     swaggerOptions: {
       persistAuthorization: true,
     },
