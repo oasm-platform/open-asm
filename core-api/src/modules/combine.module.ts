@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { RootModule } from './root/root.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
 
 @Module({
   imports: [
@@ -8,6 +9,7 @@ import { RootModule } from './root/root.module';
       disableExceptionFilter: true,
     }),
     RootModule,
+    WorkspacesModule,
   ],
 })
 export class CombineModule {}

@@ -22,7 +22,7 @@ export const Optional = () => SetMetadata('OPTIONAL', true);
  * Parameter decorator that extracts the user session from the request.
  * Provides easy access to the authenticated user's session data in controller methods.
  */
-export const Session = createParamDecorator(
+export const UserContext = createParamDecorator(
   (_data: unknown, context: ExecutionContext) => {
     const request = context.switchToHttp().getRequest();
     return request.session;
