@@ -77,21 +77,23 @@ export class WorkspacesService {
   }
 
   /**
-   * Retrieves a workspace by ID, but only if the workspace belongs to the user.
-   * @param id - The ID of the workspace to retrieve.
+   * Retrieves a workspace by its ID, if the user is a member of the workspace.
+   * @param id - The ID of the workspace to be retrieved.
    * @param userContext - The user's context data, which includes the user's ID.
-   * @returns The workspace if it exists and belongs to the user, otherwise throws a NotFoundException.
+   * @returns The workspace, if found.
+   * @throws NotFoundException if the workspace does not exist or the user is not a member.
    */
   public async getWorkspaceById(
     id: string,
     userContext: UserContextPayload,
   ): Promise<Workspace> {
-    const workspace = await this.repo.findOne({
-      where: {
-        id: id,
-        owner: { id: userContext.user.id },
-      },
-    });
+    const userId = userContext.user.id;
+    const workspace = await this.repo
+      .createQueryBuilder('workspace')
+      .leftJoin('workspace.workspaceMembers', 'member')
+      .where('workspace.id = :workspaceId', { workspaceId: id })
+      .andWhere('member.user.id = :userId', { userId })
+      .getOne();
 
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
@@ -101,20 +103,49 @@ export class WorkspacesService {
   }
 
   /**
-   * Updates a workspace by its ID.
+   * Retrieves a workspace member by workspace ID and user ID.
+   * @param workspaceId - The ID of the workspace to be retrieved.
+   * @param userId - The ID of the user to be retrieved.
+   * @returns The workspace member, if found.
+   * @throws NotFoundException if the workspace member does not exist.
+   */
+  private async getWorkspaceMember(
+    workspaceId: string,
+    userId: string,
+  ): Promise<WorkspaceMembers> {
+    const workspaceMember = await this.workspaceMembersRepository.findOne({
+      where: {
+        workspace: { id: workspaceId },
+        user: { id: userId },
+      },
+      relations: ['workspace', 'user'],
+    });
+
+    if (!workspaceMember) {
+      throw new NotFoundException('Workspace member not found');
+    }
+
+    return workspaceMember;
+  }
+
+  /**
+   * Updates a workspace by ID.
    * @param id - The ID of the workspace to be updated.
    * @param dto - The updated workspace data.
    * @param userContext - The user's context data, which includes the user's ID.
    * @returns A response indicating the workspace was successfully updated.
+   * @throws BadRequestException if the user is not the owner of the workspace.
    */
   public async updateWorkspace(
     id: string,
     dto: UpdateWorkspaceDto,
     userContext: UserContextPayload,
   ) {
-    const workspace = await this.getWorkspaceById(id, userContext);
+    const userId = userContext.user.id;
 
-    if (workspace.owner.id === userContext.user.id) {
+    const workspaceMember = await this.getWorkspaceMember(id, userId);
+
+    if (workspaceMember.user.id === userContext.user.id) {
       await this.repo.update({ id: id }, { ...dto });
 
       return { message: 'Workspace updated successfully' };
@@ -135,7 +166,7 @@ export class WorkspacesService {
   ): Promise<DefaultMessageResponseDto> {
     await this.getWorkspaceById(id, userContext);
 
-    await this.repo.delete({ id });
+    await this.repo.softDelete({ id });
     return {
       message: 'Workspace deleted successfully',
     };
