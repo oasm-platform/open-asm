@@ -5,6 +5,7 @@ import {
   GetManyResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
@@ -18,6 +19,12 @@ export class WorkspacesService {
     private readonly workspaceMembersRepository: Repository<WorkspaceMembers>,
   ) {}
 
+  /**
+   * Retrieves a list of workspaces that the user is a member of.
+   * @param query - The query parameters to filter and paginate the workspaces.
+   * @param userContextPayload - The user's context data, which includes the user's ID.
+   * @returns A paginated list of workspaces, along with the total count and page information.
+   */
   public async getWorkspaces(
     query: GetManyBaseQueryParams,
     userContextPayload: UserContextPayload,
@@ -36,13 +43,6 @@ export class WorkspacesService {
         [sortBy]: sortOrder,
       },
     });
-    return {
-      data,
-      total,
-      page,
-      limit,
-      pageCount: Math.ceil(total / limit),
-      hasNextPage: page * limit < total,
-    };
+    return getManyResponse(query, data, total);
   }
 }
