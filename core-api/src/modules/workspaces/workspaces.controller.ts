@@ -61,7 +61,7 @@ export class WorkspacesController {
     summary: 'Get Workspace By ID',
     description: 'Retrieves a workspace by its ID.',
     response: {
-      serialization: DefaultMessageResponseDto,
+      serialization: Workspace,
     },
   })
   @Get(':id')
