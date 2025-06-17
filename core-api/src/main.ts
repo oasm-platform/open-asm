@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import 'dotenv/config';
+import 'reflect-metadata';
 import { AppModule } from './app.module';
 import {
   AUTH_INSTANCE_KEY,
@@ -34,7 +35,12 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Configure global validation
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
 
   // Configure global prefix
   app.setGlobalPrefix('api', { exclude: ['/api/auth/{*path}', '/'] });
