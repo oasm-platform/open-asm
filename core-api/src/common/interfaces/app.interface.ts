@@ -1,3 +1,5 @@
+import { Role } from '../enums/enum';
+
 export interface UserContextPayload {
   session: Session;
   user: User;
@@ -6,8 +8,8 @@ export interface UserContextPayload {
 export interface Session {
   expiresAt: string;
   token: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
   ipAddress: string;
   userAgent: string;
   userId: string;
@@ -19,8 +21,8 @@ export interface User {
   email: string;
   emailVerified: boolean;
   image: any;
-  createdAt: string;
-  updatedAt: string;
-  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+  role: Role;
   id: string;
 }

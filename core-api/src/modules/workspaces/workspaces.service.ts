@@ -10,6 +10,7 @@ import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
+import { CreateWorkspaceDto } from './dto/workspaces.dto';
 
 @Injectable()
 export class WorkspacesService {
@@ -19,6 +20,34 @@ export class WorkspacesService {
     @InjectRepository(WorkspaceMembers)
     private readonly workspaceMembersRepository: Repository<WorkspaceMembers>,
   ) {}
+
+  /**
+   * Creates a new workspace.
+   * @param dto - The workspace data.
+   * @param userContextPayload - The user's context data, which includes the user's ID.
+   * @returns A message indicating if the workspace was created successfully or not.
+   */
+
+  public async createWorkspace(
+    dto: CreateWorkspaceDto,
+    userContextPayload: UserContextPayload,
+  ) {
+    try {
+      const newWorkspace = await this.repo.save({
+        name: dto.name,
+        description: dto.description,
+        owner: userContextPayload.user,
+      });
+
+      await this.workspaceMembersRepository.save({
+        workspace: newWorkspace,
+        user: userContextPayload.user,
+      });
+      return { message: 'Workspace created successfully' };
+    } catch (error) {
+      return { message: error.message };
+    }
+  }
 
   /**
    * Retrieves a list of workspaces that the user is a member of.
@@ -31,13 +60,11 @@ export class WorkspacesService {
     userContextPayload: UserContextPayload,
   ): Promise<GetManyResponseDto<Workspace>> {
     const { limit, page, sortBy, sortOrder } = query;
-    const {
-      user: { id },
-    } = userContextPayload;
+    const user = userContextPayload.user;
 
     const [data, total] = await this.repo.findAndCount({
       where: {
-        owner: { id: id },
+        owner: user,
       },
       take: query.limit,
       skip: (page - 1) * limit,

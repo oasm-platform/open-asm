@@ -26,13 +26,19 @@ import { WorkspacesService } from './workspaces.service';
 export class WorkspacesController {
   constructor(private readonly workspacesService: WorkspacesService) {}
 
+  @Doc({
+    summary: 'Create Workspace',
+    description: 'Creates a new workspace.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
   @Post()
   createWorkspace(
     @Body() dto: CreateWorkspaceDto,
-    @UserContext() user: UserContextPayload,
+    @UserContext() userContextPayload: UserContextPayload,
   ) {
-    console.log('user', user);
-    return user;
+    return this.workspacesService.createWorkspace(dto, userContextPayload);
   }
 
   @Doc({
