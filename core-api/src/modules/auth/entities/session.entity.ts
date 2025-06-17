@@ -18,4 +18,7 @@ export class Session extends BaseEntity {
 
   @ManyToOne(() => User, (user) => user.sessions, { onDelete: 'CASCADE' })
   user: User;
+
+  @ManyToOne(() => User, (user) => user.sessions, { onDelete: 'CASCADE' })
+  impersonatedBy: User;
 }

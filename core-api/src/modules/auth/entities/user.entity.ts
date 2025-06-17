@@ -37,4 +37,13 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Workspace, (workspace) => workspace.owner)
   workspaces: Workspace[];
+
+  @Column('date', { nullable: true })
+  banExpires: Date;
+
+  @Column('boolean', { nullable: true })
+  banned?: boolean;
+
+  @Column('text', { nullable: true })
+  banReason?: string;
 }
