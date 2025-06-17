@@ -1,11 +1,15 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import 'dotenv/config';
 import { AppModule } from './app.module';
-import { DEFAULT_PORT } from './common/constants/app.constants';
+import {
+  AUTH_INSTANCE_KEY,
+  DEFAULT_PORT,
+} from './common/constants/app.constants';
 import * as cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AuthGuard } from './common/guards/auth.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -13,10 +17,26 @@ async function bootstrap() {
   });
   app.set('query parser', 'extended');
 
+  // Configure CORS
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
+
+  // Configure global guards
+  const reflector = app.get(Reflector);
+
+  const auth = app.get(AUTH_INSTANCE_KEY);
+
+  app.useGlobalGuards(new AuthGuard(reflector, auth));
+
+  // Configure cookie parser
   app.use(cookieParser());
 
+  // Configure global validation
   app.useGlobalPipes(new ValidationPipe());
 
+  // Configure global prefix
   app.setGlobalPrefix('api', { exclude: ['/api/auth/{*path}', '/'] });
 
   // Show Swagger UI in development: http://localhost:3000/api/swagger
@@ -25,18 +45,7 @@ async function bootstrap() {
     .setDescription(
       'Open-source platform for cybersecurity Attack Surface Management (ASM)',
     )
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'Bearer',
-        bearerFormat: 'JWT',
-        in: 'header',
-      },
-      'token',
-    )
-    .addSecurityRequirements('token')
     .setVersion('1.0')
-    .addTag('OASM API')
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/swagger', app, documentFactory, {
@@ -45,6 +54,7 @@ async function bootstrap() {
     },
   });
 
+  // Start server
   const port = process.env.PORT ?? DEFAULT_PORT;
   await app.listen(port);
 
