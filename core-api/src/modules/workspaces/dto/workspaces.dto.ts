@@ -1,26 +1,9 @@
-import { ApiProperty, PickType } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { PartialType, PickType } from '@nestjs/swagger';
 import { Workspace } from '../entities/workspace.entity';
 
 export class CreateWorkspaceDto extends PickType(Workspace, [
   'name',
   'description',
-]) {}
+] as const) {}
 
-export class UpdateWorkspaceDto {
-  @IsString()
-  @IsOptional()
-  @ApiProperty({
-    example: 'My Workspace',
-    description: 'The name of the workspace',
-  })
-  name?: string;
-
-  @IsString()
-  @IsOptional()
-  @ApiProperty({
-    example: 'This is my workspace',
-    description: 'The description of the workspace',
-  })
-  description?: string;
-}
+export class UpdateWorkspaceDto extends PartialType(CreateWorkspaceDto) {}

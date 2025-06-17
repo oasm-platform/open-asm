@@ -12,9 +12,9 @@ import {
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
+import { CreateWorkspaceDto, UpdateWorkspaceDto } from './dto/workspaces.dto';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
-import { CreateWorkspaceDto, UpdateWorkspaceDto } from './dto/workspaces.dto';
 
 @Injectable()
 export class WorkspacesService {
@@ -36,15 +36,19 @@ export class WorkspacesService {
     dto: CreateWorkspaceDto,
     userContextPayload: UserContextPayload,
   ) {
+    const {
+      user: { id },
+    } = userContextPayload;
+
     const newWorkspace = await this.repo.save({
       name: dto.name,
       description: dto?.description,
-      owner: userContextPayload.user,
+      owner: { id },
     });
 
     await this.workspaceMembersRepository.save({
       workspace: newWorkspace,
-      user: userContextPayload.user,
+      user: { id },
     });
     return { message: 'Workspace created successfully' };
   }
@@ -60,11 +64,13 @@ export class WorkspacesService {
     userContextPayload: UserContextPayload,
   ): Promise<GetManyResponseDto<Workspace>> {
     const { limit, page, sortBy, sortOrder } = query;
-    const user = userContextPayload.user;
+    const {
+      user: { id },
+    } = userContextPayload;
 
     const [data, total] = await this.repo.findAndCount({
       where: {
-        owner: user,
+        owner: { id },
       },
       take: query.limit,
       skip: (page - 1) * limit,

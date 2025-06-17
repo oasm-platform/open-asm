@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsString } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { User } from 'src/modules/auth/entities/user.entity';
 import {
@@ -16,6 +17,7 @@ export class Workspace extends BaseEntity {
     example: 'My Workspace',
     description: 'The name of the workspace',
   })
+  @IsString()
   @Column('text')
   name: string;
 
@@ -23,6 +25,7 @@ export class Workspace extends BaseEntity {
     example: 'This is my workspace',
     description: 'The description of the workspace',
   })
+  @IsString()
   @Column('text', { nullable: true })
   description?: string;
 
