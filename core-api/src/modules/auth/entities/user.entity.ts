@@ -35,6 +35,6 @@ export class User extends BaseEntity {
   )
   workspaceMembers: WorkspaceMembers[];
 
-  @OneToMany(() => Workspace, (workspace) => workspace.ownerId)
+  @OneToMany(() => Workspace, (workspace) => workspace.owner)
   workspaces: Workspace[];
 }

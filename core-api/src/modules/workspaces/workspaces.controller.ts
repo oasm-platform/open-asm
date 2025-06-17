@@ -10,19 +10,26 @@ import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { CreateWorkspaceDto } from './dto/workspaces.dto';
 import { Workspace } from './entities/workspace.entity';
 import { WorkspacesService } from './workspaces.service';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 
 @ApiTags('Workspaces')
 @Controller('workspaces')
 export class WorkspacesController {
   constructor(private readonly workspacesService: WorkspacesService) {}
 
+  @Doc({
+    summary: 'Create Workspace',
+    description: 'Creates a new workspace.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
   @Post()
   createWorkspace(
     @Body() dto: CreateWorkspaceDto,
-    @UserContext() user: UserContextPayload,
+    @UserContext() userContextPayload: UserContextPayload,
   ) {
-    console.log('user', user);
-    return user;
+    return this.workspacesService.createWorkspace(dto, userContextPayload);
   }
 
   @Doc({
