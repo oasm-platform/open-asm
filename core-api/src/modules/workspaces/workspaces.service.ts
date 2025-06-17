@@ -33,6 +33,7 @@ export class WorkspacesService {
     const {
       user: { id },
     } = userContextPayload;
+
     const [data, total] = await this.workspaceRepository.findAndCount({
       where: {
         ownerId: { id: id },
@@ -43,6 +44,7 @@ export class WorkspacesService {
         [sortBy]: sortOrder,
       },
     });
+
     return getManyResponse(query, data, total);
   }
 }
