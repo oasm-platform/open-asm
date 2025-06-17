@@ -9,6 +9,7 @@ import { RootService } from './root.service';
 export class RootController {
   constructor(private readonly rootService: RootService) {}
 
+  @Public()
   @Get()
   getHealth(): string {
     return this.rootService.getHealth();
