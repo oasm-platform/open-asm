@@ -3,6 +3,8 @@ import { Role } from 'src/common/enums/enum';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { Account } from './account.entity';
 import { Session } from './session.entity';
+import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
+import { WorkspaceMembers } from 'src/modules/workspaces/entities/workspace-members.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -26,4 +28,13 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Account, (account) => account.user)
   accounts: Account[];
+
+  @OneToMany(
+    () => WorkspaceMembers,
+    (workspaceMembers) => workspaceMembers.user,
+  )
+  workspaceMembers: WorkspaceMembers[];
+
+  @OneToMany(() => Workspace, (workspace) => workspace.ownerId)
+  workspaces: Workspace[];
 }
