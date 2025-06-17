@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
@@ -34,7 +38,7 @@ export class WorkspacesService {
   ) {
     const newWorkspace = await this.repo.save({
       name: dto.name,
-      description: dto.description,
+      description: dto?.description,
       owner: userContextPayload.user,
     });
 
@@ -108,10 +112,14 @@ export class WorkspacesService {
     dto: UpdateWorkspaceDto,
     userContext: UserContextPayload,
   ) {
-    await this.getWorkspaceById(id, userContext);
-    await this.repo.update({ id: id }, { ...dto });
+    const workspace = await this.getWorkspaceById(id, userContext);
 
-    return { message: 'Workspace updated successfully' };
+    if (workspace.owner.id === userContext.user.id) {
+      await this.repo.update({ id: id }, { ...dto });
+
+      return { message: 'Workspace updated successfully' };
+    }
+    throw new BadRequestException('You are not the owner of this workspace');
   }
 
   /**
