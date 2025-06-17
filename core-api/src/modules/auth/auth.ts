@@ -3,7 +3,6 @@ import { admin, openAPI } from 'better-auth/plugins';
 import { randomUUID } from 'crypto';
 import 'dotenv/config';
 import { Pool } from 'pg';
-import { DEFAULT_ADMIN_ID } from 'src/common/constants/app.constants';
 import { Role } from 'src/common/enums/enum';
 import { databaseConnectionConfig } from 'src/database/database-config';
 
@@ -13,7 +12,6 @@ export const auth = betterAuth({
     admin({
       defaultRole: Role.USER,
       adminRoles: [Role.ADMIN],
-      adminUserIds: [DEFAULT_ADMIN_ID],
     }),
     openAPI({
       path: '/docs',
@@ -49,6 +47,13 @@ export const auth = betterAuth({
   },
   user: {
     modelName: 'users',
+    additionalFields: {
+      role: {
+        type: 'string',
+        enum: Role,
+        default: Role.USER,
+      },
+    },
   },
   account: {
     modelName: 'accounts',
