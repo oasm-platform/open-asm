@@ -10,7 +10,7 @@ import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
-import { CreateWorkspaceDto } from './dto/workspaces.dto';
+import { CreateWorkspaceDto, UpdateWorkspaceDto } from './dto/workspaces.dto';
 
 @Injectable()
 export class WorkspacesService {
@@ -32,21 +32,17 @@ export class WorkspacesService {
     dto: CreateWorkspaceDto,
     userContextPayload: UserContextPayload,
   ) {
-    try {
-      const newWorkspace = await this.repo.save({
-        name: dto.name,
-        description: dto.description,
-        owner: userContextPayload.user,
-      });
+    const newWorkspace = await this.repo.save({
+      name: dto.name,
+      description: dto.description,
+      owner: userContextPayload.user,
+    });
 
-      await this.workspaceMembersRepository.save({
-        workspace: newWorkspace,
-        user: userContextPayload.user,
-      });
-      return { message: 'Workspace created successfully' };
-    } catch (error) {
-      return { message: error.message };
-    }
+    await this.workspaceMembersRepository.save({
+      workspace: newWorkspace,
+      user: userContextPayload.user,
+    });
+    return { message: 'Workspace created successfully' };
   }
 
   /**
@@ -101,13 +97,30 @@ export class WorkspacesService {
   }
 
   /**
+   * Updates a workspace by its ID.
+   * @param id - The ID of the workspace to be updated.
+   * @param dto - The updated workspace data.
+   * @param userContext - The user's context data, which includes the user's ID.
+   * @returns A response indicating the workspace was successfully updated.
+   */
+  public async updateWorkspace(
+    id: string,
+    dto: UpdateWorkspaceDto,
+    userContext: UserContextPayload,
+  ) {
+    await this.getWorkspaceById(id, userContext);
+    await this.repo.update({ id: id }, { ...dto });
+
+    return { message: 'Workspace updated successfully' };
+  }
+
+  /**
    * Deletes a workspace by its ID.
    * @param id - The ID of the workspace to be deleted.
    * @param userContext - The user's context data, which includes the user's ID.
    * @returns A response indicating the workspace was successfully deleted.
    * @throws NotFoundException if the workspace does not exist or the user is not the owner.
    */
-
   public async deleteWorkspace(
     id: string,
     userContext: UserContextPayload,

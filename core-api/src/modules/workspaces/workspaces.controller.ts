@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -17,7 +18,7 @@ import {
 } from 'src/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { CreateWorkspaceDto } from './dto/workspaces.dto';
+import { CreateWorkspaceDto, UpdateWorkspaceDto } from './dto/workspaces.dto';
 import { Workspace } from './entities/workspace.entity';
 import { WorkspacesService } from './workspaces.service';
 
@@ -69,6 +70,22 @@ export class WorkspacesController {
     @UserContext() userContext: UserContextPayload,
   ) {
     return this.workspacesService.getWorkspaceById(id, userContext);
+  }
+
+  @Doc({
+    summary: 'Update Workspace',
+    description: 'Updates a workspace by its ID.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  @Patch(':id')
+  updateWorkspace(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: UpdateWorkspaceDto,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.workspacesService.updateWorkspace(id, dto, userContext);
   }
 
   @Doc({
