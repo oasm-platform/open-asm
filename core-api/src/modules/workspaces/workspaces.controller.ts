@@ -1,11 +1,21 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
   GetManyResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
+import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { CreateWorkspaceDto } from './dto/workspaces.dto';
 import { Workspace } from './entities/workspace.entity';
@@ -38,5 +48,35 @@ export class WorkspacesController {
     @UserContext() userContextPayload: UserContextPayload,
   ) {
     return this.workspacesService.getWorkspaces(query, userContextPayload);
+  }
+
+  @Doc({
+    summary: 'Get Workspace By ID',
+    description: 'Retrieves a workspace by its ID.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  @Get(':id')
+  getWorkspaceById(
+    @Param() { id }: IdQueryParamDto,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.workspacesService.getWorkspaceById(id, userContext);
+  }
+
+  @Doc({
+    summary: 'Delete Workspace',
+    description: 'Deletes a workspace by its ID.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  @Delete(':id')
+  deleteWorkspace(
+    @Param() { id }: IdQueryParamDto,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.workspacesService.deleteWorkspace(id, userContext);
   }
 }

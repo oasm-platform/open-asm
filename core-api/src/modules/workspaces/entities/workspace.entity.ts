@@ -27,7 +27,7 @@ export class Workspace extends BaseEntity {
   description?: string;
 
   @ManyToOne(() => User, (user) => user.workspaces)
-  ownerId: User;
+  owner: User;
 
   @OneToMany(
     () => WorkspaceMembers,
