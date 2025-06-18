@@ -4,17 +4,23 @@ includes:
   api:
     taskfile: ./core-api/taskfile.yml
     dir: ./core-api
+  console:
+    taskfile: ./console/taskfile.yml
+    dir: ./console
 
 tasks:
   dev:
     deps:
       - api:dev
+      - console:dev
   build:
     deps:
       - api:build
+      - console:build
   prod:
     deps:
       - api:prod
   install:
     deps:
       - api:install
+      - console:install
