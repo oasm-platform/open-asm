@@ -26,20 +26,12 @@ export class WorkspacesService {
   ) {}
 
   /**
-   * Creates a new workspace.
-   * @param dto - The workspace data.
+   * Creates a new workspace and adds the creator as a member.
+   * @param dto - The data transfer object containing the details of the workspace to be created.
    * @param userContextPayload - The user's context data, which includes the user's ID.
-   * @returns A message indicating if the workspace was created successfully or not.
+   * @returns A response indicating the workspace was successfully created.
    */
-
-  /*************  ✨ Windsurf Command ⭐  *************/
-  /**
-   * Creates a new workspace.
-   * @param dto - The workspace data.
-   * @param userContextPayload - The user's context data, which includes the user's ID.
-   * @returns A message indicating if the workspace was created successfully or not.
-   */
-  /*******  d137617c-4668-443d-b610-289fa2b019ab  *******/ public async createWorkspace(
+  public async createWorkspace(
     dto: CreateWorkspaceDto,
     userContextPayload: UserContextPayload,
   ) {
@@ -86,27 +78,23 @@ export class WorkspacesService {
   }
 
   /**
-   * Retrieves a workspace by its ID, if the user is a member of the workspace.
-   * @param id - The ID of the workspace to be retrieved.
+   * Retrieves a workspace by its ID, but only if the user is a member of the workspace.
+   * @param id - The ID of the workspace to retrieve.
    * @param userContext - The user's context data, which includes the user's ID.
-   * @returns The workspace, if found.
-   * @throws NotFoundException if the workspace does not exist or the user is not a member.
+   * @returns The workspace, if found and the user is a member. Otherwise, null.
    */
   public async getWorkspaceById(
     id: string,
     userContext: UserContextPayload,
-  ): Promise<Workspace> {
+  ): Promise<Workspace | null> {
     const userId = userContext.id;
     const workspace = await this.repo
       .createQueryBuilder('workspace')
+      .leftJoinAndSelect('workspace.owner', 'owner')
       .leftJoin('workspace.workspaceMembers', 'member')
       .where('workspace.id = :workspaceId', { workspaceId: id })
       .andWhere('member.user.id = :userId', { userId })
       .getOne();
-
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
 
     return workspace;
   }
@@ -173,7 +161,15 @@ export class WorkspacesService {
     id: string,
     userContext: UserContextPayload,
   ): Promise<DefaultMessageResponseDto> {
-    await this.getWorkspaceById(id, userContext);
+    const workspace = await this.getWorkspaceById(id, userContext);
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    if (workspace.owner.id !== userContext.id) {
+      throw new BadRequestException('You are not the owner of this workspace');
+    }
 
     await this.repo.softDelete({ id });
     return {

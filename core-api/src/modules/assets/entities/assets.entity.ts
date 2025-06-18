@@ -1,5 +1,5 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
-import { Target } from 'src/targets/entities/target.entity';
+import { Target } from 'src/modules/targets/entities/target.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
 
 @Entity('assets')

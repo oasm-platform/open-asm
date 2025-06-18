@@ -4,9 +4,13 @@ import { TargetsController } from './targets.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Target } from './entities/target.entity';
 import { WorkspaceTarget } from './entities/workspace-target.entity';
+import { WorkspacesModule } from '../workspaces/workspaces.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Target, WorkspaceTarget])],
+  imports: [
+    TypeOrmModule.forFeature([Target, WorkspaceTarget]),
+    WorkspacesModule,
+  ],
   controllers: [TargetsController],
   providers: [TargetsService],
 })

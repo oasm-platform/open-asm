@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -22,6 +23,7 @@ import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { CreateWorkspaceDto, UpdateWorkspaceDto } from './dto/workspaces.dto';
 import { Workspace } from './entities/workspace.entity';
 import { WorkspacesService } from './workspaces.service';
+import { Not } from 'typeorm';
 
 @ApiTags('Workspaces')
 @Controller('workspaces')
@@ -71,7 +73,13 @@ export class WorkspacesController {
     @Param() { id }: IdQueryParamDto,
     @UserContext() userContext: UserContextPayload,
   ) {
-    return this.workspacesService.getWorkspaceById(id, userContext);
+    const workspace = this.workspacesService.getWorkspaceById(id, userContext);
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    return workspace;
   }
 
   @Doc({
