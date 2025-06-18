@@ -21,6 +21,7 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.1.1",
     "@mui/material": "^7.1.1",
+    "@nestjs/mapped-types": "*",
     "react-router-dom": "^7.6.2"
   }
 }
