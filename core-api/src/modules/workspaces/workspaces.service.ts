@@ -32,13 +32,18 @@ export class WorkspacesService {
    * @returns A message indicating if the workspace was created successfully or not.
    */
 
-  public async createWorkspace(
+  /*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Creates a new workspace.
+   * @param dto - The workspace data.
+   * @param userContextPayload - The user's context data, which includes the user's ID.
+   * @returns A message indicating if the workspace was created successfully or not.
+   */
+  /*******  d137617c-4668-443d-b610-289fa2b019ab  *******/ public async createWorkspace(
     dto: CreateWorkspaceDto,
     userContextPayload: UserContextPayload,
   ) {
-    const {
-      user: { id },
-    } = userContextPayload;
+    const { id } = userContextPayload;
 
     const newWorkspace = await this.repo.save({
       name: dto.name,
@@ -64,9 +69,7 @@ export class WorkspacesService {
     userContextPayload: UserContextPayload,
   ): Promise<GetManyResponseDto<Workspace>> {
     const { limit, page, sortBy, sortOrder } = query;
-    const {
-      user: { id },
-    } = userContextPayload;
+    const { id } = userContextPayload;
 
     const [data, total] = await this.repo.findAndCount({
       where: {
@@ -93,7 +96,7 @@ export class WorkspacesService {
     id: string,
     userContext: UserContextPayload,
   ): Promise<Workspace> {
-    const userId = userContext.user.id;
+    const userId = userContext.id;
     const workspace = await this.repo
       .createQueryBuilder('workspace')
       .leftJoin('workspace.workspaceMembers', 'member')
@@ -147,11 +150,11 @@ export class WorkspacesService {
     dto: UpdateWorkspaceDto,
     userContext: UserContextPayload,
   ) {
-    const userId = userContext.user.id;
+    const userId = userContext.id;
 
     const workspaceMember = await this.getWorkspaceMember(id, userId);
 
-    if (workspaceMember.user.id === userContext.user.id) {
+    if (workspaceMember.user.id === userContext.id) {
       await this.repo.update({ id: id }, { ...dto });
 
       return { message: 'Workspace updated successfully' };

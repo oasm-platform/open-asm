@@ -17,7 +17,6 @@ export function getManyResponse<T>(
   total: number,
 ): GetManyResponseDto<T> {
   const { limit, page } = query;
-  console.log(query);
   return {
     data,
     total,

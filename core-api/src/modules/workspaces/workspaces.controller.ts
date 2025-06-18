@@ -9,7 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { UserContext } from 'src/common/decorators/app.decorator';
+import { Roles, UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
@@ -17,6 +17,7 @@ import {
   GetManyResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
+import { Role } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { CreateWorkspaceDto, UpdateWorkspaceDto } from './dto/workspaces.dto';
 import { Workspace } from './entities/workspace.entity';
@@ -42,6 +43,7 @@ export class WorkspacesController {
     return this.workspacesService.createWorkspace(dto, userContextPayload);
   }
 
+  @Roles(Role.USER)
   @Doc({
     summary: 'Get Workspaces',
     description: 'Retrieves a list of workspaces that the user is a member of.',

@@ -1,12 +1,16 @@
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
-import { Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 import type { getSession } from 'better-auth/api';
 import { APIError } from 'better-auth/api';
 import type { Auth } from 'better-auth/auth';
 import { fromNodeHeaders } from 'better-auth/node';
-import { AUTH_INSTANCE_KEY } from '../constants/app.constants';
+import {
+  AUTH_INSTANCE_KEY,
+  ROLE_METADATA_KEY,
+} from '../constants/app.constants';
+import { Role } from '../enums/enum';
 
 /**
  * Type representing a valid user session after authentication
@@ -57,6 +61,16 @@ export class AuthGuard implements CanActivate {
         code: 'UNAUTHORIZED',
         message: 'Unauthorized',
       });
+    }
+
+    const rolesAccepted = this.reflector.get<Role[]>(
+      ROLE_METADATA_KEY,
+      context.getHandler(),
+    );
+
+    const userRole = request.user?.role;
+    if (rolesAccepted?.length && !rolesAccepted.includes(userRole)) {
+      throw new ForbiddenException(`Role ${userRole} cannot access`);
     }
 
     return true;
