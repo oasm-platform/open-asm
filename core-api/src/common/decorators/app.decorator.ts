@@ -25,7 +25,14 @@ export const Optional = () => SetMetadata('OPTIONAL', true);
 export const UserContext = createParamDecorator(
   (_data: unknown, context: ExecutionContext) => {
     const request = context.switchToHttp().getRequest();
-    return request.session;
+    return request.session.user;
+  },
+);
+
+export const SessionContext = createParamDecorator(
+  (_data: unknown, context: ExecutionContext) => {
+    const request = context.switchToHttp().getRequest();
+    return request.session.session;
   },
 );
 
