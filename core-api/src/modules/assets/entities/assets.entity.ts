@@ -1,6 +1,6 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
+import { Target } from 'src/targets/entities/target.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
-import { Target } from './target.entity';
 
 @Entity('assets')
 export class Assets extends BaseEntity {

@@ -10,7 +10,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
-import { WorkspaceTarget } from 'src/modules/assets/entities/workspace-target.entity';
+import { WorkspaceTarget } from 'src/targets/entities/workspace-target.entity';
 
 @Entity('workspace')
 export class Workspace extends BaseEntity {
