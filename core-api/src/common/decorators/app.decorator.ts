@@ -4,7 +4,9 @@ import {
   AFTER_HOOK_KEY,
   BEFORE_HOOK_KEY,
   HOOK_KEY,
+  ROLE_METADATA_KEY,
 } from '../constants/app.constants';
+import { Role } from '../enums/enum';
 /**
  * Marks a route as public, allowing unauthenticated access.
  * When applied to a controller method, the AuthGuard will skip authentication checks.
@@ -55,3 +57,12 @@ export const AfterHook = (path: `/${string}`) =>
  * Must be applied to classes that use BeforeHook or AfterHook decorators.
  */
 export const Hook = () => SetMetadata(HOOK_KEY, true);
+
+/**
+ * Class decorator that restricts access to a controller or method to the given roles.
+ * If no roles are specified, access is restricted to admins.
+ * @param roles - List of allowed roles
+ */
+export const Roles = (...roles: Role[]) => {
+  return SetMetadata(ROLE_METADATA_KEY, roles);
+};
