@@ -10,6 +10,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
+import { WorkspaceTarget } from 'src/modules/assets/entities/workspace-target.entity';
 
 @Entity('workspace')
 export class Workspace extends BaseEntity {
@@ -37,6 +38,12 @@ export class Workspace extends BaseEntity {
     (workspaceMembers) => workspaceMembers.workspace,
   )
   workspaceMembers: WorkspaceMembers[];
+
+  @OneToMany(
+    () => WorkspaceTarget,
+    (workspaceTarget) => workspaceTarget.workspace,
+  )
+  workspaceTargets: WorkspaceTarget[];
 
   @DeleteDateColumn()
   deletedAt?: Date;
