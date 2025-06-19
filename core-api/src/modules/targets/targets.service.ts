@@ -82,14 +82,35 @@ export class TargetsService {
 
     let target = await this.getTargetByValue(value);
 
+    // If the target does not exist, create it
     if (!target) {
       target = await this.repo.save({ value });
-    }
 
-    await this.workspaceTargetRepository.save({
-      workspace,
-      target,
-    });
+      await this.workspaceTargetRepository.save({
+        workspace,
+        target,
+      });
+    }
+    // If the target exists, check if it is already associated with the workspace
+    else {
+      const workspaceTarget = await this.workspaceTargetRepository.findOne({
+        where: {
+          workspace: { id: workspace.id },
+          target: { id: target.id },
+        },
+        relations: ['workspace', 'target'],
+      });
+
+      if (workspaceTarget) {
+        throw new BadRequestException(
+          'Targer has field "value" existed in workspace',
+        );
+      }
+      await this.workspaceTargetRepository.save({
+        workspace,
+        target,
+      });
+    }
 
     return { message: 'Target created successfully' };
   }
