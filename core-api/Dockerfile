@@ -19,6 +19,6 @@ RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 
-EXPOSE 5000
+EXPOSE 6276
 
 CMD ["node", "dist/main"]
