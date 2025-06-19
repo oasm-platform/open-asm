@@ -1,8 +1,6 @@
 name: Build and Push to GHCR
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
 
 concurrency:
@@ -11,7 +9,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-core-api
 
 jobs:
   build:

@@ -1,0 +1,12 @@
+version: "3"
+
+tasks:
+  dev:
+    cmds:
+      - npm run dev
+    env:
+      NODE_ENV: "development"
+  build:
+    cmds:
+      - npm run build
+  install: npm install
