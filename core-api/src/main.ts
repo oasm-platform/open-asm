@@ -7,6 +7,7 @@ import 'dotenv/config';
 import 'reflect-metadata';
 import { AppModule } from './app.module';
 import {
+  APP_NAME,
   AUTH_INSTANCE_KEY,
   DEFAULT_PORT,
 } from './common/constants/app.constants';
@@ -47,11 +48,12 @@ async function bootstrap() {
 
   // Show Swagger UI in development: http://localhost:3000/api/docs
   const config = new DocumentBuilder()
-    .setTitle('OASM API')
+    .setTitle(APP_NAME)
     .setDescription(
       'Open-source platform for cybersecurity Attack Surface Management (ASM)',
     )
     .setVersion('1.0')
+    .setExternalDoc('Authentication Docs', 'auth/docs')
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, documentFactory, {

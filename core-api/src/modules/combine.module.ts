@@ -6,6 +6,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { JobsRegistryModule } from './jobs-registry/jobs-registry.module';
 import { AssetsModule } from './assets/assets.module';
 import { TargetsModule } from './targets/targets.module';
+import { WorkersModule } from './workers/workers.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TargetsModule } from './targets/targets.module';
     RootModule,
     JobsRegistryModule,
     AssetsModule,
+    WorkersModule,
   ],
 })
 export class CombineModule {}
