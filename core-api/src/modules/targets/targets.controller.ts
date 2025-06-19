@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
 } from '@nestjs/common';
@@ -69,5 +71,21 @@ export class TargetsController {
     @Query() query: GetManyBaseQueryParams,
   ) {
     return this.targetsService.getTargetsInWorkspace(id, query);
+  }
+
+  @Doc({
+    summary: 'Delete a target from a workspace',
+    description: 'Deletes a target from a workspace.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  @Delete(':id/workspace/:workspaceId')
+  deleteTargetFromWorkspace(
+    @Param() { id }: IdQueryParamDto,
+    @Param('workspaceId', new ParseUUIDPipe({ version: '4' }))
+    workspaceId: string,
+  ) {
+    return this.targetsService.deleteTargetFromWorkspace(id, workspaceId);
   }
 }

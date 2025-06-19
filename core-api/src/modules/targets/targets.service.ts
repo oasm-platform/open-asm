@@ -130,4 +130,29 @@ export class TargetsService {
 
     return getManyResponse(query, targets, total);
   }
+
+  /**
+   * Deletes a target from a workspace.
+   * @param id - The ID of the target to be deleted.
+   * @param workspaceId - The ID of the workspace from which to delete the target.
+   * @throws NotFoundException if the target is not found in the workspace.
+   * @returns A response indicating the target was successfully deleted.
+   */
+  public async deleteTargetFromWorkspace(id: string, workspaceId: string) {
+    const workspaceTarget = await this.workspaceTargetRepository.findOneBy({
+      target: { id },
+      workspace: { id: workspaceId },
+    });
+
+    if (!workspaceTarget) {
+      throw new NotFoundException('Target not found in workspace');
+    }
+
+    await this.workspaceTargetRepository.delete({
+      target: { id },
+      workspace: { id: workspaceId },
+    });
+
+    return { message: 'Target deleted successfully' };
+  }
 }
