@@ -22,6 +22,16 @@ export class TargetsService {
   ) {}
 
   /**
+   * Retrieves a target entity by its ID.
+   *
+   * @param id - The ID of the target to retrieve.
+   * @returns A promise that resolves to the target entity if found, otherwise null.
+   */
+  public async getTargetById(id: string): Promise<Target | null> {
+    return this.repo.findOneBy({ id });
+  }
+
+  /**
    * Retrieves a target entity by its value.
    *
    * @param value - The unique value of the target to retrieve.

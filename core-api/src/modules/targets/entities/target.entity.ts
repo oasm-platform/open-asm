@@ -2,6 +2,7 @@ import { BaseEntity } from 'src/common/entities/base.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsBoolean, IsString } from 'class-validator';
 
 @Entity('targets')
 export class Target extends BaseEntity {
@@ -9,6 +10,7 @@ export class Target extends BaseEntity {
     example: 'https://example.com',
     description: 'The target value',
   })
+  @IsString()
   @Column({ unique: true })
   value: string;
 
@@ -16,9 +18,10 @@ export class Target extends BaseEntity {
   lastDiscoveredAt: Date;
 
   @ApiProperty({
-    example: true,
+    example: false,
     description: 'Whether to re-scan the target',
   })
+  @IsBoolean()
   @Column({ default: false })
   isReScan: boolean;
 
