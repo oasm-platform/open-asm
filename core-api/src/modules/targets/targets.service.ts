@@ -10,6 +10,12 @@ import { Target } from './entities/target.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateTargetDto } from './dto/targets.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import {
+  GetManyBaseQueryParams,
+  GetManyResponseDto,
+} from 'src/common/dtos/get-many-base.dto';
+import { getManyResponse } from 'src/utils/getManyResponse';
+import { get } from 'http';
 
 @Injectable()
 export class TargetsService {
@@ -57,7 +63,7 @@ export class TargetsService {
     userContext: UserContextPayload,
   ) {
     const { id } = userContext;
-    const { workspaceId, value, isReScan } = dto;
+    const { workspaceId, value } = dto;
 
     // Check if the workspace exists
     const workspace = await this.workspacesService.getWorkspaceById(
@@ -77,7 +83,7 @@ export class TargetsService {
     let target = await this.getTargetByValue(value);
 
     if (!target) {
-      target = await this.repo.save({ value, isReScan });
+      target = await this.repo.save({ value });
     }
 
     await this.workspaceTargetRepository.save({
@@ -86,5 +92,42 @@ export class TargetsService {
     });
 
     return { message: 'Target created successfully' };
+  }
+
+  /**
+   * Retrieves a paginated list of targets associated with a specified workspace.
+   *
+   * @param id - The ID of the workspace for which to retrieve targets.
+   * @param query - The query parameters to filter and paginate the targets.
+   * @returns A promise that resolves to a paginated list of targets, including total count and pagination information.
+   */
+  public async getTargetsInWorkspace(
+    id: string,
+    query: GetManyBaseQueryParams,
+  ): Promise<GetManyResponseDto<Target>> {
+    const { limit, page, sortBy, sortOrder } = query;
+
+    // Create query builder from repository and join tables
+    const queryBuilder = this.repo
+      .createQueryBuilder('target')
+      .innerJoin('target.workspaceTargets', 'workspaceTarget')
+      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .where('workspace.id = :workspaceId', { workspaceId: id });
+
+    if (query.sortBy in Target) {
+      queryBuilder.orderBy(`target.${sortBy}`, sortOrder);
+    } else {
+      queryBuilder.orderBy('target.createdAt', sortOrder);
+    }
+
+    const total = await queryBuilder.getCount();
+
+    const offset = (page - 1) * limit;
+
+    queryBuilder.limit(limit).offset(offset);
+
+    const targets = await queryBuilder.getMany();
+
+    return getManyResponse(query, targets, total);
   }
 }

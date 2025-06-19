@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import { TargetsService } from './targets.service';
 import { CreateTargetDto } from './dto/targets.dto';
@@ -14,6 +15,10 @@ import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-respo
 import { Doc } from 'src/common/doc/doc.decorator';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { Target } from './entities/target.entity';
+import {
+  GetManyBaseQueryParams,
+  GetManyResponseDto,
+} from 'src/common/dtos/get-many-base.dto';
 
 @Controller('targets')
 export class TargetsController {
@@ -49,5 +54,20 @@ export class TargetsController {
       throw new NotFoundException('Target not found');
     }
     return target;
+  }
+
+  @Doc({
+    summary: 'Get all targets in a workspace',
+    description: 'Retrieves all targets in a workspace.',
+    response: {
+      serialization: GetManyResponseDto<Target>,
+    },
+  })
+  @Get('workspace/:id')
+  getTargetsInWorkspace(
+    @Param() { id }: IdQueryParamDto,
+    @Query() query: GetManyBaseQueryParams,
+  ) {
+    return this.targetsService.getTargetsInWorkspace(id, query);
   }
 }

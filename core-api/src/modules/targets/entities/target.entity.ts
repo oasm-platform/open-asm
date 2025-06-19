@@ -17,11 +17,6 @@ export class Target extends BaseEntity {
   @Column({ nullable: true, default: () => 'CURRENT_TIMESTAMP' })
   lastDiscoveredAt: Date;
 
-  @ApiProperty({
-    example: false,
-    description: 'Whether to re-scan the target',
-  })
-  @IsBoolean()
   @Column({ default: false })
   isReScan: boolean;
 
