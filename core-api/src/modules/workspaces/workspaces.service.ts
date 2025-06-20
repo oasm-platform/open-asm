@@ -61,9 +61,13 @@ export class WorkspacesService {
     query: GetManyBaseQueryParams,
     userContextPayload: UserContextPayload,
   ): Promise<GetManyResponseDto<Workspace>> {
-    const { limit, page, sortBy, sortOrder } = query;
+    const { limit, page, sortOrder } = query;
+    let { sortBy } = query;
     const { id } = userContextPayload;
 
+    if (!(sortBy in Workspace)) {
+      sortBy = 'createdAt';
+    }
     const [data, total] = await this.repo.findAndCount({
       where: {
         owner: { id },
@@ -150,12 +154,12 @@ export class WorkspacesService {
   }
 
   /**
-   * Updates a workspace by its ID, but only if the requesting user is the owner.
+   * Updates a workspace's details, but only if the requesting user is the owner of the workspace.
    *
    * @param id - The ID of the workspace to be updated.
-   * @param dto - The data transfer object containing the updated workspace details.
+   * @param dto - The data transfer object containing the updated details of the workspace.
    * @param userContext - The user's context data, which includes the user's ID.
-   * @throws ForbiddenException if the workspace is not found or the user is not the owner.
+   * @throws BadRequestException if the workspace is not found or the user is not the owner.
    * @returns A response indicating the workspace was successfully updated.
    */
   public async updateWorkspace(
@@ -163,18 +167,17 @@ export class WorkspacesService {
     dto: UpdateWorkspaceDto,
     userContext: UserContextPayload,
   ) {
-    const workspace = await this.getWorkspaceByIdAndOwner(id, userContext);
-    if (workspace) {
-      await this.repo.update({ id: id }, { ...dto });
-      return { message: 'Workspace updated successfully' };
-    }
-    throw new ForbiddenException(
-      'Workspace not found or you are not the owner of this workspace',
-    );
+    await this.getWorkspaceByIdAndOwner(id, userContext);
+
+    await this.repo.update({ id: id }, { ...dto });
+
+    return { message: 'Workspace updated successfully' };
   }
 
   /**
-   * Deletes a workspace, but only if the requesting user is the owner.
+   * Deletes a workspace by its ID, but only if the requesting user is the owner.
+   * The workspace is soft deleted, meaning it is not actually removed from the
+   * database, but its `deletedAt` field is set to the current timestamp.
    *
    * @param id - The ID of the workspace to be deleted.
    * @param userContext - The user's context data, which includes the user's ID.
@@ -188,6 +191,7 @@ export class WorkspacesService {
     await this.getWorkspaceByIdAndOwner(id, userContext);
 
     await this.repo.softDelete({ id });
+
     return {
       message: 'Workspace deleted successfully',
     };
