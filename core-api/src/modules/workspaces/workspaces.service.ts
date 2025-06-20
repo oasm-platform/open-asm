@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -121,7 +120,7 @@ export class WorkspacesService {
     });
 
     if (!workspace || workspace.owner.id !== userContext.id) {
-      throw new BadRequestException('You are not the owner of this workspace');
+      throw new ForbiddenException('You are not the owner of this workspace');
     }
 
     return workspace;
