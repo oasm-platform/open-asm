@@ -85,7 +85,12 @@ export class TargetsController {
     @Param() { id }: IdQueryParamDto,
     @Param('workspaceId', new ParseUUIDPipe({ version: '4' }))
     workspaceId: string,
+    @UserContext() userContext: UserContextPayload,
   ) {
-    return this.targetsService.deleteTargetFromWorkspace(id, workspaceId);
+    return this.targetsService.deleteTargetFromWorkspace(
+      id,
+      workspaceId,
+      userContext,
+    );
   }
 }

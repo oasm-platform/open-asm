@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -100,6 +101,29 @@ export class WorkspacesService {
   }
 
   /**
+   * Retrieves a workspace by its ID, but only if the requesting user is the owner of the workspace.
+   * @param id - The ID of the workspace to retrieve.
+   * @param userContext - The user's context data, which includes the user's ID.
+   * @throws BadRequestException if the workspace is not found or the user is not the owner.
+   * @returns The workspace, if found and the user is the owner.
+   */
+  public async getWorkspaceByIdAndOwner(
+    workspaceId: string,
+    userContext: UserContextPayload,
+  ): Promise<Workspace> {
+    const workspace = await this.repo.findOne({
+      where: { id: workspaceId },
+      relations: ['owner'],
+    });
+
+    if (!workspace || workspace.owner.id !== userContext.id) {
+      throw new BadRequestException('You are not the owner of this workspace');
+    }
+
+    return workspace;
+  }
+
+  /**
    * Retrieves a workspace member by workspace ID and user ID.
    * @param workspaceId - The ID of the workspace to be retrieved.
    * @param userId - The ID of the user to be retrieved.
@@ -126,50 +150,42 @@ export class WorkspacesService {
   }
 
   /**
-   * Updates a workspace by ID.
+   * Updates a workspace by its ID, but only if the requesting user is the owner.
+   *
    * @param id - The ID of the workspace to be updated.
-   * @param dto - The updated workspace data.
+   * @param dto - The data transfer object containing the updated workspace details.
    * @param userContext - The user's context data, which includes the user's ID.
+   * @throws ForbiddenException if the workspace is not found or the user is not the owner.
    * @returns A response indicating the workspace was successfully updated.
-   * @throws BadRequestException if the user is not the owner of the workspace.
    */
   public async updateWorkspace(
     id: string,
     dto: UpdateWorkspaceDto,
     userContext: UserContextPayload,
   ) {
-    const userId = userContext.id;
-
-    const workspaceMember = await this.getWorkspaceMember(id, userId);
-
-    if (workspaceMember.user.id === userContext.id) {
+    const workspace = await this.getWorkspaceByIdAndOwner(id, userContext);
+    if (workspace) {
       await this.repo.update({ id: id }, { ...dto });
-
       return { message: 'Workspace updated successfully' };
     }
-    throw new BadRequestException('You are not the owner of this workspace');
+    throw new ForbiddenException(
+      'Workspace not found or you are not the owner of this workspace',
+    );
   }
 
   /**
-   * Deletes a workspace by its ID.
+   * Deletes a workspace, but only if the requesting user is the owner.
+   *
    * @param id - The ID of the workspace to be deleted.
    * @param userContext - The user's context data, which includes the user's ID.
+   * @throws ForbiddenException if the workspace is not found or the user is not the owner.
    * @returns A response indicating the workspace was successfully deleted.
-   * @throws NotFoundException if the workspace does not exist or the user is not the owner.
    */
   public async deleteWorkspace(
     id: string,
     userContext: UserContextPayload,
   ): Promise<DefaultMessageResponseDto> {
-    const workspace = await this.getWorkspaceById(id, userContext);
-
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
-
-    if (workspace.owner.id !== userContext.id) {
-      throw new BadRequestException('You are not the owner of this workspace');
-    }
+    await this.getWorkspaceByIdAndOwner(id, userContext);
 
     await this.repo.softDelete({ id });
     return {

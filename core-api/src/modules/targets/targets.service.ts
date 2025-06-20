@@ -1,9 +1,10 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { In, Not, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { WorkspaceTarget } from './entities/workspace-target.entity';
 import { Target } from './entities/target.entity';
@@ -15,7 +16,6 @@ import {
   GetManyResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { get } from 'http';
 
 @Injectable()
 export class TargetsService {
@@ -62,23 +62,13 @@ export class TargetsService {
     dto: CreateTargetDto,
     userContext: UserContextPayload,
   ) {
-    const { id } = userContext;
     const { workspaceId, value } = dto;
 
-    // Check if the workspace exists
-    const workspace = await this.workspacesService.getWorkspaceById(
+    // Check if the workspace exists and the user is the owner
+    const workspace = await this.workspacesService.getWorkspaceByIdAndOwner(
       workspaceId,
       userContext,
     );
-
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
-
-    // Check if the user is the owner of the workspace
-    if (workspace.owner.id !== id) {
-      throw new BadRequestException('You are not the owner of this workspace');
-    }
 
     let target = await this.getTargetByValue(value);
 
@@ -133,6 +123,7 @@ export class TargetsService {
       .createQueryBuilder('target')
       .innerJoin('target.workspaceTargets', 'workspaceTarget')
       .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('workspace.workspaceMembers', 'workspaceMember')
       .where('workspace.id = :workspaceId', { workspaceId: id });
 
     if (query.sortBy in Target) {
@@ -153,13 +144,24 @@ export class TargetsService {
   }
 
   /**
-   * Deletes a target from a workspace.
+   * Deletes a target from a workspace, but only if the requesting user is the owner of the workspace.
+   *
    * @param id - The ID of the target to be deleted.
-   * @param workspaceId - The ID of the workspace from which to delete the target.
+   * @param workspaceId - The ID of the workspace from which the target will be deleted.
+   * @param userContext - The user's context data, which includes the user's ID.
    * @throws NotFoundException if the target is not found in the workspace.
    * @returns A response indicating the target was successfully deleted.
    */
-  public async deleteTargetFromWorkspace(id: string, workspaceId: string) {
+  public async deleteTargetFromWorkspace(
+    id: string,
+    workspaceId: string,
+    userContext: UserContextPayload,
+  ) {
+    await this.workspacesService.getWorkspaceByIdAndOwner(
+      workspaceId,
+      userContext,
+    );
+
     const workspaceTarget = await this.workspaceTargetRepository.findOneBy({
       target: { id },
       workspace: { id: workspaceId },
