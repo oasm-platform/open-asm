@@ -2,7 +2,7 @@ import { BaseEntity } from 'src/common/entities/base.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsString } from 'class-validator';
+import { IsString } from 'class-validator';
 
 @Entity('targets')
 export class Target extends BaseEntity {
