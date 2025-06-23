@@ -10,4 +10,7 @@ export class Worker extends BaseEntity {
 
   @Column({ type: 'int', unique: false })
   workerIndex: number;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  lastSeenAt: Date;
 }

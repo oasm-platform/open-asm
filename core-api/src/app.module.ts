@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { CombineModule } from './modules/combine.module';
 import { TargetsModule } from './modules/targets/targets.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -10,6 +11,7 @@ import { TargetsModule } from './modules/targets/targets.module';
       envFilePath: `.env`,
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     CombineModule,
   ],

@@ -3,9 +3,10 @@ import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, LessThan, Repository } from 'typeorm';
 import { Worker } from './entities/worker.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
+import { Interval } from '@nestjs/schedule';
 
 @Injectable()
 export class WorkersService {
@@ -33,7 +34,12 @@ export class WorkersService {
     console.log(`✅ Worker connected: ${uniqueWorkerId}`);
 
     res.write(`event: registered ${uniqueWorkerId}\n`);
-    this.workerJoin(genId, workerName);
+    await this.workerJoin(genId, workerName);
+    setInterval(() => {
+      this.repo.update(genId, {
+        lastSeenAt: new Date(),
+      });
+    }, 5000);
     req.on('close', () => {
       console.log(`❌ Worker disconnected: ${uniqueWorkerId}`);
       this.workerLeave(genId);
@@ -85,6 +91,27 @@ export class WorkersService {
 
       return result[0]?.workerIndex;
     });
+  }
+
+  /**
+   * Automatically removes any workers that have been offline for at least 1 minute (60 seconds)
+   * from the database. This function is intended to be run periodically (e.g. every 1 minute)
+   * to clean up stale workers that may have disconnected without properly unregistering.
+   *
+   */
+  @Interval(60000)
+  async autoRemoveWorkersOffline() {
+    const workers = await this.repo
+      .find({
+        where: {
+          lastSeenAt: LessThan(new Date(Date.now() - 60 * 1000)),
+        },
+      })
+      .then((res) => res.map((worker) => worker.id));
+
+    for (const worker of workers) {
+      await this.workerLeave(worker);
+    }
   }
 
   /**
