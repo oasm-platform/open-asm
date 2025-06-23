@@ -17,6 +17,7 @@ import {
 } from 'src/common/dtos/get-many-base.dto';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Asset } from '../assets/entities/assets.entity';
+import { AssetsService } from '../assets/assets.service';
 
 @Injectable()
 export class TargetsService {
@@ -25,9 +26,8 @@ export class TargetsService {
     private readonly repo: Repository<Target>,
     @InjectRepository(WorkspaceTarget)
     private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
-    @InjectRepository(Asset)
-    private readonly assetRepository: Repository<Asset>,
     private readonly workspacesService: WorkspacesService,
+    private assetService: AssetsService,
   ) {}
 
   /**
@@ -83,10 +83,8 @@ export class TargetsService {
         workspace,
         target,
       });
-      await this.assetRepository.save({
-        target,
-        value,
-      });
+
+      await this.assetService.createAssets(target);
     }
     // If the target exists, check if it is already associated with the workspace
     else {

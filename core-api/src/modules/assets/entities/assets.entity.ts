@@ -8,6 +8,7 @@ export class Asset extends BaseEntity {
   @Column()
   value: string;
 
+  // Relationships
   @ManyToOne(() => Target, (target) => target.workspaceTargets, {
     onDelete: 'CASCADE',
   })
