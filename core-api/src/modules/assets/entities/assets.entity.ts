@@ -1,6 +1,7 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
+import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { Target } from 'src/modules/targets/entities/target.entity';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('assets')
 export class Assets extends BaseEntity {
@@ -11,4 +12,9 @@ export class Assets extends BaseEntity {
     onDelete: 'CASCADE',
   })
   target: Target;
+
+  @OneToMany(() => Job, (job) => job.asset, {
+    onDelete: 'CASCADE',
+  })
+  jobs: Job[];
 }

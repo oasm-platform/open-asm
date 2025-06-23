@@ -4,7 +4,16 @@ export enum Role {
 }
 
 export enum WorkerName {
-  SCAN_SUB_DOMAINS = 'scan-sub-domains',
-  SCAN_PORTS_AND_SERVICES = 'scan-ports-and-services',
-  WEB_INSPECTION = 'web-inspection',
+  SUBFINDER = 'subfinder',
+  NAABU = 'naabu',
+  DNSX = 'dnsx',
+  HTTPX = 'httpx',
+}
+
+export enum JobStatus {
+  PENDING = 'pending',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled',
 }
