@@ -8,11 +8,13 @@ export class WorkspaceTarget {
   id: string;
 
   @ManyToOne(() => Workspace, (workspace) => workspace.workspaceTargets, {
+    cascade: true,
     onDelete: 'CASCADE',
   })
   workspace: Workspace;
 
   @ManyToOne(() => Target, (target) => target.workspaceTargets, {
+    cascade: true,
     onDelete: 'CASCADE',
   })
   target: Target;
