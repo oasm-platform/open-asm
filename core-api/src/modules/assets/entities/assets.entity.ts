@@ -14,6 +14,9 @@ export class Asset extends BaseEntity {
   })
   target: Target;
 
+  @Column({ default: false })
+  isPrimary: boolean;
+
   @OneToMany(() => Job, (job) => job.asset, {
     onDelete: 'CASCADE',
   })
