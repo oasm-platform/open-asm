@@ -4,7 +4,7 @@ import { Target } from 'src/modules/targets/entities/target.entity';
 import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('assets')
-export class Assets extends BaseEntity {
+export class Asset extends BaseEntity {
   @Column()
   value: string;
 

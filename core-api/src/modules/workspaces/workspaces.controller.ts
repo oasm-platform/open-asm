@@ -45,7 +45,6 @@ export class WorkspacesController {
     return this.workspacesService.createWorkspace(dto, userContextPayload);
   }
 
-  @Roles(Role.USER)
   @Doc({
     summary: 'Get Workspaces',
     description: 'Retrieves a list of workspaces that the user is a member of.',
