@@ -1,15 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
-import { WorkerName } from 'src/common/enums/enum';
+import { JobStatus, WorkerName } from 'src/common/enums/enum';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Worker } from './entities/worker.entity';
+import { Job } from '../jobs-registry/entities/job.entity';
 
 @Injectable()
 export class WorkersService {
   constructor(
-    @InjectRepository(Worker) private readonly repo: Repository<Worker>,
+    @InjectRepository(Worker) public readonly repo: Repository<Worker>,
+    @InjectRepository(Job) private readonly jobRepo: Repository<Job>,
     private readonly dataSource: DataSource,
   ) {}
   /**
@@ -93,6 +95,31 @@ export class WorkersService {
    */
 
   private async workerLeave(id: string) {
+    await this.jobRepo
+      .createQueryBuilder('jobs')
+      .update()
+      .set({ status: JobStatus.PENDING, workerId: null as any })
+      .where('jobs."workerId" = :id', { id })
+      .execute();
     return this.repo.delete(id);
+  }
+
+  /**
+   * Retrieves a worker by its unique identifier.
+   *
+   * @param id - The unique identifier of the worker to retrieve.
+   * @returns A promise that resolves to the worker if found, otherwise null.
+   * @throws NotFoundException if the worker is not found.
+   */
+  public async getWorkerById(id: string): Promise<Worker | null> {
+    const worker = await this.repo.findOne({
+      where: { id },
+    });
+
+    if (!worker) {
+      throw new NotFoundException(`Worker with ID ${id} not found`);
+    }
+
+    return worker;
   }
 }

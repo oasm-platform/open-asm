@@ -21,5 +21,5 @@ export class Job extends BaseEntity {
   pickJobAt: Date;
 
   @Column({ nullable: true })
-  workerId: string;
+  workerId?: string;
 }
