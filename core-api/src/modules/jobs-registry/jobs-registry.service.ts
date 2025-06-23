@@ -56,7 +56,6 @@ export class JobsRegistryService {
     workerId: string,
   ): Promise<GetNextJobResponseDto | null> {
     const worker = await this.workerService.getWorkerById(workerId);
-    console.log(worker);
     const job = await this.repo.findOne({
       where: {
         status: JobStatus.PENDING,

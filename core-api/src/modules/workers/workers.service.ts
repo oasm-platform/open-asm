@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
@@ -10,6 +10,7 @@ import { Interval } from '@nestjs/schedule';
 
 @Injectable()
 export class WorkersService {
+  private logger = new Logger('WorkersService');
   constructor(
     @InjectRepository(Worker) public readonly repo: Repository<Worker>,
     @InjectRepository(Job) private readonly jobRepo: Repository<Job>,
@@ -28,21 +29,26 @@ export class WorkersService {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    const genId = randomUUID();
-    const uniqueWorkerId = `${workerName}-${genId}`;
+    const workerId = randomUUID();
+    const uniqueWorkerId = `${workerName}-${workerId}`;
 
-    console.log(`✅ Worker connected: ${uniqueWorkerId}`);
+    this.logger.verbose(`✅ Worker connected: ${uniqueWorkerId}`);
 
-    res.write(`event: registered ${uniqueWorkerId}\n`);
-    await this.workerJoin(genId, workerName);
+    res.write(
+      JSON.stringify({
+        workerId,
+        workerName,
+      }),
+    );
+    await this.workerJoin(workerId, workerName);
     setInterval(() => {
-      this.repo.update(genId, {
+      this.repo.update(workerId, {
         lastSeenAt: new Date(),
       });
     }, 5000);
     req.on('close', () => {
-      console.log(`❌ Worker disconnected: ${uniqueWorkerId}`);
-      this.workerLeave(genId);
+      this.logger.verbose(`❌ Worker disconnected: ${uniqueWorkerId}`);
+      this.workerLeave(workerId);
     });
 
     return;
