@@ -7,6 +7,7 @@ import { DataSource, LessThan, Repository } from 'typeorm';
 import { Worker } from './entities/worker.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { Interval } from '@nestjs/schedule';
+import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 
 @Injectable()
 export class WorkersService {
@@ -38,6 +39,9 @@ export class WorkersService {
       JSON.stringify({
         workerId,
         workerName,
+        command: JobsRegistryService.workerSteps.find(
+          (step) => step.id === workerName,
+        )?.command,
       }),
     );
     await this.workerJoin(workerId, workerName);

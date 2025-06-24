@@ -50,6 +50,7 @@ export async function workersControllerAlive(
 
           const chunk = decoder.decode(value, { stream: true });
           Tool.workerId = JSON.parse(chunk).workerId;
+          Tool.command = JSON.parse(chunk).command;
           parser.feed(chunk);
         }
       } catch (err) {

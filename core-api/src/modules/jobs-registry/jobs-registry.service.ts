@@ -20,6 +20,8 @@ export class JobsRegistryService {
     {
       id: WorkerName.SUBFINDER,
       description: 'Fast passive subdomain enumeration tool.',
+      command:
+        'subfinder -d {{value}} -all -silent -timeout 30 -max-time 10 -json',
       resultHandler: () => {},
     },
     {
