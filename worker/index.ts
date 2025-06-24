@@ -1,7 +1,8 @@
-import connect from "./connect";
+import { Tool } from "./tool/tool";
+
 async function main() {
-  // Connect stream
-  const workerId = await connect();
+  const tool = new Tool();
+  await tool.connect();
 }
 
 main();

@@ -1,5 +1,5 @@
 import { createParser, type EventSourceMessage } from "eventsource-parser";
-import { WorkerId } from "./workerId";
+import { Tool } from "../../tool/tool";
 
 export async function workersControllerAlive(
   workerName: string
@@ -49,8 +49,7 @@ export async function workersControllerAlive(
           }
 
           const chunk = decoder.decode(value, { stream: true });
-          const workerId = JSON.parse(chunk).workerId;
-          WorkerId.setWorkerId(workerId);
+          Tool.workerId = JSON.parse(chunk).workerId;
           parser.feed(chunk);
         }
       } catch (err) {
