@@ -15,8 +15,5 @@
   "workspaces": [
     "core-api",
     "console"
-  ],
-  "dependencies": {
-    "@nestjs/schedule": "^6.0.0"
-  }
+  ]
 }

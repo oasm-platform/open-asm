@@ -133,6 +133,7 @@ export class WorkersService {
       .update()
       .set({ status: JobStatus.PENDING, workerId: null as any })
       .where('jobs."workerId" = :id', { id })
+      .andWhere('jobs.status = :status', { status: JobStatus.IN_PROGRESS })
       .execute();
     return this.repo.delete(id);
   }

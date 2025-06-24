@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
 import { Asset } from '../assets/entities/assets.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Job } from './entities/job.entity';
 import { WorkersService } from '../workers/workers.service';
-import { GetNextJobResponseDto } from './dto/jobs-registry.dto';
+import {
+  GetNextJobResponseDto,
+  UpdateResultDto,
+} from './dto/jobs-registry.dto';
 
 @Injectable()
 export class JobsRegistryService {
@@ -70,6 +73,7 @@ export class JobsRegistryService {
     if (job) {
       job.workerId = workerId;
       job.status = JobStatus.IN_PROGRESS;
+      job.pickJobAt = new Date();
       await this.repo.save(job);
 
       return {
@@ -80,5 +84,32 @@ export class JobsRegistryService {
     }
 
     return null;
+  }
+
+  /**
+   * Updates the result of a job with the given worker ID.
+   * @param workerId the ID of the worker that ran the job
+   * @param dto the data transfer object containing the result of the job
+   * @returns an object with the worker ID and result of the job
+   */
+  public async updateResult(workerId: string, dto: UpdateResultDto) {
+    const job = await this.repo.findOne({
+      where: {
+        workerId,
+        status: JobStatus.IN_PROGRESS,
+      },
+    });
+
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+
+    job.status = JobStatus.COMPLETED;
+    job.rawResult = dto.data;
+    await this.repo.save(job);
+    return {
+      workerId,
+      dto,
+    };
   }
 }

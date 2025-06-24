@@ -22,4 +22,7 @@ export class Job extends BaseEntity {
 
   @Column({ nullable: true })
   workerId?: string;
+
+  @Column({ type: 'json', nullable: true })
+  rawResult: object;
 }
