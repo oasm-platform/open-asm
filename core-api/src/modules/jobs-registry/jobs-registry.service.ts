@@ -20,9 +20,10 @@ export class JobsRegistryService {
     {
       id: WorkerName.SUBFINDER,
       description: 'Fast passive subdomain enumeration tool.',
-      command:
-        'subfinder -d {{value}} -all -silent -timeout 30 -max-time 10 -json',
-      resultHandler: () => {},
+      command: 'subfinder -d {{value}} -all -silent -timeout 30 -max-time 10',
+      resultHandler: (result: string) => {
+        return result.trim().split('\n');
+      },
     },
     {
       id: WorkerName.NAABU,
@@ -107,8 +108,19 @@ export class JobsRegistryService {
     }
 
     job.status = JobStatus.COMPLETED;
-    job.rawResult = dto.data;
-    await this.repo.save(job);
+
+    const { workerName } = job;
+    const step = JobsRegistryService.workerSteps.find(
+      (step) => step.id === workerName,
+    );
+    if (step) {
+      const parsed = step?.resultHandler((dto.data as any).raw) ?? null;
+      job.rawResult = {
+        [step.id]: parsed,
+      };
+      await this.repo.save(job);
+    }
+
     return {
       workerId,
       dto,
