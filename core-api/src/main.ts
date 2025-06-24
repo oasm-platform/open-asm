@@ -12,6 +12,9 @@ import {
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
+import * as fs from 'fs';
+import { generateApi } from 'swagger-typescript-api';
+import path from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -62,6 +65,9 @@ async function bootstrap() {
     },
   });
 
+  const pathOutputOpenApi = '../open-api/open-api.json';
+  fs.writeFileSync(pathOutputOpenApi, JSON.stringify(documentFactory()));
+
   // Start server
   const port = process.env.PORT ?? DEFAULT_PORT;
   await app.listen(port);
@@ -69,4 +75,5 @@ async function bootstrap() {
   const logger = new Logger('Application');
   logger.log(`Application is running on port ${port}`);
 }
+
 bootstrap();
