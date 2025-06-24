@@ -13,9 +13,6 @@ import {
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
 import * as fs from 'fs';
-import { generateApi } from 'swagger-typescript-api';
-import path from 'path';
-
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,

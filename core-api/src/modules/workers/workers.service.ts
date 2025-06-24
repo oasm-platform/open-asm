@@ -41,7 +41,7 @@ export class WorkersService {
       }),
     );
     await this.workerJoin(workerId, workerName);
-    setInterval(() => {
+    const interval = setInterval(() => {
       this.repo.update(workerId, {
         lastSeenAt: new Date(),
       });
@@ -49,12 +49,12 @@ export class WorkersService {
     req.on('close', () => {
       this.logger.verbose(`❌ Worker disconnected: ${uniqueWorkerId}`);
       this.workerLeave(workerId);
+      clearInterval(interval);
     });
 
     return;
   }
 
-  /*************  ✨ Windsurf Command ⭐  *************/
   /**
    * Registers a worker in the database by inserting a new record
    * with a unique worker index for the given worker name ID.
@@ -69,7 +69,6 @@ export class WorkersService {
    * @returns A promise that resolves to the assigned worker index.
    */
 
-  /*******  e6877d22-7221-48f9-9519-3ec6523aa572  *******/
   private async workerJoin(
     id: string,
     workerName: WorkerName,

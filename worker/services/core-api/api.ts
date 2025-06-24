@@ -104,14 +104,14 @@ export interface UpdateResultDto {
 }
 
 /** Unique identifier for the worker */
-export enum WorkersControllerHandleAliveParamsWorkerNameIdEnum {
+export enum WorkersControllerAliveParamsWorkerNameIdEnum {
   Subfinder = "subfinder",
   Naabu = "naabu",
   Dnsx = "dnsx",
   Httpx = "httpx",
 }
 
-export enum WorkersControllerHandleAliveParamsEnum {
+export enum WorkersControllerAliveParamsEnum {
   Subfinder = "subfinder",
   Naabu = "naabu",
   Dnsx = "dnsx",
@@ -612,11 +612,11 @@ export class Api<
    * No description
    *
    * @tags Workers
-   * @name WorkersControllerHandleAlive
+   * @name WorkersControllerAlive
    * @request GET:/api/workers/{workerNameId}/alive
    */
-  workersControllerHandleAlive = (
-    workerNameId: WorkersControllerHandleAliveParamsEnum,
+  workersControllerAlive = (
+    workerNameId: WorkersControllerAliveParamsEnum,
     params: RequestParams = {},
   ) =>
     this.request<any, any>({

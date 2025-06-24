@@ -11,7 +11,7 @@ export class WorkersController {
 
   @Public()
   @Get(':workerNameId/alive')
-  handleAlive(
+  alive(
     @Req() req: Request,
     @Res() res: Response,
     @Param() { workerNameId }: WorkerAliveDto,
