@@ -65,7 +65,8 @@ export class WorkersService {
         const parsed = result
           .trim()
           .split('\n')
-          .map((i) => i.replace('\r', ''));
+          .filter((i) => i.includes(':'))
+          .map((i) => Number(i.split(':')[1].replace('\r', '')));
         this.updateResultToDatabase(dataSource, job, parsed);
       },
     },
