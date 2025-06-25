@@ -59,8 +59,7 @@ export class WorkersService {
     {
       id: WorkerName.NAABU,
       description: 'Scan open ports and detect running services on each port.',
-      command:
-        'naabu -host {{value}} -top-ports 1000 -s s -rate 1000 -silent -retries 2',
+      command: 'naabu -host {{value}} -s s -rate 1000 -silent -retries 2',
       resultHandler: ({ result, job, dataSource }) => {
         const parsed = result
           .trim()
