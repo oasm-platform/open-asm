@@ -81,6 +81,11 @@ export class JobsRegistryService {
         workerId,
         status: JobStatus.IN_PROGRESS,
       },
+      relations: {
+        asset: {
+          target: true,
+        },
+      },
     });
 
     if (!job) {

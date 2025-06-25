@@ -6,6 +6,7 @@ import { Request, Response } from 'express';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
 import { Worker } from 'src/common/interfaces/app.interface';
 import { DataSource, LessThan, Repository } from 'typeorm';
+import { Asset } from '../assets/entities/assets.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { WorkerInstance } from './entities/worker.entity';
 
@@ -15,6 +16,8 @@ export class WorkersService {
   constructor(
     @InjectRepository(WorkerInstance)
     public readonly repo: Repository<WorkerInstance>,
+    @InjectRepository(Asset)
+    public readonly assetRepo: Repository<Asset>,
     @InjectRepository(Job) private readonly jobRepo: Repository<Job>,
     private readonly dataSource: DataSource,
   ) {}
@@ -24,9 +27,21 @@ export class WorkersService {
       id: WorkerName.SUBFINDER,
       description: 'Fast passive subdomain enumeration tool.',
       command: 'subfinder -d {{value}} -all -silent -timeout 30 -max-time 10',
-      resultHandler: ({ result, job, dataSource }) => {
+      resultHandler: async ({ result, job, dataSource }) => {
         const parsed = result.trim().split('\n');
         this.updateResultToDatabase(dataSource, job, parsed);
+        const assets = parsed.map((i) => ({
+          id: randomUUID(),
+          value: i,
+          target: { id: job.asset.target.id },
+        }));
+        // Fill to the asset table
+        await this.assetRepo
+          .createQueryBuilder()
+          .insert()
+          .values(assets)
+          .orIgnore()
+          .execute();
       },
     },
     {

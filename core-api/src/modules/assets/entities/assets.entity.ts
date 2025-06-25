@@ -1,9 +1,10 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { Target } from 'src/modules/targets/entities/target.entity';
-import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
 
 @Entity('assets')
+@Unique(['value', 'target'])
 export class Asset extends BaseEntity {
   @Column()
   value: string;
