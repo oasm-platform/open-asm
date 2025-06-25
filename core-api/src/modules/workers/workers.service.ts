@@ -42,14 +42,31 @@ export class WorkersService {
           .values(assets)
           .orIgnore()
           .execute();
+
+        await this.jobRepo
+          .createQueryBuilder()
+          .insert()
+          .values(
+            assets.map((i) => ({
+              asset: i,
+              workerName: WorkerName.NAABU,
+            })),
+          )
+          .orIgnore()
+          .execute();
       },
     },
     {
       id: WorkerName.NAABU,
       description: 'Scan open ports and detect running services on each port.',
-      command: '',
-      resultHandler: ({ result }) => {
-        return result.trim().split('\n');
+      command:
+        'naabu -host {{value}} -top-ports 1000 -s s -rate 1000 -silent -retries 2',
+      resultHandler: ({ result, job, dataSource }) => {
+        const parsed = result
+          .trim()
+          .split('\n')
+          .map((i) => i.replace('\r', ''));
+        this.updateResultToDatabase(dataSource, job, parsed);
       },
     },
     {

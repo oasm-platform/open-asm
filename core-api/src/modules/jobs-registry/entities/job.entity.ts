@@ -14,16 +14,16 @@ export class Job extends BaseEntity {
   workerName: WorkerName;
 
   @Column({ type: 'enum', enum: JobStatus, default: JobStatus.PENDING })
-  status: JobStatus;
+  status?: JobStatus;
 
   @Column({ nullable: true })
-  pickJobAt: Date;
+  pickJobAt?: Date;
 
   @Column({ nullable: true })
   workerId?: string;
 
   @Column({ type: 'json', nullable: true })
-  rawResult: object;
+  rawResult?: object;
 
   @Column({ nullable: true })
   completedAt?: Date;

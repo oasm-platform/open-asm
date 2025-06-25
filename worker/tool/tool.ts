@@ -1,9 +1,10 @@
+import { exec } from "child_process";
+import logger from "node-color-log";
+import { promisify } from "util";
 import coreApi from "../services/core-api";
 import { workersControllerAlive } from "../services/core-api/alive";
 import { WorkersControllerAliveParamsEnum } from "../services/core-api/api";
-import { exec } from "child_process";
-import { promisify } from "util";
-import logger from "node-color-log";
+import runCommand from "./runCommand";
 const execAsync = promisify(exec);
 interface Job {
   jobId: string;
@@ -75,8 +76,6 @@ export class Tool {
    * Handles a job and reports result to core.
    */
   private async jobHandler(job: Job) {
-    this.queue = this.queue.filter((j) => j.jobId !== job.jobId);
-
     const data = await this.commandExecution(Tool.command!, job.value);
     await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
       jobId: job.jobId,
@@ -84,6 +83,7 @@ export class Tool {
         raw: data,
       },
     });
+    this.queue = this.queue.filter((j) => j.jobId !== job.jobId);
 
     logger
       .color("green")
@@ -103,8 +103,7 @@ export class Tool {
     logger.color("blue").log(`[RUNNING]: ${command}`);
 
     try {
-      const { stdout } = await execAsync(command);
-      return stdout.trim();
+      return runCommand(command);
     } catch (error: any) {
       console.error("Command execution error:", error);
       throw new Error(`Failed to execute command: ${error.message}`);

@@ -8,10 +8,10 @@ tasks:
 
   dev:subfinder:
     cmds:
-      - NAME=subfinder bun --watch index.ts
+      - NAME=subfinder MAX_JOBS=10 bun --watch index.ts
     silent: true
 
   dev:naabu:
     cmds:
-      - NAME=naabu bun --watch index.ts
+      - NAME=naabu MAX_JOBS=10 bun --watch index.ts
     silent: true
