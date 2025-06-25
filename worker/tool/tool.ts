@@ -48,8 +48,6 @@ export class Tool {
 
     // Wait until Tool.workerId is set (by SSE handler)
     await this.waitUntil(() => !!Tool.workerId, 1000);
-
-    console.log(`Worker connected: ${Tool.workerId}`);
   }
 
   /**
