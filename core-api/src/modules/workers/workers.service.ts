@@ -8,7 +8,7 @@ import { Worker } from './entities/worker.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { Interval } from '@nestjs/schedule';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
-import { workers } from './workers';
+import { WorkerManager } from 'src/common/interfaces/app.interface';
 
 @Injectable()
 export class WorkersService {
@@ -18,6 +18,71 @@ export class WorkersService {
     @InjectRepository(Job) private readonly jobRepo: Repository<Job>,
     private readonly dataSource: DataSource,
   ) {}
+
+  public workers: WorkerManager[] = [
+    {
+      id: WorkerName.SUBFINDER,
+      description: 'Fast passive subdomain enumeration tool.',
+      command: 'subfinder -d {{value}} -all -silent -timeout 30 -max-time 10',
+      resultHandler: ({ result, job, dataSource }) => {
+        const parsed = result.trim().split('\n');
+        this.updateResultToDatabase(dataSource, job, parsed);
+      },
+    },
+    {
+      id: WorkerName.NAABU,
+      description: 'Scan open ports and detect running services on each port.',
+      command: '',
+      resultHandler: ({ result }) => {
+        return result.trim().split('\n');
+      },
+    },
+    {
+      id: WorkerName.DNSX,
+      description:
+        'Perform DNS resolution and enumeration to gather additional information about subdomains and their associated IP addresses.',
+      command: '',
+      resultHandler: ({ result }) => {
+        return result.trim().split('\n');
+      },
+    },
+  ];
+
+  /**
+   * Updates the result of a job with the given worker ID.
+   * @param dataSource the DataSource to use for the update
+   * @param job the job to update
+   * @param result the result of the job
+   */
+  private updateResultToDatabase(
+    dataSource: DataSource,
+    job: Job,
+    result: any,
+  ) {
+    // Update parsed result to database
+    dataSource
+      .createQueryBuilder()
+      .update(Job)
+      .set({
+        rawResult: result,
+        status: JobStatus.COMPLETED,
+        completedAt: new Date(),
+      })
+      .where('id = :id', { id: job.id })
+      .execute();
+  }
+
+  /**
+   * Finds a worker by name.
+   * @param workerName the name of the worker to find
+   * @returns the worker step, or undefined if not found
+   */
+  public getWorkerStepByName(
+    workerName: WorkerName,
+  ): WorkerManager | undefined {
+    return this.workers.find((step) => step.id === workerName);
+  }
+
   /**
    * Handles a worker's "alive" signal, which is sent
    * whenever a worker boots up or restarts.
@@ -40,7 +105,7 @@ export class WorkersService {
       JSON.stringify({
         workerId,
         workerName,
-        command: workers.find((step) => step.id === workerName)?.command,
+        command: this.getWorkerStepByName(workerName)?.command,
       }),
     );
     await this.workerJoin(workerId, workerName);

@@ -1,15 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { JobStatus, WorkerName } from 'src/common/enums/enum';
-import { Asset } from '../assets/entities/assets.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
-import { Job } from './entities/job.entity';
+import { JobStatus, WorkerName } from 'src/common/enums/enum';
+import { DataSource, Repository } from 'typeorm';
+import { Asset } from '../assets/entities/assets.entity';
 import { WorkersService } from '../workers/workers.service';
 import {
   GetNextJobResponseDto,
   UpdateResultDto,
 } from './dto/jobs-registry.dto';
-import { workers } from '../workers/workers';
+import { Job } from './entities/job.entity';
 
 @Injectable()
 export class JobsRegistryService {
@@ -91,7 +90,7 @@ export class JobsRegistryService {
     job.status = JobStatus.COMPLETED;
 
     const { workerName } = job;
-    const step = workers.find((step) => step.id === workerName);
+    const step = this.workerService.getWorkerStepByName(workerName);
     if (step) {
       step?.resultHandler({
         dataSource: this.dataSource,
