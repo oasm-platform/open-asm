@@ -1,6 +1,6 @@
+import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { DataSource } from 'typeorm';
 import { Role, WorkerName } from '../enums/enum';
-import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 
 export interface UserContextPayload {
   expiresAt: string;
@@ -30,7 +30,7 @@ export interface ResultHandler {
   job: Job;
 }
 
-export interface WorkerManager {
+export interface Worker {
   id: WorkerName;
   description: string;
   command: string;

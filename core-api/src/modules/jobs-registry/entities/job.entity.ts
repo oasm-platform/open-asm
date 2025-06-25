@@ -1,8 +1,7 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
-import { Worker } from 'src/modules/workers/entities/worker.entity';
-import { Column, Entity, ManyToOne, OneToOne } from 'typeorm';
+import { Column, Entity, ManyToOne } from 'typeorm';
 
 @Entity('jobs')
 export class Job extends BaseEntity {

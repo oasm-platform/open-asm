@@ -1,25 +1,25 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Worker } from 'src/common/interfaces/app.interface';
 import { DataSource, LessThan, Repository } from 'typeorm';
-import { Worker } from './entities/worker.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
-import { Interval } from '@nestjs/schedule';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
-import { WorkerManager } from 'src/common/interfaces/app.interface';
+import { WorkerInstance } from './entities/worker.entity';
 
 @Injectable()
 export class WorkersService {
   private logger = new Logger('WorkersService');
   constructor(
-    @InjectRepository(Worker) public readonly repo: Repository<Worker>,
+    @InjectRepository(WorkerInstance)
+    public readonly repo: Repository<WorkerInstance>,
     @InjectRepository(Job) private readonly jobRepo: Repository<Job>,
     private readonly dataSource: DataSource,
   ) {}
 
-  public workers: WorkerManager[] = [
+  public workers: Worker[] = [
     {
       id: WorkerName.SUBFINDER,
       description: 'Fast passive subdomain enumeration tool.',
@@ -77,9 +77,7 @@ export class WorkersService {
    * @param workerName the name of the worker to find
    * @returns the worker step, or undefined if not found
    */
-  public getWorkerStepByName(
-    workerName: WorkerName,
-  ): WorkerManager | undefined {
+  public getWorkerStepByName(workerName: WorkerName): Worker | undefined {
     return this.workers.find((step) => step.id === workerName);
   }
 
@@ -212,7 +210,7 @@ export class WorkersService {
    * @returns A promise that resolves to the worker if found, otherwise null.
    * @throws NotFoundException if the worker is not found.
    */
-  public async getWorkerById(id: string): Promise<Worker | null> {
+  public async getWorkerById(id: string): Promise<WorkerInstance | null> {
     const worker = await this.repo.findOne({
       where: { id },
     });
