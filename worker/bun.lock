@@ -6,6 +6,7 @@
       "dependencies": {
         "axios": "^1.10.0",
         "eventsource-parser": "^3.0.2",
+        "node-color-log": "^12.0.1",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -67,6 +68,8 @@
     "mime-db": ["mime-db@1.52.0", "", {}, "sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg=="],
 
     "mime-types": ["mime-types@2.1.35", "", { "dependencies": { "mime-db": "1.52.0" } }, "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw=="],
+
+    "node-color-log": ["node-color-log@12.0.1", "", {}, "sha512-fhbWy00HXAVucPHoji9KNZRtXHcDKuMoVJ3QA+vaMEcAyK6psmJAf5TF9t2SmkybuHz0jre+jgUDyXcFmpgSNg=="],
 
     "proxy-from-env": ["proxy-from-env@1.1.0", "", {}, "sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg=="],
 

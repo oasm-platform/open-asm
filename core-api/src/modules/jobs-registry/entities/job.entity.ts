@@ -25,4 +25,7 @@ export class Job extends BaseEntity {
 
   @Column({ type: 'json', nullable: true })
   rawResult: object;
+
+  @Column({ nullable: true })
+  completedAt?: Date;
 }

@@ -2,41 +2,22 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
 import { Asset } from '../assets/entities/assets.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import { Job } from './entities/job.entity';
 import { WorkersService } from '../workers/workers.service';
 import {
   GetNextJobResponseDto,
   UpdateResultDto,
 } from './dto/jobs-registry.dto';
+import { workers } from '../workers/workers';
 
 @Injectable()
 export class JobsRegistryService {
   constructor(
     @InjectRepository(Job) public readonly repo: Repository<Job>,
     private workerService: WorkersService,
+    private dataSource: DataSource,
   ) {}
-  public static workerSteps = [
-    {
-      id: WorkerName.SUBFINDER,
-      description: 'Fast passive subdomain enumeration tool.',
-      command: 'subfinder -d {{value}} -all -silent -timeout 30 -max-time 10',
-      resultHandler: (result: string) => {
-        return result.trim().split('\n');
-      },
-    },
-    {
-      id: WorkerName.NAABU,
-      description: 'Scan open ports and detect running services on each port.',
-      resultHandler: () => {},
-    },
-    {
-      id: WorkerName.DNSX,
-      description:
-        'Perform DNS resolution and enumeration to gather additional information about subdomains and their associated IP addresses.',
-      resultHandler: () => {},
-    },
-  ];
 
   /**
    * Creates a new job associated with the given asset and worker name.
@@ -110,15 +91,13 @@ export class JobsRegistryService {
     job.status = JobStatus.COMPLETED;
 
     const { workerName } = job;
-    const step = JobsRegistryService.workerSteps.find(
-      (step) => step.id === workerName,
-    );
+    const step = workers.find((step) => step.id === workerName);
     if (step) {
-      const parsed = step?.resultHandler((dto.data as any).raw) ?? null;
-      job.rawResult = {
-        [step.id]: parsed,
-      };
-      await this.repo.save(job);
+      step?.resultHandler({
+        dataSource: this.dataSource,
+        result: (dto.data as any).raw,
+        job,
+      });
     }
 
     return {

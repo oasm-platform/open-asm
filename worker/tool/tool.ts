@@ -3,7 +3,7 @@ import { workersControllerAlive } from "../services/core-api/alive";
 import { WorkersControllerAliveParamsEnum } from "../services/core-api/api";
 import { exec } from "child_process";
 import { promisify } from "util";
-
+import logger from "node-color-log";
 const execAsync = promisify(exec);
 interface Job {
   jobId: string;
@@ -85,9 +85,11 @@ export class Tool {
       },
     });
 
-    console.log(
-      `Job ${job.jobId} with value "${job.value}" processed by ${Tool.workerId}`
-    );
+    logger
+      .color("green")
+      .log(
+        `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - WorkerName: ${this.workerName}`
+      );
   }
 
   private async commandExecution(
@@ -98,7 +100,7 @@ export class Tool {
       .replace("{{value}}", value)
       .replace("{{workerId}}", Tool.workerId!);
 
-    console.log(`Executing: ${command}`);
+    logger.color("blue").log(`[RUNNING]: ${command}`);
 
     try {
       const { stdout } = await execAsync(command);

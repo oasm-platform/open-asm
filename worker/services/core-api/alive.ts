@@ -1,5 +1,6 @@
 import { createParser, type EventSourceMessage } from "eventsource-parser";
 import { Tool } from "../../tool/tool";
+import logger from "node-color-log";
 
 const RETRY_DELAY_MS = 3000;
 
@@ -58,7 +59,9 @@ export async function workersControllerAlive(
                 const parsed = JSON.parse(chunk);
                 Tool.workerId = parsed.workerId;
                 Tool.command = parsed.command;
-                console.log(`[SSE:${workerName}] WorkerId: ${Tool.workerId}`);
+                logger
+                  .color("green")
+                  .log(`[CONNECTED] ✅ WorkerId: ${Tool.workerId}`);
               } catch (_) {
                 // Ignore JSON parse errors for non-JSON data
               }
@@ -67,7 +70,7 @@ export async function workersControllerAlive(
             }
           } catch (err) {
             console.error(
-              `[SSE:${workerName}] Error while reading stream. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
+              `Error while reading stream. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
               err
             );
             setTimeout(connect, RETRY_DELAY_MS);
@@ -77,7 +80,7 @@ export async function workersControllerAlive(
         read();
       } catch (err) {
         console.error(
-          `[SSE:${workerName}] Connection failed. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
+          `Connection failed. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
           err
         );
         setTimeout(connect, RETRY_DELAY_MS);
