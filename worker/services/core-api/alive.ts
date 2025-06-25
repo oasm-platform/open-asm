@@ -4,7 +4,7 @@ import { Tool } from "../../tool/tool";
 export async function workersControllerAlive(
   workerName: string
 ): Promise<string> {
-  const url = `${process.env.CORE_API_URL}/api/workers/${workerName}/alive`;
+  const url = `${process.env.API}/api/workers/${workerName}/alive`;
   const res = await fetch(url, {
     headers: {
       Accept: "text/event-stream",

@@ -20,7 +20,11 @@ export class Tool {
 
   public async run() {
     await this.connectToCore();
-    this.pullJobsContinuously();
+    try {
+      this.pullJobsContinuously();
+    } catch (e) {
+      throw new Error();
+    }
   }
 
   /**
@@ -54,14 +58,16 @@ export class Tool {
   private async pullJobsContinuously() {
     while (true) {
       while (this.queue.length < this.maxJobsQueue) {
-        const job = (await coreApi.jobsRegistryControllerGetNextJob(
-          Tool.workerId!
-        )) as Job;
+        try {
+          const job = (await coreApi.jobsRegistryControllerGetNextJob(
+            Tool.workerId!
+          )) as Job;
 
-        if (!job) break;
+          if (!job) break;
 
-        this.queue.push(job);
-        this.jobHandler(job);
+          this.queue.push(job);
+          this.jobHandler(job);
+        } catch (e) {}
       }
       await this.sleep(2000); // Pull interval or backoff
     }

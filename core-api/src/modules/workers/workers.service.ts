@@ -51,7 +51,7 @@ export class WorkersService {
       });
     }, 5000);
     req.on('close', () => {
-      this.logger.verbose(`❌ Worker disconnected: ${uniqueWorkerId}`);
+      this.logger.warn(`❌ Worker disconnected: ${uniqueWorkerId}`);
       this.workerLeave(workerId);
       clearInterval(interval);
     });
