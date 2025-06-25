@@ -84,7 +84,10 @@ export class TargetsService {
         target,
       });
 
-      await this.assetService.createAssets({ target, value, isPrimary: true });
+      await this.assetService.createPrimaryAsset({
+        target,
+        value,
+      });
     }
     // If the target exists, check if it is already associated with the workspace
     else {

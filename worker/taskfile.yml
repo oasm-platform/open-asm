@@ -1,5 +1,17 @@
 version: "3"
+
 tasks:
   dev:
+    deps:
+      - dev:subfinder
+      - dev:naabu
+
+  dev:subfinder:
     cmds:
-      - bun --watch index.ts
+      - NAME=subfinder bun --watch index.ts
+    silent: true
+
+  dev:naabu:
+    cmds:
+      - NAME=naabu bun --watch index.ts
+    silent: true

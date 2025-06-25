@@ -57,10 +57,9 @@ export class AssetsService {
    * @param target - The target to which the asset is associated.
    * @returns The created asset.
    */
-  public async createAssets({
+  public async createPrimaryAsset({
     target,
     value,
-    isPrimary = false,
   }: {
     target: Target;
     value: string;
@@ -70,12 +69,9 @@ export class AssetsService {
       id: randomUUID(),
       target,
       value,
-      isPrimary,
+      isPrimary: true,
     });
-
-    if (isPrimary) {
-      this.jobRegistryService.createJob(asset, WorkerName.SUBFINDER);
-    }
+    this.jobRegistryService.createJob(asset, WorkerName.SUBFINDER);
     return asset;
   }
 }
