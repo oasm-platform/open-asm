@@ -1,0 +1,5 @@
+version: "3"
+tasks:
+  dev:
+    cmds:
+      - bun --watch index.ts
