@@ -38,3 +38,10 @@ tasks:
       - console:instal
   gen-api:
     cmd: npx swagger-typescript-api generate -n api.ts -p ./open-api/open-api.json -o ./worker/services/core-api --route-types --axios --extract-enums --unwrap-response-data --default-response any --module-name-index 1000
+  docker-compose:
+    cmds:
+      - |
+        docker compose --env-file ./core-api/.env up -d \
+        --scale worker-subdomains=1 \
+        --scale worker-httpx=1 \
+        --scale worker-ports=1

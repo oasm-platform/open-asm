@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  core-api:
+    container_name: core-api
+    build:
+      context: .
+      dockerfile: ./core-api/Dockerfile
+    networks:
+      - default
+    env_file:
+      - ./core-api/.env
+    environment:
+      DB_HOST: postgres
+    ports:
+      - "6276:6276"
+    restart: "always"
+    depends_on:
+      - postgres
+    volumes:
+      - ./open-api:/open-api
+
+  worker-subdomains:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    environment:
+      - API=http://core-api:6276
+      - NAME=subdomains
+    env_file:
+      - ./worker/.env
+    networks:
+      - default
+    restart: "always"
+
+  worker-httpx:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    environment:
+      - API=http://core-api:6276
+      - NAME=httpx
+    env_file:
+      - ./worker/.env
+    networks:
+      - default
+    restart: "always"
+
+  worker-ports:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    environment:
+      - API=http://core-api:6276
+      - NAME=ports
+    env_file:
+      - ./worker/.env
+    networks:
+      - default
+    restart: "always"
+
+  postgres:
+    container_name: postgres
+    image: postgres:15
+    restart: always
+    env_file:
+      - ./core-api/.env
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - default
+
+volumes:
+  pgdata:
+
+networks:
+  default:
+    driver: bridge

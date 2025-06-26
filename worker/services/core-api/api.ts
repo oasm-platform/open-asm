@@ -106,16 +106,14 @@ export interface UpdateResultDto {
 /** Unique identifier for the worker */
 export enum WorkersControllerAliveParamsWorkerNameIdEnum {
   Subdomains = "subdomains",
-  Ports = "ports",
-  Dnsx = "dnsx",
   Httpx = "httpx",
+  Ports = "ports",
 }
 
 export enum WorkersControllerAliveParamsEnum {
   Subdomains = "subdomains",
-  Ports = "ports",
-  Dnsx = "dnsx",
   Httpx = "httpx",
+  Ports = "ports",
 }
 
 import type {

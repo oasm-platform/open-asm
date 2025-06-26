@@ -1,0 +1,4 @@
+node_modules
+bun.lockb
+npm-debug.log
+*.log
