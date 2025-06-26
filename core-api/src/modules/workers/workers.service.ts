@@ -26,15 +26,32 @@ export class WorkersService {
     {
       id: WorkerName.SUBFINDER,
       description: 'Fast passive subdomain enumeration tool.',
-      command: 'subfinder -d {{value}} -all -silent -timeout 30 -max-time 10',
+      command:
+        'subfinder -d {{value}} | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
       resultHandler: async ({ result, job, dataSource }) => {
-        const parsed = result.trim().split('\n');
+        const parsed = {};
+
+        result.split('\n').forEach((line) => {
+          const cleaned = line.replace(/\x1B\[[0-9;]*m/g, '').trim();
+
+          const match = cleaned.match(/^([^\[]+)\s+\[([A-Z]+)\]\s+\[(.+)\]$/);
+          if (!match) return;
+
+          const [, domain, type, value] = match;
+
+          if (!parsed[domain]) parsed[domain] = {};
+          if (!parsed[domain][type]) parsed[domain][type] = [];
+
+          parsed[domain][type].push(value);
+        });
+
         this.updateResultToDatabase(dataSource, job, parsed);
-        const assets = parsed.map((i) => ({
+        const assets: Asset[] | any[] = Object.keys(parsed).map((i) => ({
           id: randomUUID(),
           value: i,
           target: { id: job.asset.target.id },
         }));
+
         // Fill to the asset table
         await this.assetRepo
           .createQueryBuilder()
@@ -42,6 +59,9 @@ export class WorkersService {
           .values(assets)
           .orIgnore()
           .execute();
+
+        // push current asset from job to NAABu
+        assets.push(job.asset);
 
         await this.jobRepo
           .createQueryBuilder()
@@ -59,7 +79,7 @@ export class WorkersService {
     {
       id: WorkerName.NAABU,
       description: 'Scan open ports and detect running services on each port.',
-      command: 'naabu -host {{value}} -s s -rate 1000 -silent -retries 2',
+      command: 'naabu -host {{value}} -silent',
       resultHandler: ({ result, job, dataSource }) => {
         const parsed = result
           .trim()

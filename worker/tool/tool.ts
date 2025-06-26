@@ -1,11 +1,9 @@
-import { exec } from "child_process";
 import logger from "node-color-log";
-import { promisify } from "util";
 import coreApi from "../services/core-api";
 import { workersControllerAlive } from "../services/core-api/alive";
 import { WorkersControllerAliveParamsEnum } from "../services/core-api/api";
 import runCommand from "./runCommand";
-const execAsync = promisify(exec);
+
 interface Job {
   jobId: string;
   value: string;
@@ -55,7 +53,7 @@ export class Tool {
    * Periodically pulls jobs from core if the queue isn't full.
    */
   private async pullJobsContinuously() {
-    logger.color("green").log(`[STARTED] - WorkerId: ${Tool.workerId}`);
+    logger.info(`[${this.workerName?.toUpperCase()}] - Start pulling jobs...`);
     while (true) {
       while (this.queue.length < this.maxJobsQueue) {
         try {
@@ -67,7 +65,9 @@ export class Tool {
 
           this.queue.push(job);
           this.jobHandler(job);
-        } catch (e) {}
+        } catch (e) {
+          logger.error("Error while pulling job");
+        }
       }
       await this.sleep(2000); // Pull interval or backoff
     }
@@ -78,19 +78,23 @@ export class Tool {
    */
   private async jobHandler(job: Job) {
     const data = await this.commandExecution(Tool.command!, job.value);
-    await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
-      jobId: job.jobId,
-      data: {
-        raw: data,
-      },
-    });
-    this.queue = this.queue.filter((j) => j.jobId !== job.jobId);
+    try {
+      await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
+        jobId: job.jobId,
+        data: {
+          raw: data,
+        },
+      });
+      this.queue = this.queue.filter((j) => j.jobId !== job.jobId);
 
-    logger
-      .color("green")
-      .log(
-        `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - WorkerName: ${this.workerName}`
-      );
+      logger
+        .color("green")
+        .log(
+          `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - WorkerName: ${this.workerName}`
+        );
+    } catch (e) {
+      logger.color("red").log(e);
+    }
   }
 
   private async commandExecution(
