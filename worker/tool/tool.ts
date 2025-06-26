@@ -66,10 +66,10 @@ export class Tool {
           this.queue.push(job);
           this.jobHandler(job);
         } catch (e) {
-          logger.error("Error while pulling job");
+          logger.error("Error while pulling job", e);
         }
       }
-      await this.sleep(2000); // Pull interval or backoff
+      await this.sleep(2000);
     }
   }
 
@@ -95,6 +95,7 @@ export class Tool {
     } catch (e) {
       logger.error(`Error while reporting jobId: ${job.jobId}`);
     }
+    return;
   }
 
   private async commandExecution(

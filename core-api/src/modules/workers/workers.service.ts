@@ -72,7 +72,6 @@ export class WorkersService {
           .orIgnore()
           .execute();
 
-        // push current asset from job to NAABu
         assets.push(job.asset);
 
         await this.jobsRegistryService.startNextJob(assets, job.workerName);
@@ -82,7 +81,7 @@ export class WorkersService {
       id: WorkerName.PORTS,
       description: 'Scan open ports and detect running services on each port.',
       command: 'naabu -host {{value}} -silent',
-      resultHandler: async ({ result, job, dataSource }) => {
+      resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         const parsed = result
           .trim()
           .split('\n')
@@ -100,9 +99,15 @@ export class WorkersService {
       id: WorkerName.HTTPX,
       description:
         'HTTPX is a fast and multi-purpose HTTP toolkit that allows you to run multiple HTTP requests against a target.',
-      command: 'echo "hello httpx"',
-      resultHandler: ({ result }) => {
-        return result.trim().split('\n');
+      command:
+        'httpx -u {{value}} -status-code -favicon -asn -title -web-server -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
+      resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
+        console.log(result);
+        this.updateResultToDatabase(dataSource, job, JSON.parse(result));
+        await this.jobsRegistryService.startNextJob(
+          [job.asset],
+          job.workerName,
+        );
       },
     },
   ];

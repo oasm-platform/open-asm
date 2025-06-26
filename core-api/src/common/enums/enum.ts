@@ -5,8 +5,8 @@ export enum Role {
 
 export enum WorkerName {
   SUBDOMAINS = 'subdomains',
-  PORTS = 'ports',
   HTTPX = 'httpx',
+  PORTS = 'ports',
 }
 
 export enum JobStatus {
