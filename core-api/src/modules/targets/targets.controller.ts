@@ -9,18 +9,18 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { TargetsService } from './targets.service';
-import { CreateTargetDto } from './dto/targets.dto';
 import { UserContext } from 'src/common/decorators/app.decorator';
-import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { Doc } from 'src/common/doc/doc.decorator';
-import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
-import { Target } from './entities/target.entity';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
   GetManyResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
+import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
+import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { CreateTargetDto } from './dto/targets.dto';
+import { Target } from './entities/target.entity';
+import { TargetsService } from './targets.service';
 
 @Controller('targets')
 export class TargetsController {

@@ -55,6 +55,7 @@ export class Tool {
    * Periodically pulls jobs from core if the queue isn't full.
    */
   private async pullJobsContinuously() {
+    logger.color("green").log(`[STARTED] - WorkerId: ${Tool.workerId}`);
     while (true) {
       while (this.queue.length < this.maxJobsQueue) {
         try {

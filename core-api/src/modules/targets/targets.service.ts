@@ -1,23 +1,21 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Repository } from 'typeorm';
-import { WorkspacesService } from '../workspaces/workspaces.service';
-import { WorkspaceTarget } from './entities/workspace-target.entity';
-import { Target } from './entities/target.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { CreateTargetDto } from './dto/targets.dto';
-import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import {
   GetManyBaseQueryParams,
   GetManyResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
+import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { Asset } from '../assets/entities/assets.entity';
+import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
+import { CreateTargetDto } from './dto/targets.dto';
+import { Target } from './entities/target.entity';
+import { WorkspaceTarget } from './entities/workspace-target.entity';
 
 @Injectable()
 export class TargetsService {
@@ -72,7 +70,6 @@ export class TargetsService {
       workspaceId,
       userContext,
     );
-
     let target = await this.getTargetByValue(value);
 
     // If the target does not exist, create it
