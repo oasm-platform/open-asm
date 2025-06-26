@@ -3,15 +3,21 @@ version: "3"
 tasks:
   dev:
     deps:
-      - dev:subfinder
-      - dev:naabu
+      - dev:subdomains
+      - dev:ports
+      - dev:httpx
 
-  dev:subfinder:
+  dev:subdomains:
     cmds:
-      - NAME=subfinder MAX_JOBS=10 bun --watch index.ts
+      - NAME=subdomains MAX_JOBS=10 bun --watch index.ts
     silent: true
 
-  dev:naabu:
+  dev:ports:
     cmds:
-      - NAME=naabu MAX_JOBS=10 bun --watch index.ts
+      - NAME=ports MAX_JOBS=10 bun --watch index.ts
+    silent: true
+
+  dev:httpx:
+    cmds:
+      - NAME=httpx MAX_JOBS=10 bun --watch index.ts
     silent: true

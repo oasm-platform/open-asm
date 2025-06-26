@@ -1,17 +1,16 @@
-import { Injectable, Get } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Asset } from './entities/assets.entity';
-import { Target } from '../targets/entities/target.entity';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { randomUUID } from 'crypto';
-import { WorkerName } from 'src/common/enums/enum';
-import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import {
   GetManyBaseQueryParams,
   GetManyResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
+import { WorkerName } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
+import { Repository } from 'typeorm';
+import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { Target } from '../targets/entities/target.entity';
+import { Asset } from './entities/assets.entity';
 
 @Injectable()
 export class AssetsService {
@@ -71,7 +70,7 @@ export class AssetsService {
       value,
       isPrimary: true,
     });
-    this.jobRegistryService.createJob(asset, WorkerName.SUBFINDER);
+    this.jobRegistryService.createJob(asset, WorkerName.SUBDOMAINS);
     return asset;
   }
 }

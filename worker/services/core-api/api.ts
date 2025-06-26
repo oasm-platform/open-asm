@@ -19,8 +19,8 @@ export type AppResponseSerialization = object;
 
 export interface CreateTargetDto {
   /**
-   * The target value
-   * @example "https://example.com"
+   * The target domain (with optional URL path, will be parsed to extract domain)
+   * @example "example.com"
    */
   value: string;
   /**
@@ -32,8 +32,8 @@ export interface CreateTargetDto {
 
 export interface Target {
   /**
-   * The target value
-   * @example "https://example.com"
+   * The target domain (with optional URL path, will be parsed to extract domain)
+   * @example "example.com"
    */
   value: string;
 }
@@ -105,15 +105,15 @@ export interface UpdateResultDto {
 
 /** Unique identifier for the worker */
 export enum WorkersControllerAliveParamsWorkerNameIdEnum {
-  Subfinder = "subfinder",
-  Naabu = "naabu",
+  Subdomains = "subdomains",
+  Ports = "ports",
   Dnsx = "dnsx",
   Httpx = "httpx",
 }
 
 export enum WorkersControllerAliveParamsEnum {
-  Subfinder = "subfinder",
-  Naabu = "naabu",
+  Subdomains = "subdomains",
+  Ports = "ports",
   Dnsx = "dnsx",
   Httpx = "httpx",
 }

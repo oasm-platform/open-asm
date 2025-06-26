@@ -4,9 +4,8 @@ export enum Role {
 }
 
 export enum WorkerName {
-  SUBFINDER = 'subfinder',
-  NAABU = 'naabu',
-  DNSX = 'dnsx',
+  SUBDOMAINS = 'subdomains',
+  PORTS = 'ports',
   HTTPX = 'httpx',
 }
 

@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
-import { Worker } from 'src/common/interfaces/app.interface';
+import { ResultHandler, Worker } from 'src/common/interfaces/app.interface';
 import { DataSource, LessThan, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
@@ -35,11 +35,11 @@ export class WorkersService {
 
   public workers: Worker[] = [
     {
-      id: WorkerName.SUBFINDER,
+      id: WorkerName.SUBDOMAINS,
       description: 'Fast passive subdomain enumeration tool.',
       command:
         'subfinder -d {{value}} | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
-      resultHandler: async ({ result, job, dataSource }) => {
+      resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         const parsed = {};
 
         result.split('\n').forEach((line) => {
@@ -75,27 +75,32 @@ export class WorkersService {
         // push current asset from job to NAABu
         assets.push(job.asset);
 
-        this.jobsRegistryService.startNextJob(assets, job.workerName);
+        await this.jobsRegistryService.startNextJob(assets, job.workerName);
       },
     },
     {
-      id: WorkerName.NAABU,
+      id: WorkerName.PORTS,
       description: 'Scan open ports and detect running services on each port.',
       command: 'naabu -host {{value}} -silent',
-      resultHandler: ({ result, job, dataSource }) => {
+      resultHandler: async ({ result, job, dataSource }) => {
         const parsed = result
           .trim()
           .split('\n')
           .filter((i) => i.includes(':'))
-          .map((i) => Number(i.split(':')[1].replace('\r', '')));
+          .map((i) => Number(i.split(':')[1].replace('\r', '')))
+          .sort();
         this.updateResultToDatabase(dataSource, job, parsed);
+        await this.jobsRegistryService.startNextJob(
+          [job.asset],
+          job.workerName,
+        );
       },
     },
     {
-      id: WorkerName.DNSX,
+      id: WorkerName.HTTPX,
       description:
-        'Perform DNS resolution and enumeration to gather additional information about subdomains and their associated IP addresses.',
-      command: '',
+        'HTTPX is a fast and multi-purpose HTTP toolkit that allows you to run multiple HTTP requests against a target.',
+      command: 'echo "hello httpx"',
       resultHandler: ({ result }) => {
         return result.trim().split('\n');
       },
@@ -224,12 +229,12 @@ export class WorkersService {
    * to clean up stale workers that may have disconnected without properly unregistering.
    *
    */
-  @Interval(60000)
+  @Interval(15000)
   async autoRemoveWorkersOffline() {
     const workers = await this.repo
       .find({
         where: {
-          lastSeenAt: LessThan(new Date(Date.now() - 60 * 1000)),
+          lastSeenAt: LessThan(new Date(Date.now() - 15 * 1000)),
         },
       })
       .then((res) => res.map((worker) => worker.id));
