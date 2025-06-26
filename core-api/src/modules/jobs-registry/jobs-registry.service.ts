@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, InsertResult, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { WorkersService } from '../workers/workers.service';
 import {
@@ -108,5 +108,37 @@ export class JobsRegistryService {
       workerId,
       dto,
     };
+  }
+
+  /**
+   * Starts the next job in the queue by inserting it into the database.
+   * Ignores any errors that might occur if the job already exists in the database.
+   * @param assets the assets to start the next job for
+   * @param currentWorkerName the name of the current worker
+   */
+  public async startNextJob(
+    assets: Asset[],
+    currentWorkerName: WorkerName,
+  ): Promise<InsertResult | null> {
+    const currentJobIndex =
+      Object.values(WorkerName).indexOf(currentWorkerName);
+
+    const nextWorkerHandleJob =
+      Object.values(WorkerName)[currentJobIndex + 1] || null;
+
+    if (!nextWorkerHandleJob) {
+      return null;
+    }
+    return this.repo
+      .createQueryBuilder()
+      .insert()
+      .values(
+        assets.map((i) => ({
+          asset: i,
+          workerName: nextWorkerHandleJob,
+        })),
+      )
+      .orIgnore()
+      .execute();
   }
 }

@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -8,6 +14,7 @@ import { Worker } from 'src/common/interfaces/app.interface';
 import { DataSource, LessThan, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
+import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkerInstance } from './entities/worker.entity';
 
 @Injectable()
@@ -16,10 +23,14 @@ export class WorkersService {
   constructor(
     @InjectRepository(WorkerInstance)
     public readonly repo: Repository<WorkerInstance>,
+
     @InjectRepository(Asset)
     public readonly assetRepo: Repository<Asset>,
-    @InjectRepository(Job) private readonly jobRepo: Repository<Job>,
+
     private readonly dataSource: DataSource,
+
+    @Inject(forwardRef(() => JobsRegistryService))
+    private jobsRegistryService: JobsRegistryService,
   ) {}
 
   public workers: Worker[] = [
@@ -46,12 +57,12 @@ export class WorkersService {
         });
 
         this.updateResultToDatabase(dataSource, job, parsed);
-        const assets: Asset[] | any[] = Object.keys(parsed).map((i) => ({
+        const assets: Asset[] = Object.keys(parsed).map((i) => ({
           id: randomUUID(),
           value: i,
           target: { id: job.asset.target.id },
           dnsRecords: parsed[i],
-        }));
+        })) as Asset[];
 
         // Fill to the asset table
         await this.assetRepo
@@ -64,17 +75,7 @@ export class WorkersService {
         // push current asset from job to NAABu
         assets.push(job.asset);
 
-        await this.jobRepo
-          .createQueryBuilder()
-          .insert()
-          .values(
-            assets.map((i) => ({
-              asset: i,
-              workerName: WorkerName.NAABU,
-            })),
-          )
-          .orIgnore()
-          .execute();
+        this.jobsRegistryService.startNextJob(assets, job.workerName);
       },
     },
     {
@@ -246,7 +247,7 @@ export class WorkersService {
    */
 
   private async workerLeave(id: string) {
-    await this.jobRepo
+    await this.jobsRegistryService.repo
       .createQueryBuilder('jobs')
       .update()
       .set({ status: JobStatus.PENDING, workerId: null as any })

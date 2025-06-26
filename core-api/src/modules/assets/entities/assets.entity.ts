@@ -16,13 +16,13 @@ export class Asset extends BaseEntity {
   target: Target;
 
   @Column({ default: false })
-  isPrimary: boolean;
+  isPrimary?: boolean;
 
   @OneToMany(() => Job, (job) => job.asset, {
     onDelete: 'CASCADE',
   })
-  jobs: Job[];
+  jobs?: Job[];
 
   @Column({ type: 'json', nullable: true })
-  dnsRecords: object;
+  dnsRecords?: object;
 }
