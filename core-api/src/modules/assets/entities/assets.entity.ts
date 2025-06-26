@@ -22,4 +22,7 @@ export class Asset extends BaseEntity {
     onDelete: 'CASCADE',
   })
   jobs: Job[];
+
+  @Column({ type: 'json', nullable: true })
+  dnsRecords: object;
 }

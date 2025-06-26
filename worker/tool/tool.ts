@@ -93,7 +93,7 @@ export class Tool {
           `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - WorkerName: ${this.workerName}`
         );
     } catch (e) {
-      logger.color("red").log(e);
+      logger.error(`Error while reporting jobId: ${job.jobId}`);
     }
   }
 

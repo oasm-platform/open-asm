@@ -50,6 +50,7 @@ export class WorkersService {
           id: randomUUID(),
           value: i,
           target: { id: job.asset.target.id },
+          dnsRecords: parsed[i],
         }));
 
         // Fill to the asset table
