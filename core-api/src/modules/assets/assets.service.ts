@@ -39,18 +39,17 @@ export class AssetsService {
       sortBy = 'createdAt';
     }
 
-    // Get raw data from the database
     const rawData = await this.repo.query(
       `
-      WITH latest_job AS (
-        SELECT DISTINCT ON ("assetId")
+      WITH latest_jobs AS (
+        SELECT DISTINCT ON ("assetId", "workerName")
           "assetId",
           "workerName",
           "rawResult",
           "createdAt"
         FROM jobs
         WHERE "rawResult" IS NOT NULL
-        ORDER BY "assetId", "createdAt" DESC
+        ORDER BY "assetId", "workerName", "createdAt" DESC
       )
       SELECT
         a.id,
@@ -60,14 +59,14 @@ export class AssetsService {
         a."createdAt",
         a."updatedAt",
         a."dnsRecords",
-        j."workerName",
-        j."rawResult" AS "workerResult"
+        COALESCE(json_object_agg(j."workerName", j."rawResult") FILTER (WHERE j."workerName" IS NOT NULL), '{}') AS "workerResults"
       FROM assets a
-      LEFT JOIN latest_job j ON j."assetId" = a.id
+      LEFT JOIN latest_jobs j ON j."assetId" = a.id
       WHERE a."targetId" = $1
+      GROUP BY a.id
       ORDER BY a."${sortBy}" ${sortOrder}
       LIMIT $2 OFFSET $3
-    `,
+      `,
       [id, limit, (page - 1) * limit],
     );
 
@@ -75,7 +74,7 @@ export class AssetsService {
 
     // Map raw data to GetAssetsResponseDto
     const data: GetAssetsResponseDto[] = rawData.map((item: any) => {
-      let asset = new GetAssetsResponseDto();
+      const asset = new GetAssetsResponseDto();
       asset.id = item.id;
       asset.value = item.value;
       asset.targetId = item.targetId;
@@ -83,9 +82,10 @@ export class AssetsService {
       asset.createdAt = item.createdAt;
       asset.updatedAt = item.updatedAt;
       asset.dnsRecords = item.dnsRecords;
-      asset.workerResults = item.workerName
-        ? { [item.workerName]: item.workerResult }
-        : {};
+      asset.workerResults =
+        typeof item.workerResults === 'string'
+          ? JSON.parse(item.workerResults)
+          : item.workerResults || {};
       return asset;
     });
 
