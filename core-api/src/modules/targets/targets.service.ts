@@ -49,20 +49,17 @@ export class TargetsService {
   }
 
   /**
-   * Creates a target and associates it with a workspace.
-   * If the target does not exist, it will be created.
-   * Only the owner of the workspace can create a target.
+   * Creates a target entity or associates an existing target with a workspace.
    *
-   * @param dto - The data transfer object containing target details.
-   * @param userContext - The user's context data, which includes the user's ID.
-   * @throws NotFoundException if the workspace does not exist.
-   * @throws BadRequestException if the user is not the owner of the workspace.
-   * @returns A response indicating the target was successfully created.
+   * @param dto - The data transfer object containing the target details.
+   * @param userContextPayload - The user's context data, which includes the user's ID.
+   * @returns A promise that resolves to the target entity if created, otherwise a BadRequestException is thrown.
+   * @throws BadRequestException if the target already exists in the workspace.
    */
   public async createTarget(
     dto: CreateTargetDto,
     userContext: UserContextPayload,
-  ) {
+  ): Promise<Target> {
     const { workspaceId, value } = dto;
 
     // Check if the workspace exists and the user is the owner
@@ -107,7 +104,7 @@ export class TargetsService {
       });
     }
 
-    return { message: 'Target created successfully' };
+    return target;
   }
 
   /**

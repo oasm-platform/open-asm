@@ -30,7 +30,7 @@ export class TargetsController {
     summary: 'Create a target',
     description: 'Creates a new target.',
     response: {
-      serialization: DefaultMessageResponseDto,
+      serialization: Target,
     },
   })
   @Post()
