@@ -38,7 +38,7 @@ export class WorkersService {
       id: WorkerName.SUBDOMAINS,
       description: 'Fast passive subdomain enumeration tool.',
       command:
-        'subfinder -d {{value}} | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
+        '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         const parsed = {};
 
@@ -56,6 +56,10 @@ export class WorkersService {
           parsed[domain][type].push(value);
         });
 
+        const primaryAsset = parsed[job.asset.value];
+
+        console.log(primaryAsset, 'primaryAsset');
+        delete parsed[job.asset.value];
         this.updateResultToDatabase(dataSource, job, {
           total: Object.keys(parsed).length,
         });
@@ -65,7 +69,6 @@ export class WorkersService {
           target: { id: job.asset.target.id },
           dnsRecords: parsed[i],
         })) as Asset[];
-
         // Fill to the asset table
         await this.assetRepo
           .createQueryBuilder()
@@ -73,6 +76,10 @@ export class WorkersService {
           .values(assets)
           .orIgnore()
           .execute();
+
+        await this.assetRepo.update(job.asset.id, {
+          dnsRecords: primaryAsset,
+        });
 
         assets.push(job.asset);
 
