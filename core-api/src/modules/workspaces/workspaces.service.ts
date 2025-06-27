@@ -26,15 +26,16 @@ export class WorkspacesService {
   ) {}
 
   /**
-   * Creates a new workspace and adds the creator as a member.
-   * @param dto - The data transfer object containing the details of the workspace to be created.
+   * Creates a new workspace, and adds the requesting user as a member.
+   * The workspace is created with the owner set to the requesting user.
+   * @param dto - The data transfer object containing the workspace details.
    * @param userContextPayload - The user's context data, which includes the user's ID.
-   * @returns A response indicating the workspace was successfully created.
+   * @returns The newly created workspace entity.
    */
   public async createWorkspace(
     dto: CreateWorkspaceDto,
     userContextPayload: UserContextPayload,
-  ) {
+  ): Promise<Workspace> {
     const { id } = userContextPayload;
 
     const newWorkspace = await this.repo.save({
@@ -47,7 +48,8 @@ export class WorkspacesService {
       workspace: newWorkspace,
       user: { id },
     });
-    return { message: 'Workspace created successfully' };
+
+    return newWorkspace;
   }
 
   /**
