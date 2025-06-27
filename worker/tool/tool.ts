@@ -99,8 +99,8 @@ export class Tool {
     value: string
   ): Promise<string> {
     const command = commandPattern
-      .replace("{{value}}", value)
-      .replace("{{workerId}}", Tool.workerId!);
+      .replace(/{{value}}/g, value)
+      .replace(/{{workerId}}/g, Tool.workerId!);
 
     logger.color("blue").log(`[RUNNING]: ${command}`);
 

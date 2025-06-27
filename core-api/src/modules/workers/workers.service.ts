@@ -41,7 +41,6 @@ export class WorkersService {
         '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         const parsed = {};
-
         result.split('\n').forEach((line) => {
           const cleaned = line.replace(/\x1B\[[0-9;]*m/g, '').trim();
 
@@ -58,7 +57,6 @@ export class WorkersService {
 
         const primaryAsset = parsed[job.asset.value];
 
-        console.log(primaryAsset, 'primaryAsset');
         delete parsed[job.asset.value];
         this.updateResultToDatabase(dataSource, job, {
           total: Object.keys(parsed).length,
@@ -111,7 +109,6 @@ export class WorkersService {
       command:
         'httpx -u {{value}} -status-code -favicon -asn -title -web-server -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
-        console.log(result);
         this.updateResultToDatabase(dataSource, job, JSON.parse(result));
         await this.jobsRegistryService.startNextJob(
           [job.asset],
