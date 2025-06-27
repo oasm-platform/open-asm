@@ -56,7 +56,9 @@ export class WorkersService {
           parsed[domain][type].push(value);
         });
 
-        this.updateResultToDatabase(dataSource, job, parsed);
+        this.updateResultToDatabase(dataSource, job, {
+          total: Object.keys(parsed).length,
+        });
         const assets: Asset[] = Object.keys(parsed).map((i) => ({
           id: randomUUID(),
           value: i,
