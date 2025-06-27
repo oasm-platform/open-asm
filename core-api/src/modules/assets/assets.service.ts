@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';
 import { Asset } from './entities/assets.entity';
+import { GetAssetsResponseDto } from './dto/assets.dto';
 
 @Injectable()
 export class AssetsService {
@@ -30,21 +31,62 @@ export class AssetsService {
   public async getAllAssetsInTarget(
     id: string,
     query: GetManyBaseQueryParams,
-  ): Promise<GetManyResponseDto<Asset>> {
+  ): Promise<GetManyResponseDto<GetAssetsResponseDto>> {
     const { limit, page, sortOrder } = query;
-    let { sortBy } = query;
 
+    let sortBy = query.sortBy;
     if (!(sortBy in Asset)) {
       sortBy = 'createdAt';
     }
 
-    const [data, total] = await this.repo.findAndCount({
-      where: { target: { id } },
-      take: limit,
-      skip: (page - 1) * limit,
-      order: {
-        [sortBy]: sortOrder,
-      },
+    // Get raw data from the database
+    const rawData = await this.repo.query(
+      `
+      WITH latest_job AS (
+        SELECT DISTINCT ON ("assetId")
+          "assetId",
+          "workerName",
+          "rawResult",
+          "createdAt"
+        FROM jobs
+        WHERE "rawResult" IS NOT NULL
+        ORDER BY "assetId", "createdAt" DESC
+      )
+      SELECT
+        a.id,
+        a.value,
+        a."targetId",
+        a."isPrimary",
+        a."createdAt",
+        a."updatedAt",
+        a."dnsRecords",
+        j."workerName",
+        j."rawResult" AS "workerResult"
+      FROM assets a
+      LEFT JOIN latest_job j ON j."assetId" = a.id
+      WHERE a."targetId" = $1
+      ORDER BY a."${sortBy}" ${sortOrder}
+      LIMIT $2 OFFSET $3
+    `,
+      [id, limit, (page - 1) * limit],
+    );
+
+    const total = await this.repo.count({ where: { target: { id } } });
+
+    // Map raw data to GetAssetsResponseDto
+    const data: GetAssetsResponseDto[] = rawData.map((item: any) => {
+      let asset = new GetAssetsResponseDto();
+      asset.id = item.id;
+      asset.value = item.value;
+      asset.targetId = item.targetId;
+      asset.isPrimary = item.isPrimary;
+      asset.createdAt = item.createdAt;
+      asset.updatedAt = item.updatedAt;
+      asset.dnsRecords = item.dnsRecords;
+      asset.workerResults = item.workerName
+        ? { [item.workerName]: item.workerResult }
+        : {};
+      return asset;
     });
 
     return getManyResponse(query, data, total);
