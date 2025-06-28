@@ -65,9 +65,7 @@ export class Tool {
 
           this.queue.push(job);
           this.jobHandler(job);
-        } catch (e) {
-          logger.error("Error while pulling job", e);
-        }
+        } catch (e) {}
       }
       await this.sleep(2000);
     }
@@ -92,9 +90,7 @@ export class Tool {
         .log(
           `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - WorkerName: ${this.workerName}`
         );
-    } catch (e) {
-      logger.error(`Error while reporting jobId: ${job.jobId}`);
-    }
+    } catch (e) {}
     return;
   }
 
@@ -103,8 +99,8 @@ export class Tool {
     value: string
   ): Promise<string> {
     const command = commandPattern
-      .replace("{{value}}", value)
-      .replace("{{workerId}}", Tool.workerId!);
+      .replace(/{{value}}/g, value)
+      .replace(/{{workerId}}/g, Tool.workerId!);
 
     logger.color("blue").log(`[RUNNING]: ${command}`);
 

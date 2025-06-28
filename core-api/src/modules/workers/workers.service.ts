@@ -38,10 +38,9 @@ export class WorkersService {
       id: WorkerName.SUBDOMAINS,
       description: 'Fast passive subdomain enumeration tool.',
       command:
-        'subfinder -d {{value}} | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
+        '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         const parsed = {};
-
         result.split('\n').forEach((line) => {
           const cleaned = line.replace(/\x1B\[[0-9;]*m/g, '').trim();
 
@@ -56,6 +55,9 @@ export class WorkersService {
           parsed[domain][type].push(value);
         });
 
+        const primaryAsset = parsed[job.asset.value];
+
+        delete parsed[job.asset.value];
         this.updateResultToDatabase(dataSource, job, {
           total: Object.keys(parsed).length,
         });
@@ -65,7 +67,6 @@ export class WorkersService {
           target: { id: job.asset.target.id },
           dnsRecords: parsed[i],
         })) as Asset[];
-
         // Fill to the asset table
         await this.assetRepo
           .createQueryBuilder()
@@ -73,6 +74,10 @@ export class WorkersService {
           .values(assets)
           .orIgnore()
           .execute();
+
+        await this.assetRepo.update(job.asset.id, {
+          dnsRecords: primaryAsset,
+        });
 
         assets.push(job.asset);
 
@@ -104,7 +109,6 @@ export class WorkersService {
       command:
         'httpx -u {{value}} -status-code -favicon -asn -title -web-server -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
-        console.log(result);
         this.updateResultToDatabase(dataSource, job, JSON.parse(result));
         await this.jobsRegistryService.startNextJob(
           [job.asset],
