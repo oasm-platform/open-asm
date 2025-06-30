@@ -1,10 +1,9 @@
-import LoginPage from "./pages/login/login"
+import { RouterProvider } from "react-router-dom"
+import { router } from "./routers"
 
 function App() {
   return (
-    <>
-      <LoginPage />
-    </>
+    <RouterProvider router={router} />
   )
 }
 
