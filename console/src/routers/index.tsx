@@ -1,6 +1,6 @@
 import Layout from '@/components/common/Layout';
 import Home from '@/pages/home/Home';
-import LoginPage from '@/pages/login/login';
+import Login from '@/pages/login/login';
 import { createBrowserRouter } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
@@ -16,7 +16,7 @@ export const router = createBrowserRouter([
                 path: 'login',
                 element: (
                     <GuestRoute>
-                        <LoginPage />
+                        <Login />
                     </GuestRoute>
                 ),
             },

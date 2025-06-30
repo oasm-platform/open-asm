@@ -9,8 +9,10 @@ import {
     FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { authClient } from '@/utils/authClient'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
+import { useLocation } from 'react-router-dom'
 import { z } from 'zod'
 
 const formSchema = z.object({
@@ -18,7 +20,11 @@ const formSchema = z.object({
     password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
-export default function LoginPage() {
+export default function Login() {
+    // Inside the Login component:
+    const location = useLocation()
+    const searchParams = new URLSearchParams(location.search)
+    const redirectUrl = searchParams.get('redirect')
     const form = useForm({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -28,7 +34,11 @@ export default function LoginPage() {
     })
 
     function onSubmit(values: z.infer<typeof formSchema>) {
-        console.log(values)
+        authClient.signIn.email({
+            email: values.email,
+            password: values.password,
+            callbackURL: redirectUrl as string || "/"
+        })
     }
 
     return (
