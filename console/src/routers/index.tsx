@@ -1,6 +1,6 @@
-import Layout from '@/components/common/Layout';
+import Layout from '@/components/common/layout/Layout';
 import Home from '@/pages/home/Home';
-import Login from '@/pages/login/login';
+import Login from '@/pages/login/Login';
 import { createBrowserRouter } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';

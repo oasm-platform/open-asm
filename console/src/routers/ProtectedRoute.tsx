@@ -1,3 +1,4 @@
+import ProtectedLayout from "@/components/common/layout/ProtectedLayout";
 import { authClient } from "@/utils/authClient";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 const { useSession } = authClient
@@ -11,7 +12,9 @@ const ProtectedRoute = () => {
         return <Navigate to={`/login?redirect=${currentPath}`} />
     }
     return (
-        <Outlet />
+        <ProtectedLayout>
+            <Outlet />
+        </ProtectedLayout>
     );
 };
 
