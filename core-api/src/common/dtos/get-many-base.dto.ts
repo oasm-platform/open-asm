@@ -11,26 +11,18 @@ import {
 } from 'class-validator';
 
 export class GetManyResponseDto<T> {
-  @ApiProperty({
-    example: [
-      {
-        id: 1,
-        createdAt: '1970-01-01T00:00:00.000Z',
-        updatedAt: '1970-01-01T00:00:00.000Z',
-      },
-    ],
-  })
+  @ApiProperty({ isArray: true, type: () => Object })
   @IsArray()
-  data: T[];
-  @ApiProperty()
+  data: Array<T>;
+  @ApiProperty({ type: Number })
   total: number;
-  @ApiProperty()
+  @ApiProperty({ type: Number })
   page: number;
-  @ApiProperty()
+  @ApiProperty({ type: Number })
   limit: number;
-  @ApiProperty()
+  @ApiProperty({ type: Boolean })
   hasNextPage?: boolean;
-  @ApiProperty()
+  @ApiProperty({ type: Number })
   pageCount: number;
 }
 

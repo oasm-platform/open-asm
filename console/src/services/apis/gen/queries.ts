@@ -40,8 +40,10 @@ export type CreateTargetDto = {
   workspaceId: string;
 };
 
+export type GetManyResponseDtoDataItem = { [key: string]: unknown };
+
 export type GetManyResponseDto = {
-  data: string[];
+  data: GetManyResponseDtoDataItem[];
   total: number;
   page: number;
   limit: number;
@@ -1106,10 +1108,6 @@ export const useWorkspacesControllerCreateWorkspace = <
   return useMutation(mutationOptions, queryClient);
 };
 
-/**
- * Retrieves a list of workspaces that the user is a member of.
- * @summary Get Workspaces
- */
 export const workspacesControllerGetWorkspaces = (
   params?: WorkspacesControllerGetWorkspacesParams,
   options?: SecondParameter<typeof orvalClient>,
@@ -1269,9 +1267,6 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-/**
- * @summary Get Workspaces
- */
 
 export function useWorkspacesControllerGetWorkspacesInfinite<
   TData = InfiniteData<
@@ -1426,9 +1421,6 @@ export function useWorkspacesControllerGetWorkspaces<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-/**
- * @summary Get Workspaces
- */
 
 export function useWorkspacesControllerGetWorkspaces<
   TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,

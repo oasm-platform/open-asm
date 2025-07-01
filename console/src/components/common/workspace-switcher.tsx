@@ -22,7 +22,8 @@ export function WorkspaceSwitcher() {
     if (isLoading) {
         return null
     }
-    return <></>
+
+
     return (
         <SidebarMenu>
             <SidebarMenuItem>
@@ -47,10 +48,10 @@ export function WorkspaceSwitcher() {
                     >
                         {response?.data?.map((workspace) => (
                             <DropdownMenuItem
-                                key={workspace}
+                                key={workspace.id as any}
                                 onSelect={() => setSelectedWorkspace(workspace.id)}
                             >
-                                {workspace.name}
+                                {workspace?.name}
                                 {workspace.id === selectedWorkspace && <Check className="ml-auto" />}
                             </DropdownMenuItem>
                         ))}

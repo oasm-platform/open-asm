@@ -9,7 +9,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
@@ -43,13 +43,7 @@ export class WorkspacesController {
     return this.workspacesService.createWorkspace(dto, userContextPayload);
   }
 
-  @Doc({
-    summary: 'Get Workspaces',
-    description: 'Retrieves a list of workspaces that the user is a member of.',
-    response: {
-      serialization: GetManyResponseDto<Workspace>,
-    },
-  })
+  @ApiOkResponse({ type: GetManyResponseDto<Workspace> })
   @Get()
   getWorkspaces(
     @Query() query: GetManyBaseQueryParams,
