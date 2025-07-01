@@ -17,6 +17,7 @@ export const auth = betterAuth({
       path: '/docs',
     }),
   ],
+  trustedOrigins: ['*'],
   advanced: {
     database: {
       generateId: () => randomUUID(),

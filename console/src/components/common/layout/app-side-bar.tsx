@@ -4,6 +4,7 @@ import * as React from "react"
 import {
     Sidebar,
     SidebarContent,
+    SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
     SidebarHeader,
@@ -12,6 +13,7 @@ import {
     SidebarMenuItem,
     SidebarRail
 } from "@/components/ui/sidebar"
+import { NavUser } from "../nav-user"
 import { WorkspaceSwitcher } from "../workspace-switcher"
 import { SearchForm } from "./search-form"
 
@@ -66,6 +68,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 ))}
             </SidebarContent>
             <SidebarRail />
+            <SidebarFooter>
+                <NavUser />
+
+            </SidebarFooter>
         </Sidebar>
     )
 }
