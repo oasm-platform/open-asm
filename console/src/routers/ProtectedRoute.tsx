@@ -1,4 +1,4 @@
-import ProtectedLayout from "@/components/common/layout/ProtectedLayout";
+import ProtectedLayout from "@/components/common/layout/protect-layout";
 import { authClient } from "@/utils/authClient";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 const { useSession } = authClient

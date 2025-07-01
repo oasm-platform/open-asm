@@ -12,8 +12,8 @@ import {
     SidebarMenuItem,
     SidebarRail
 } from "@/components/ui/sidebar"
-import { WorkspaceSwitcher } from "../WorkspaceSwitcher"
-import { SearchForm } from "./SearchForm"
+import { WorkspaceSwitcher } from "../workspace-switcher"
+import { SearchForm } from "./search-form"
 
 // This is sample data.
 const data = {

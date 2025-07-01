@@ -5,7 +5,7 @@ import {
     SidebarTrigger,
 } from "@/components/ui/sidebar"
 import type { JSX } from "react"
-import { AppSidebar } from "./AppSidebar"
+import { AppSidebar } from "./app-side-bar"
 
 export default function ProtectedLayout({ children }: { children: JSX.Element }) {
     return (
@@ -18,6 +18,9 @@ export default function ProtectedLayout({ children }: { children: JSX.Element })
                         orientation="vertical"
                         className="mr-2 data-[orientation=vertical]:h-4"
                     />
+                    <div>
+
+                    </div>
                 </header>
                 <div className="flex flex-1 flex-col gap-4 p-4">
                     {children}
