@@ -1,29 +1,28 @@
 "use client"
 
 import { BriefcaseBusiness, Check, ChevronsUpDown } from "lucide-react"
-import * as React from "react"
 
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
+    DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar'
+import { useWorkspacesControllerGetWorkspaces } from "@/services/apis/gen/queries"
+import { DropdownMenuItem } from "@radix-ui/react-dropdown-menu"
+import React from "react"
 
-export function WorkspaceSwitcher({
-    versions,
-    defaultVersion,
-}: {
-    versions: string[]
-    defaultVersion: string
-}) {
-    const [selectedVersion, setSelectedVersion] = React.useState(defaultVersion)
-
+export function WorkspaceSwitcher() {
+    const [selectedWorkspace, setSelectedWorkspace] = React.useState()
+    const { data: response, isLoading } = useWorkspacesControllerGetWorkspaces({ limit: 100, page: 1 })
+    if (isLoading) {
+        return null
+    }
+    return <></>
     return (
         <SidebarMenu>
             <SidebarMenuItem>
@@ -46,13 +45,13 @@ export function WorkspaceSwitcher({
                         className="w-[--radix-dropdown-menu-trigger-width]"
                         align="start"
                     >
-                        {versions.map((version) => (
+                        {response?.data?.map((workspace) => (
                             <DropdownMenuItem
-                                key={version}
-                                onSelect={() => setSelectedVersion(version)}
+                                key={workspace}
+                                onSelect={() => setSelectedWorkspace(workspace.id)}
                             >
-                                v{version}{" "}
-                                {version === selectedVersion && <Check className="ml-auto" />}
+                                {workspace.name}
+                                {workspace.id === selectedWorkspace && <Check className="ml-auto" />}
                             </DropdownMenuItem>
                         ))}
                     </DropdownMenuContent>
