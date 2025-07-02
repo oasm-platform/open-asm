@@ -19,7 +19,11 @@ import {
 } from 'src/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { CreateWorkspaceDto, UpdateWorkspaceDto } from './dto/workspaces.dto';
+import {
+  CreateWorkspaceDto,
+  UpdateWorkspaceDto,
+  WorkspaceStatisticsResponseDto,
+} from './dto/workspaces.dto';
 import { Workspace } from './entities/workspace.entity';
 import { WorkspacesService } from './workspaces.service';
 
@@ -50,6 +54,21 @@ export class WorkspacesController {
     @UserContext() userContextPayload: UserContextPayload,
   ) {
     return this.workspacesService.getWorkspaces(query, userContextPayload);
+  }
+
+  @Doc({
+    summary: 'Get Workspace Statistics',
+    description: 'Retrieves statistics for a specific workspace.',
+    response: {
+      serialization: WorkspaceStatisticsResponseDto,
+    },
+  })
+  @Get(':id/statistics')
+  getWorkspaceStatistics(
+    @Param() { id }: IdQueryParamDto,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.workspacesService.getWorkspaceStatistics(id, userContext);
   }
 
   @Doc({

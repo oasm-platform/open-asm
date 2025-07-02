@@ -7,3 +7,11 @@ export class CreateWorkspaceDto extends PickType(Workspace, [
 ] as const) {}
 
 export class UpdateWorkspaceDto extends PartialType(CreateWorkspaceDto) {}
+
+export class WorkspaceStatisticsResponseDto {
+  totalTargets: number;
+  totalAssets: number;
+  technologies: string[];
+  cnameRecords: string[];
+  statusCodes: number[];
+}
