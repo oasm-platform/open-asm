@@ -1,28 +1,37 @@
-"use client"
-
-import { BriefcaseBusiness, Check, ChevronsUpDown } from "lucide-react"
+"use client";
 
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from '@/components/ui/sidebar'
-import { useWorkspacesControllerGetWorkspaces } from "@/services/apis/gen/queries"
-import { DropdownMenuItem } from "@radix-ui/react-dropdown-menu"
-import React from "react"
+} from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton"; // Assuming you have a Skeleton component
+import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
+import { DropdownMenuItem } from "@radix-ui/react-dropdown-menu";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 export function WorkspaceSwitcher() {
-    const [selectedWorkspace, setSelectedWorkspace] = React.useState<string | null>()
-    const { data: response, isLoading } = useWorkspacesControllerGetWorkspaces({ limit: 100, page: 1 })
-    if (isLoading) {
-        return null
-    }
+    const {
+        workspaces,
+        isLoading,
+        selectedWorkspace,
+        handleSelectWorkspace,
+    } = useWorkspaceSelector();
 
+    if (isLoading) {
+        return (
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <Skeleton className="h-10 w-full" />
+                </SidebarMenuItem>
+            </SidebarMenu>
+        );
+    }
 
     return (
         <SidebarMenu>
@@ -33,31 +42,34 @@ export function WorkspaceSwitcher() {
                             size="lg"
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
-                            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                                <BriefcaseBusiness className="size-4" />
-                            </div>
                             <div className="flex flex-col gap-0.5 leading-none">
-                                <span className="font-semibold">My workspace</span>
+                                <span className="font-semibold">
+                                    {
+                                        workspaces.find((ws) => ws.id === selectedWorkspace)?.name || "Select workspace"
+                                    }
+                                </span>
                             </div>
                             <ChevronsUpDown className="ml-auto" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
+
                     <DropdownMenuContent
-                        className="w-[--radix-dropdown-menu-trigger-width]"
                         align="start"
+                        className="min-w-[var(--radix-dropdown-menu-trigger-width)] p-2"
                     >
-                        {response?.data?.map((workspace) => (
+                        {workspaces.map((workspace) => (
                             <DropdownMenuItem
-                                key={workspace.id as any}
-                                onSelect={() => setSelectedWorkspace(workspace.id)}
+                                key={workspace.id}
+                                onSelect={() => handleSelectWorkspace(workspace.id)}
+                                className="cursor-pointer px-2 py-1.5 rounded hover:bg-muted flex items-center justify-between"
                             >
-                                {workspace?.name}
-                                {workspace.id === selectedWorkspace && <Check className="ml-auto" />}
+                                {workspace.name}
+                                {workspace.id === selectedWorkspace && <Check size={16} />}
                             </DropdownMenuItem>
                         ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>
         </SidebarMenu>
-    )
+    );
 }

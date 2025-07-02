@@ -42,10 +42,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return (
         <Sidebar {...props}>
             <SidebarHeader>
-                <WorkspaceSwitcher
-                    versions={data.versions}
-                    defaultVersion={data.versions[0]}
-                />
+                <WorkspaceSwitcher />
                 <SearchForm />
             </SidebarHeader>
             <SidebarContent>
