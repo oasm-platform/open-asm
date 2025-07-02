@@ -13,7 +13,7 @@ import {
 export class GetManyBaseResponseDto<T> {
   @ApiProperty({ isArray: true, type: () => Object })
   @IsArray()
-  data: Array<T>;
+  data: T[];
   @ApiProperty({ type: Number })
   total: number;
   @ApiProperty({ type: Number })

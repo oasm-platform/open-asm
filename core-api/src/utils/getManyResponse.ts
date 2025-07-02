@@ -1,5 +1,5 @@
 import { Type } from '@nestjs/common';
-import { ApiExtraModels } from '@nestjs/swagger';
+import { ApiExtraModels, ApiProperty } from '@nestjs/swagger';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
@@ -29,7 +29,13 @@ export function getManyResponse<T>(
 }
 
 export function GetManyResponseDto<T>(model: Type<T>) {
-  class PaginatedDto extends GetManyBaseResponseDto<T> {}
+  class PaginatedDto extends GetManyBaseResponseDto<T> {
+    @ApiProperty({ isArray: true, type: () => model })
+    declare data: T[];
+  }
+
   ApiExtraModels(model)(PaginatedDto);
+  ApiExtraModels(PaginatedDto);
+
   return PaginatedDto;
 }
