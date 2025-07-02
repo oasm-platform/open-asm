@@ -23,6 +23,8 @@ import { JobStatus, WorkerName } from 'src/common/enums/enum';
 import { Asset } from '../assets/entities/assets.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
+import { WorkspaceStatisticsRepository } from './workspaces-statistics.repository';
+import { stat } from 'fs';
 
 @Injectable()
 export class WorkspacesService {
@@ -32,6 +34,8 @@ export class WorkspacesService {
     @InjectRepository(WorkspaceMembers)
     private readonly workspaceMembersRepository: Repository<WorkspaceMembers>,
     private dataSource: DataSource,
+
+    private readonly workspaceStatisticsRepository: WorkspaceStatisticsRepository,
   ) {}
 
   /**
@@ -102,89 +106,15 @@ export class WorkspacesService {
   public async getWorkspaceStatistics(
     id: string,
     userContext: UserContextPayload,
-  ): Promise<WorkspaceStatisticsResponseDto> {
+  ): Promise<WorkspaceStatisticsResponseDto | null> {
     const workspace = await this.getWorkspaceById(id, userContext);
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
     }
 
-    // Count total targets
-    const totalTargets = await this.dataSource
-      .createQueryBuilder()
-      .select('COUNT(*)', 'count')
-      .from(WorkspaceTarget, 'wt')
-      .where('wt.workspace.id = :workspaceId', { workspaceId: id })
-      .getRawOne();
-
-    // Count total assets
-    const totalAssets = await this.dataSource
-      .createQueryBuilder()
-      .select('COUNT(*)', 'count')
-      .from(Asset, 'a')
-      .leftJoin('a.target', 't')
-      .leftJoin('t.workspaceTargets', 'wt')
-      .where('wt.workspace.id = :workspaceId', { workspaceId: id })
-      .getRawOne();
-
-    // Get technologies
-    const technologies = await this.dataSource
-      .createQueryBuilder()
-      .select(
-        `DISTINCT jsonb_array_elements_text(j."rawResult"::jsonb->'tech')`,
-        'technology',
-      )
-      .from(Job, 'j')
-      .leftJoin('j.asset', 'a')
-      .leftJoin('a.target', 't')
-      .leftJoin('t.workspaceTargets', 'wt')
-      .where('wt.workspace.id = :workspaceId', { workspaceId: id })
-      .andWhere('j.workerName = :workerName', { workerName: WorkerName.HTTPX })
-      .andWhere('j.status = :status', { status: JobStatus.COMPLETED })
-      .andWhere('j."rawResult" IS NOT NULL')
-      .getRawMany();
-
-    // Get CNAME records
-    const cnames = await this.dataSource
-      .createQueryBuilder()
-      .select(
-        `DISTINCT jsonb_array_elements_text(a."dnsRecords"::jsonb->'CNAME')`,
-        'cname',
-      )
-      .from(Asset, 'a')
-      .leftJoin('a.target', 't')
-      .leftJoin('t.workspaceTargets', 'wt')
-      .where('wt.workspace.id = :workspaceId', { workspaceId: id })
-      .andWhere('a."dnsRecords" IS NOT NULL')
-      .andWhere(`a."dnsRecords"::jsonb ? 'CNAME'`)
-      .getRawMany();
-
-    // Get status codes
-    const statusCodes = await this.dataSource
-      .createQueryBuilder()
-      .select(`DISTINCT j."rawResult"::jsonb->>'status_code'`, 'status_code')
-      .from(Job, 'j')
-      .leftJoin('j.asset', 'a')
-      .leftJoin('a.target', 't')
-      .leftJoin('t.workspaceTargets', 'wt')
-      .where('wt.workspace.id = :workspaceId', { workspaceId: id })
-      .andWhere('j.workerName = :workerName', { workerName: WorkerName.HTTPX })
-      .andWhere('j.status = :status', { status: JobStatus.COMPLETED })
-      .andWhere('j."rawResult" IS NOT NULL')
-      .andWhere('j."rawResult"::jsonb ? :statusKey', {
-        statusKey: 'status_code',
-      })
-      .orderBy('status_code')
-      .getRawMany();
-
-    // Construct the response DTO
-    const result = new WorkspaceStatisticsResponseDto();
-    result.totalTargets = parseInt(totalTargets.count, 10) || 0;
-    result.totalAssets = parseInt(totalAssets.count, 10) || 0;
-    result.technologies = technologies.map((tech) => tech.technology) || [];
-    result.cnameRecords = cnames.map((cname) => cname.cname) || [];
-    result.statusCodes = statusCodes.map((code) => code.status_code) || [];
-
-    return result;
+    return await this.workspaceStatisticsRepository.getStatisticsByWorkspaceId(
+      id,
+    );
   }
 
   /**

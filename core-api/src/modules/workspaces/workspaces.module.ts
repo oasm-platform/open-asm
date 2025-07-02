@@ -4,14 +4,18 @@ import { WorkspacesController } from './workspaces.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Workspace } from './entities/workspace.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
-import { Asset } from '../assets/entities/assets.entity';
-import { Job } from '../jobs-registry/entities/job.entity';
-import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
-
+import { WorkspaceStatisticsRepository } from './workspaces-statistics.repository';
+import { WorkspaceStatisticsView } from './entities/workspace-statistics.view.entity';
 @Module({
-  imports: [TypeOrmModule.forFeature([Workspace, WorkspaceMembers])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Workspace,
+      WorkspaceMembers,
+      WorkspaceStatisticsView,
+    ]),
+  ],
   controllers: [WorkspacesController],
-  providers: [WorkspacesService],
+  providers: [WorkspacesService, WorkspaceStatisticsRepository],
   exports: [WorkspacesService],
 })
 export class WorkspacesModule {}
