@@ -7,7 +7,7 @@ export const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <ThemeProvider defaultTheme="dark" storageKey="theme">
         <RouterProvider router={router} />
       </ThemeProvider>
     </QueryClientProvider>

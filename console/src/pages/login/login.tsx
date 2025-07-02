@@ -11,6 +11,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { authClient } from '@/utils/authClient'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Loader2Icon } from 'lucide-react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useLocation } from 'react-router-dom'
 import { z } from 'zod'
@@ -21,7 +23,6 @@ const formSchema = z.object({
 })
 
 export default function Login() {
-    // Inside the Login component:
     const location = useLocation()
     const searchParams = new URLSearchParams(location.search)
     const redirectUrl = searchParams.get('redirect')
@@ -33,12 +34,31 @@ export default function Login() {
         },
     })
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
-        authClient.signIn.email({
-            email: values.email,
-            password: values.password,
-            callbackURL: redirectUrl as string || "/"
-        })
+    const [loading, setLoading] = useState(false)
+
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        try {
+            setLoading(true)
+            await authClient.signIn.email({
+                email: values.email,
+                password: values.password,
+                callbackURL: redirectUrl as string || "/"
+            })
+        } catch (error) {
+            if (error instanceof Error) {
+                form.setError('password', {
+                    type: 'server',
+                    message: error.message
+                })
+            } else {
+                form.setError('password', {
+                    type: 'server',
+                    message: 'An unexpected error occurred'
+                })
+            }
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (
@@ -73,10 +93,16 @@ export default function Login() {
                                             <Input type="password" placeholder="••••••••" {...field} />
                                         </FormControl>
                                         <FormMessage />
+                                        {form.formState.errors.password?.type === 'server' && (
+                                            <FormMessage className="text-red-500">
+                                                {form.formState.errors.password.message}
+                                            </FormMessage>
+                                        )}
                                     </FormItem>
                                 )}
                             />
-                            <Button type="submit" className="w-full">
+                            <Button disabled={loading} type="submit" className="w-full">
+                                {loading && <Loader2Icon className="animate-spin" />}
                                 Sign In
                             </Button>
                         </form>

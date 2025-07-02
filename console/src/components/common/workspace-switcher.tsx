@@ -23,11 +23,15 @@ export function WorkspaceSwitcher() {
         handleSelectWorkspace,
     } = useWorkspaceSelector();
 
+    // Define a consistent height class
+    const itemHeightClass = "h-10";
+
     if (isLoading) {
         return (
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <Skeleton className="h-10 w-full" />
+                    {/* Use the consistent height class for the skeleton */}
+                    <Skeleton className={`${itemHeightClass} w-full`} />
                 </SidebarMenuItem>
             </SidebarMenu>
         );
@@ -38,9 +42,10 @@ export function WorkspaceSwitcher() {
             <SidebarMenuItem>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
+                        {/* Use the consistent height class for the button */}
                         <SidebarMenuButton
-                            size="lg"
-                            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                            size="lg" // Keep size="lg" for padding/font-size etc.
+                            className={`${itemHeightClass} data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground`}
                         >
                             <div className="flex flex-col gap-0.5 leading-none">
                                 <span className="font-semibold">
@@ -73,3 +78,4 @@ export function WorkspaceSwitcher() {
         </SidebarMenu>
     );
 }
+

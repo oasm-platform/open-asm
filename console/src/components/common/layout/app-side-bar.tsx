@@ -1,5 +1,5 @@
-import * as React from "react"
-
+import * as React from "react";
+import { Link, useLocation } from "react-router-dom";
 
 import {
     Sidebar,
@@ -12,33 +12,33 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail
-} from "@/components/ui/sidebar"
-import { NavUser } from "../nav-user"
-import { WorkspaceSwitcher } from "../workspace-switcher"
-import { SearchForm } from "./search-form"
+} from "@/components/ui/sidebar";
+import { LayoutDashboard, Target } from "lucide-react";
+import { NavUser } from "../nav-user";
+import { WorkspaceSwitcher } from "../workspace-switcher";
+import { SearchForm } from "./search-form";
 
-// This is sample data.
-const data = {
-    versions: ["My workspace"],
-    navMain: [
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    const location = useLocation();
+
+    const menu = [
         {
             title: "Overview",
             url: "#",
             items: [
                 {
                     title: "Dashboard",
-                    url: "#",
+                    icon: <LayoutDashboard />,
+                    url: "",
                 },
                 {
-                    title: "Assets",
-                    url: "#",
+                    title: "Targets",
+                    icon: <Target />,
+                    url: "/targets",
                 },
             ],
         },
-    ],
-}
-
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    ];
     return (
         <Sidebar {...props}>
             <SidebarHeader>
@@ -46,19 +46,31 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SearchForm />
             </SidebarHeader>
             <SidebarContent>
-                {/* We create a SidebarGroup for each parent. */}
-                {data.navMain.map((item) => (
+                {menu.map((item) => (
                     <SidebarGroup key={item.title}>
-                        {/* <SidebarGroupLabel>{item.title}</SidebarGroupLabel> */}
                         <SidebarGroupContent>
                             <SidebarMenu>
-                                {item.items.map((item) => (
-                                    <SidebarMenuItem key={item.title}>
-                                        <SidebarMenuButton asChild>
-                                            <a href={item.url}>{item.title}</a>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                ))}
+                                {item.items.map((item) => {
+                                    const toUrl = item.url.startsWith("/") ? item.url : `/${item.url}`;
+                                    const isActive = location.pathname === toUrl;
+
+                                    return (
+                                        <SidebarMenuItem key={item.title}>
+                                            <SidebarMenuButton
+                                                asChild
+                                                isActive={isActive}
+                                                className="hover:cursor-pointer"
+                                            >
+                                                <Link
+                                                    to={toUrl}
+                                                    className="flex items-center justify-start gap-2 w-full h-full"
+                                                >
+                                                    {item.icon} {item.title}
+                                                </Link>
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+                                    );
+                                })}
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
@@ -67,8 +79,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarRail />
             <SidebarFooter>
                 <NavUser />
-
             </SidebarFooter>
         </Sidebar>
-    )
+    );
 }
