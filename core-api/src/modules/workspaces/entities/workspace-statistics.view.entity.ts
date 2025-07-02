@@ -2,7 +2,6 @@ import { ViewColumn, ViewEntity } from 'typeorm';
 
 @ViewEntity({
   expression: `
-    CREATE OR REPLACE VIEW workspace_statistics_view AS
     WITH workspace_targets_count AS (
       SELECT 
         wt."workspaceId",
