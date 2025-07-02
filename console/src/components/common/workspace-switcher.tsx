@@ -17,7 +17,7 @@ import { DropdownMenuItem } from "@radix-ui/react-dropdown-menu"
 import React from "react"
 
 export function WorkspaceSwitcher() {
-    const [selectedWorkspace, setSelectedWorkspace] = React.useState()
+    const [selectedWorkspace, setSelectedWorkspace] = React.useState<string | null>()
     const { data: response, isLoading } = useWorkspacesControllerGetWorkspaces({ limit: 100, page: 1 })
     if (isLoading) {
         return null

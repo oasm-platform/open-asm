@@ -27,6 +27,9 @@ import type {
 
 import { orvalClient } from "../axios-client";
 export type Target = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
   /** The target domain (with optional URL path, will be parsed to extract domain) */
   value: string;
 };
@@ -40,10 +43,10 @@ export type CreateTargetDto = {
   workspaceId: string;
 };
 
-export type GetManyResponseDtoDataItem = { [key: string]: unknown };
+export type GetManyBaseResponseDtoDataItem = { [key: string]: unknown };
 
-export type GetManyResponseDto = {
-  data: GetManyResponseDtoDataItem[];
+export type GetManyBaseResponseDto = {
+  data: GetManyBaseResponseDtoDataItem[];
   total: number;
   page: number;
   limit: number;
@@ -56,6 +59,9 @@ export type DefaultMessageResponseDto = {
 };
 
 export type Workspace = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
   /** The name of the workspace */
   name: string;
   /** The description of the workspace */
@@ -68,6 +74,17 @@ export type CreateWorkspaceDto = {
   /** The description of the workspace */
   description: string;
 };
+
+export type PaginatedDto = {
+  data: Workspace[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type WorkspaceStatisticsResponseDto = { [key: string]: unknown };
 
 export type UpdateWorkspaceDto = {
   /** The name of the workspace */
@@ -545,7 +562,7 @@ export const targetsControllerGetTargetsInWorkspace = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyResponseDto>(
+  return orvalClient<GetManyBaseResponseDto>(
     { url: `/api/targets/workspace/${id}`, method: "GET", params, signal },
     options,
   );
@@ -1108,12 +1125,16 @@ export const useWorkspacesControllerCreateWorkspace = <
   return useMutation(mutationOptions, queryClient);
 };
 
+/**
+ * Retrieves a list of workspaces that the user is a member of.
+ * @summary Get Workspaces
+ */
 export const workspacesControllerGetWorkspaces = (
   params?: WorkspacesControllerGetWorkspacesParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyResponseDto>(
+  return orvalClient<PaginatedDto>(
     { url: `/api/workspaces`, method: "GET", params, signal },
     options,
   );
@@ -1267,6 +1288,9 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
+/**
+ * @summary Get Workspaces
+ */
 
 export function useWorkspacesControllerGetWorkspacesInfinite<
   TData = InfiniteData<
@@ -1421,6 +1445,9 @@ export function useWorkspacesControllerGetWorkspaces<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
+/**
+ * @summary Get Workspaces
+ */
 
 export function useWorkspacesControllerGetWorkspaces<
   TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
@@ -1445,6 +1472,371 @@ export function useWorkspacesControllerGetWorkspaces<
     params,
     options,
   );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves statistics for a specific workspace.
+ * @summary Get Workspace Statistics
+ */
+export const workspacesControllerGetWorkspaceStatistics = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspaceStatisticsResponseDto>(
+    { url: `/api/workspaces/${id}/statistics`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerGetWorkspaceStatisticsQueryKey = (
+  id: string,
+) => {
+  return [`/api/workspaces/${id}/statistics`] as const;
+};
+
+export const getWorkspacesControllerGetWorkspaceStatisticsInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+    >,
+    TError = unknown,
+  >(
+    id: string,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getWorkspacesControllerGetWorkspaceStatisticsQueryKey(id);
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+    > = ({ signal }) =>
+      workspacesControllerGetWorkspaceStatistics(id, requestOptions, signal);
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!id,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type WorkspacesControllerGetWorkspaceStatisticsInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+  >;
+export type WorkspacesControllerGetWorkspaceStatisticsInfiniteQueryError =
+  unknown;
+
+export function useWorkspacesControllerGetWorkspaceStatisticsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+          >,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceStatisticsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+          >,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceStatisticsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get Workspace Statistics
+ */
+
+export function useWorkspacesControllerGetWorkspaceStatisticsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetWorkspaceStatisticsInfiniteQueryOptions(
+      id,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkspacesControllerGetWorkspaceStatisticsQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetWorkspaceStatisticsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+  > = ({ signal }) =>
+    workspacesControllerGetWorkspaceStatistics(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetWorkspaceStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+>;
+export type WorkspacesControllerGetWorkspaceStatisticsQueryError = unknown;
+
+export function useWorkspacesControllerGetWorkspaceStatistics<
+  TData = Awaited<
+    ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+          >,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceStatistics<
+  TData = Awaited<
+    ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+          >,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceStatistics<
+  TData = Awaited<
+    ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get Workspace Statistics
+ */
+
+export function useWorkspacesControllerGetWorkspaceStatistics<
+  TData = Awaited<
+    ReturnType<typeof workspacesControllerGetWorkspaceStatistics>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetWorkspaceStatisticsQueryOptions(id, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -2798,7 +3190,7 @@ export const assetsControllerGetAllAssetsInTarget = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyResponseDto>(
+  return orvalClient<GetManyBaseResponseDto>(
     { url: `/api/assets/target/${id}`, method: "GET", params, signal },
     options,
   );
