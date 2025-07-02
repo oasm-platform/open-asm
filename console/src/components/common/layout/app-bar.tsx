@@ -4,6 +4,7 @@ import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import ThemeModeSwitcher from "@/components/ui/theme-mode-switcher";
 import { Separator } from "@radix-ui/react-separator";
 import type { JSX } from "react";
+import { CreateTarget } from "../create-target";
 
 export default function AppBar({ children }: { children: JSX.Element }) {
     return (
@@ -14,7 +15,8 @@ export default function AppBar({ children }: { children: JSX.Element }) {
                     orientation="vertical"
                     className="mr-2 data-[orientation=vertical]:h-4"
                 />
-                <div className="ml-auto">
+                <div className="ml-auto flex gap-3">
+                    <CreateTarget />
                     <ThemeModeSwitcher />
                 </div>
             </header>

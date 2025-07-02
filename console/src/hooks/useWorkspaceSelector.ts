@@ -18,13 +18,16 @@ export function useWorkspaceSelector() {
     return null;
   });
 
+  // Đảm bảo handleSelectWorkspace luôn ổn định và cập nhật state
   const handleSelectWorkspace = React.useCallback((id: string) => {
     setSelectedWorkspaceState(id);
     if (typeof window !== "undefined") {
       localStorage.setItem(LOCAL_STORAGE_KEY, id);
     }
+    window.location.reload();
   }, []);
 
+  // Khi response thay đổi, cập nhật selectedWorkspace nếu cần
   React.useEffect(() => {
     if (response?.data && response.data.length > 0) {
       const workspaceIds = response.data.map((ws) => ws.id);
@@ -59,7 +62,18 @@ export function useWorkspaceSelector() {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
     }
-  }, [response]);
+  }, [response, selectedWorkspace]);
+
+  // Lắng nghe sự thay đổi của localStorage từ các tab khác (nếu cần)
+  React.useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LOCAL_STORAGE_KEY) {
+        setSelectedWorkspaceState(e.newValue);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   return {
     workspaces: response?.data || [],

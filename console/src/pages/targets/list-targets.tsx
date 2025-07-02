@@ -90,8 +90,13 @@ export const columns: ColumnDef<Target, any>[] = [
 export function ListTargets() {
     const { selectedWorkspace } = useWorkspaceSelector()
     const { data, isLoading } = useTargetsControllerGetTargetsInWorkspace(
-        selectedWorkspace ?? ""
+        selectedWorkspace ?? "", {}, {
+        query: {
+            queryKey: [selectedWorkspace]
+        }
+    }
     )
+
 
     const targets = data?.data ?? []
 
