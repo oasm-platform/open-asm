@@ -8,10 +8,8 @@ import { databaseConnectionConfig } from './database-config';
     TypeOrmModule.forRoot({
       type: 'postgres',
       entities: [__dirname + '/../**/**/*.entity{.ts,.js}'],
-      migrations: [__dirname + '/../**/**/*.migration{.ts,.js}'],
       ...databaseConnectionConfig,
-      migrationsRun: true,
-      synchronize: false,
+      synchronize: true,
     }),
   ],
 })
