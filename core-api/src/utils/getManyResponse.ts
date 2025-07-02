@@ -34,6 +34,10 @@ export function GetManyResponseDto<T>(model: Type<T>) {
     declare data: T[];
   }
 
+  Object.defineProperty(PaginatedDto, 'name', {
+    value: `GetMany${model.name}Dto`,
+  });
+
   ApiExtraModels(model)(PaginatedDto);
   ApiExtraModels(PaginatedDto);
 

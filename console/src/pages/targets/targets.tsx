@@ -1,8 +1,10 @@
+import { ListTargets } from "./list-targets";
+
 
 const Targets = () => {
     return (
         <div>
-            Targets
+            <ListTargets />
         </div>
     );
 };

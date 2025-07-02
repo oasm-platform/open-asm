@@ -28,6 +28,7 @@ export class Target extends BaseEntity {
   @Column({ unique: true, type: 'varchar' })
   value: string;
 
+  @ApiProperty()
   @Column({
     type: 'timestamp',
     nullable: true,

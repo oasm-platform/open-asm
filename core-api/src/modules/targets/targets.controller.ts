@@ -12,12 +12,10 @@ import {
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from 'src/common/dtos/get-many-base.dto';
+import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { CreateTargetDto } from './dto/targets.dto';
 import { Target } from './entities/target.entity';
 import { TargetsService } from './targets.service';
@@ -62,7 +60,7 @@ export class TargetsController {
     summary: 'Get all targets in a workspace',
     description: 'Retrieves all targets in a workspace.',
     response: {
-      serialization: GetManyBaseResponseDto<Target>,
+      serialization: GetManyResponseDto(Target),
     },
   })
   @Get('workspace/:id')

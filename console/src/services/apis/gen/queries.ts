@@ -32,6 +32,7 @@ export type Target = {
   updatedAt: string;
   /** The target domain (with optional URL path, will be parsed to extract domain) */
   value: string;
+  lastDiscoveredAt: string;
 };
 
 export type AppResponseSerialization = { [key: string]: unknown };
@@ -43,10 +44,8 @@ export type CreateTargetDto = {
   workspaceId: string;
 };
 
-export type GetManyBaseResponseDtoDataItem = { [key: string]: unknown };
-
-export type GetManyBaseResponseDto = {
-  data: GetManyBaseResponseDtoDataItem[];
+export type GetManyTargetDto = {
+  data: Target[];
   total: number;
   page: number;
   limit: number;
@@ -75,7 +74,7 @@ export type CreateWorkspaceDto = {
   description: string;
 };
 
-export type PaginatedDto = {
+export type GetManyWorkspaceDto = {
   data: Workspace[];
   total: number;
   page: number;
@@ -109,6 +108,17 @@ export type UpdateResultDtoData = { [key: string]: unknown };
 export type UpdateResultDto = {
   jobId: string;
   data: UpdateResultDtoData;
+};
+
+export type GetManyBaseResponseDtoDataItem = { [key: string]: unknown };
+
+export type GetManyBaseResponseDto = {
+  data: GetManyBaseResponseDtoDataItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
@@ -562,7 +572,7 @@ export const targetsControllerGetTargetsInWorkspace = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyBaseResponseDto>(
+  return orvalClient<GetManyTargetDto>(
     { url: `/api/targets/workspace/${id}`, method: "GET", params, signal },
     options,
   );
@@ -1134,7 +1144,7 @@ export const workspacesControllerGetWorkspaces = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<PaginatedDto>(
+  return orvalClient<GetManyWorkspaceDto>(
     { url: `/api/workspaces`, method: "GET", params, signal },
     options,
   );

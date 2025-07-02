@@ -51,6 +51,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 {item.items.map((item) => {
+                                    // Ensure all URLs are absolute for comparison
                                     const toUrl = item.url.startsWith("/") ? item.url : `/${item.url}`;
                                     const isActive = location.pathname === toUrl;
 
