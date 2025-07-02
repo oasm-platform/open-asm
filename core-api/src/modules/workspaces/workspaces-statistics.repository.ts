@@ -28,12 +28,6 @@ export class WorkspaceStatisticsRepository {
     if (!result) {
       return null;
     }
-    return {
-      totalTargets: result.total_targets || 0,
-      totalAssets: result.total_assets || 0,
-      technologies: result.technologies || [],
-      cnameRecords: result.cname_records || [],
-      statusCodes: result.status_codes || [],
-    };
+    return result;
   }
 }

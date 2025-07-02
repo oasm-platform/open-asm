@@ -5,14 +5,14 @@ import { ViewColumn, ViewEntity } from 'typeorm';
     WITH workspace_targets_count AS (
       SELECT 
         wt."workspaceId",
-        COUNT(*) as total_targets
+        COUNT(*) as "totalTargets"
       FROM workspace_targets wt
       GROUP BY wt."workspaceId"
     ),
     workspace_assets_count AS (
       SELECT 
         wt."workspaceId",
-        COUNT(DISTINCT a.id) as total_assets
+        COUNT(DISTINCT a.id) as "totalAssets"
       FROM workspace_targets wt
       LEFT JOIN targets t ON t.id = wt."targetId"
       LEFT JOIN assets a ON a."targetId" = t.id
@@ -21,7 +21,7 @@ import { ViewColumn, ViewEntity } from 'typeorm';
     workspace_technologies AS (
       SELECT 
         wt."workspaceId",
-        jsonb_agg(DISTINCT tech_element ORDER BY tech_element) as technologies
+        jsonb_agg(DISTINCT tech_element ORDER BY tech_element) as "technologies"
       FROM workspace_targets wt
       LEFT JOIN targets t ON t.id = wt."targetId"
       LEFT JOIN assets a ON a."targetId" = t.id
@@ -36,7 +36,7 @@ import { ViewColumn, ViewEntity } from 'typeorm';
     workspace_cnames AS (
       SELECT 
         wt."workspaceId",
-        jsonb_agg(DISTINCT cname_element ORDER BY cname_element) as cname_records
+        jsonb_agg(DISTINCT cname_element ORDER BY cname_element) as "cnameRecords"
       FROM workspace_targets wt
       LEFT JOIN targets t ON t.id = wt."targetId"
       LEFT JOIN assets a ON a."targetId" = t.id
@@ -48,7 +48,7 @@ import { ViewColumn, ViewEntity } from 'typeorm';
     workspace_status_codes AS (
       SELECT 
         wt."workspaceId",
-        jsonb_agg(DISTINCT (j."rawResult"::jsonb->>'status_code')::integer ORDER BY (j."rawResult"::jsonb->>'status_code')::integer) as status_codes
+        jsonb_agg(DISTINCT (j."rawResult"::jsonb->>'status_code')::integer ORDER BY (j."rawResult"::jsonb->>'status_code')::integer) as "statusCodes"
       FROM workspace_targets wt
       LEFT JOIN targets t ON t.id = wt."targetId"
       LEFT JOIN assets a ON a."targetId" = t.id
@@ -60,13 +60,13 @@ import { ViewColumn, ViewEntity } from 'typeorm';
       GROUP BY wt."workspaceId"
     )
     SELECT 
-      w.id as workspace_id,
-      COALESCE(wtc.total_targets, 0) as total_targets,
-      COALESCE(wac.total_assets, 0) as total_assets,
-      COALESCE(wt.technologies, '[]'::jsonb) as technologies,
-      COALESCE(wc.cname_records, '[]'::jsonb) as cname_records,
-      COALESCE(wsc.status_codes, '[]'::jsonb) as status_codes
-    FROM public.workspace w -- Replace 'public' with 'your_schema' if needed
+      w.id as "workspaceId",
+      COALESCE(wtc."totalTargets", 0) as "totalTargets",
+      COALESCE(wac."totalAssets", 0) as "totalAssets",
+      COALESCE(wt."technologies", '[]'::jsonb) as "technologies",
+      COALESCE(wc."cnameRecords", '[]'::jsonb) as "cnameRecords",
+      COALESCE(wsc."statusCodes", '[]'::jsonb) as "statusCodes"
+    FROM public.workspace w
     LEFT JOIN workspace_targets_count wtc ON wtc."workspaceId" = w.id
     LEFT JOIN workspace_assets_count wac ON wac."workspaceId" = w.id
     LEFT JOIN workspace_technologies wt ON wt."workspaceId" = w.id
@@ -76,20 +76,20 @@ import { ViewColumn, ViewEntity } from 'typeorm';
 })
 export class WorkspaceStatisticsView {
   @ViewColumn()
-  workspace_id: string;
+  workspaceId: string;
 
   @ViewColumn()
-  total_targets: number;
+  totalTargets: number;
 
   @ViewColumn()
-  total_assets: number;
+  totalAssets: number;
 
   @ViewColumn()
   technologies: string[];
 
   @ViewColumn()
-  cname_records: string[];
+  cnameRecords: string[];
 
   @ViewColumn()
-  status_codes: number[];
+  statusCodes: number[];
 }
