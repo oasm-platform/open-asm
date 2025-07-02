@@ -16,3 +16,8 @@ export enum JobStatus {
   FAILED = 'failed',
   CANCELLED = 'cancelled',
 }
+
+export enum ScanStatus {
+  RUNNING = 'RUNNING',
+  DONE = 'DONE',
+}

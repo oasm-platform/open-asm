@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsString, Matches } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
+import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
 
@@ -41,4 +42,7 @@ export class Target extends BaseEntity {
 
   @OneToMany(() => WorkspaceTarget, (workspaceTarget) => workspaceTarget.target)
   workspaceTargets: WorkspaceTarget[];
+
+  @OneToMany(() => Asset, (asset) => asset.target)
+  assets: Asset[];
 }

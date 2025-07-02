@@ -44,8 +44,28 @@ export type CreateTargetDto = {
   workspaceId: string;
 };
 
-export type GetManyTargetDto = {
-  data: Target[];
+export type GetManyTargetResponseDtoStatus =
+  (typeof GetManyTargetResponseDtoStatus)[keyof typeof GetManyTargetResponseDtoStatus];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const GetManyTargetResponseDtoStatus = {
+  RUNNING: "RUNNING",
+  DONE: "DONE",
+} as const;
+
+export type GetManyTargetResponseDto = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  /** The target domain (with optional URL path, will be parsed to extract domain) */
+  value: string;
+  lastDiscoveredAt: string;
+  status: GetManyTargetResponseDtoStatus;
+  totalAssets: number;
+};
+
+export type GetManyGetManyTargetResponseDtoDto = {
+  data: GetManyTargetResponseDto[];
   total: number;
   page: number;
   limit: number;
@@ -572,7 +592,7 @@ export const targetsControllerGetTargetsInWorkspace = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyTargetDto>(
+  return orvalClient<GetManyGetManyTargetResponseDtoDto>(
     { url: `/api/targets/workspace/${id}`, method: "GET", params, signal },
     options,
   );

@@ -12,9 +12,10 @@ import {
     type SortingState,
     type VisibilityState,
 } from "@tanstack/react-table"
-import { ChevronDown, MoreHorizontal } from "lucide-react"
+import { BadgeCheckIcon, ChevronDown, Loader2Icon, MoreHorizontal } from "lucide-react"
 import * as React from "react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -46,11 +47,12 @@ export const columns: ColumnDef<Target, any>[] = [
         cell: ({ row }) => <div>{row.getValue("value")}</div>,
     },
     {
-        accessorKey: "isReScan",
-        header: "Is ReScan",
-        cell: ({ row }) => (
-            <div>{row.getValue("isReScan") ? "Yes" : "No"}</div>
-        ),
+        accessorKey: "totalAssets",
+        header: "Total assets",
+        cell: ({ row }) => {
+            const value: string = row.getValue("totalAssets")
+            return <div><b>{value}</b> assets</div>
+        },
     },
     {
         accessorKey: "lastDiscoveredAt",
@@ -60,6 +62,27 @@ export const columns: ColumnDef<Target, any>[] = [
             return <div>{new Date(value).toLocaleString()}</div>
         },
     },
+    {
+        accessorKey: "status",
+        header: "Scan status",
+        cell: ({ row }) => {
+            const value: string = row.getValue("status")
+            return value === "DONE" ? <Badge
+                variant="secondary"
+                className="bg-green-500 text-white dark:bg-green-500"
+            >
+                <BadgeCheckIcon />
+                Done
+            </Badge> : <Badge
+                variant="secondary"
+                className="bg-yellow-500 text-white dark:bg-yellow-600"
+            >
+                <Loader2Icon className="animate-spin" />
+                Running
+            </Badge>
+        },
+    },
+
     {
         id: "actions",
         enableHiding: false,
@@ -92,7 +115,8 @@ export function ListTargets() {
     const { data, isLoading } = useTargetsControllerGetTargetsInWorkspace(
         selectedWorkspace ?? "", {}, {
         query: {
-            queryKey: [selectedWorkspace]
+            queryKey: [selectedWorkspace],
+            refetchInterval: 5000
         }
     }
     )

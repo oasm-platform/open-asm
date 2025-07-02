@@ -1,6 +1,7 @@
 import { ApiProperty, PickType } from '@nestjs/swagger';
-import { Target } from '../entities/target.entity';
 import { IsUUID } from 'class-validator';
+import { ScanStatus } from 'src/common/enums/enum';
+import { Target } from '../entities/target.entity';
 
 export class CreateTargetDto extends PickType(Target, ['value'] as const) {
   @ApiProperty({
@@ -9,4 +10,12 @@ export class CreateTargetDto extends PickType(Target, ['value'] as const) {
   })
   @IsUUID('4')
   workspaceId: string;
+}
+
+export class GetManyTargetResponseDto extends Target {
+  @ApiProperty({ enum: ScanStatus, example: ScanStatus.DONE })
+  status: ScanStatus;
+
+  @ApiProperty({ example: 100 })
+  totalAssets: number;
 }

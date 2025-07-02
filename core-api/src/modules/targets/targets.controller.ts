@@ -16,7 +16,7 @@ import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
-import { CreateTargetDto } from './dto/targets.dto';
+import { CreateTargetDto, GetManyTargetResponseDto } from './dto/targets.dto';
 import { Target } from './entities/target.entity';
 import { TargetsService } from './targets.service';
 
@@ -60,7 +60,7 @@ export class TargetsController {
     summary: 'Get all targets in a workspace',
     description: 'Retrieves all targets in a workspace.',
     response: {
-      serialization: GetManyResponseDto(Target),
+      serialization: GetManyResponseDto(GetManyTargetResponseDto),
     },
   })
   @Get('workspace/:id')

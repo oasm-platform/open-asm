@@ -117,30 +117,43 @@ export class TargetsService {
   public async getTargetsInWorkspace(
     id: string,
     query: GetManyBaseQueryParams,
-  ): Promise<GetManyBaseResponseDto<Target>> {
+  ): Promise<
+    GetManyBaseResponseDto<Target & { totalAssets: number; status: string }>
+  > {
     const { limit, page, sortBy, sortOrder } = query;
 
-    // Create query builder from repository and join tables
+    const offset = (page - 1) * limit;
+
     const queryBuilder = this.repo
-      .createQueryBuilder('target')
-      .innerJoin('target.workspaceTargets', 'workspaceTarget')
+      .createQueryBuilder('targets')
+      .innerJoin('targets.workspaceTargets', 'workspaceTarget')
       .innerJoin('workspaceTarget.workspace', 'workspace')
       .innerJoin('workspace.workspaceMembers', 'workspaceMember')
-      .where('workspace.id = :workspaceId', { workspaceId: id });
+      .leftJoin('targets.assets', 'asset')
+      .leftJoin('asset.jobs', 'job')
+      .where('workspace.id = :workspaceId', { workspaceId: id })
+      .select([
+        'targets.id as id',
+        'targets.value as value',
+        'targets.lastDiscoveredAt as "lastDiscoveredAt"',
+        'COUNT(DISTINCT asset.id) AS "totalAssets"',
+        `CASE
+          WHEN COUNT(CASE WHEN job.status IN ('pending', 'in_progress') THEN 1 END) > 0
+          THEN 'RUNNING'
+          ELSE 'DONE'
+        END AS status`,
+      ])
+      .groupBy('targets.id');
 
-    if (query.sortBy in Target) {
-      queryBuilder.orderBy(`target.${sortBy}`, sortOrder);
+    if (sortBy in Target) {
+      queryBuilder.orderBy(`targets.${sortBy}`, sortOrder);
     } else {
-      queryBuilder.orderBy('target.createdAt', sortOrder);
+      queryBuilder.orderBy('targets.createdAt', sortOrder);
     }
 
     const total = await queryBuilder.getCount();
 
-    const offset = (page - 1) * limit;
-
-    queryBuilder.limit(limit).offset(offset);
-
-    const targets = await queryBuilder.getMany();
+    const targets = await queryBuilder.limit(limit).offset(offset).getRawMany();
 
     return getManyResponse(query, targets, total);
   }
