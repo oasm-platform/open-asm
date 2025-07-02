@@ -1,12 +1,12 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { AssetsService } from './assets.service';
-import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
+import { ApiTags } from '@nestjs/swagger';
 import { Doc } from 'src/common/doc/doc.decorator';
 import {
   GetManyBaseQueryParams,
-  GetManyResponseDto,
+  GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { ApiTags } from '@nestjs/swagger';
+import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
+import { AssetsService } from './assets.service';
 import { GetAssetsResponseDto } from './dto/assets.dto';
 
 @ApiTags('Assets')
@@ -18,7 +18,7 @@ export class AssetsController {
     summary: 'Get assets in target',
     description: 'Retrieves a list of assets associated with the given target.',
     response: {
-      serialization: GetManyResponseDto<GetAssetsResponseDto>,
+      serialization: GetManyBaseResponseDto<GetAssetsResponseDto>,
     },
   })
   @Get('/target/:id')

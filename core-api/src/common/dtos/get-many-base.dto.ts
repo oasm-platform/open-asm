@@ -10,7 +10,7 @@ import {
   Min,
 } from 'class-validator';
 
-export class GetManyResponseDto<T> {
+export class GetManyBaseResponseDto<T> {
   @ApiProperty({ isArray: true, type: () => Object })
   @IsArray()
   data: Array<T>;

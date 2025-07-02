@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
-  GetManyResponseDto,
+  GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
@@ -74,7 +74,7 @@ export class WorkspacesService {
   public async getWorkspaces(
     query: GetManyBaseQueryParams,
     userContextPayload: UserContextPayload,
-  ): Promise<GetManyResponseDto<Workspace>> {
+  ): Promise<GetManyBaseResponseDto<Workspace>> {
     const { limit, page, sortOrder } = query;
     let { sortBy } = query;
     const { id } = userContextPayload;

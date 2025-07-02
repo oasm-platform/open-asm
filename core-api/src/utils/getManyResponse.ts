@@ -1,8 +1,9 @@
+import { Type } from '@nestjs/common';
+import { ApiExtraModels } from '@nestjs/swagger';
 import {
   GetManyBaseQueryParams,
-  GetManyResponseDto,
+  GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-
 /**
  * Returns a `GetManyResponseDto` object, which is a standardized response
  * object for GET many endpoints.
@@ -15,7 +16,7 @@ export function getManyResponse<T>(
   query: GetManyBaseQueryParams,
   data: T[],
   total: number,
-): GetManyResponseDto<T> {
+): GetManyBaseResponseDto<T> {
   const { limit, page } = query;
   return {
     data,
@@ -25,4 +26,10 @@ export function getManyResponse<T>(
     pageCount: Math.ceil(total / limit),
     hasNextPage: page * limit < total,
   };
+}
+
+export function GetManyResponseDto<T>(model: Type<T>) {
+  class PaginatedDto extends GetManyBaseResponseDto<T> {}
+  ApiExtraModels(model)(PaginatedDto);
+  return PaginatedDto;
 }

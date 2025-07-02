@@ -9,16 +9,14 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import {
-  GetManyBaseQueryParams,
-  GetManyResponseDto,
-} from 'src/common/dtos/get-many-base.dto';
+import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   CreateWorkspaceDto,
   UpdateWorkspaceDto,
@@ -47,7 +45,13 @@ export class WorkspacesController {
     return this.workspacesService.createWorkspace(dto, userContextPayload);
   }
 
-  @ApiOkResponse({ type: GetManyResponseDto<Workspace> })
+  @Doc({
+    summary: 'Get Workspaces',
+    description: 'Retrieves a list of workspaces that the user is a member of.',
+    response: {
+      serialization: GetManyResponseDto(Workspace),
+    },
+  })
   @Get()
   getWorkspaces(
     @Query() query: GetManyBaseQueryParams,

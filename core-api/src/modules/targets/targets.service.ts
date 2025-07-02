@@ -6,7 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   GetManyBaseQueryParams,
-  GetManyResponseDto,
+  GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
@@ -117,7 +117,7 @@ export class TargetsService {
   public async getTargetsInWorkspace(
     id: string,
     query: GetManyBaseQueryParams,
-  ): Promise<GetManyResponseDto<Target>> {
+  ): Promise<GetManyBaseResponseDto<Target>> {
     const { limit, page, sortBy, sortOrder } = query;
 
     // Create query builder from repository and join tables

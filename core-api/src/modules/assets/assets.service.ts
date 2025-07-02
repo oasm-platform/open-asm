@@ -3,15 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import {
   GetManyBaseQueryParams,
-  GetManyResponseDto,
+  GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { WorkerName } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';
-import { Asset } from './entities/assets.entity';
 import { GetAssetsResponseDto } from './dto/assets.dto';
+import { Asset } from './entities/assets.entity';
 
 @Injectable()
 export class AssetsService {
@@ -31,7 +31,7 @@ export class AssetsService {
   public async getAllAssetsInTarget(
     id: string,
     query: GetManyBaseQueryParams,
-  ): Promise<GetManyResponseDto<GetAssetsResponseDto>> {
+  ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
     const { limit, page, sortOrder } = query;
 
     let sortBy = query.sortBy;
