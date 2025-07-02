@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogClose,
@@ -8,13 +8,14 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector"
-import { useTargetsControllerCreateTarget } from "@/services/apis/gen/queries"
-import { Target } from "lucide-react"
-import { useForm } from "react-hook-form"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
+import { useTargetsControllerCreateTarget, useTargetsControllerGetTargetsInWorkspace } from "@/services/apis/gen/queries";
+import { Target } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
 
@@ -23,7 +24,15 @@ type FormValues = {
 };
 
 export function CreateTarget() {
+    const [open, setOpen] = useState(false);
     const { selectedWorkspace } = useWorkspaceSelector()
+    const { refetch } = useTargetsControllerGetTargetsInWorkspace(
+        selectedWorkspace ?? "", {}, {
+        query: {
+            queryKey: [selectedWorkspace]
+        }
+    }
+    )
     const {
         register,
         handleSubmit,
@@ -31,7 +40,17 @@ export function CreateTarget() {
         reset,
     } = useForm<FormValues>();
 
-    const { mutate } = useTargetsControllerCreateTarget()
+    const { mutate } = useTargetsControllerCreateTarget(
+        {
+            mutation: {
+                onSuccess: () => {
+                    refetch();
+                    setOpen(false);
+                    reset();
+                }
+            }
+        }
+    )
 
     function onSubmit(data: FormValues) {
         selectedWorkspace && mutate({
@@ -40,12 +59,11 @@ export function CreateTarget() {
                 workspaceId: selectedWorkspace
             }
         })
-        // handle valid domain submission here
-        reset();
+        // reset moved to onSuccess
     }
 
     return (
-        <Dialog>
+        <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button variant="outline">
                     <Target />
