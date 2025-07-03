@@ -5,17 +5,20 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { Request, Response } from 'express';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
 import { ResultHandler, Worker } from 'src/common/interfaces/app.interface';
+import { generateToken } from 'src/utils/genToken';
 import { DataSource, LessThan, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { WorkerAliveDto, WorkerJoinDto } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 import {
   GetManyBaseQueryParams,
@@ -36,6 +39,8 @@ export class WorkersService {
 
     @Inject(forwardRef(() => JobsRegistryService))
     private jobsRegistryService: JobsRegistryService,
+
+    private configService: ConfigService,
   ) {}
 
   public workers: Worker[] = [
@@ -165,36 +170,21 @@ export class WorkersService {
    * @param res The express response.
    * @param workerId The worker's unique identifier.
    */
-  public async alive(req: Request, res: Response, workerName: WorkerName) {
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-
-    const workerId = randomUUID();
-    const uniqueWorkerId = `${workerName}-${workerId}`;
-
-    this.logger.verbose(`✅ Worker connected: ${uniqueWorkerId}`);
-
-    res.write(
-      JSON.stringify({
-        workerId,
-        workerName,
-        command: this.getWorkerStepByName(workerName)?.command,
-      }),
-    );
-    await this.workerJoin(workerId, workerName);
-    const interval = setInterval(() => {
-      this.repo.update(workerId, {
+  public async alive(dto: WorkerAliveDto) {
+    const result = await this.repo.update(
+      {
+        token: dto.token,
+      },
+      {
         lastSeenAt: new Date(),
-      });
-    }, 5000);
-    req.on('close', () => {
-      this.logger.warn(`❌ Worker disconnected: ${uniqueWorkerId}`);
-      this.workerLeave(workerId);
-      clearInterval(interval);
-    });
-
-    return;
+      },
+    );
+    if (result.affected === 0) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    return {
+      alive: 'OK',
+    };
   }
 
   /**
@@ -216,6 +206,7 @@ export class WorkersService {
     workerName: WorkerName,
   ): Promise<number> {
     return await this.dataSource.transaction(async (manager) => {
+      const token = generateToken(48);
       const result = await manager.query(
         `
         WITH next_index AS (
@@ -229,11 +220,11 @@ export class WorkersService {
           ORDER BY i ASC
           LIMIT 1
         )
-        INSERT INTO workers (id, "workerName", "workerIndex")
-        SELECT $2, $1, i FROM next_index
+        INSERT INTO workers (id, "workerName", "workerIndex", "token")
+        SELECT $2, $1, i, $3 FROM next_index
         RETURNING "workerIndex";
       `,
-        [workerName, id],
+        [workerName, id, token],
       );
 
       return result[0]?.workerIndex;
@@ -246,12 +237,12 @@ export class WorkersService {
    * to clean up stale workers that may have disconnected without properly unregistering.
    *
    */
-  @Interval(15000)
+  @Interval(60 * 1000)
   async autoRemoveWorkersOffline() {
     const workers = await this.repo
       .find({
         where: {
-          lastSeenAt: LessThan(new Date(Date.now() - 15 * 1000)),
+          lastSeenAt: LessThan(new Date(Date.now() - 60 * 1000)),
         },
       })
       .then((res) => res.map((worker) => worker.id));
@@ -324,5 +315,35 @@ export class WorkersService {
     });
 
     return getManyResponse(query, workers, total);
+   * Handles a worker's manual join request.
+   * Validates the provided token and registers the worker instance in the database.
+   *
+   * @param dto - The data transfer object containing worker name and token.
+   * @returns A promise that resolves to the newly created WorkerInstance.
+   * @throws UnauthorizedException if the provided token is invalid.
+   */
+  public async join(dto: WorkerJoinDto): Promise<WorkerInstance | null> {
+    const { workerName, token } = dto;
+
+    // Retrieve the admin token from configuration
+    const adminToken = this.configService.get('OASM_ADMIN_TOKEN');
+
+    // Validate the provided token against the admin token
+    if (token !== adminToken) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    // Generate a unique ID for the new worker instance
+    const workerId = randomUUID();
+
+    // Register the worker in the database using the internal method
+    await this.workerJoin(workerId, workerName);
+
+    // Fetch and return the newly created worker instance from the repository
+    return this.repo.findOne({
+      where: {
+        id: workerId,
+      },
+    });
   }
 }

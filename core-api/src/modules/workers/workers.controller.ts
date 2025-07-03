@@ -25,16 +25,22 @@ export class WorkersController {
   constructor(private readonly workersService: WorkersService) {}
 
   @Public()
+  @Post('/alive')
+  alive(@Body() dto: WorkerAliveDto) {
+    return this.workersService.alive(dto);
+  }
+
   @Doc({
-    summary: 'Checks if a worker is alive.',
+    summary: 'Worker join',
+    description: 'Worker join the cluster',
+    response: {
+      serialization: WorkerInstance,
+    },
   })
-  @Get(':workerNameId/alive')
-  alive(
-    @Req() req: Request,
-    @Res() res: Response,
-    @Param() { workerNameId }: WorkerAliveDto,
-  ) {
-    return this.workersService.alive(req, res, workerNameId);
+  @Public()
+  @Post('join')
+  join(@Body() dto: WorkerJoinDto) {
+    return this.workersService.join(dto);
   }
 
   @Doc({

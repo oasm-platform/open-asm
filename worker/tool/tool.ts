@@ -1,7 +1,6 @@
 import logger from "node-color-log";
 import coreApi from "../services/core-api";
-import { workersControllerAlive } from "../services/core-api/alive";
-import { WorkersControllerAliveParamsEnum } from "../services/core-api/api";
+import { WorkerJoinDtoWorkerNameEnum } from "../services/core-api/api";
 import runCommand from "./runCommand";
 
 interface Job {
@@ -13,6 +12,7 @@ interface Job {
 export class Tool {
   private queue: Job[] = [];
   public static workerId: string | null = null;
+  public static token: string | null = null;
   public static command: string | null = null;
   private readonly maxJobsQueue = Number(process.env.MAX_JOBS) || 10;
   private readonly workerName = process.env.NAME as string;
@@ -31,20 +31,23 @@ export class Tool {
    */
   private async connectToCore() {
     if (
-      !Object.values(WorkersControllerAliveParamsEnum).includes(
-        this.workerName as WorkersControllerAliveParamsEnum
+      !Object.values(WorkerJoinDtoWorkerNameEnum).includes(
+        this.workerName as WorkerJoinDtoWorkerNameEnum
       )
     ) {
-      const accepted = Object.values(WorkersControllerAliveParamsEnum).join(
-        ", "
-      );
+      const accepted = Object.values(WorkerJoinDtoWorkerNameEnum).join(", ");
       throw new Error(
         `Invalid worker name "${this.workerName}". Accepted values: ${accepted}`
       );
     }
 
-    workersControllerAlive(this.workerName);
-
+    const worker: any = await coreApi.workersControllerJoin({
+      token: process.env.TOKEN!,
+      workerName: this.workerName as WorkerJoinDtoWorkerNameEnum,
+    });
+    Tool.workerId = worker.id;
+    Tool.token = worker.token;
+    logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId}`);
     // Wait until Tool.workerId is set (by SSE handler)
     await this.waitUntil(() => !!Tool.workerId, 1000);
   }
@@ -60,7 +63,7 @@ export class Tool {
           const job = (await coreApi.jobsRegistryControllerGetNextJob(
             Tool.workerId!
           )) as Job;
-
+          console.log(job);
           if (!job) break;
 
           this.queue.push(job);

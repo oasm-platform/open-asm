@@ -1,12 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum } from 'class-validator';
+import { IsEnum, IsString } from 'class-validator';
 import { WorkerName } from 'src/common/enums/enum';
 
-export class WorkerAliveDto {
-  @ApiProperty({
-    enum: WorkerName,
-    description: 'Unique identifier for the worker',
-  })
+export class WorkerJoinDto {
+  @ApiProperty()
+  @IsString()
+  token: string;
+
+  @ApiProperty({ enum: WorkerName })
   @IsEnum(WorkerName)
-  workerNameId: WorkerName;
+  workerName: WorkerName;
+}
+
+export class WorkerAliveDto {
+  @ApiProperty()
+  @IsString()
+  token: string;
 }

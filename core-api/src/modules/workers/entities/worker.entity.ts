@@ -12,4 +12,7 @@ export class WorkerInstance extends BaseEntity {
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   lastSeenAt: Date;
+
+  @Column({ nullable: true })
+  token: string;
 }

@@ -10,9 +10,19 @@
  * ---------------------------------------------------------------
  */
 
-export interface DefaultMessageResponseDto {
-  /** @example "Success" */
-  message: string;
+export interface Target {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  /**
+   * The target domain (with optional URL path, will be parsed to extract domain)
+   * @example "example.com"
+   */
+  value: string;
+  /** @format date-time */
+  lastDiscoveredAt: string;
 }
 
 export type AppResponseSerialization = object;
@@ -30,22 +40,55 @@ export interface CreateTargetDto {
   workspaceId: string;
 }
 
-export interface Target {
+export interface GetManyTargetResponseDto {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
   /**
    * The target domain (with optional URL path, will be parsed to extract domain)
    * @example "example.com"
    */
   value: string;
+  /** @format date-time */
+  lastDiscoveredAt: string;
+  /** @example "DONE" */
+  status: GetManyTargetResponseDtoStatusEnum;
+  /** @example 100 */
+  totalAssets: number;
 }
 
-export interface GetManyResponseDto {
-  /** @example [{"id":1,"createdAt":"1970-01-01T00:00:00.000Z","updatedAt":"1970-01-01T00:00:00.000Z"}] */
-  data: string[];
+export interface GetManyGetManyTargetResponseDtoDto {
+  data: GetManyTargetResponseDto[];
   total: number;
   page: number;
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+}
+
+export interface DefaultMessageResponseDto {
+  /** @example "Success" */
+  message: string;
+}
+
+export interface Workspace {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  /**
+   * The name of the workspace
+   * @example "My Workspace"
+   */
+  name: string;
+  /**
+   * The description of the workspace
+   * @example "This is my workspace"
+   */
+  description: string;
 }
 
 export interface CreateWorkspaceDto {
@@ -61,18 +104,16 @@ export interface CreateWorkspaceDto {
   description: string;
 }
 
-export interface Workspace {
-  /**
-   * The name of the workspace
-   * @example "My Workspace"
-   */
-  name: string;
-  /**
-   * The description of the workspace
-   * @example "This is my workspace"
-   */
-  description: string;
+export interface GetManyWorkspaceDto {
+  data: Workspace[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 }
+
+export type WorkspaceStatisticsResponseDto = object;
 
 export interface UpdateWorkspaceDto {
   /**
@@ -103,14 +144,39 @@ export interface UpdateResultDto {
   data: object;
 }
 
-/** Unique identifier for the worker */
-export enum WorkersControllerAliveParamsWorkerNameIdEnum {
-  Subdomains = "subdomains",
-  Httpx = "httpx",
-  Ports = "ports",
+export interface GetManyBaseResponseDto {
+  data: object[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 }
 
-export enum WorkersControllerAliveParamsEnum {
+export interface WorkerAliveDto {
+  token: string;
+}
+
+export interface WorkerInstance {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface WorkerJoinDto {
+  token: string;
+  workerName: WorkerJoinDtoWorkerNameEnum;
+}
+
+/** @example "DONE" */
+export enum GetManyTargetResponseDtoStatusEnum {
+  RUNNING = "RUNNING",
+  DONE = "DONE",
+}
+
+export enum WorkerJoinDtoWorkerNameEnum {
   Subdomains = "subdomains",
   Httpx = "httpx",
   Ports = "ports",
@@ -391,6 +457,22 @@ export class Api<
     });
 
   /**
+   * @description Rescans a target and triggers a new scan job.
+   *
+   * @tags Targets
+   * @name TargetsControllerReScanTarget
+   * @summary Rescan a target
+   * @request POST:/api/targets/{id}/re-scan
+   */
+  targetsControllerReScanTarget = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/targets/${id}/re-scan`,
+      method: "POST",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Creates a new workspace.
    *
    * @tags Workspaces
@@ -436,6 +518,25 @@ export class Api<
       path: `/api/workspaces`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves statistics for a specific workspace.
+   *
+   * @tags Workspaces
+   * @name WorkspacesControllerGetWorkspaceStatistics
+   * @summary Get Workspace Statistics
+   * @request GET:/api/workspaces/{id}/statistics
+   */
+  workspacesControllerGetWorkspaceStatistics = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workspaces/${id}/statistics`,
+      method: "GET",
       format: "json",
       ...params,
     });
@@ -611,15 +712,32 @@ export class Api<
    *
    * @tags Workers
    * @name WorkersControllerAlive
-   * @request GET:/api/workers/{workerNameId}/alive
+   * @request POST:/api/workers/alive
    */
-  workersControllerAlive = (
-    workerNameId: WorkersControllerAliveParamsEnum,
-    params: RequestParams = {},
-  ) =>
+  workersControllerAlive = (data: WorkerAliveDto, params: RequestParams = {}) =>
     this.request<any, any>({
-      path: `/api/workers/${workerNameId}/alive`,
-      method: "GET",
+      path: `/api/workers/alive`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      ...params,
+    });
+
+  /**
+   * @description Worker join the cluster
+   *
+   * @tags Workers
+   * @name WorkersControllerJoin
+   * @summary Worker join
+   * @request POST:/api/workers/join
+   */
+  workersControllerJoin = (data: WorkerJoinDto, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workers/join`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
       ...params,
     });
 }
