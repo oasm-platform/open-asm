@@ -23,7 +23,7 @@ tasks:
           sleep 1
         done
         echo "API is up! Starting worker..."
-      - task worker:dev
+      # - task worker:dev
 
   build:
     deps:

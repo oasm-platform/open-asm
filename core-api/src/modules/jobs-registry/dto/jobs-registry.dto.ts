@@ -10,6 +10,10 @@ export class GetNextJobResponseDto {
   value: string;
   @ApiProperty()
   workerName: WorkerName;
+  @ApiProperty({
+    description: 'Command to run',
+  })
+  command: string;
 }
 
 export class WorkerIdParams {

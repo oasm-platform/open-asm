@@ -7,18 +7,17 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { JobsRegistryService } from './jobs-registry.service';
 import { Public } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
+import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
   UpdateResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
-import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { Job } from './entities/job.entity';
+import { JobsRegistryService } from './jobs-registry.service';
 
 @Controller('jobs-registry')
 export class JobsRegistryController {

@@ -7,6 +7,7 @@ interface Job {
   jobId: string;
   value: string;
   workerName: string;
+  command: string;
 }
 
 export class Tool {
@@ -19,6 +20,7 @@ export class Tool {
 
   public async run() {
     await this.connectToCore();
+    this.alive();
     try {
       this.pullJobsContinuously();
     } catch (e) {
@@ -26,6 +28,20 @@ export class Tool {
     }
   }
 
+  private async alive() {
+    setInterval(async () => {
+      try {
+        await coreApi.workersControllerAlive({
+          token: Tool.token!,
+        });
+      } catch (error: any) {
+        if (error?.response?.status === 401) {
+          logger.warn("Token unauthorized. Reconnecting...");
+          await this.connectToCore();
+        }
+      }
+    }, 5000);
+  }
   /**
    * Validates and connects worker via SSE, waits until workerId is set.
    */
@@ -58,17 +74,18 @@ export class Tool {
   private async pullJobsContinuously() {
     logger.info(`[${this.workerName?.toUpperCase()}] - Start pulling jobs...`);
     while (true) {
-      while (this.queue.length < this.maxJobsQueue) {
-        try {
+      try {
+        if (this.queue.length < this.maxJobsQueue) {
           const job = (await coreApi.jobsRegistryControllerGetNextJob(
             Tool.workerId!
           )) as Job;
-          console.log(job);
-          if (!job) break;
-
-          this.queue.push(job);
-          this.jobHandler(job);
-        } catch (e) {}
+          if (job) {
+            this.queue.push(job);
+            this.jobHandler(job);
+          }
+        }
+      } catch (err) {
+        logger.error("Cannot get next job");
       }
       await this.sleep(2000);
     }
@@ -78,7 +95,7 @@ export class Tool {
    * Handles a job and reports result to core.
    */
   private async jobHandler(job: Job) {
-    const data = await this.commandExecution(Tool.command!, job.value);
+    const data = await this.commandExecution(job.command, job.value);
     try {
       await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
         jobId: job.jobId,

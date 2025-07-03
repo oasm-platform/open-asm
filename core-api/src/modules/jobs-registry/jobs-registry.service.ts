@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
+import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, InsertResult, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { WorkersService } from '../workers/workers.service';
@@ -10,11 +12,6 @@ import {
   UpdateResultDto,
 } from './dto/jobs-registry.dto';
 import { Job } from './entities/job.entity';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from 'src/common/dtos/get-many-base.dto';
-import { getManyResponse } from 'src/utils/getManyResponse';
 
 @Injectable()
 export class JobsRegistryService {
@@ -65,10 +62,15 @@ export class JobsRegistryService {
       job.pickJobAt = new Date();
       await this.repo.save(job);
 
+      const workerStep = this.workerService.getWorkerStepByName(job.workerName);
+      if (!workerStep) {
+        return null;
+      }
       return {
         jobId: job.id,
         value: job.asset.value,
         workerName: job.workerName,
+        command: workerStep.command,
       };
     }
 

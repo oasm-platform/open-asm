@@ -237,12 +237,12 @@ export class WorkersService {
    * to clean up stale workers that may have disconnected without properly unregistering.
    *
    */
-  @Interval(60 * 1000)
+  @Interval(15 * 1000)
   async autoRemoveWorkersOffline() {
     const workers = await this.repo
       .find({
         where: {
-          lastSeenAt: LessThan(new Date(Date.now() - 60 * 1000)),
+          lastSeenAt: LessThan(new Date(Date.now() - 15 * 1000)),
         },
       })
       .then((res) => res.map((worker) => worker.id));
