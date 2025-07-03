@@ -19,12 +19,7 @@ import {
 } from './dto/workspaces.dto';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
-import { JobStatus, WorkerName } from 'src/common/enums/enum';
-import { Asset } from '../assets/entities/assets.entity';
-import { Job } from '../jobs-registry/entities/job.entity';
-import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { WorkspaceStatisticsRepository } from './workspaces-statistics.repository';
-import { stat } from 'fs';
 
 @Injectable()
 export class WorkspacesService {

@@ -5,10 +5,16 @@ import { DataSource, InsertResult, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { WorkersService } from '../workers/workers.service';
 import {
+  GetManyJobsQueryParams,
   GetNextJobResponseDto,
   UpdateResultDto,
 } from './dto/jobs-registry.dto';
 import { Job } from './entities/job.entity';
+import {
+  GetManyBaseQueryParams,
+  GetManyBaseResponseDto,
+} from 'src/common/dtos/get-many-base.dto';
+import { getManyResponse } from 'src/utils/getManyResponse';
 
 @Injectable()
 export class JobsRegistryService {
@@ -70,6 +76,46 @@ export class JobsRegistryService {
   }
 
   /**
+   * Retrieves a paginated list of jobs associated with a specified target ID.
+   *
+   * @param id - The ID of the target for which to retrieve jobs.
+   * @param query - The query parameters to filter and paginate the jobs,
+   *                including page, limit, sortOrder, jobStatus, workerName, and sortBy.
+   * @returns A promise that resolves to a paginated list of jobs, including total count and pagination information.
+   */
+  public async getJobsByTargetId(
+    id: string,
+    query: GetManyJobsQueryParams,
+  ): Promise<GetManyBaseResponseDto<Job>> {
+    const { page, limit, sortOrder, jobStatus, workerName } = query;
+    let { sortBy } = query;
+    if (!sortBy) {
+      sortBy = 'createdAt';
+    }
+
+    const qb = this.repo
+      .createQueryBuilder('job')
+      .leftJoinAndSelect('job.asset', 'asset')
+      .leftJoinAndSelect('asset.target', 'target')
+      .where('target.id = :id', { id });
+
+    if (jobStatus && jobStatus !== 'all') {
+      qb.andWhere('job.status = :jobStatus', { jobStatus });
+    }
+    if (workerName && workerName !== 'all') {
+      qb.andWhere('job.workerName = :workerName', { workerName });
+    }
+
+    qb.orderBy(`job.${sortBy}`, sortOrder as 'ASC' | 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return getManyResponse(query, data, total);
+  }
+
+  /**
    * Updates the result of a job with the given worker ID.
    * @param workerId the ID of the worker that ran the job
    * @param dto the data transfer object containing the result of the job
@@ -111,6 +157,8 @@ export class JobsRegistryService {
   }
 
   /**
+   * Starts the next job in the queue by inserting it into the database.
+   *
    * Starts the next job in the queue by inserting it into the database.
    * Ignores any errors that might occur if the job already exists in the database.
    * @param assets the assets to start the next job for
