@@ -1,3 +1,4 @@
+import { getManyResponse } from 'src/utils/getManyResponse';
 import {
   forwardRef,
   Inject,
@@ -16,6 +17,10 @@ import { Asset } from '../assets/entities/assets.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkerInstance } from './entities/worker.entity';
+import {
+  GetManyBaseQueryParams,
+  GetManyBaseResponseDto,
+} from 'src/common/dtos/get-many-base.dto';
 
 @Injectable()
 export class WorkersService {
@@ -291,5 +296,33 @@ export class WorkersService {
     }
 
     return worker;
+  }
+
+  /**
+   * Retrieves a paginated list of workers.
+   *
+   * @param query - The query parameters for filtering and pagination,
+   *                including page, limit, sortOrder, and sortBy.
+   * @returns A promise that resolves to a paginated list of workers
+   *          along with total count and pagination information.
+   */
+  public async getWorkers(
+    query: GetManyBaseQueryParams,
+  ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
+    const { page, limit, sortOrder } = query;
+    let { sortBy } = query;
+    if (!sortBy) {
+      sortBy = 'createdAt';
+    }
+
+    const [workers, total] = await this.repo.findAndCount({
+      order: {
+        [sortBy]: sortOrder,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return getManyResponse(query, workers, total);
   }
 }
