@@ -9,6 +9,8 @@ import {
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
+import { GetManyResponseDto } from 'src/utils/getManyResponse';
+import { Job } from './entities/job.entity';
 
 @Controller('jobs-registry')
 export class JobsRegistryController {
@@ -28,10 +30,23 @@ export class JobsRegistryController {
   }
 
   @Doc({
-    summary:
-      'Gets all jobs associated with the given target ID, filtered by status and worker name.',
+    summary: 'Gets jobs by asset ID, filtered by status and worker name.',
     response: {
-      serialization: GetNextJobResponseDto,
+      serialization: GetManyResponseDto(Job),
+    },
+  })
+  @Get('/asset/:id')
+  getJobsByAssetId(
+    @Param() { id }: IdQueryParamDto,
+    @Query() query: GetManyJobsQueryParams,
+  ) {
+    return this.jobsRegistryService.getJobsByAssetId(id, query);
+  }
+
+  @Doc({
+    summary: 'Gets jobs by target ID, filtered by status and worker name.',
+    response: {
+      serialization: GetManyResponseDto(Job),
     },
   })
   @Get('/target/:id')

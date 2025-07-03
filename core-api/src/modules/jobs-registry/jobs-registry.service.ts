@@ -76,6 +76,40 @@ export class JobsRegistryService {
   }
 
   /**
+   * Retrieves a paginated list of jobs associated with a specified asset ID.
+   *
+   * @param id - The ID of the asset for which to retrieve jobs.
+   * @param query - The query parameters to filter and paginate the jobs, including page, limit, sort order, job status, and worker name.
+   * @returns A promise that resolves to a paginated response containing the jobs and total count.
+   */
+  public async getJobsByAssetId(
+    id: string,
+    query: GetManyJobsQueryParams,
+  ): Promise<GetManyBaseResponseDto<Job>> {
+    const { page, limit, sortOrder, jobStatus, workerName } = query;
+    let { sortBy } = query;
+    if (!sortBy) {
+      sortBy = 'createdAt';
+    }
+
+    const qb = this.repo
+      .createQueryBuilder('job')
+      .leftJoin('job.asset', 'asset')
+      .where('asset.id = :id', { id });
+
+    if (jobStatus && jobStatus !== 'all') {
+      qb.andWhere('job.status = :jobStatus', { jobStatus });
+    }
+    if (workerName && workerName !== 'all') {
+      qb.andWhere('job.workerName = :workerName', { workerName });
+    }
+    qb.orderBy(`job.${sortBy}`, sortOrder as 'ASC' | 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+    const [data, total] = await qb.getManyAndCount();
+    return getManyResponse(query, data, total);
+  }
+  /**
    * Retrieves a paginated list of jobs associated with a specified target ID.
    *
    * @param id - The ID of the target for which to retrieve jobs.
@@ -95,8 +129,8 @@ export class JobsRegistryService {
 
     const qb = this.repo
       .createQueryBuilder('job')
-      .leftJoinAndSelect('job.asset', 'asset')
-      .leftJoinAndSelect('asset.target', 'target')
+      .leftJoin('job.asset', 'asset')
+      .leftJoin('asset.target', 'target')
       .where('target.id = :id', { id });
 
     if (jobStatus && jobStatus !== 'all') {
