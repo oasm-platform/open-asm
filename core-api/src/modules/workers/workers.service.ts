@@ -109,6 +109,7 @@ export class WorkersService {
       command:
         'httpx -u {{value}} -status-code -favicon -asn -title -web-server -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
+        console.log(result);
         this.updateResultToDatabase(dataSource, job, JSON.parse(result));
         await this.jobsRegistryService.startNextJob(
           [job.asset],

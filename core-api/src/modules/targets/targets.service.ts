@@ -25,7 +25,7 @@ export class TargetsService {
     @InjectRepository(WorkspaceTarget)
     private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private readonly workspacesService: WorkspacesService,
-    private assetService: AssetsService,
+    public assetService: AssetsService,
   ) {}
 
   /**

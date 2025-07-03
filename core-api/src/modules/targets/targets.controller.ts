@@ -91,4 +91,16 @@ export class TargetsController {
       userContext,
     );
   }
+
+  @Doc({
+    summary: 'Rescan a target',
+    description: 'Rescans a target and triggers a new scan job.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  @Post(':id/re-scan')
+  reScanTarget(@Param() { id }: IdQueryParamDto) {
+    return this.targetsService.assetService.reScan(id);
+  }
 }

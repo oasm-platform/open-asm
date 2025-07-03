@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
@@ -114,5 +115,29 @@ export class AssetsService {
     });
     this.jobRegistryService.createJob(asset, WorkerName.SUBDOMAINS);
     return asset;
+  }
+
+  /**
+   * Triggers a rescan for a specific asset by creating new jobs for relevant workers.
+   *
+   * @param assetId - The ID of the asset to rescan.
+   * @throws Error if the asset is not found.
+   */
+  public async reScan(targetId: string): Promise<DefaultMessageResponseDto> {
+    const asset = await this.repo.findOne({
+      where: {
+        target: { id: targetId },
+        isPrimary: true,
+      },
+    });
+
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    this.jobRegistryService.createJob(asset, WorkerName.SUBDOMAINS);
+    return {
+      message: 'Rescan started',
+    };
   }
 }
