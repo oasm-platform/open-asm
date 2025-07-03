@@ -83,7 +83,7 @@ export class JobsRegistryService {
    * @returns A promise that resolves to a paginated response containing the jobs and total count.
    */
   public async getJobsByAssetId(
-    id: string,
+    assetId: string,
     query: GetManyJobsQueryParams,
   ): Promise<GetManyBaseResponseDto<Job>> {
     const { page, limit, sortOrder, jobStatus, workerName } = query;
@@ -95,7 +95,7 @@ export class JobsRegistryService {
     const qb = this.repo
       .createQueryBuilder('job')
       .leftJoin('job.asset', 'asset')
-      .where('asset.id = :id', { id });
+      .where('asset.id = :assetId', { assetId });
 
     if (jobStatus && jobStatus !== 'all') {
       qb.andWhere('job.status = :jobStatus', { jobStatus });
@@ -118,7 +118,7 @@ export class JobsRegistryService {
    * @returns A promise that resolves to a paginated list of jobs, including total count and pagination information.
    */
   public async getJobsByTargetId(
-    id: string,
+    targetId: string,
     query: GetManyJobsQueryParams,
   ): Promise<GetManyBaseResponseDto<Job>> {
     const { page, limit, sortOrder, jobStatus, workerName } = query;
@@ -131,7 +131,7 @@ export class JobsRegistryService {
       .createQueryBuilder('job')
       .leftJoin('job.asset', 'asset')
       .leftJoin('asset.target', 'target')
-      .where('target.id = :id', { id });
+      .where('target.id = :targetId', { targetId });
 
     if (jobStatus && jobStatus !== 'all') {
       qb.andWhere('job.status = :jobStatus', { jobStatus });

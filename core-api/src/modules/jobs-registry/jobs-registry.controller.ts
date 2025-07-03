@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { JobsRegistryService } from './jobs-registry.service';
 import { Public } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
@@ -35,12 +43,12 @@ export class JobsRegistryController {
       serialization: GetManyResponseDto(Job),
     },
   })
-  @Get('/asset/:id')
+  @Get('/asset/:assetId')
   getJobsByAssetId(
-    @Param() { id }: IdQueryParamDto,
+    @Param('assetId', new ParseUUIDPipe()) assetId: string,
     @Query() query: GetManyJobsQueryParams,
   ) {
-    return this.jobsRegistryService.getJobsByAssetId(id, query);
+    return this.jobsRegistryService.getJobsByAssetId(assetId, query);
   }
 
   @Doc({
@@ -49,12 +57,12 @@ export class JobsRegistryController {
       serialization: GetManyResponseDto(Job),
     },
   })
-  @Get('/target/:id')
+  @Get('/target/:targetId')
   getJobsByTargetId(
-    @Param() { id }: IdQueryParamDto,
+    @Param('targetId', new ParseUUIDPipe()) targetId: string,
     @Query() query: GetManyJobsQueryParams,
   ) {
-    return this.jobsRegistryService.getJobsByTargetId(id, query);
+    return this.jobsRegistryService.getJobsByTargetId(targetId, query);
   }
 
   @Doc({ summary: 'Updates the result of a job with the given worker ID.' })
