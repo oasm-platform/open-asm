@@ -1,4 +1,3 @@
-import { getManyResponse } from 'src/utils/getManyResponse';
 import {
   forwardRef,
   Inject,
@@ -11,19 +10,20 @@ import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import {
+  GetManyBaseQueryParams,
+  GetManyBaseResponseDto,
+} from 'src/common/dtos/get-many-base.dto';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
 import { ResultHandler, Worker } from 'src/common/interfaces/app.interface';
 import { generateToken } from 'src/utils/genToken';
+import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, LessThan, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkerAliveDto, WorkerJoinDto } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from 'src/common/dtos/get-many-base.dto';
 
 @Injectable()
 export class WorkersService {
@@ -315,13 +315,7 @@ export class WorkersService {
     });
 
     return getManyResponse(query, workers, total);
-   * Handles a worker's manual join request.
-   * Validates the provided token and registers the worker instance in the database.
-   *
-   * @param dto - The data transfer object containing worker name and token.
-   * @returns A promise that resolves to the newly created WorkerInstance.
-   * @throws UnauthorizedException if the provided token is invalid.
-   */
+  }
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance | null> {
     const { workerName, token } = dto;
 

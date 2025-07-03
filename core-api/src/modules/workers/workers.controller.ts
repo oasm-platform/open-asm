@@ -1,24 +1,13 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  Req,
-  Res,
-} from '@nestjs/common';
-import { WorkersService } from './workers.service';
-import { WorkerAliveDto } from './dto/workers.dto';
-import { Request, Response } from 'express';
-import { randomUUID } from 'crypto';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { Public } from 'src/common/decorators/app.decorator';
+import { Doc } from 'src/common/doc/doc.decorator';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { Doc } from 'src/common/doc/doc.decorator';
+import { WorkerAliveDto, WorkerJoinDto } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+import { WorkersService } from './workers.service';
 
 @Controller('workers')
 export class WorkersController {
