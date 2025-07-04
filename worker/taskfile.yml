@@ -2,23 +2,11 @@ version: "3"
 
 tasks:
   dev:
-    deps:
-      - dev:subdomains
-      - dev:ports
-      - dev:httpx
-    parallel: true
-
-  dev:subdomains:
     cmds:
-      - NAME=subdomains MAX_JOBS=10 bun --watch index.ts
-    silent: true
-
-  dev:ports:
-    cmds:
-      - NAME=ports MAX_JOBS=10 bun --watch index.ts
-    silent: true
-
-  dev:httpx:
-    cmds:
-      - NAME=httpx MAX_JOBS=10 bun --watch index.ts
-    silent: true
+      - |
+        for i in $(seq 1 3); do
+          echo "Starting worker $i"
+          bun --watch index.ts &
+        done
+        wait
+    silent: false
