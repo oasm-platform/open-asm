@@ -12,24 +12,64 @@ interface Job {
 
 export class Tool {
   private queue: Job[] = [];
+  private processingJobs = new Set<string>(); // Track jobs being processed
   public static workerId: string | null = null;
   public static token: string | null = null;
   public static command: string | null = null;
   private readonly maxJobsQueue = Number(process.env.MAX_JOBS) || 10;
+  private readonly maxConcurrentJobs =
+    Number(process.env.MAX_CONCURRENT_JOBS) || 5;
   private readonly workerName = process.env.NAME as string;
+  private readonly pullInterval = Number(process.env.PULL_INTERVAL) || 1000; // Configurable pull interval
+  private isShuttingDown = false;
 
   public async run() {
     await this.connectToCore();
     this.alive();
+
+    // Handle graceful shutdown
+    this.setupGracefulShutdown();
+
     try {
-      this.pullJobsContinuously();
+      // Start job pulling and processing concurrently
+      await Promise.all([
+        this.pullJobsContinuously(),
+        this.processQueueContinuously(),
+      ]);
     } catch (e) {
-      throw new Error();
+      logger.error("Tool execution failed:", e);
+      throw new Error("Tool execution failed");
     }
   }
 
+  private setupGracefulShutdown() {
+    const gracefulShutdown = async () => {
+      logger.info("Graceful shutdown initiated...");
+      this.isShuttingDown = true;
+
+      // Wait for current jobs to finish
+      while (this.processingJobs.size > 0) {
+        logger.info(
+          `Waiting for ${this.processingJobs.size} jobs to complete...`
+        );
+        await this.sleep(1000);
+      }
+
+      logger.info("All jobs completed. Shutting down...");
+      process.exit(0);
+    };
+
+    process.on("SIGTERM", gracefulShutdown);
+    process.on("SIGINT", gracefulShutdown);
+  }
+
   private async alive() {
-    setInterval(async () => {
+    const aliveInterval = setInterval(async () => {
+      if (this.isShuttingDown) {
+        clearInterval(aliveInterval);
+        return;
+      }
+
       try {
         await coreApi.workersControllerAlive({
           token: Tool.token!,
@@ -38,10 +78,13 @@ export class Tool {
         if (error?.response?.status === 401) {
           logger.warn("Token unauthorized. Reconnecting...");
           await this.connectToCore();
+        } else {
+          logger.error("Alive check failed:", error.message);
         }
       }
     }, 5000);
   }
+
   /**
    * Validates and connects worker via SSE, waits until workerId is set.
    */
@@ -65,10 +108,12 @@ export class Tool {
       Tool.workerId = worker.id;
       Tool.token = worker.token;
       logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId}`);
+
       // Wait until Tool.workerId is set (by SSE handler)
       await this.waitUntil(() => !!Tool.workerId, 1000);
     } catch (e) {
-      logger.error("Cannot connect to core.");
+      logger.error("Cannot connect to core:", e);
+      throw e;
     }
   }
 
@@ -77,22 +122,82 @@ export class Tool {
    */
   private async pullJobsContinuously() {
     logger.info(`[${this.workerName?.toUpperCase()}] - Start pulling jobs...`);
-    while (true) {
+
+    while (!this.isShuttingDown) {
       try {
-        if (this.queue.length < this.maxJobsQueue) {
-          const job = (await coreApi.jobsRegistryControllerGetNextJob(
-            Tool.workerId!
-          )) as Job;
-          if (job) {
-            this.queue.push(job);
-            this.jobHandler(job);
-          }
+        // Pull multiple jobs at once if queue has space
+        const availableSlots = this.maxJobsQueue - this.queue.length;
+        if (availableSlots > 0) {
+          const jobPromises = Array.from(
+            { length: Math.min(availableSlots, 3) },
+            () => this.pullSingleJob()
+          );
+
+          const jobs = await Promise.allSettled(jobPromises);
+          jobs.forEach((result) => {
+            if (result.status === "fulfilled" && result.value) {
+              this.queue.push(result.value);
+            }
+          });
         }
       } catch (err) {
-        logger.error("Cannot get next job");
-        this.connectToCore();
+        logger.error("Cannot get next job:", err);
+        await this.reconnectWithBackoff();
       }
-      await this.sleep(2000);
+
+      await this.sleep(this.pullInterval);
+    }
+  }
+
+  private async pullSingleJob(): Promise<Job | null> {
+    try {
+      const job = (await coreApi.jobsRegistryControllerGetNextJob(
+        Tool.workerId!
+      )) as Job;
+      return job || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Continuously processes jobs from the queue with concurrency control.
+   */
+  private async processQueueContinuously() {
+    while (!this.isShuttingDown) {
+      try {
+        // Process jobs concurrently up to the limit
+        while (
+          this.queue.length > 0 &&
+          this.processingJobs.size < this.maxConcurrentJobs &&
+          !this.isShuttingDown
+        ) {
+          const job = this.queue.shift();
+          if (job) {
+            // Process job without awaiting (fire and forget)
+            this.processJobConcurrently(job);
+          }
+        }
+      } catch (error) {
+        logger.error("Error in queue processing:", error);
+      }
+
+      await this.sleep(100); // Small delay to prevent tight loop
+    }
+  }
+
+  /**
+   * Processes a single job concurrently.
+   */
+  private async processJobConcurrently(job: Job) {
+    this.processingJobs.add(job.jobId);
+
+    try {
+      await this.jobHandler(job);
+    } catch (error) {
+      logger.error(`Job ${job.jobId} failed:`, error);
+    } finally {
+      this.processingJobs.delete(job.jobId);
     }
   }
 
@@ -100,23 +205,43 @@ export class Tool {
    * Handles a job and reports result to core.
    */
   private async jobHandler(job: Job) {
-    const data = await this.commandExecution(job.command, job.value);
+    const startTime = Date.now();
+
     try {
+      const data = await this.commandExecution(job.command, job.value);
+
       await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
         jobId: job.jobId,
         data: {
           raw: data,
         },
       });
-      this.queue = this.queue.filter((j) => j.jobId !== job.jobId);
 
+      const executionTime = Date.now() - startTime;
       logger
         .color("green")
         .log(
-          `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - WorkerName: ${this.workerName}`
+          `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - WorkerName: ${this.workerName} - Time: ${executionTime}ms`
         );
-    } catch (e) {}
-    return;
+    } catch (e) {
+      logger.error(`Failed to handle job ${job.jobId}:`, e);
+
+      // Optionally report failure to core
+      try {
+        await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
+          jobId: job.jobId,
+          data: {
+            raw: `Error: ${e instanceof Error ? e.message : "Unknown error"}`,
+            error: true,
+          },
+        });
+      } catch (reportError) {
+        logger.error(
+          `Failed to report job failure for ${job.jobId}:`,
+          reportError
+        );
+      }
+    }
   }
 
   private async commandExecution(
@@ -130,11 +255,36 @@ export class Tool {
     logger.color("blue").log(`[RUNNING]: ${command}`);
 
     try {
-      return runCommand(command);
+      return await runCommand(command);
     } catch (error: any) {
-      console.error("Command execution error:", error);
+      logger.error("Command execution error:", error);
       throw new Error(`Failed to execute command: ${error.message}`);
     }
+  }
+
+  /**
+   * Reconnect with exponential backoff
+   */
+  private async reconnectWithBackoff() {
+    let retryCount = 0;
+    const maxRetries = 5;
+
+    while (retryCount < maxRetries && !this.isShuttingDown) {
+      try {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+        logger.warn(
+          `Reconnecting in ${delay}ms... (attempt ${retryCount + 1}/${maxRetries})`
+        );
+        await this.sleep(delay);
+        await this.connectToCore();
+        return;
+      } catch (error) {
+        retryCount++;
+        logger.error(`Reconnection attempt ${retryCount} failed:`, error);
+      }
+    }
+
+    throw new Error("Failed to reconnect after maximum retries");
   }
 
   /**
@@ -142,13 +292,18 @@ export class Tool {
    */
   private async waitUntil(
     condition: () => boolean,
-    intervalMs: number
+    intervalMs: number,
+    timeoutMs: number = 30000
   ): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
       const interval = setInterval(() => {
         if (condition()) {
           clearInterval(interval);
           resolve();
+        } else if (Date.now() - startTime > timeoutMs) {
+          clearInterval(interval);
+          reject(new Error("Timeout waiting for condition"));
         }
       }, intervalMs);
     });
@@ -159,5 +314,20 @@ export class Tool {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise((res) => setTimeout(res, ms));
+  }
+
+  /**
+   * Get current status for monitoring
+   */
+  public getStatus() {
+    return {
+      queueLength: this.queue.length,
+      processingJobs: this.processingJobs.size,
+      maxConcurrentJobs: this.maxConcurrentJobs,
+      maxJobsQueue: this.maxJobsQueue,
+      workerId: Tool.workerId,
+      workerName: this.workerName,
+      isShuttingDown: this.isShuttingDown,
+    };
   }
 }
