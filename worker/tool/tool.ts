@@ -57,15 +57,19 @@ export class Tool {
       );
     }
 
-    const worker: any = await coreApi.workersControllerJoin({
-      token: process.env.TOKEN!,
-      workerName: this.workerName as WorkerJoinDtoWorkerNameEnum,
-    });
-    Tool.workerId = worker.id;
-    Tool.token = worker.token;
-    logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId}`);
-    // Wait until Tool.workerId is set (by SSE handler)
-    await this.waitUntil(() => !!Tool.workerId, 1000);
+    try {
+      const worker: any = await coreApi.workersControllerJoin({
+        token: process.env.TOKEN!,
+        workerName: this.workerName as WorkerJoinDtoWorkerNameEnum,
+      });
+      Tool.workerId = worker.id;
+      Tool.token = worker.token;
+      logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId}`);
+      // Wait until Tool.workerId is set (by SSE handler)
+      await this.waitUntil(() => !!Tool.workerId, 1000);
+    } catch (e) {
+      logger.error("Cannot connect to core.");
+    }
   }
 
   /**
@@ -86,6 +90,7 @@ export class Tool {
         }
       } catch (err) {
         logger.error("Cannot get next job");
+        this.connectToCore();
       }
       await this.sleep(2000);
     }

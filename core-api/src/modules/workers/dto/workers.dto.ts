@@ -1,15 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsString } from 'class-validator';
-import { WorkerName } from 'src/common/enums/enum';
+import { IsString } from 'class-validator';
 
 export class WorkerJoinDto {
   @ApiProperty()
   @IsString()
   token: string;
-
-  @ApiProperty({ enum: WorkerName })
-  @IsEnum(WorkerName)
-  workerName: WorkerName;
 }
 
 export class WorkerAliveDto {

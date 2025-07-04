@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { WORKER_TIMEOUT } from 'src/common/constants/app.constants';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
@@ -119,12 +120,13 @@ export class WorkersService {
       command:
         'httpx -u {{value}} -status-code -favicon -asn -title -web-server -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
-        console.log(result);
-        this.updateResultToDatabase(dataSource, job, JSON.parse(result));
-        await this.jobsRegistryService.startNextJob(
-          [job.asset],
-          job.workerName,
-        );
+        if (result) {
+          this.updateResultToDatabase(dataSource, job, JSON.parse(result));
+          await this.jobsRegistryService.startNextJob(
+            [job.asset],
+            job.workerName,
+          );
+        }
       },
     },
   ];
@@ -201,33 +203,11 @@ export class WorkersService {
    * @returns A promise that resolves to the assigned worker index.
    */
 
-  private async workerJoin(
-    id: string,
-    workerName: WorkerName,
-  ): Promise<number> {
-    return await this.dataSource.transaction(async (manager) => {
-      const token = generateToken(48);
-      const result = await manager.query(
-        `
-        WITH next_index AS (
-          SELECT i
-          FROM generate_series(
-            0,
-            COALESCE((SELECT MAX("workerIndex") FROM workers WHERE "workerName" = $1), -1) + 1
-          ) AS i
-          LEFT JOIN workers w ON w."workerIndex" = i AND w."workerName" = $1
-          WHERE w."workerIndex" IS NULL
-          ORDER BY i ASC
-          LIMIT 1
-        )
-        INSERT INTO workers (id, "workerName", "workerIndex", "token")
-        SELECT $2, $1, i, $3 FROM next_index
-        RETURNING "workerIndex";
-      `,
-        [workerName, id, token],
-      );
-
-      return result[0]?.workerIndex;
+  private workerJoin(id: string): Promise<WorkerInstance> {
+    const token = generateToken(48);
+    return this.repo.save({
+      id,
+      token,
     });
   }
 
@@ -237,12 +217,12 @@ export class WorkersService {
    * to clean up stale workers that may have disconnected without properly unregistering.
    *
    */
-  @Interval(15 * 1000)
+  @Interval(WORKER_TIMEOUT * 1000)
   async autoRemoveWorkersOffline() {
     const workers = await this.repo
       .find({
         where: {
-          lastSeenAt: LessThan(new Date(Date.now() - 15 * 1000)),
+          lastSeenAt: LessThan(new Date(Date.now() - WORKER_TIMEOUT * 1000)),
         },
       })
       .then((res) => res.map((worker) => worker.id));
@@ -317,7 +297,7 @@ export class WorkersService {
     return getManyResponse(query, workers, total);
   }
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance | null> {
-    const { workerName, token } = dto;
+    const { token } = dto;
 
     // Retrieve the admin token from configuration
     const adminToken = this.configService.get('OASM_ADMIN_TOKEN');
@@ -331,7 +311,7 @@ export class WorkersService {
     const workerId = randomUUID();
 
     // Register the worker in the database using the internal method
-    await this.workerJoin(workerId, workerName);
+    await this.workerJoin(workerId);
 
     // Fetch and return the newly created worker instance from the repository
     return this.repo.findOne({
