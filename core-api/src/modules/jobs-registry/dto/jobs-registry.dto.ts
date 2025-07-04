@@ -28,7 +28,10 @@ export class UpdateResultDto {
   jobId: string;
   @ApiProperty()
   @IsObject()
-  data: object;
+  data: {
+    error?: boolean;
+    raw?: any;
+  };
 }
 
 export class GetManyJobsQueryParams extends GetManyBaseQueryParams {

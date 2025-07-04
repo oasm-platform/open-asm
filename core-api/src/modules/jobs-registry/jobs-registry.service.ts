@@ -155,10 +155,39 @@ export class JobsRegistryService {
    * @param dto the data transfer object containing the result of the job
    * @returns an object with the worker ID and result of the job
    */
-  public async updateResult(workerId: string, dto: UpdateResultDto) {
-    const job = await this.repo.findOne({
+  public async updateResult(
+    workerId: string,
+    dto: UpdateResultDto,
+  ): Promise<{ workerId: string; dto: UpdateResultDto }> {
+    const { jobId, data } = dto;
+
+    const job = await this.findJobForUpdate(workerId, jobId);
+
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+
+    const step = this.workerService.getWorkerStepByName(job.workerName);
+
+    if (!step) {
+      throw new Error(`Worker step not found for worker: ${job.workerName}`);
+    }
+
+    const hasError = data?.error;
+    const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
+
+    await this.updateJobStatus(job.id, newStatus);
+
+    await this.processStepResult(step, job, dto.data);
+
+    return { workerId, dto };
+  }
+
+  private async findJobForUpdate(workerId: string, jobId: string) {
+    return this.repo.findOne({
       where: {
         workerId,
+        id: jobId,
         status: JobStatus.IN_PROGRESS,
       },
       relations: {
@@ -167,27 +196,37 @@ export class JobsRegistryService {
         },
       },
     });
+  }
 
-    if (!job) {
-      throw new NotFoundException('Job not found');
-    }
+  private async updateJobStatus(
+    jobId: string,
+    status: JobStatus,
+  ): Promise<void> {
+    await this.repo.update(jobId, { status });
+  }
 
-    job.status = JobStatus.COMPLETED;
-
-    const { workerName } = job;
-    const step = this.workerService.getWorkerStepByName(workerName);
-    if (step) {
-      step?.resultHandler({
+  private async processStepResult(
+    step: any,
+    job: any,
+    data: any,
+  ): Promise<void> {
+    try {
+      await step.resultHandler({
         dataSource: this.dataSource,
-        result: (dto.data as any).raw,
+        result: data?.raw,
         job,
       });
-    }
+    } catch (error) {
+      // Log error and potentially update job status to failed
+      console.error('Error processing step result:', error);
 
-    return {
-      workerId,
-      dto,
-    };
+      // If the job wasn't already marked as failed, mark it as failed now
+      if (job.status !== JobStatus.FAILED) {
+        await this.updateJobStatus(job.id, JobStatus.FAILED);
+      }
+
+      throw error;
+    }
   }
 
   /**

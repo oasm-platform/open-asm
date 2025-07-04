@@ -115,7 +115,7 @@ export class Tool {
         const availableSlots = this.maxJobsQueue - this.queue.length;
         if (availableSlots > 0) {
           const jobPromises = Array.from(
-            { length: Math.min(availableSlots, 3) },
+            { length: Math.min(availableSlots, this.maxJobsQueue) },
             () => this.pullSingleJob()
           );
 

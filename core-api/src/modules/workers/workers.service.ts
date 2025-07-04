@@ -52,6 +52,7 @@ export class WorkersService {
         '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         const parsed = {};
+
         result.split('\n').forEach((line) => {
           const cleaned = line.replace(/\x1B\[[0-9;]*m/g, '').trim();
 

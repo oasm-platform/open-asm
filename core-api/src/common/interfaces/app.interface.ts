@@ -34,5 +34,5 @@ export interface Worker {
   id: WorkerName;
   description: string;
   command: string;
-  resultHandler: ({ dataSource, result }: ResultHandler) => void;
+  resultHandler: ({ dataSource, result, job }: ResultHandler) => Promise<void>;
 }
