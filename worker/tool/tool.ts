@@ -1,6 +1,5 @@
 import logger from "node-color-log";
 import coreApi from "../services/core-api";
-import { WorkerJoinDtoWorkerNameEnum } from "../services/core-api/api";
 import runCommand from "./runCommand";
 
 interface Job {
@@ -19,7 +18,6 @@ export class Tool {
   private readonly maxJobsQueue = Number(process.env.MAX_JOBS) || 10;
   private readonly maxConcurrentJobs =
     Number(process.env.MAX_CONCURRENT_JOBS) || 5;
-  private readonly workerName = process.env.NAME as string;
   private readonly pullInterval = Number(process.env.PULL_INTERVAL) || 1000; // Configurable pull interval
   private isShuttingDown = false;
 
@@ -89,21 +87,9 @@ export class Tool {
    * Validates and connects worker via SSE, waits until workerId is set.
    */
   private async connectToCore() {
-    if (
-      !Object.values(WorkerJoinDtoWorkerNameEnum).includes(
-        this.workerName as WorkerJoinDtoWorkerNameEnum
-      )
-    ) {
-      const accepted = Object.values(WorkerJoinDtoWorkerNameEnum).join(", ");
-      throw new Error(
-        `Invalid worker name "${this.workerName}". Accepted values: ${accepted}`
-      );
-    }
-
     try {
       const worker: any = await coreApi.workersControllerJoin({
         token: process.env.TOKEN!,
-        workerName: this.workerName as WorkerJoinDtoWorkerNameEnum,
       });
       Tool.workerId = worker.id;
       Tool.token = worker.token;
@@ -121,7 +107,7 @@ export class Tool {
    * Periodically pulls jobs from core if the queue isn't full.
    */
   private async pullJobsContinuously() {
-    logger.info(`[${this.workerName?.toUpperCase()}] - Start pulling jobs...`);
+    logger.info(`Start pulling jobs...`);
 
     while (!this.isShuttingDown) {
       try {
@@ -221,7 +207,7 @@ export class Tool {
       logger
         .color("green")
         .log(
-          `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - WorkerName: ${this.workerName} - Time: ${executionTime}ms`
+          `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - Time: ${executionTime}ms`
         );
     } catch (e) {
       logger.error(`Failed to handle job ${job.jobId}:`, e);
@@ -326,7 +312,6 @@ export class Tool {
       maxConcurrentJobs: this.maxConcurrentJobs,
       maxJobsQueue: this.maxJobsQueue,
       workerId: Tool.workerId,
-      workerName: this.workerName,
       isShuttingDown: this.isShuttingDown,
     };
   }

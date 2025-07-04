@@ -137,6 +137,25 @@ export interface GetNextJobResponseDto {
   jobId: string;
   value: string;
   workerName: string;
+  /** Command to run */
+  command: string;
+}
+
+export interface Job {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface GetManyJobDto {
+  data: Job[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 }
 
 export interface UpdateResultDto {
@@ -167,7 +186,6 @@ export interface WorkerInstance {
 
 export interface WorkerJoinDto {
   token: string;
-  workerName: WorkerJoinDtoWorkerNameEnum;
 }
 
 /** @example "DONE" */
@@ -176,10 +194,52 @@ export enum GetManyTargetResponseDtoStatusEnum {
   DONE = "DONE",
 }
 
-export enum WorkerJoinDtoWorkerNameEnum {
+/**
+ * Filter jobs by status
+ * @default "all"
+ */
+export enum JobsRegistryControllerGetJobsByAssetIdParamsJobStatusEnum {
+  Pending = "pending",
+  InProgress = "in_progress",
+  Completed = "completed",
+  Failed = "failed",
+  Cancelled = "cancelled",
+  All = "all",
+}
+
+/**
+ * Filter jobs by worker name
+ * @default "all"
+ */
+export enum JobsRegistryControllerGetJobsByAssetIdParamsWorkerNameEnum {
   Subdomains = "subdomains",
   Httpx = "httpx",
   Ports = "ports",
+  All = "all",
+}
+
+/**
+ * Filter jobs by status
+ * @default "all"
+ */
+export enum JobsRegistryControllerGetJobsByTargetIdParamsJobStatusEnum {
+  Pending = "pending",
+  InProgress = "in_progress",
+  Completed = "completed",
+  Failed = "failed",
+  Cancelled = "cancelled",
+  All = "all",
+}
+
+/**
+ * Filter jobs by worker name
+ * @default "all"
+ */
+export enum JobsRegistryControllerGetJobsByTargetIdParamsWorkerNameEnum {
+  Subdomains = "subdomains",
+  Httpx = "httpx",
+  Ports = "ports",
+  All = "all",
 }
 
 import type {
@@ -659,6 +719,86 @@ export class Api<
    * No description
    *
    * @tags JobsRegistry
+   * @name JobsRegistryControllerGetJobsByAssetId
+   * @summary Gets jobs by asset ID, filtered by status and worker name.
+   * @request GET:/api/jobs-registry/asset/{assetId}
+   */
+  jobsRegistryControllerGetJobsByAssetId = (
+    assetId: string,
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      /**
+       * Filter jobs by status
+       * @default "all"
+       */
+      jobStatus: JobsRegistryControllerGetJobsByAssetIdParamsJobStatusEnum;
+      /**
+       * Filter jobs by worker name
+       * @default "all"
+       */
+      workerName: JobsRegistryControllerGetJobsByAssetIdParamsWorkerNameEnum;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry/asset/${assetId}`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags JobsRegistry
+   * @name JobsRegistryControllerGetJobsByTargetId
+   * @summary Gets jobs by target ID, filtered by status and worker name.
+   * @request GET:/api/jobs-registry/target/{targetId}
+   */
+  jobsRegistryControllerGetJobsByTargetId = (
+    targetId: string,
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      /**
+       * Filter jobs by status
+       * @default "all"
+       */
+      jobStatus: JobsRegistryControllerGetJobsByTargetIdParamsJobStatusEnum;
+      /**
+       * Filter jobs by worker name
+       * @default "all"
+       */
+      workerName: JobsRegistryControllerGetJobsByTargetIdParamsWorkerNameEnum;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry/target/${targetId}`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags JobsRegistry
    * @name JobsRegistryControllerUpdateResult
    * @summary Updates the result of a job with the given worker ID.
    * @request POST:/api/jobs-registry/{workerId}/result
@@ -737,6 +877,35 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Workers
+   * @name WorkersControllerGetWorkers
+   * @summary Gets all workers with pagination and sorting.
+   * @request GET:/api/workers
+   */
+  workersControllerGetWorkers = (
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workers`,
+      method: "GET",
+      query: query,
       format: "json",
       ...params,
     });
