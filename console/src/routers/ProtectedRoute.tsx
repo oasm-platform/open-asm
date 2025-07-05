@@ -6,12 +6,15 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 const { useSession } = authClient
 
 const ProtectedRoute = () => {
-    const { data, isPending } = useSession();
+    const { data, isPending: isLoadingSession } = useSession();
     const location = useLocation();
     const currentPath = location.pathname;
-    const { workspaces } = useWorkspaceSelector()
-    if (!data && !isPending) {
+    const { workspaces, isLoading: isLoadingWorkspaces } = useWorkspaceSelector()
+    if (!data && !isLoadingSession) {
         return <Navigate to={`/login?redirect=${currentPath}`} />
+    }
+    if (isLoadingWorkspaces) {
+        return <></>
     }
     return (
         <ProtectedLayout>
