@@ -13,10 +13,8 @@ import {
     SidebarMenuItem,
     SidebarRail
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Target } from "lucide-react";
+import { LayoutDashboard, Radar, Target } from "lucide-react";
 import { NavUser } from "../nav-user";
-import { WorkspaceSwitcher } from "../workspace-switcher";
-import { SearchForm } from "./search-form";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const location = useLocation();
@@ -42,8 +40,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return (
         <Sidebar {...props}>
             <SidebarHeader>
-                <WorkspaceSwitcher />
-                <SearchForm />
+                <div className="flex h-13 justify-start items-center gap-3">
+                    <Radar size={40} />
+                    <b className="text-lg">OASM</b>
+                </div>
+
             </SidebarHeader>
             <SidebarContent>
                 {menu.map((item) => (

@@ -19,7 +19,6 @@ const ProtectedRoute = () => {
     return (
         <ProtectedLayout>
             {workspaces.length === 0 ? <CreateWorkspace /> : <Outlet />}
-
         </ProtectedLayout>
     );
 };
