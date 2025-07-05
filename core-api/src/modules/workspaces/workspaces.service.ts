@@ -1,9 +1,11 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { LIMIT_WORKSPACE_CREATE } from 'src/common/constants/app.constants';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
@@ -45,6 +47,15 @@ export class WorkspacesService {
     userContextPayload: UserContextPayload,
   ): Promise<Workspace> {
     const { id } = userContextPayload;
+    const currentNumberOfWorkspace = await this.repo.count({
+      where: {
+        owner: { id },
+      },
+    });
+
+    if (currentNumberOfWorkspace >= LIMIT_WORKSPACE_CREATE) {
+      throw new BadRequestException('You have reached the limit of workspaces');
+    }
 
     const newWorkspace = await this.repo.save({
       name: dto.name,

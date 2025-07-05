@@ -10,12 +10,11 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
+import CreateWorkspace from "@/pages/workspaces/create-workspace-dialog";
 import { DropdownMenuItem } from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
-import { useNavigate } from 'react-router-dom';
+import { Check, ChevronsUpDown } from "lucide-react";
 
 export function WorkspaceSwitcher() {
-    const navigate = useNavigate();
     const {
         workspaces,
         isLoading,
@@ -82,13 +81,7 @@ export function WorkspaceSwitcher() {
                             </div>
                         )}
 
-                        {/* Create workspace */}
-                        <DropdownMenuItem
-                            onClick={() => navigate('/workspaces/create')}
-                            className="cursor-pointer gap-1 px-2 py-1.5 rounded hover:bg-muted flex items-center justify-start"
-                        >
-                            <Plus size={20} />  New workspace
-                        </DropdownMenuItem>
+                        <CreateWorkspace />
                     </DropdownMenuContent>
 
                 </DropdownMenu>

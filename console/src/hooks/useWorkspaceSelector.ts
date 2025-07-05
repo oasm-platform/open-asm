@@ -1,16 +1,17 @@
 import { useWorkspacesControllerGetWorkspaces } from "@/services/apis/gen/queries";
 import React from "react";
-import { useNavigate } from "react-router-dom";
 
 const LOCAL_STORAGE_KEY = "workspace_id";
 
 export function useWorkspaceSelector() {
-  const { data: response, isLoading } = useWorkspacesControllerGetWorkspaces({
+  const {
+    data: response,
+    isLoading,
+    refetch,
+  } = useWorkspacesControllerGetWorkspaces({
     limit: 100,
     page: 1,
   });
-
-  const navigate = useNavigate();
   const [selectedWorkspace, setSelectedWorkspaceState] = React.useState<
     string | null
   >(() => {
@@ -61,7 +62,6 @@ export function useWorkspaceSelector() {
       if (typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
-      navigate("/workspaces/create");
     }
   }, [response, selectedWorkspace]);
 
@@ -80,5 +80,7 @@ export function useWorkspaceSelector() {
     isLoading,
     selectedWorkspace,
     handleSelectWorkspace,
+    setSelectedWorkspaceState,
+    refetch,
   };
 }

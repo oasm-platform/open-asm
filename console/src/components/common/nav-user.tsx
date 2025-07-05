@@ -26,7 +26,7 @@ export function NavUser() {
     const { data: session } = useSession()
     const user = session?.user
     if (!user) {
-        return null
+        return <></>
     }
     return (
         <SidebarMenu>

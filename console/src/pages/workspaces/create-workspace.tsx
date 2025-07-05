@@ -1,33 +1,13 @@
-"use client";
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import CreateWorkspaceDialog from "./create-workspace-dialog";
 
 const CreateWorkspace = () => {
     return (
-        <div className="flex items-center justify-center px-4">
-            <Card className="w-full max-w-md">
-                <CardHeader>
-                    <CardTitle>Create Workspace</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form className="flex flex-col gap-4">
-                        <Input
-                            name="name"
-                            placeholder="Workspace Name"
-                            required
-                        />
-                        <Textarea
-                            name="description"
-                            placeholder="Description"
-                            rows={4}
-                        />
-                        <Button type="submit">Create Workspace</Button>
-                    </form>
-                </CardContent>
-            </Card>
+        <div className="min-h-[calc(100vh-64px)] flex flex-col justify-center items-center">
+            {/* Added description text as a guide */}
+            <p className="mb-4 text-center text-gray-600">
+                To get started, please create a workspace.
+            </p>
+            <CreateWorkspaceDialog />
         </div>
     );
 };
