@@ -228,9 +228,22 @@ export class WorkersService {
       })
       .then((res) => res.map((worker) => worker.id));
 
-    for (const worker of workers) {
-      await this.workerLeave(worker);
+    if (workers.length > 0) {
+      for (const worker of workers) {
+        await this.workerLeave(worker);
+      }
     }
+
+    // Retry job failed
+    this.jobsRegistryService.repo.update(
+      {
+        status: JobStatus.FAILED,
+      },
+      {
+        status: JobStatus.PENDING,
+        workerId: null as any,
+      },
+    );
   }
 
   /**

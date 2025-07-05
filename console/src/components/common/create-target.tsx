@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { useTargetsControllerCreateTarget, useTargetsControllerGetTargetsInWorkspace } from "@/services/apis/gen/queries";
-import { Target } from "lucide-react";
+import { Loader2Icon, Target } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -40,7 +40,7 @@ export function CreateTarget() {
         reset,
     } = useForm<FormValues>();
 
-    const { mutate } = useTargetsControllerCreateTarget(
+    const { mutate, isPending } = useTargetsControllerCreateTarget(
         {
             mutation: {
                 onSuccess: () => {
@@ -101,7 +101,9 @@ export function CreateTarget() {
                         <DialogClose asChild>
                             <Button variant="outline" type="button">Cancel</Button>
                         </DialogClose>
-                        <Button type="submit">Start</Button>
+                        <Button disabled={isPending} type="submit">
+                            {isPending && <Loader2Icon className="animate-spin" />}
+                            Start</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
