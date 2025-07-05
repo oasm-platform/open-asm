@@ -48,7 +48,12 @@ import { ViewColumn, ViewEntity } from 'typeorm';
     workspace_status_codes AS (
       SELECT 
         wt."workspaceId",
-        jsonb_agg(DISTINCT (j."rawResult"::jsonb->>'status_code')::integer ORDER BY (j."rawResult"::jsonb->>'status_code')::integer) as "statusCodes"
+        jsonb_agg(
+          DISTINCT (j."rawResult"::jsonb->>'status_code')::integer 
+          ORDER BY (j."rawResult"::jsonb->>'status_code')::integer
+        ) FILTER (
+          WHERE (j."rawResult"::jsonb->>'status_code')::integer > 0
+        ) as "statusCodes"
       FROM workspace_targets wt
       LEFT JOIN targets t ON t.id = wt."targetId"
       LEFT JOIN assets a ON a."targetId" = t.id

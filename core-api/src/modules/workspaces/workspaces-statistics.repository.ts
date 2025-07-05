@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { WorkspaceStatisticsResponseDto } from './dto/workspaces.dto';
 import { WorkspaceStatisticsView } from './entities/workspace-statistics.view.entity';
 
@@ -21,8 +21,7 @@ export class WorkspaceStatisticsRepository {
   ): Promise<WorkspaceStatisticsResponseDto | null> {
     const result = await this.statisticsViewRepository
       .createQueryBuilder('ws')
-      .where('ws.workspace_id = :workspaceId', { workspaceId })
-      .limit(1)
+      .where('ws.workspaceId = :workspaceId', { workspaceId })
       .getOne();
 
     if (!result) {
