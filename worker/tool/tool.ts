@@ -15,6 +15,7 @@ export class Tool {
   public static workerId: string | null = null;
   public static token: string | null = null;
   public static command: string | null = null;
+  private isAliveError = false;
   private readonly maxJobsQueue = Number(process.env.MAX_JOBS) || 10;
   private readonly maxConcurrentJobs =
     Number(process.env.MAX_CONCURRENT_JOBS) || 5;
@@ -72,12 +73,16 @@ export class Tool {
         await coreApi.workersControllerAlive({
           token: Tool.token!,
         });
-        logger.success(`Alive - ${Tool.workerId}`);
+        if (this.isAliveError) {
+          logger.success("Reconnected to core.");
+          this.isAliveError = false;
+        }
       } catch (error: any) {
         if (error?.response?.status === 401) {
           logger.warn("Token unauthorized. Reconnecting...");
           await this.connectToCore();
         } else {
+          this.isAliveError = true;
           logger.error("Alive check failed:", error.message);
         }
       }
@@ -88,19 +93,25 @@ export class Tool {
    * Validates and connects worker via SSE, waits until workerId is set.
    */
   private async connectToCore() {
-    try {
-      const worker: any = await coreApi.workersControllerJoin({
-        token: process.env.TOKEN!,
-      });
-      Tool.workerId = worker.id;
-      Tool.token = worker.token;
-      logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId}`);
+    let attempt = 0;
 
-      // Wait until Tool.workerId is set (by SSE handler)
-      await this.waitUntil(() => !!Tool.workerId, 1000);
-    } catch (e) {
-      logger.error("Cannot connect to core:", e);
-      throw e;
+    while (true) {
+      try {
+        const worker: any = await coreApi.workersControllerJoin({
+          token: process.env.TOKEN!,
+        });
+        Tool.workerId = worker.id;
+        Tool.token = worker.token;
+        logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId}`);
+
+        // Wait until Tool.workerId is set (by SSE handler)
+        await this.waitUntil(() => !!Tool.workerId, 1000);
+        return; // success, exit the method
+      } catch (e) {
+        attempt++;
+        logger.error(`Cannot connect to core (attempt ${attempt}):`);
+        await this.sleep(1000 * attempt); // exponential backoff delay
+      }
     }
   }
 
