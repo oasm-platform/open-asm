@@ -72,6 +72,7 @@ export class Tool {
         await coreApi.workersControllerAlive({
           token: Tool.token!,
         });
+        logger.success(`Alive - ${Tool.workerId}`);
       } catch (error: any) {
         if (error?.response?.status === 401) {
           logger.warn("Token unauthorized. Reconnecting...");

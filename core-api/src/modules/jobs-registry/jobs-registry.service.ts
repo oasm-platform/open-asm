@@ -44,35 +44,49 @@ export class JobsRegistryService {
   public async getNextJob(
     workerId: string,
   ): Promise<GetNextJobResponseDto | null> {
-    const job = await this.repo.findOne({
-      where: {
-        status: JobStatus.PENDING,
-      },
-      order: {
-        createdAt: 'ASC',
-      },
-      relations: ['asset'],
-    });
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (job) {
+    try {
+      const job = await queryRunner.manager
+        .createQueryBuilder(Job, 'jobs')
+        .innerJoinAndSelect('jobs.asset', 'asset')
+        .where('jobs.status = :status', { status: JobStatus.PENDING })
+        .orderBy('jobs.createdAt', 'ASC')
+        .setLock('pessimistic_write')
+        .limit(1)
+        .getOne();
+
+      if (!job) {
+        await queryRunner.rollbackTransaction();
+        return null;
+      }
+
       job.workerId = workerId;
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
-      await this.repo.save(job);
+      await queryRunner.manager.save(job);
+
+      await queryRunner.commitTransaction();
 
       const workerStep = this.workerService.getWorkerStepByName(job.workerName);
       if (!workerStep) {
         return null;
       }
+
       return {
         jobId: job.id,
         value: job.asset.value,
         workerName: job.workerName,
         command: workerStep.command,
       };
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
     }
-
-    return null;
   }
 
   /**
