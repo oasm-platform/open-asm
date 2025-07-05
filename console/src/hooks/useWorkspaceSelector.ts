@@ -1,5 +1,6 @@
 import { useWorkspacesControllerGetWorkspaces } from "@/services/apis/gen/queries";
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 const LOCAL_STORAGE_KEY = "workspace_id";
 
@@ -9,6 +10,7 @@ export function useWorkspaceSelector() {
     page: 1,
   });
 
+  const navigate = useNavigate();
   const [selectedWorkspace, setSelectedWorkspaceState] = React.useState<
     string | null
   >(() => {
@@ -18,7 +20,6 @@ export function useWorkspaceSelector() {
     return null;
   });
 
-  // Đảm bảo handleSelectWorkspace luôn ổn định và cập nhật state
   const handleSelectWorkspace = React.useCallback((id: string) => {
     setSelectedWorkspaceState(id);
     if (typeof window !== "undefined") {
@@ -27,7 +28,6 @@ export function useWorkspaceSelector() {
     window.location.reload();
   }, []);
 
-  // Khi response thay đổi, cập nhật selectedWorkspace nếu cần
   React.useEffect(() => {
     if (response?.data && response.data.length > 0) {
       const workspaceIds = response.data.map((ws) => ws.id);
@@ -61,10 +61,10 @@ export function useWorkspaceSelector() {
       if (typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
+      navigate("/workspaces/create");
     }
   }, [response, selectedWorkspace]);
 
-  // Lắng nghe sự thay đổi của localStorage từ các tab khác (nếu cần)
   React.useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === LOCAL_STORAGE_KEY) {

@@ -1,7 +1,8 @@
-import Layout from '@/components/common/layout/layout';
+import Layout from '@/components/common/layout/Layout';
 import Home from '@/pages/home/Home';
-import Login from '@/pages/login/Login';
+import Login from '@/pages/login/login';
 import Targets from '@/pages/targets/targets';
+import CreateWorkspace from '@/pages/workspaces/create-workspace';
 import { createBrowserRouter } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
@@ -31,6 +32,10 @@ export const router = createBrowserRouter([
                     {
                         element: <Targets />,
                         path: 'targets'
+                    },
+                    {
+                        element: <CreateWorkspace />,
+                        path: 'workspaces/create'
                     }
                 ]
             },
