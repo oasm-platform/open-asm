@@ -7,8 +7,10 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { Public } from 'src/common/decorators/app.decorator';
+import { Public, UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
+import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
+import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   GetManyJobsQueryParams,
@@ -22,6 +24,21 @@ import { JobsRegistryService } from './jobs-registry.service';
 @Controller('jobs-registry')
 export class JobsRegistryController {
   constructor(private readonly jobsRegistryService: JobsRegistryService) {}
+
+  @Doc({
+    summary: 'Get Jobs',
+    description: 'Retrieves a list of jobs that the user is a member of.',
+    response: {
+      serialization: GetManyResponseDto(Job),
+    },
+  })
+  @Get('')
+  getManyJobs(
+    @Query() query: GetManyBaseQueryParams,
+    @UserContext() userContextPayload: UserContextPayload,
+  ) {
+    return this.jobsRegistryService.getManyJobs(query, userContextPayload);
+  }
 
   @Doc({
     summary:

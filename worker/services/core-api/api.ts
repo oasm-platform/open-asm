@@ -133,20 +133,18 @@ export interface CreateFirstAdminDto {
   password: string;
 }
 
-export interface GetNextJobResponseDto {
-  jobId: string;
-  value: string;
-  workerName: string;
-  /** Command to run */
-  command: string;
-}
-
 export interface Job {
   id: string;
   /** @format date-time */
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
+  workerName: string;
+  status: string;
+  /** @format date-time */
+  pickJobAt: string;
+  /** @format date-time */
+  completedAt: string;
 }
 
 export interface GetManyJobDto {
@@ -156,6 +154,14 @@ export interface GetManyJobDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+}
+
+export interface GetNextJobResponseDto {
+  jobId: string;
+  value: string;
+  workerName: string;
+  /** Command to run */
+  command: string;
 }
 
 export interface UpdateResultDto {
@@ -692,6 +698,35 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of jobs that the user is a member of.
+   *
+   * @tags JobsRegistry
+   * @name JobsRegistryControllerGetManyJobs
+   * @summary Get Jobs
+   * @request GET:/api/jobs-registry
+   */
+  jobsRegistryControllerGetManyJobs = (
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry`,
+      method: "GET",
+      query: query,
       format: "json",
       ...params,
     });

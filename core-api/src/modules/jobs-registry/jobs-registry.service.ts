@@ -1,7 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
+import {
+  GetManyBaseQueryParams,
+  GetManyBaseResponseDto,
+} from 'src/common/dtos/get-many-base.dto';
 import { JobStatus, WorkerName } from 'src/common/enums/enum';
+import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, InsertResult, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
@@ -20,6 +24,27 @@ export class JobsRegistryService {
     private workerService: WorkersService,
     private dataSource: DataSource,
   ) {}
+  public async getManyJobs(
+    query: GetManyBaseQueryParams,
+    userContextPayload: UserContextPayload,
+  ): Promise<GetManyBaseResponseDto<Job>> {
+    const { limit, page, sortOrder } = query;
+    let { sortBy } = query;
+    const { id } = userContextPayload;
+
+    if (!(sortBy in Job)) {
+      sortBy = 'createdAt';
+    }
+    const [data, total] = await this.repo.findAndCount({
+      take: query.limit,
+      skip: (page - 1) * limit,
+      order: {
+        [sortBy]: sortOrder,
+      },
+    });
+
+    return getManyResponse<Job>(query, data, total);
+  }
 
   /**
    * Creates a new job associated with the given asset and worker name.
