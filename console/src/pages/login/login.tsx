@@ -37,28 +37,16 @@ export default function Login() {
     const [loading, setLoading] = useState(false)
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
-        try {
-            setLoading(true)
-            await authClient.signIn.email({
-                email: values.email,
-                password: values.password,
-                callbackURL: redirectUrl as string || "/"
-            })
-        } catch (error) {
-            if (error instanceof Error) {
-                form.setError('password', {
-                    type: 'server',
-                    message: error.message
-                })
-            } else {
-                form.setError('password', {
-                    type: 'server',
-                    message: 'An unexpected error occurred'
-                })
-            }
-        } finally {
-            setLoading(false)
+        setLoading(true)
+        const res = await authClient.signIn.email({
+            email: values.email,
+            password: values.password,
+            callbackURL: redirectUrl || "/"
+        })
+        if (!res.data) {
+            form.setError("password", { message: "Invalid email or password" })
         }
+        setLoading(false)
     }
 
     return (
@@ -93,11 +81,6 @@ export default function Login() {
                                             <Input type="password" placeholder="••••••••" {...field} />
                                         </FormControl>
                                         <FormMessage />
-                                        {form.formState.errors.password?.type === 'server' && (
-                                            <FormMessage className="text-red-500">
-                                                {form.formState.errors.password.message}
-                                            </FormMessage>
-                                        )}
                                     </FormItem>
                                 )}
                             />

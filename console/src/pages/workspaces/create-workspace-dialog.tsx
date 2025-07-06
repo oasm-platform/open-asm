@@ -15,6 +15,7 @@ import { useWorkspacesControllerCreateWorkspace } from "@/services/apis/gen/quer
 import { Loader2Icon, Plus } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 
 type FormData = {
     name: string;
@@ -38,14 +39,15 @@ const CreateWorkspaceDialog = () => {
             },
         }, {
             onSuccess: (data) => {
+                toast.success("Workspace created successfully")
                 refetch().then(() => {
                     handleSelectWorkspace(data.id)
                 })
                 setOpen(false);
                 reset();
             },
-            onError: (error) => {
-                console.log(error)
+            onError: () => {
+                toast.error("Failed to create workspace")
             }
         })
 

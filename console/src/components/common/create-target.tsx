@@ -16,6 +16,7 @@ import { useTargetsControllerCreateTarget, useTargetsControllerGetTargetsInWorks
 import { Loader2Icon, Target } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
 
@@ -57,6 +58,13 @@ export function CreateTarget() {
             data: {
                 value: data.value,
                 workspaceId: selectedWorkspace
+            }
+        }, {
+            onError: () => {
+                toast.error("Failed to create target")
+            },
+            onSuccess: () => {
+                toast.success("Target created successfully")
             }
         })
         // reset moved to onSuccess
