@@ -4,16 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from 'src/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { CreateTargetDto } from './dto/targets.dto';
+import {
+  CreateTargetDto,
+  GetManyWorkspaceQueryParamsDto,
+} from './dto/targets.dto';
 import { Target } from './entities/target.entity';
 import { WorkspaceTarget } from './entities/workspace-target.entity';
 
@@ -115,12 +115,11 @@ export class TargetsService {
    * @returns A promise that resolves to a paginated list of targets, including total count and pagination information.
    */
   public async getTargetsInWorkspace(
-    id: string,
-    query: GetManyBaseQueryParams,
+    query: GetManyWorkspaceQueryParamsDto,
   ): Promise<
     GetManyBaseResponseDto<Target & { totalAssets: number; status: string }>
   > {
-    const { limit, page, sortBy, sortOrder } = query;
+    const { limit, page, sortBy, sortOrder, workspaceId } = query;
 
     const offset = (page - 1) * limit;
 
@@ -131,7 +130,7 @@ export class TargetsService {
       .innerJoin('workspace.workspaceMembers', 'workspaceMember')
       .leftJoin('targets.assets', 'asset')
       .leftJoin('asset.jobs', 'job')
-      .where('workspace.id = :workspaceId', { workspaceId: id })
+      .where('workspace.id = :workspaceId', { workspaceId })
       .select([
         'targets.id as id',
         'targets.value as value',

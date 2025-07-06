@@ -12,11 +12,14 @@ import {
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
-import { CreateTargetDto, GetManyTargetResponseDto } from './dto/targets.dto';
+import {
+  CreateTargetDto,
+  GetManyTargetResponseDto,
+  GetManyWorkspaceQueryParamsDto,
+} from './dto/targets.dto';
 import { Target } from './entities/target.entity';
 import { TargetsService } from './targets.service';
 
@@ -40,6 +43,18 @@ export class TargetsController {
   }
 
   @Doc({
+    summary: 'Get all targets in a workspace',
+    description: 'Retrieves all targets in a workspace.',
+    response: {
+      serialization: GetManyResponseDto(GetManyTargetResponseDto),
+    },
+  })
+  @Get()
+  getTargetsInWorkspace(@Query() query: GetManyWorkspaceQueryParamsDto) {
+    return this.targetsService.getTargetsInWorkspace(query);
+  }
+
+  @Doc({
     summary: 'Get a target by ID',
     description: 'Retrieves a target by its ID.',
     response: {
@@ -54,21 +69,6 @@ export class TargetsController {
       throw new NotFoundException('Target not found');
     }
     return target;
-  }
-
-  @Doc({
-    summary: 'Get all targets in a workspace',
-    description: 'Retrieves all targets in a workspace.',
-    response: {
-      serialization: GetManyResponseDto(GetManyTargetResponseDto),
-    },
-  })
-  @Get('workspace/:id')
-  getTargetsInWorkspace(
-    @Param() { id }: IdQueryParamDto,
-    @Query() query: GetManyBaseQueryParams,
-  ) {
-    return this.targetsService.getTargetsInWorkspace(id, query);
   }
 
   @Doc({

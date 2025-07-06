@@ -1,5 +1,6 @@
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
+import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { ScanStatus } from 'src/common/enums/enum';
 import { Target } from '../entities/target.entity';
 
@@ -18,4 +19,10 @@ export class GetManyTargetResponseDto extends Target {
 
   @ApiProperty({ example: 100 })
   totalAssets: number;
+}
+
+export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
+  @ApiProperty()
+  @IsUUID('4')
+  workspaceId: string;
 }

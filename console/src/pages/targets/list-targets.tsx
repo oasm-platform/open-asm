@@ -113,9 +113,14 @@ export const columns: ColumnDef<Target, any>[] = [
 export function ListTargets() {
     const { selectedWorkspace } = useWorkspaceSelector()
     const { data, isLoading } = useTargetsControllerGetTargetsInWorkspace(
-        selectedWorkspace ?? "", {}, {
+        {
+            workspaceId: selectedWorkspace ?? "",
+            limit: 10,
+            page: 1,
+            sortBy: "createdAt",
+            sortOrder: "DESC",
+        }, {
         query: {
-            queryKey: [selectedWorkspace],
             refetchInterval: 5000
         }
     }

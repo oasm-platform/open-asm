@@ -28,7 +28,13 @@ export function CreateTarget() {
     const [open, setOpen] = useState(false);
     const { selectedWorkspace } = useWorkspaceSelector()
     const { refetch } = useTargetsControllerGetTargetsInWorkspace(
-        selectedWorkspace ?? "", {}, {
+        {
+            workspaceId: selectedWorkspace ?? "",
+            limit: 10,
+            page: 1,
+            sortBy: "createdAt",
+            sortOrder: "desc",
+        }, {
         query: {
             queryKey: [selectedWorkspace]
         }

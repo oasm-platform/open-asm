@@ -177,6 +177,7 @@ export type WorkerJoinDto = {
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
+  workspaceId: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -384,6 +385,366 @@ export const useTargetsControllerCreateTarget = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * Retrieves all targets in a workspace.
+ * @summary Get all targets in a workspace
+ */
+export const targetsControllerGetTargetsInWorkspace = (
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetManyTargetResponseDtoDto>(
+    { url: `/api/targets`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getTargetsControllerGetTargetsInWorkspaceQueryKey = (
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+) => {
+  return [`/api/targets`, ...(params ? [params] : [])] as const;
+};
+
+export const getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+    TargetsControllerGetTargetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetsInWorkspaceParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTargetsControllerGetTargetsInWorkspaceQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+    QueryKey,
+    TargetsControllerGetTargetsInWorkspaceParams["page"]
+  > = ({ signal, pageParam }) =>
+    targetsControllerGetTargetsInWorkspace(
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+    TError,
+    TData,
+    QueryKey,
+    TargetsControllerGetTargetsInWorkspaceParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetsInWorkspaceInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
+  >;
+export type TargetsControllerGetTargetsInWorkspaceInfiniteQueryError = unknown;
+
+export function useTargetsControllerGetTargetsInWorkspaceInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+    TargetsControllerGetTargetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetsInWorkspaceParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetsInWorkspaceInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+    TargetsControllerGetTargetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetsInWorkspaceParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetsInWorkspaceInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+    TargetsControllerGetTargetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetsInWorkspaceParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all targets in a workspace
+ */
+
+export function useTargetsControllerGetTargetsInWorkspaceInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+    TargetsControllerGetTargetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetsInWorkspaceParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getTargetsControllerGetTargetsInWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTargetsControllerGetTargetsInWorkspaceQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
+  > = ({ signal }) =>
+    targetsControllerGetTargetsInWorkspace(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetsInWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
+>;
+export type TargetsControllerGetTargetsInWorkspaceQueryError = unknown;
+
+export function useTargetsControllerGetTargetsInWorkspace<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetsInWorkspace<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetsInWorkspace<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all targets in a workspace
+ */
+
+export function useTargetsControllerGetTargetsInWorkspace<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: TargetsControllerGetTargetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTargetsControllerGetTargetsInWorkspaceQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * Retrieves a target by its ID.
@@ -698,391 +1059,6 @@ export function useTargetsControllerGetTarget<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getTargetsControllerGetTargetQueryOptions(id, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Retrieves all targets in a workspace.
- * @summary Get all targets in a workspace
- */
-export const targetsControllerGetTargetsInWorkspace = (
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyGetManyTargetResponseDtoDto>(
-    { url: `/api/targets/workspace/${id}`, method: "GET", params, signal },
-    options,
-  );
-};
-
-export const getTargetsControllerGetTargetsInWorkspaceQueryKey = (
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-) => {
-  return [`/api/targets/workspace/${id}`, ...(params ? [params] : [])] as const;
-};
-
-export const getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams["page"]
-  >,
-  TError = unknown,
->(
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTargetsControllerGetTargetsInWorkspaceQueryKey(id, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    QueryKey,
-    TargetsControllerGetTargetsInWorkspaceParams["page"]
-  > = ({ signal, pageParam }) =>
-    targetsControllerGetTargetsInWorkspace(
-      id,
-      { ...params, page: pageParam || params?.["page"] },
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!id,
-    ...queryOptions,
-  } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TError,
-    TData,
-    QueryKey,
-    TargetsControllerGetTargetsInWorkspaceParams["page"]
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type TargetsControllerGetTargetsInWorkspaceInfiniteQueryResult =
-  NonNullable<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
-  >;
-export type TargetsControllerGetTargetsInWorkspaceInfiniteQueryError = unknown;
-
-export function useTargetsControllerGetTargetsInWorkspaceInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams["page"]
-  >,
-  TError = unknown,
->(
-  id: string,
-  params: undefined | TargetsControllerGetTargetsInWorkspaceParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams["page"]
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          QueryKey
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerGetTargetsInWorkspaceInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams["page"]
-  >,
-  TError = unknown,
->(
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams["page"]
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          QueryKey
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerGetTargetsInWorkspaceInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams["page"]
-  >,
-  TError = unknown,
->(
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get all targets in a workspace
- */
-
-export function useTargetsControllerGetTargetsInWorkspaceInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams["page"]
-  >,
-  TError = unknown,
->(
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions(
-      id,
-      params,
-      options,
-    );
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getTargetsControllerGetTargetsInWorkspaceQueryOptions = <
-  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTargetsControllerGetTargetsInWorkspaceQueryKey(id, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
-  > = ({ signal }) =>
-    targetsControllerGetTargetsInWorkspace(id, params, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!id,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type TargetsControllerGetTargetsInWorkspaceQueryResult = NonNullable<
-  Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
->;
-export type TargetsControllerGetTargetsInWorkspaceQueryError = unknown;
-
-export function useTargetsControllerGetTargetsInWorkspace<
-  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  params: undefined | TargetsControllerGetTargetsInWorkspaceParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerGetTargetsInWorkspace<
-  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTargetsControllerGetTargetsInWorkspace<
-  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get all targets in a workspace
- */
-
-export function useTargetsControllerGetTargetsInWorkspace<
-  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-  TError = unknown,
->(
-  id: string,
-  params?: TargetsControllerGetTargetsInWorkspaceParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getTargetsControllerGetTargetsInWorkspaceQueryOptions(
-    id,
-    params,
-    options,
-  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
