@@ -38,11 +38,11 @@ const Statistic = () => {
                 {/* Status Codes */}
                 < Card className="col-span-1" >
                     <CardHeader>
-                        <CardTitle>Status Codes ({(data?.statusCodes as string[]).length})</CardTitle>
+                        <CardTitle>Status Codes ({(data?.statusCodes as string[])?.length})</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap gap-2">
-                            {(data?.statusCodes as (string | number)[]).map((code) => {
+                            {(data?.statusCodes as (string | number)[])?.map((code) => {
                                 const codeStr = code.toString(); // convert to string
                                 let variant: "secondary" | "success" | "warning" | "destructive" = "secondary";
                                 if (codeStr.startsWith("2")) variant = "success";       // green
@@ -57,11 +57,11 @@ const Statistic = () => {
                 {/* CNAME Records */}
                 <Card className="col-span-2" >
                     <CardHeader>
-                        <CardTitle>CNAME Records ({(data?.cnameRecords as string[]).length})</CardTitle>
+                        <CardTitle>CNAME Records ({(data?.cnameRecords as string[])?.length})</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <ul className="space-y-2">
-                            {(data?.cnameRecords as string[]).map((record) => (
+                            {(data?.cnameRecords as string[])?.map((record) => (
                                 <pre key={record} className="text-sm">{record}</pre>
                             ))}
                         </ul>
@@ -72,11 +72,11 @@ const Statistic = () => {
             {/* Technologies */}
             <Card className="col-span-2" >
                 <CardHeader>
-                    <CardTitle>Detected Technologies ({(data?.technologies as string[]).length})</CardTitle>
+                    <CardTitle>Detected Technologies ({(data?.technologies as string[])?.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-wrap gap-2">
-                        {(data?.technologies as string[]).map((tech) => (
+                        {(data?.technologies as string[])?.map((tech) => (
                             <Badge variant="outline" key={tech}>{tech}</Badge>
                         ))}
                     </div>

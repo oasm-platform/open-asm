@@ -19,14 +19,21 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar"
 import { authClient } from "@/utils/authClient"
+import { useQueryClient } from "@tanstack/react-query"
 
 export function NavUser() {
+    const queryClient = useQueryClient();
     const { isMobile } = useSidebar()
     const { useSession, signOut } = authClient
     const { data: session } = useSession()
     const user = session?.user
     if (!user) {
         return <></>
+    }
+
+    const handleLogout = () => {
+        signOut()
+        queryClient.clear()
     }
     return (
         <SidebarMenu>
@@ -82,7 +89,7 @@ export function NavUser() {
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => signOut()}>
+                        <DropdownMenuItem onClick={handleLogout}>
                             {/* <IconLogout /> */}
                             Log out
                         </DropdownMenuItem>
