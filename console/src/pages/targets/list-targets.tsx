@@ -112,7 +112,6 @@ export function ListTargets() {
     const targets = data?.data ?? []
 
     if (!data && !isLoading) return <div>Error loading targets.</div>
-
     return (
         <DataTable
             columns={targetColumns}

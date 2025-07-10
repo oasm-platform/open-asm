@@ -10,7 +10,7 @@ import { RouterProvider } from "react-router-dom";
 import { ThemeProvider } from "./components/ui/theme-provider";
 
 import { router } from "./routers";
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 0,
@@ -22,6 +22,7 @@ const queryClient = new QueryClient({
     },
   },
 });
+
 const localStoragePersister = createAsyncStoragePersister({
   storage: window.localStorage,
   key: 'rq-persist'
