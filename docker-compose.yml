@@ -7,11 +7,9 @@ services:
       context: .
       dockerfile: ./core-api/Dockerfile
     networks:
-      - default
+      - oasm
     env_file:
       - ./core-api/.env
-    environment:
-      POSTGRES_HOST: postgres
     ports:
       - "6276:6276"
     restart: "always"
@@ -20,45 +18,17 @@ services:
     volumes:
       - ./open-api:/open-api
 
-  worker-subdomains:
+  worker:
     build:
       context: ./worker
       dockerfile: Dockerfile
     environment:
-      - API=http://core-api:6276
-      - NAME=subdomains
-    env_file:
-      - ./worker/.env
+      - API=http://core-api:6276/
+      - API_KEY=change_me
+      - MAX_JOBS=10
     networks:
-      - default
+      - oasm
     restart: "always"
-
-  worker-httpx:
-    build:
-      context: ./worker
-      dockerfile: Dockerfile
-    environment:
-      - API=http://core-api:6276
-      - NAME=httpx
-    env_file:
-      - ./worker/.env
-    networks:
-      - default
-    restart: "always"
-
-  worker-ports:
-    build:
-      context: ./worker
-      dockerfile: Dockerfile
-    environment:
-      - API=http://core-api:6276
-      - NAME=ports
-    env_file:
-      - ./worker/.env
-    networks:
-      - default
-    restart: "always"
-
   postgres:
     container_name: postgres
     image: postgres:15
@@ -74,11 +44,11 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     networks:
-      - default
+      - oasm
 
 volumes:
   pgdata:
 
 networks:
-  default:
+  oasm:
     driver: bridge

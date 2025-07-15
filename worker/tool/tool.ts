@@ -109,7 +109,10 @@ export class Tool {
         return; // success, exit the method
       } catch (e) {
         attempt++;
-        logger.error(`Cannot connect to core (attempt ${attempt}):`);
+        logger.error(
+          `Cannot connect to core ${process.env.API} (attempt ${attempt}):`,
+          e
+        );
         await this.sleep(1000 * attempt); // exponential backoff delay
       }
     }
