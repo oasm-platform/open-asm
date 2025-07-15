@@ -112,6 +112,10 @@ export type UpdateWorkspaceDto = {
   description?: string;
 };
 
+export type GetApiKeyResponseDto = {
+  apiKey: string;
+};
+
 export type CreateFirstAdminDto = {
   email: string;
   password: string;
@@ -177,11 +181,11 @@ export type WorkerJoinDto = {
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
-  workspaceId: string;
   page?: number;
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  workspaceId: string;
 };
 
 export type WorkspacesControllerGetWorkspacesParams = {
@@ -275,6 +279,18 @@ export const JobsRegistryControllerGetJobsByTargetIdWorkerName = {
   ports: "ports",
   all: "all",
 } as const;
+
+export type AssetsControllerGetAssetsInWorkspaceParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  workspaceId: string;
+  targetId?: string[];
+  port?: string[];
+  tech?: string[];
+  statusCode?: string[];
+};
 
 export type AssetsControllerGetAllAssetsInTargetParams = {
   page?: number;
@@ -2588,6 +2604,609 @@ export const useWorkspacesControllerDeleteWorkspace = <
   return useMutation(mutationOptions, queryClient);
 };
 
+/**
+ * Get API key
+ * @summary Get API key
+ */
+export const usersControllerGetApiKey = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetApiKeyResponseDto>(
+    { url: `/api/users/api-key`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getUsersControllerGetApiKeyQueryKey = () => {
+  return [`/api/users/api-key`] as const;
+};
+
+export const getUsersControllerGetApiKeyInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getUsersControllerGetApiKeyQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof usersControllerGetApiKey>>
+  > = ({ signal }) => usersControllerGetApiKey(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type UsersControllerGetApiKeyInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof usersControllerGetApiKey>>
+>;
+export type UsersControllerGetApiKeyInfiniteQueryError = unknown;
+
+export function useUsersControllerGetApiKeyInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof usersControllerGetApiKey>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useUsersControllerGetApiKeyInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof usersControllerGetApiKey>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useUsersControllerGetApiKeyInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get API key
+ */
+
+export function useUsersControllerGetApiKeyInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getUsersControllerGetApiKeyInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getUsersControllerGetApiKeyQueryOptions = <
+  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getUsersControllerGetApiKeyQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof usersControllerGetApiKey>>
+  > = ({ signal }) => usersControllerGetApiKey(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type UsersControllerGetApiKeyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof usersControllerGetApiKey>>
+>;
+export type UsersControllerGetApiKeyQueryError = unknown;
+
+export function useUsersControllerGetApiKey<
+  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof usersControllerGetApiKey>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useUsersControllerGetApiKey<
+  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof usersControllerGetApiKey>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useUsersControllerGetApiKey<
+  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get API key
+ */
+
+export function useUsersControllerGetApiKey<
+  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getUsersControllerGetApiKeyQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Regenerates the API key for a user.
+ * @summary Regenerate API key
+ */
+export const usersControllerRegenerateApiKey = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetApiKeyResponseDto>(
+    { url: `/api/users/api-key/regenerate`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getUsersControllerRegenerateApiKeyQueryKey = () => {
+  return [`/api/users/api-key/regenerate`] as const;
+};
+
+export const getUsersControllerRegenerateApiKeyInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getUsersControllerRegenerateApiKeyQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+  > = ({ signal }) => usersControllerRegenerateApiKey(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type UsersControllerRegenerateApiKeyInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+>;
+export type UsersControllerRegenerateApiKeyInfiniteQueryError = unknown;
+
+export function useUsersControllerRegenerateApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useUsersControllerRegenerateApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useUsersControllerRegenerateApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Regenerate API key
+ */
+
+export function useUsersControllerRegenerateApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getUsersControllerRegenerateApiKeyInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getUsersControllerRegenerateApiKeyQueryOptions = <
+  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getUsersControllerRegenerateApiKeyQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+  > = ({ signal }) => usersControllerRegenerateApiKey(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type UsersControllerRegenerateApiKeyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+>;
+export type UsersControllerRegenerateApiKeyQueryError = unknown;
+
+export function useUsersControllerRegenerateApiKey<
+  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useUsersControllerRegenerateApiKey<
+  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useUsersControllerRegenerateApiKey<
+  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Regenerate API key
+ */
+
+export function useUsersControllerRegenerateApiKey<
+  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getUsersControllerRegenerateApiKeyQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
 export const rootControllerGetHealth = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
@@ -4552,6 +5171,364 @@ export const useJobsRegistryControllerUpdateResult = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * Retrieves a list of assets associated with the given workspace.
+ * @summary Get assets in workspace
+ */
+export const assetsControllerGetAssetsInWorkspace = (
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyBaseResponseDto>(
+    { url: `/api/assets`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetAssetsInWorkspaceQueryKey = (
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+) => {
+  return [`/api/assets`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetAssetsInWorkspaceInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetAssetsInWorkspaceQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    QueryKey,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
+  > = ({ signal, pageParam }) =>
+    assetsControllerGetAssetsInWorkspace(
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    TError,
+    TData,
+    QueryKey,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetAssetsInWorkspaceInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>>;
+export type AssetsControllerGetAssetsInWorkspaceInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetAssetsInWorkspaceInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetsInWorkspaceInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetsInWorkspaceInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets in workspace
+ */
+
+export function useAssetsControllerGetAssetsInWorkspaceInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetsControllerGetAssetsInWorkspaceInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetsControllerGetAssetsInWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetAssetsInWorkspaceQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
+  > = ({ signal }) =>
+    assetsControllerGetAssetsInWorkspace(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetAssetsInWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
+>;
+export type AssetsControllerGetAssetsInWorkspaceQueryError = unknown;
+
+export function useAssetsControllerGetAssetsInWorkspace<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetsInWorkspace<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetsInWorkspace<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets in workspace
+ */
+
+export function useAssetsControllerGetAssetsInWorkspace<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetsInWorkspaceParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetAssetsInWorkspaceQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * Retrieves a list of assets associated with the given target.

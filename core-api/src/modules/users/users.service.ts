@@ -34,7 +34,7 @@ export class UsersService {
     }
 
     if (!user.apiKey) {
-      user.apiKey = generateToken(48);
+      user.apiKey = generateToken(32);
       await this.usersRepository.save(user);
     }
     return {
@@ -56,7 +56,7 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    user.apiKey = generateToken(48);
+    user.apiKey = generateToken(32);
     await this.usersRepository.save(user);
     return {
       apiKey: user.apiKey!,

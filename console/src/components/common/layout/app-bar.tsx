@@ -1,12 +1,13 @@
 // src/components/AppBar.tsx
 
+import { ConnectWorker } from "@/components/ui/connect-worker";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import ThemeModeSwitcher from "@/components/ui/theme-mode-switcher";
 import { Separator } from "@radix-ui/react-separator";
 import type { JSX } from "react";
-import { CreateTarget } from "../create-target";
-import { SearchForm } from "../search-form";
-import { WorkspaceSwitcher } from "../workspace-switcher";
+import { CreateTarget } from "../../ui/create-target";
+import { SearchForm } from "../../ui/search-form";
+import { WorkspaceSwitcher } from "../../ui/workspace-switcher";
 
 export default function AppBar({ children }: { children: JSX.Element }) {
     return (
@@ -20,6 +21,7 @@ export default function AppBar({ children }: { children: JSX.Element }) {
                         className="mr-2 data-[orientation=vertical]:h-4"
                     />
                 </div>
+                <ConnectWorker />
                 <div className="w-full flex justify-center">
                     <SearchForm className="w-1/2" />
                 </div>

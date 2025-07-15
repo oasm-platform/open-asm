@@ -14,7 +14,7 @@ import {
     SidebarRail
 } from "@/components/ui/sidebar";
 import { LayoutDashboard, Radar, Target } from "lucide-react";
-import { NavUser } from "../nav-user";
+import { NavUser } from "../../ui/nav-user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const location = useLocation();
