@@ -46,4 +46,7 @@ export class User extends BaseEntity {
 
   @Column('text', { nullable: true })
   banReason?: string;
+
+  @Column('text', { nullable: true })
+  apiKey?: string;
 }
