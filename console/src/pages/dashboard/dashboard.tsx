@@ -1,9 +1,12 @@
-import Statistic from "./Statistic";
+import Page from "@/components/common/page";
 import JobsRegistry from "./jobs-registry";
+import Statistic from "./statistic";
 
 export default function Dashboard() {
-    return <div className="p-6 grid grid-cols-4 gap-6">
-        <Statistic />
-        <JobsRegistry />
-    </div>
+    return <Page title="Dashboard">
+        <div className="grid grid-cols-4 gap-6">
+            <Statistic />
+            <JobsRegistry />
+        </div>
+    </Page>
 }

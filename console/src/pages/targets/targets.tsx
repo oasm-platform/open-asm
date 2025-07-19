@@ -1,11 +1,12 @@
+import Page from "@/components/common/page";
 import { ListTargets } from "./list-targets";
 
 
 const Targets = () => {
     return (
-        <div>
+        <Page title="Targets">
             <ListTargets />
-        </div>
+        </Page>
     );
 };
 

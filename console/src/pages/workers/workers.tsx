@@ -1,10 +1,11 @@
+import Page from "@/components/common/page";
 import ListWorkers from "./list-workers";
 
 const Workers = () => {
     return (
-        <div>
+        <Page title="Workers">
             <ListWorkers />
-        </div>
+        </Page>
     );
 };
 
