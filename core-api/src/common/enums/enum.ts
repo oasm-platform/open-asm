@@ -21,3 +21,8 @@ export enum ScanStatus {
   RUNNING = 'RUNNING',
   DONE = 'DONE',
 }
+
+export enum WorkerType {
+  BUILT_IN = 'built_in',
+  PLUGIN = 'plugin',
+}

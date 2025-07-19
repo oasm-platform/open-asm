@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { useTargetsControllerCreateTarget, useTargetsControllerGetTargetsInWorkspace } from "@/services/apis/gen/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2Icon, Target } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -71,6 +72,9 @@ export function CreateTarget() {
             },
             onSuccess: () => {
                 toast.success("Target created successfully")
+                useQueryClient().invalidateQueries({
+                    queryKey: ["targets", selectedWorkspace],
+                })
             }
         })
         // reset moved to onSuccess
