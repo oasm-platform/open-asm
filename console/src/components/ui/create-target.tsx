@@ -79,9 +79,9 @@ export function CreateTarget() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline">
-                    <Target />
-                    Start discovery
+                <Button variant="outline" className="gap-2">
+                    <Target className="shrink-0" />
+                    <span className="hidden lg:inline">Start discovery</span>
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">

@@ -32,9 +32,9 @@ export function ConnectWorker() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="secondary">
-                    <SquareTerminal />
-                    Connect worker
+                <Button variant="secondary" className="gap-2">
+                    <SquareTerminal className="shrink-0" />
+                    <span className="hidden lg:inline">Connect worker</span>
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
