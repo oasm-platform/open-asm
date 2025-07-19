@@ -174,10 +174,21 @@ export type WorkerInstance = {
   id: string;
   createdAt: string;
   updatedAt: string;
+  lastSeenAt: string;
+  token: string;
 };
 
 export type WorkerJoinDto = {
   token: string;
+};
+
+export type GetManyWorkerInstanceDto = {
+  data: WorkerInstance[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
@@ -6095,7 +6106,7 @@ export const workersControllerGetWorkers = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyBaseResponseDto>(
+  return orvalClient<GetManyWorkerInstanceDto>(
     { url: `/api/workers`, method: "GET", params, signal },
     options,
   );

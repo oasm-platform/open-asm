@@ -1,6 +1,10 @@
-name: Build and Push to GHCR
+name: Build and Push Core API to GHCR
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'core-api/**'
   workflow_dispatch:
 
 concurrency:

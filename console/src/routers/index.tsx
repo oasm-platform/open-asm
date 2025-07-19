@@ -1,7 +1,8 @@
 import Layout from '@/components/common/layout/layout';
-import Dashboard from '@/pages/dashboard/Dashboard';
-import Login from '@/pages/login/Login';
+import Dashboard from '@/pages/dashboard/dashboard';
+import Login from '@/pages/login/login';
 import Targets from '@/pages/targets/targets';
+import Workers from '@/pages/workers/workers';
 import { createBrowserRouter } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
@@ -31,6 +32,10 @@ export const router = createBrowserRouter([
                     {
                         element: <Targets />,
                         path: 'targets'
+                    },
+                    {
+                        element: <Workers />,
+                        path: 'workers'
                     },
                 ]
             },

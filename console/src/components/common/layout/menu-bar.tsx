@@ -7,13 +7,14 @@ import {
     SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
+    SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Radar, Target } from "lucide-react";
+import { LayoutDashboard, Radar, SquareTerminal, Target } from "lucide-react";
 import { NavUser } from "../../ui/nav-user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -34,6 +35,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     icon: <Target />,
                     url: "/targets",
                 },
+
+            ],
+        },
+        {
+            title: "Settings",
+            url: "#",
+            items: [
+                {
+                    title: "Workers",
+                    icon: <SquareTerminal />,
+                    url: "/workers",
+                },
+
+
             ],
         },
     ];
@@ -44,12 +59,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <Radar size={40} />
                     <b className="text-lg">OASM</b>
                 </div>
-
             </SidebarHeader>
             <SidebarContent>
                 {menu.map((item) => (
                     <SidebarGroup key={item.title}>
                         <SidebarGroupContent>
+                            <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
                             <SidebarMenu>
                                 {item.items.map((item) => {
                                     // Ensure all URLs are absolute for comparison
