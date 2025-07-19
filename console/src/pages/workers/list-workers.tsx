@@ -1,14 +1,15 @@
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkersControllerGetWorkers } from "@/services/apis/gen/queries"
-import { formatDistanceToNow } from "date-fns"
-import { Copy } from "lucide-react"
-import { toast } from "sonner"
+import dayjs from "dayjs"
+import relativeTime from "dayjs/plugin/relativeTime"
+import { Loader2Icon } from "lucide-react"
+dayjs.extend(relativeTime)
 
 
 const ListWorkers = () => {
-    const { data } = useWorkersControllerGetWorkers({
+    const { data, isLoading, isError } = useWorkersControllerGetWorkers({
         limit: 100,
         page: 1,
         sortBy: "createdAt",
@@ -18,36 +19,82 @@ const ListWorkers = () => {
             refetchInterval: 1000
         }
     })
+
+    // Skeleton loading state
+    if (isLoading) {
+        return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[...Array(3)].map((_, i) => (
+                    <Card key={i}>
+                        <CardContent className="p-3 space-y-4">
+                            <div className="flex justify-between items-start">
+                                <Skeleton className="h-4 w-20" />
+                                <Skeleton className="h-6 w-16" />
+                            </div>
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-4 w-2/3" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+        )
+    }
+
+    // Empty state
+    if (!data?.data?.length) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                    <Loader2Icon className="h-6 w-6 text-muted-foreground animate-spin" />
+                </div>
+                <h3 className="mt-4 text-lg font-medium text-muted-foreground">Pending connect workers...</h3>
+            </div>
+        )
+    }
+
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data?.data?.map((worker) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+            {data.data.map((worker) => (
                 <Card key={worker.id}>
                     <CardContent className="p-3 space-y-1.5">
-                        <div className="text-sm text-muted-foreground">ID</div>
-                        <div className="break-words font-mono text-sm">{worker.id}</div>
 
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Token</span>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 cursor-pointer"
-                                onClick={() => {
-                                    navigator.clipboard.writeText(worker.token)
-                                    toast.success('Token copied to clipboard')
-                                }}
+                        <div className="flex justify-between items-start">
+                            <Badge variant="outline">
+                                {worker.id.slice(0, 8)}
+                            </Badge>
+                            <Badge
+                                variant={worker.currentJobsCount > 0 ? "default" : "secondary"}
+                                className={`${worker.currentJobsCount > 0 ? 'bg-green-500 hover:bg-green-700 text-white' : ''} ml-2`}
                             >
-                                <Copy className="h-3.5 w-3.5" />
-                                <span className="sr-only">Copy token</span>
-                            </Button>
+                                {worker.currentJobsCount > 0 ? <Loader2Icon className="animate-spin mr-1 h-4 w-4" /> : ""}  {worker.currentJobsCount > 0 ? "Running" : "Idle"}
+                            </Badge>
                         </div>
 
                         <div className="flex items-center justify-between mt-3">
-                            <Badge variant="outline">Last seen</Badge>
+                            <Badge variant="outline">Status</Badge>
+                            <div className="flex items-center space-x-2">
+                                {new Date().getTime() - new Date(worker.lastSeenAt).getTime() < 30000 ? (
+                                    <>
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                        </span>
+                                        <span className="text-sm text-green-600">Online</span>
+                                    </>
+                                ) : (
+                                    <span className="text-sm text-muted-foreground">
+                                        {dayjs(worker.lastSeenAt).fromNow()}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-3">
+                            <Badge variant="outline">Created at</Badge>
                             <span className="text-sm text-muted-foreground">
-                                {formatDistanceToNow(new Date(worker.lastSeenAt), {
-                                    addSuffix: true,
-                                })}
+                                {dayjs(worker.createdAt).fromNow()}
                             </span>
                         </div>
                     </CardContent>

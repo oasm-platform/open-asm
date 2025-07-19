@@ -4,7 +4,7 @@ tasks:
   dev:
     cmds:
       - |
-        for i in $(seq 1 3); do
+        for i in $(seq 1 5); do
           echo "Starting worker $i"
           bun --watch index.ts &
         done

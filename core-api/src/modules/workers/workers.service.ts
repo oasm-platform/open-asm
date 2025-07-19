@@ -297,19 +297,34 @@ export class WorkersService {
     const { page, limit, sortOrder } = query;
     let { sortBy } = query;
     if (!sortBy) {
-      sortBy = 'createdAt';
+      sortBy = '"createdAt"';
     }
 
-    const [workers, total] = await this.repo.findAndCount({
-      order: {
-        [sortBy]: sortOrder,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const result = await this.repo
+      .createQueryBuilder('w')
+      .select('w')
+      .addSelect(
+        `(SELECT COUNT(j.id) FROM jobs j WHERE j."workerId"::uuid = w.id::uuid and j.status = '${JobStatus.IN_PROGRESS}')`,
+        'currentJobsCount',
+      )
+      .orderBy(`w.${sortBy.replace(/[^a-zA-Z0-9_]/g, '')}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getRawAndEntities();
+
+    const workers = result.entities.map((entity, index) => ({
+      ...entity,
+      currentJobsCount: parseInt(
+        result.raw[index]?.currentJobsCount || '0',
+        10,
+      ),
+    }));
+
+    const total = workers.length;
 
     return getManyResponse(query, workers, total);
   }
+
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance | null> {
     const { token } = dto;
 

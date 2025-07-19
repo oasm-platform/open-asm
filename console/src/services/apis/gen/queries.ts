@@ -176,6 +176,7 @@ export type WorkerInstance = {
   updatedAt: string;
   lastSeenAt: string;
   token: string;
+  currentJobsCount: number;
 };
 
 export type WorkerJoinDto = {
