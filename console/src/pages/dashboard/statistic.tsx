@@ -2,52 +2,54 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { useWorkspacesControllerGetWorkspaceStatistics } from "@/services/apis/gen/queries";
+import { Link } from "react-router-dom"; // Import Link
 
 const Statistic = () => {
-    const { selectedWorkspace } = useWorkspaceSelector()
-    const { data, isLoading } = useWorkspacesControllerGetWorkspaceStatistics(selectedWorkspace ?? "")
-    if (isLoading) return <></>
+    const { selectedWorkspace } = useWorkspaceSelector();
+    const { data, isLoading } = useWorkspacesControllerGetWorkspaceStatistics(selectedWorkspace ?? "");
+    if (isLoading) return <></>;
+
     return (
-
-
-        < div className="col-span-4 lg:col-span-3 grid gap-6 md:grid-cols-2 lg:grid-cols-2" >
+        <div className="col-span-4 lg:col-span-3 grid gap-6 md:grid-cols-2 lg:grid-cols-2">
             {/* Total Targets */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Total Targets</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-3xl font-bold">{data?.totalTargets?.toString() ?? "0"}</p>
-                </CardContent>
-            </Card>
+            <Link to="/targets" className="hover:opacity-90 transition">
+                <Card className="h-full cursor-pointer">
+                    <CardHeader>
+                        <CardTitle>Total Targets</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-3xl font-bold">{data?.totalTargets?.toString() ?? "0"}</p>
+                    </CardContent>
+                </Card>
+            </Link>
 
             {/* Total Assets */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Total Assets</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-3xl font-bold">{data?.totalAssets?.toString() ?? "0"}</p>
+            <Link to="/assets" className="hover:opacity-90 transition">
+                <Card className="h-full cursor-pointer">
+                    <CardHeader>
+                        <CardTitle>Total Assets</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-3xl font-bold">{data?.totalAssets?.toString() ?? "0"}</p>
+                    </CardContent>
+                </Card>
+            </Link>
 
-                </CardContent>
-            </Card>
-
-
-            {/* Status Codes (1/3) + CNAME Records (2/3) */}
-            < div className="col-span-2 grid grid-cols-3 gap-6" >
+            {/* Status Codes + CNAME */}
+            <div className="col-span-2 grid grid-cols-3 gap-6">
                 {/* Status Codes */}
-                < Card className="col-span-1" >
+                <Card className="col-span-1">
                     <CardHeader>
                         <CardTitle>Status Codes ({(data?.statusCodes as string[])?.length})</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap gap-2">
                             {(data?.statusCodes as (string | number)[])?.map((code) => {
-                                const codeStr = code.toString(); // convert to string
+                                const codeStr = code.toString();
                                 let variant: "secondary" | "success" | "warning" | "destructive" = "secondary";
-                                if (codeStr.startsWith("2")) variant = "success";       // green
-                                else if (codeStr.startsWith("3")) variant = "warning";  // yellow
-                                else if (codeStr.startsWith("4") || codeStr.startsWith("5")) variant = "destructive"; // red
+                                if (codeStr.startsWith("2")) variant = "success";
+                                else if (codeStr.startsWith("3")) variant = "warning";
+                                else if (codeStr.startsWith("4") || codeStr.startsWith("5")) variant = "destructive";
                                 return <Badge variant={variant as any} key={codeStr}>{codeStr}</Badge>;
                             })}
                         </div>
@@ -55,7 +57,7 @@ const Statistic = () => {
                 </Card>
 
                 {/* CNAME Records */}
-                <Card className="col-span-2" >
+                <Card className="col-span-2">
                     <CardHeader>
                         <CardTitle>CNAME Records ({(data?.cnameRecords as string[])?.length})</CardTitle>
                     </CardHeader>
@@ -67,10 +69,10 @@ const Statistic = () => {
                         </ul>
                     </CardContent>
                 </Card>
-            </div >
+            </div>
 
             {/* Technologies */}
-            <Card className="col-span-2" >
+            <Card className="col-span-2">
                 <CardHeader>
                     <CardTitle>Detected Technologies ({(data?.technologies as string[])?.length})</CardTitle>
                 </CardHeader>
@@ -82,10 +84,7 @@ const Statistic = () => {
                     </div>
                 </CardContent>
             </Card>
-        </div >
-
-
-
+        </div>
     );
 };
 

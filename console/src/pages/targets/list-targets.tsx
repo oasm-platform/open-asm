@@ -23,7 +23,7 @@ import { useQueryClient } from "@tanstack/react-query"
 export const targetColumns: ColumnDef<Target, any>[] = [
     {
         accessorKey: "value",
-        header: "Value",
+        header: "Target",
         cell: ({ row }) => <div>{row.getValue("value")}</div>,
     },
     {
@@ -69,11 +69,12 @@ export const targetColumns: ColumnDef<Target, any>[] = [
         enableHiding: false,
         cell: ({ row }) => {
             const { selectedWorkspace } = useWorkspaceSelector()
+            const queryClient = useQueryClient()
             const { mutate: deleteTarget } = useTargetsControllerDeleteTargetFromWorkspace({
                 mutation: {
                     onSuccess: () => {
-                        useQueryClient().invalidateQueries({
-                            queryKey: ["targets", selectedWorkspace],
+                        queryClient.refetchQueries({
+                            queryKey: ["targets"],
                         })
                     },
                 },
@@ -138,8 +139,10 @@ export function ListTargets() {
         },
         {
             query: {
-                refetchInterval: 5000,
+                // refetchInterval: 5000,
+                queryKey: ["targets", selectedWorkspace],
             },
+
         },
     )
 

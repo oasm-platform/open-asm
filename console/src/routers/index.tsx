@@ -1,4 +1,5 @@
 import Layout from '@/components/common/layout/layout';
+import Assets from '@/pages/assets/assets';
 import Dashboard from '@/pages/dashboard/dashboard';
 import Login from '@/pages/login/login';
 import Targets from '@/pages/targets/targets';
@@ -36,6 +37,10 @@ export const router = createBrowserRouter([
                     {
                         element: <Workers />,
                         path: 'workers'
+                    },
+                    {
+                        element: <Assets />,
+                        path: 'assets'
                     },
                 ]
             },

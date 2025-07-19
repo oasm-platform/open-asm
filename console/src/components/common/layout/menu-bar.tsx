@@ -14,7 +14,7 @@ import {
     SidebarMenuItem,
     SidebarRail
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Radar, SquareTerminal, Target } from "lucide-react";
+import { CloudCheck, LayoutDashboard, Radar, SquareTerminal, Target } from "lucide-react";
 import { NavUser } from "../../ui/nav-user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -34,6 +34,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     title: "Targets",
                     icon: <Target />,
                     url: "/targets",
+                },
+                {
+                    title: "Assets",
+                    icon: <CloudCheck />,
+                    url: "/assets",
                 },
 
             ],

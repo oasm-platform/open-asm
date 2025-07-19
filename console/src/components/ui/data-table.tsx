@@ -217,8 +217,7 @@ export function DataTable<TData, TValue>({
 
             {/* Pagination */}
             {showPagination && (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-4">
-                    {/* Page size selector */}
+                <div className="flex flex-row-reverse justify-end items-center">
                     <div className="flex items-center gap-2">
                         <Select value={pageSize.toString()} onValueChange={(value) => onPageSizeChange?.(parseInt(value))}>
                             <SelectTrigger className="w-[70px]">
@@ -234,7 +233,6 @@ export function DataTable<TData, TValue>({
                         </Select>
                     </div>
 
-                    {/* Pagination controls */}
                     <Pagination>
                         <PaginationContent>
                             <PaginationItem>

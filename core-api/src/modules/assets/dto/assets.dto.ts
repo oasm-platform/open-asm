@@ -1,14 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsString,
-  IsUUID,
-  IsArray,
-  IsOptional,
-  Matches,
-  ArrayMaxSize,
-} from 'class-validator';
-import { Job } from 'src/modules/jobs-registry/entities/job.entity';
+import { Transform } from 'class-transformer';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
+import { Any } from 'typeorm';
 
 export class GetAssetsResponseDto {
   @ApiProperty()
@@ -27,44 +21,45 @@ export class GetAssetsResponseDto {
   @ApiProperty({ required: false })
   dnsRecords?: object;
 
-  @ApiProperty({ type: Job, required: false })
-  workerResults: Record<string, any>;
+  @ApiProperty({ type: Any, required: false })
+  metadata: Record<string, any>;
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   @ApiProperty()
-  @IsUUID()
-  workspaceId: string;
+  @IsUUID(4)
+  workspaceId?: string;
 
   @ApiProperty({
     required: false,
+    isArray: true,
   })
-  @IsArray()
   @IsUUID(4, { each: true })
   @IsOptional()
-  targetId?: string[];
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  targetIds?: string[];
 
   @ApiProperty({
     required: false,
   })
-  @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  port?: string[];
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  ports?: string[];
 
   @ApiProperty({
     required: false,
   })
-  @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  tech?: string[];
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  techs?: string[];
 
   @ApiProperty({
     required: false,
   })
-  @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  statusCode?: string[];
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  statusCodes?: string[];
 }

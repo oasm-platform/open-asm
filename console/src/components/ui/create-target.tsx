@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useTargetsControllerCreateTarget, useTargetsControllerGetTargetsInWorkspace } from "@/services/apis/gen/queries";
+import { useTargetsControllerCreateTarget } from "@/services/apis/gen/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2Icon, Target } from "lucide-react";
 import { useState } from "react";
@@ -28,37 +28,14 @@ type FormValues = {
 export function CreateTarget() {
     const [open, setOpen] = useState(false);
     const { selectedWorkspace } = useWorkspaceSelector()
-    const { refetch } = useTargetsControllerGetTargetsInWorkspace(
-        {
-            workspaceId: selectedWorkspace ?? "",
-            limit: 10,
-            page: 1,
-            sortBy: "createdAt",
-            sortOrder: "desc",
-        }, {
-        query: {
-            queryKey: [selectedWorkspace]
-        }
-    }
-    )
     const {
         register,
         handleSubmit,
         formState: { errors },
         reset,
     } = useForm<FormValues>();
-
-    const { mutate, isPending } = useTargetsControllerCreateTarget(
-        {
-            mutation: {
-                onSuccess: () => {
-                    refetch();
-                    setOpen(false);
-                    reset();
-                }
-            }
-        }
-    )
+    const queryClient = useQueryClient()
+    const { mutate, isPending } = useTargetsControllerCreateTarget()
 
     function onSubmit(data: FormValues) {
         selectedWorkspace && mutate({
@@ -67,13 +44,16 @@ export function CreateTarget() {
                 workspaceId: selectedWorkspace
             }
         }, {
-            onError: () => {
+            onError: (e) => {
+                console.log(e);
                 toast.error("Failed to create target")
             },
             onSuccess: () => {
                 toast.success("Target created successfully")
-                useQueryClient().invalidateQueries({
-                    queryKey: ["targets", selectedWorkspace],
+                setOpen(false);
+                reset();
+                queryClient.refetchQueries({
+                    queryKey: ["targets"],
                 })
             }
         })
