@@ -186,6 +186,7 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
   sortBy?: string;
   sortOrder?: string;
   workspaceId: string;
+  value?: string;
 };
 
 export type WorkspacesControllerGetWorkspacesParams = {

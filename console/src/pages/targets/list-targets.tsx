@@ -110,6 +110,7 @@ export function ListTargets() {
             page,
             sortBy,
             sortOrder,
+            value: filter,
         },
         {
             query: {
@@ -138,7 +139,7 @@ export function ListTargets() {
                 setSortBy(col)
                 setSortOrder(order)
             }}
-            filterColumnKey="value" // <-- sửa lại đúng cột filter
+            filterColumnKey="value"
             filterValue={filter}
             onFilterChange={setFilter}
             totalItems={total}

@@ -119,7 +119,7 @@ export class TargetsService {
   ): Promise<
     GetManyBaseResponseDto<Target & { totalAssets: number; status: string }>
   > {
-    const { limit, page, sortBy, sortOrder, workspaceId } = query;
+    const { limit, page, sortBy, sortOrder, workspaceId, value } = query;
 
     const offset = (page - 1) * limit;
 
@@ -143,6 +143,12 @@ export class TargetsService {
         END AS status`,
       ])
       .groupBy('targets.id');
+
+    if (value) {
+      queryBuilder.andWhere('targets.value LIKE :value', {
+        value: `%${value}%`,
+      });
+    }
 
     if (sortBy in Target) {
       queryBuilder.orderBy(`targets.${sortBy}`, sortOrder);
