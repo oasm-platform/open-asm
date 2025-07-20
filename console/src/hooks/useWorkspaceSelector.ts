@@ -1,7 +1,27 @@
 import { useWorkspacesControllerGetWorkspaces } from "@/services/apis/gen/queries";
 import React from "react";
+import createState from "./createState"; // adjust path as needed
 
-const LOCAL_STORAGE_KEY = "workspace_id";
+// Define workspace state type
+interface WorkspaceState {
+  selectedWorkspaceId: string | null;
+}
+
+// Create global workspace state
+const useWorkspaceState = createState<WorkspaceState>(
+  "workspace",
+  { selectedWorkspaceId: null },
+  {
+    setSelectedWorkspace: (state, id: string | null) => ({
+      ...state,
+      selectedWorkspaceId: id,
+    }),
+    clearSelectedWorkspace: (state) => ({
+      ...state,
+      selectedWorkspaceId: null,
+    }),
+  }
+);
 
 export function useWorkspaceSelector() {
   const {
@@ -12,75 +32,57 @@ export function useWorkspaceSelector() {
     limit: 100,
     page: 1,
   });
-  const [selectedWorkspace, setSelectedWorkspaceState] = React.useState<
-    string | null
-  >(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem(LOCAL_STORAGE_KEY);
-    }
-    return null;
-  });
 
-  const handleSelectWorkspace = React.useCallback((id: string) => {
-    setSelectedWorkspaceState(id);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(LOCAL_STORAGE_KEY, id);
-    }
-    window.location.reload();
-  }, []);
+  const { state, setSelectedWorkspace, clearSelectedWorkspace } =
+    useWorkspaceState();
 
+  const handleSelectWorkspace = React.useCallback(
+    (id: string) => {
+      setSelectedWorkspace(id);
+      // Remove window.location.reload() since we're using global state
+    },
+    [setSelectedWorkspace]
+  );
+
+  // Auto-select workspace logic
   React.useEffect(() => {
     if (response?.data && response.data.length > 0) {
       const workspaceIds = response.data.map((ws) => ws.id);
-      const localStorageId =
-        typeof window !== "undefined"
-          ? localStorage.getItem(LOCAL_STORAGE_KEY)
-          : null;
+      const currentSelectedId = state.selectedWorkspaceId;
 
       let finalSelectedId: string | null = null;
 
-      if (localStorageId && workspaceIds.includes(localStorageId)) {
-        finalSelectedId = localStorageId;
+      // If current selected workspace still exists, keep it
+      if (currentSelectedId && workspaceIds.includes(currentSelectedId)) {
+        finalSelectedId = currentSelectedId;
       } else {
+        // Otherwise, select the first workspace
         finalSelectedId = response.data[0].id;
       }
 
-      if (selectedWorkspace !== finalSelectedId) {
-        setSelectedWorkspaceState(finalSelectedId);
-      }
-
-      if (
-        typeof window !== "undefined" &&
-        localStorage.getItem(LOCAL_STORAGE_KEY) !== finalSelectedId
-      ) {
-        localStorage.setItem(LOCAL_STORAGE_KEY, finalSelectedId);
+      // Update state only if different
+      if (state.selectedWorkspaceId !== finalSelectedId) {
+        setSelectedWorkspace(finalSelectedId);
       }
     } else if (response?.data && response.data.length === 0) {
-      if (selectedWorkspace !== null) {
-        setSelectedWorkspaceState(null);
-      }
-      if (typeof window !== "undefined") {
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+      // Clear selection when no workspaces
+      if (state.selectedWorkspaceId !== null) {
+        clearSelectedWorkspace();
       }
     }
-  }, [response, selectedWorkspace]);
-
-  React.useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === LOCAL_STORAGE_KEY) {
-        setSelectedWorkspaceState(e.newValue);
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }, [
+    response,
+    state.selectedWorkspaceId,
+    setSelectedWorkspace,
+    clearSelectedWorkspace,
+  ]);
 
   return {
     workspaces: response?.data || [],
     isLoading,
-    selectedWorkspace,
+    selectedWorkspace: state.selectedWorkspaceId,
     handleSelectWorkspace,
-    setSelectedWorkspaceState,
+    setSelectedWorkspaceState: setSelectedWorkspace, // Keep for backward compatibility
     refetch,
   };
 }
