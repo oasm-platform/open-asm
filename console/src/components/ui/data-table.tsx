@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-table"
 import { ArrowDownNarrowWide, ArrowUpNarrowWide, ChevronDown } from "lucide-react"
 import * as React from "react"
+import { cn } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -48,6 +49,8 @@ interface DataTableProps<TData, TValue> {
     isLoading?: boolean
     filterColumnKey?: string
     filterValue?: string
+    onRowClick?: (row: TData) => void
+    rowClassName?: string
     onFilterChange?: (value: string) => void
     filterPlaceholder?: string
     showColumnVisibility?: boolean
@@ -69,6 +72,8 @@ export function DataTable<TData, TValue>({
     isLoading = false,
     filterColumnKey,
     filterValue = "",
+    onRowClick,
+    rowClassName,
     onFilterChange,
     filterPlaceholder = "Filter...",
     showColumnVisibility = true,
@@ -196,7 +201,15 @@ export function DataTable<TData, TValue>({
                     <TableBody>
                         {table.getRowModel().rows.length ? (
                             table.getRowModel().rows.map((row) => (
-                                <TableRow key={row.id}>
+                                <TableRow
+                                    key={row.id}
+                                    data-state={row.getIsSelected() && "selected"}
+                                    className={cn(
+                                        rowClassName,
+                                        onRowClick && "cursor-pointer hover:bg-muted/50"
+                                    )}
+                                    onClick={() => onRowClick?.(row.original)}
+                                >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}

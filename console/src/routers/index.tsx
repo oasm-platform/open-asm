@@ -2,6 +2,7 @@ import Layout from '@/components/common/layout/layout';
 import Assets from '@/pages/assets/assets';
 import Dashboard from '@/pages/dashboard/dashboard';
 import Login from '@/pages/login/login';
+import DetailTarget from '@/pages/targets/detail-target';
 import Targets from '@/pages/targets/targets';
 import Workers from '@/pages/workers/workers';
 import { createBrowserRouter } from 'react-router-dom';
@@ -31,8 +32,17 @@ export const router = createBrowserRouter([
                         element: <Dashboard />
                     },
                     {
-                        element: <Targets />,
-                        path: 'targets'
+                        path: 'targets',
+                        children: [
+                            {
+                                path: '',
+                                element: <Targets />,
+                            },
+                            {
+                                path: ':id',
+                                element: <DetailTarget />
+                            }
+                        ]
                     },
                     {
                         element: <Workers />,

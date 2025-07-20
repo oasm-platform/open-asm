@@ -147,7 +147,10 @@ export const assetColumns: ColumnDef<any, any>[] = [
     }
 ]
 
-export function ListAssets() {
+interface ListAssetsProps {
+    targetId?: string
+}
+export function ListAssets({ targetId }: ListAssetsProps) {
     const { selectedWorkspace } = useWorkspaceSelector()
 
     const {
@@ -159,11 +162,15 @@ export function ListAssets() {
             setSortOrder,
             setFilter,
         },
-    } = useServerDataTable()
+    } = useServerDataTable({
+        defaultSortBy: "value",
+        defaultSortOrder: "ASC",
+    })
 
     const { data, isLoading } = useAssetsControllerGetAssets(
         {
             workspaceId: selectedWorkspace ?? "",
+            targetIds: targetId ? [targetId] : undefined,
             limit: pageSize,
             page,
             sortBy,

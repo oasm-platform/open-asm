@@ -33,6 +33,8 @@ export type Target = {
   /** The target domain (with optional URL path, will be parsed to extract domain) */
   value: string;
   lastDiscoveredAt: string;
+  totalAssets: number;
+  status: string;
 };
 
 export type AppResponseSerialization = { [key: string]: unknown };
@@ -54,12 +56,6 @@ export const GetManyTargetResponseDtoStatus = {
 } as const;
 
 export type GetManyTargetResponseDto = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  /** The target domain (with optional URL path, will be parsed to extract domain) */
-  value: string;
-  lastDiscoveredAt: string;
   status: GetManyTargetResponseDtoStatus;
   totalAssets: number;
 };
@@ -788,7 +784,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
  * Retrieves a target by its ID.
  * @summary Get a target by ID
  */
-export const targetsControllerGetTarget = (
+export const targetsControllerGetTargetById = (
   id: string,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
@@ -799,19 +795,21 @@ export const targetsControllerGetTarget = (
   );
 };
 
-export const getTargetsControllerGetTargetQueryKey = (id: string) => {
+export const getTargetsControllerGetTargetByIdQueryKey = (id: string) => {
   return [`/api/targets/${id}`] as const;
 };
 
-export const getTargetsControllerGetTargetInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof targetsControllerGetTarget>>>,
+export const getTargetsControllerGetTargetByIdInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+  >,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
@@ -822,11 +820,12 @@ export const getTargetsControllerGetTargetInfiniteQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getTargetsControllerGetTargetQueryKey(id);
+    queryOptions?.queryKey ?? getTargetsControllerGetTargetByIdQueryKey(id);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof targetsControllerGetTarget>>
-  > = ({ signal }) => targetsControllerGetTarget(id, requestOptions, signal);
+    Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+  > = ({ signal }) =>
+    targetsControllerGetTargetById(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -834,35 +833,37 @@ export const getTargetsControllerGetTargetInfiniteQueryOptions = <
     enabled: !!id,
     ...queryOptions,
   } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+    Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type TargetsControllerGetTargetInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof targetsControllerGetTarget>>
+export type TargetsControllerGetTargetByIdInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetById>>
 >;
-export type TargetsControllerGetTargetInfiniteQueryError = unknown;
+export type TargetsControllerGetTargetByIdInfiniteQueryError = unknown;
 
-export function useTargetsControllerGetTargetInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof targetsControllerGetTarget>>>,
+export function useTargetsControllerGetTargetByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+  >,
   TError = unknown,
 >(
   id: string,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+          Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
           TError,
-          Awaited<ReturnType<typeof targetsControllerGetTarget>>
+          Awaited<ReturnType<typeof targetsControllerGetTargetById>>
         >,
         "initialData"
       >;
@@ -872,24 +873,26 @@ export function useTargetsControllerGetTargetInfinite<
 ): DefinedUseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTargetsControllerGetTargetInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof targetsControllerGetTarget>>>,
+export function useTargetsControllerGetTargetByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+  >,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+          Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
           TError,
-          Awaited<ReturnType<typeof targetsControllerGetTarget>>
+          Awaited<ReturnType<typeof targetsControllerGetTargetById>>
         >,
         "initialData"
       >;
@@ -899,15 +902,17 @@ export function useTargetsControllerGetTargetInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTargetsControllerGetTargetInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof targetsControllerGetTarget>>>,
+export function useTargetsControllerGetTargetByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+  >,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
@@ -922,15 +927,17 @@ export function useTargetsControllerGetTargetInfinite<
  * @summary Get a target by ID
  */
 
-export function useTargetsControllerGetTargetInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof targetsControllerGetTarget>>>,
+export function useTargetsControllerGetTargetByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+  >,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
@@ -941,7 +948,7 @@ export function useTargetsControllerGetTargetInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getTargetsControllerGetTargetInfiniteQueryOptions(
+  const queryOptions = getTargetsControllerGetTargetByIdInfiniteQueryOptions(
     id,
     options,
   );
@@ -958,15 +965,15 @@ export function useTargetsControllerGetTargetInfinite<
   return query;
 }
 
-export const getTargetsControllerGetTargetQueryOptions = <
-  TData = Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+export const getTargetsControllerGetTargetByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
@@ -977,11 +984,12 @@ export const getTargetsControllerGetTargetQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getTargetsControllerGetTargetQueryKey(id);
+    queryOptions?.queryKey ?? getTargetsControllerGetTargetByIdQueryKey(id);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof targetsControllerGetTarget>>
-  > = ({ signal }) => targetsControllerGetTarget(id, requestOptions, signal);
+    Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+  > = ({ signal }) =>
+    targetsControllerGetTargetById(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -989,35 +997,35 @@ export const getTargetsControllerGetTargetQueryOptions = <
     enabled: !!id,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+    Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type TargetsControllerGetTargetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof targetsControllerGetTarget>>
+export type TargetsControllerGetTargetByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetById>>
 >;
-export type TargetsControllerGetTargetQueryError = unknown;
+export type TargetsControllerGetTargetByIdQueryError = unknown;
 
-export function useTargetsControllerGetTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+export function useTargetsControllerGetTargetById<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
   TError = unknown,
 >(
   id: string,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+          Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
           TError,
-          Awaited<ReturnType<typeof targetsControllerGetTarget>>
+          Awaited<ReturnType<typeof targetsControllerGetTargetById>>
         >,
         "initialData"
       >;
@@ -1027,24 +1035,24 @@ export function useTargetsControllerGetTarget<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTargetsControllerGetTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+export function useTargetsControllerGetTargetById<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+          Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
           TError,
-          Awaited<ReturnType<typeof targetsControllerGetTarget>>
+          Awaited<ReturnType<typeof targetsControllerGetTargetById>>
         >,
         "initialData"
       >;
@@ -1054,15 +1062,15 @@ export function useTargetsControllerGetTarget<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTargetsControllerGetTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+export function useTargetsControllerGetTargetById<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
@@ -1077,15 +1085,15 @@ export function useTargetsControllerGetTarget<
  * @summary Get a target by ID
  */
 
-export function useTargetsControllerGetTarget<
-  TData = Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+export function useTargetsControllerGetTargetById<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
   TError = unknown,
 >(
   id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof targetsControllerGetTarget>>,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
         TError,
         TData
       >
@@ -1096,7 +1104,10 @@ export function useTargetsControllerGetTarget<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getTargetsControllerGetTargetQueryOptions(id, options);
+  const queryOptions = getTargetsControllerGetTargetByIdQueryOptions(
+    id,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

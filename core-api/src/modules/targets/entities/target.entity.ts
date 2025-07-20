@@ -45,4 +45,10 @@ export class Target extends BaseEntity {
 
   @OneToMany(() => Asset, (asset) => asset.target)
   assets: Asset[];
+
+  @ApiProperty()
+  totalAssets: number;
+
+  @ApiProperty()
+  status: string;
 }

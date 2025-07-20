@@ -34,8 +34,29 @@ export class TargetsService {
    * @param id - The ID of the target to retrieve.
    * @returns A promise that resolves to the target entity if found, otherwise null.
    */
-  public async getTargetById(id: string): Promise<Target | null> {
-    return this.repo.findOneBy({ id });
+  public async getTargetById(id: string): Promise<Target> {
+    const result = await this.repo
+      .createQueryBuilder('targets')
+      .leftJoin('targets.workspaceTargets', 'workspaceTarget')
+      .leftJoin('workspaceTarget.workspace', 'workspace')
+      .leftJoin('workspace.workspaceMembers', 'workspaceMember')
+      .leftJoin('targets.assets', 'asset')
+      .leftJoin('asset.jobs', 'job')
+      .where('targets.id = :id', { id })
+      .select([
+        'targets.id as id',
+        'targets.value as value',
+        'targets.lastDiscoveredAt as "lastDiscoveredAt"',
+        'COALESCE(COUNT(DISTINCT asset.id), 0) AS "totalAssets"',
+        `CASE
+        WHEN COUNT(CASE WHEN job.status IN ('pending', 'in_progress') THEN 1 END) > 0
+        THEN 'RUNNING'
+        ELSE 'DONE'
+      END AS status`,
+      ])
+      .groupBy('targets.id, targets.value, targets.lastDiscoveredAt')
+      .getRawOne();
+    return result;
   }
 
   /**

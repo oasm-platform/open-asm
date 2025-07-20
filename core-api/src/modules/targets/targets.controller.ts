@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -62,13 +61,8 @@ export class TargetsController {
     },
   })
   @Get(':id')
-  getTarget(@Param() { id }: IdQueryParamDto) {
-    const target = this.targetsService.getTargetById(id);
-
-    if (!target) {
-      throw new NotFoundException('Target not found');
-    }
-    return target;
+  getTargetById(@Param() { id }: IdQueryParamDto) {
+    return this.targetsService.getTargetById(id);
   }
 
   @Doc({

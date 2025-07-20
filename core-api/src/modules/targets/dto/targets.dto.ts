@@ -13,7 +13,7 @@ export class CreateTargetDto extends PickType(Target, ['value'] as const) {
   workspaceId: string;
 }
 
-export class GetManyTargetResponseDto extends Target {
+export class GetManyTargetResponseDto {
   @ApiProperty({ enum: ScanStatus, example: ScanStatus.DONE })
   status: ScanStatus;
 

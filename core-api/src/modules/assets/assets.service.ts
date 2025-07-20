@@ -147,7 +147,7 @@ export class AssetsService {
     const offset = (page - 1) * limit;
     const sqlParams: any[] = [workspaceId];
 
-    let whereClosure = 'wt."workspaceId" = $1';
+    let whereClosure = 'wt."workspaceId" = $1 ';
 
     if (targetIds) {
       whereClosure += `AND a."targetId" = ANY($2) `;

@@ -19,12 +19,13 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useServerDataTable } from "@/hooks/useServerDataTable"
 import type { Target } from "@/services/apis/gen/queries"
 import { useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "react-router-dom"
 
 export const targetColumns: ColumnDef<Target, any>[] = [
     {
         accessorKey: "value",
         header: "Target",
-        cell: ({ row }) => <div>{row.getValue("value")}</div>,
+        cell: ({ row }) => <div className="font-medium">{row.getValue("value")}</div>,
     },
     {
         accessorKey: "totalAssets",
@@ -139,7 +140,7 @@ export function ListTargets() {
         },
         {
             query: {
-                // refetchInterval: 5000,
+                refetchInterval: 3000,
                 queryKey: ["targets", selectedWorkspace],
             },
 
@@ -150,6 +151,12 @@ export function ListTargets() {
     const total = data?.total ?? 0
 
     if (!data && !isLoading) return <div>Error loading targets.</div>
+
+    const navigate = useNavigate()
+
+    const handleRowClick = (target: Target) => {
+        navigate(`/targets/${target.id}`)
+    }
 
     return (
         <DataTable
@@ -170,6 +177,8 @@ export function ListTargets() {
             filterValue={filter}
             onFilterChange={setFilter}
             totalItems={total}
+            onRowClick={handleRowClick}
+            rowClassName="cursor-pointer hover:bg-muted/50 transition-colors"
         />
     )
 }
