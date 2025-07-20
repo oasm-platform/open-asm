@@ -9,15 +9,21 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { useUsersControllerGetApiKey } from "@/services/apis/gen/queries";
+import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { Copy, SquareTerminal } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export function ConnectWorker() {
+    const { workspaces, selectedWorkspace } = useWorkspaceSelector()
+
+    if (!selectedWorkspace) return null;
+
+    const apiKey = workspaces[workspaces.findIndex((workspace) => workspace.id === selectedWorkspace)]?.apiKey;
+
     const [open, setOpen] = useState(false);
-    const { data } = useUsersControllerGetApiKey()
-    const rawCommand = `docker run -d --name open-asm-worker open-asm-worker -e API_KEY=${data?.apiKey} -e API=${import.meta.env.VITE_API_URL} -e MAX_JOBS=10`;
+
+    const rawCommand = `docker run -d --name open-asm-worker open-asm-worker -e API_KEY=${apiKey} -e API=${import.meta.env.VITE_API_URL} -e MAX_JOBS=10`;
 
     const handleCopyCommand = async () => {
         await navigator.clipboard.writeText(rawCommand);
@@ -25,7 +31,7 @@ export function ConnectWorker() {
     };
 
     const handleCopyApiKey = async () => {
-        await navigator.clipboard.writeText(data?.apiKey || "");
+        await navigator.clipboard.writeText(apiKey || "");
         toast.success("API key copied to clipboard");
     };
 
@@ -47,7 +53,7 @@ export function ConnectWorker() {
                 <div className="space-y-4">
                     <p>API Key:</p>
                     <div className="relative bg-black text-white font-mono rounded-md p-4 text-sm">
-                        <pre className="whitespace-pre-wrap">{data?.apiKey}</pre>
+                        <pre className="whitespace-pre-wrap">{apiKey}</pre>
                         <Button
                             onClick={handleCopyApiKey}
                             size="icon"

@@ -12,10 +12,12 @@ import {
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { generateToken } from 'src/utils/genToken';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import {
   CreateWorkspaceDto,
+  GetApiKeyResponseDto,
   UpdateWorkspaceDto,
   WorkspaceStatisticsResponseDto,
 } from './dto/workspaces.dto';
@@ -59,6 +61,7 @@ export class WorkspacesService {
       name: dto.name,
       description: dto?.description,
       owner: { id },
+      apiKey: generateToken(32),
     });
 
     await this.workspaceMembersRepository.save({
@@ -233,6 +236,25 @@ export class WorkspacesService {
 
     return {
       message: 'Workspace deleted successfully',
+    };
+  }
+
+  /**
+   * Regenerates the API key for a user.
+   * @param userId The ID of the user to regenerate the API key for.
+   * @returns The new API key for the user.
+   */
+  public async regenerateApiKey(
+    userContext: UserContextPayload,
+  ): Promise<GetApiKeyResponseDto> {
+    const workspace = await this.getWorkspaceByIdAndOwner(
+      userContext.id,
+      userContext,
+    );
+    workspace.apiKey = generateToken(32);
+    await this.repo.save(workspace);
+    return {
+      apiKey: workspace.apiKey!,
     };
   }
 }

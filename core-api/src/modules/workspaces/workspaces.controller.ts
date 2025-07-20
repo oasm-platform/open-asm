@@ -19,6 +19,7 @@ import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   CreateWorkspaceDto,
+  GetApiKeyResponseDto,
   UpdateWorkspaceDto,
   WorkspaceStatisticsResponseDto,
 } from './dto/workspaces.dto';
@@ -125,5 +126,17 @@ export class WorkspacesController {
     @UserContext() userContext: UserContextPayload,
   ) {
     return this.workspacesService.deleteWorkspace(id, userContext);
+  }
+
+  @Doc({
+    summary: 'Regenerate API key',
+    description: 'Regenerates the API key for a user.',
+    response: {
+      serialization: GetApiKeyResponseDto,
+    },
+  })
+  @Get('api-key/regenerate')
+  regenerateApiKey(@UserContext() userContext: UserContextPayload) {
+    return this.workspacesService.regenerateApiKey(userContext);
   }
 }

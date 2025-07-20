@@ -85,6 +85,8 @@ export type Workspace = {
   name: string;
   /** The description of the workspace */
   description: string;
+  /** The API key of the workspace */
+  apiKey: string;
 };
 
 export type CreateWorkspaceDto = {
@@ -2625,328 +2627,32 @@ export const useWorkspacesControllerDeleteWorkspace = <
 };
 
 /**
- * Get API key
- * @summary Get API key
- */
-export const usersControllerGetApiKey = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetApiKeyResponseDto>(
-    { url: `/api/users/api-key`, method: "GET", signal },
-    options,
-  );
-};
-
-export const getUsersControllerGetApiKeyQueryKey = () => {
-  return [`/api/users/api-key`] as const;
-};
-
-export const getUsersControllerGetApiKeyInfiniteQueryOptions = <
-  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getUsersControllerGetApiKeyQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof usersControllerGetApiKey>>
-  > = ({ signal }) => usersControllerGetApiKey(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type UsersControllerGetApiKeyInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof usersControllerGetApiKey>>
->;
-export type UsersControllerGetApiKeyInfiniteQueryError = unknown;
-
-export function useUsersControllerGetApiKeyInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof usersControllerGetApiKey>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useUsersControllerGetApiKeyInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof usersControllerGetApiKey>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useUsersControllerGetApiKeyInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get API key
- */
-
-export function useUsersControllerGetApiKeyInfinite<
-  TData = InfiniteData<Awaited<ReturnType<typeof usersControllerGetApiKey>>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getUsersControllerGetApiKeyInfiniteQueryOptions(options);
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getUsersControllerGetApiKeyQueryOptions = <
-  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getUsersControllerGetApiKeyQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof usersControllerGetApiKey>>
-  > = ({ signal }) => usersControllerGetApiKey(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type UsersControllerGetApiKeyQueryResult = NonNullable<
-  Awaited<ReturnType<typeof usersControllerGetApiKey>>
->;
-export type UsersControllerGetApiKeyQueryError = unknown;
-
-export function useUsersControllerGetApiKey<
-  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof usersControllerGetApiKey>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useUsersControllerGetApiKey<
-  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof usersControllerGetApiKey>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useUsersControllerGetApiKey<
-  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get API key
- */
-
-export function useUsersControllerGetApiKey<
-  TData = Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof usersControllerGetApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getUsersControllerGetApiKeyQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
  * Regenerates the API key for a user.
  * @summary Regenerate API key
  */
-export const usersControllerRegenerateApiKey = (
+export const workspacesControllerRegenerateApiKey = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<GetApiKeyResponseDto>(
-    { url: `/api/users/api-key/regenerate`, method: "GET", signal },
+    { url: `/api/workspaces/api-key/regenerate`, method: "GET", signal },
     options,
   );
 };
 
-export const getUsersControllerRegenerateApiKeyQueryKey = () => {
-  return [`/api/users/api-key/regenerate`] as const;
+export const getWorkspacesControllerRegenerateApiKeyQueryKey = () => {
+  return [`/api/workspaces/api-key/regenerate`] as const;
 };
 
-export const getUsersControllerRegenerateApiKeyInfiniteQueryOptions = <
+export const getWorkspacesControllerRegenerateApiKeyInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
   >,
   TError = unknown,
 >(options?: {
   query?: Partial<
     UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+      Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
       TError,
       TData
     >
@@ -2956,43 +2662,43 @@ export const getUsersControllerRegenerateApiKeyInfiniteQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getUsersControllerRegenerateApiKeyQueryKey();
+    queryOptions?.queryKey ?? getWorkspacesControllerRegenerateApiKeyQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
-  > = ({ signal }) => usersControllerRegenerateApiKey(requestOptions, signal);
+    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
+  > = ({ signal }) =>
+    workspacesControllerRegenerateApiKey(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type UsersControllerRegenerateApiKeyInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
->;
-export type UsersControllerRegenerateApiKeyInfiniteQueryError = unknown;
+export type WorkspacesControllerRegenerateApiKeyInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>>;
+export type WorkspacesControllerRegenerateApiKeyInfiniteQueryError = unknown;
 
-export function useUsersControllerRegenerateApiKeyInfinite<
+export function useWorkspacesControllerRegenerateApiKeyInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
   >,
   TError = unknown,
 >(
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
           TError,
-          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
         >,
         "initialData"
       >;
@@ -3002,25 +2708,25 @@ export function useUsersControllerRegenerateApiKeyInfinite<
 ): DefinedUseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUsersControllerRegenerateApiKeyInfinite<
+export function useWorkspacesControllerRegenerateApiKeyInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
   >,
   TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
           TError,
-          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
         >,
         "initialData"
       >;
@@ -3030,16 +2736,16 @@ export function useUsersControllerRegenerateApiKeyInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUsersControllerRegenerateApiKeyInfinite<
+export function useWorkspacesControllerRegenerateApiKeyInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
   >,
   TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
         TError,
         TData
       >
@@ -3054,16 +2760,16 @@ export function useUsersControllerRegenerateApiKeyInfinite<
  * @summary Regenerate API key
  */
 
-export function useUsersControllerRegenerateApiKeyInfinite<
+export function useWorkspacesControllerRegenerateApiKeyInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
   >,
   TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
         TError,
         TData
       >
@@ -3075,7 +2781,7 @@ export function useUsersControllerRegenerateApiKeyInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions =
-    getUsersControllerRegenerateApiKeyInfiniteQueryOptions(options);
+    getWorkspacesControllerRegenerateApiKeyInfiniteQueryOptions(options);
 
   const query = useInfiniteQuery(
     queryOptions,
@@ -3089,13 +2795,13 @@ export function useUsersControllerRegenerateApiKeyInfinite<
   return query;
 }
 
-export const getUsersControllerRegenerateApiKeyQueryOptions = <
-  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+export const getWorkspacesControllerRegenerateApiKeyQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
   TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+      Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
       TError,
       TData
     >
@@ -3105,41 +2811,42 @@ export const getUsersControllerRegenerateApiKeyQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getUsersControllerRegenerateApiKeyQueryKey();
+    queryOptions?.queryKey ?? getWorkspacesControllerRegenerateApiKeyQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
-  > = ({ signal }) => usersControllerRegenerateApiKey(requestOptions, signal);
+    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
+  > = ({ signal }) =>
+    workspacesControllerRegenerateApiKey(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type UsersControllerRegenerateApiKeyQueryResult = NonNullable<
-  Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+export type WorkspacesControllerRegenerateApiKeyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
 >;
-export type UsersControllerRegenerateApiKeyQueryError = unknown;
+export type WorkspacesControllerRegenerateApiKeyQueryError = unknown;
 
-export function useUsersControllerRegenerateApiKey<
-  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+export function useWorkspacesControllerRegenerateApiKey<
+  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
   TError = unknown,
 >(
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
           TError,
-          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
         >,
         "initialData"
       >;
@@ -3149,23 +2856,23 @@ export function useUsersControllerRegenerateApiKey<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUsersControllerRegenerateApiKey<
-  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+export function useWorkspacesControllerRegenerateApiKey<
+  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
   TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
           TError,
-          Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>
+          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
         >,
         "initialData"
       >;
@@ -3175,14 +2882,14 @@ export function useUsersControllerRegenerateApiKey<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useUsersControllerRegenerateApiKey<
-  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+export function useWorkspacesControllerRegenerateApiKey<
+  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
   TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
         TError,
         TData
       >
@@ -3197,14 +2904,14 @@ export function useUsersControllerRegenerateApiKey<
  * @summary Regenerate API key
  */
 
-export function useUsersControllerRegenerateApiKey<
-  TData = Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+export function useWorkspacesControllerRegenerateApiKey<
+  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
   TError = unknown,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof usersControllerRegenerateApiKey>>,
+        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
         TError,
         TData
       >
@@ -3215,7 +2922,8 @@ export function useUsersControllerRegenerateApiKey<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getUsersControllerRegenerateApiKeyQueryOptions(options);
+  const queryOptions =
+    getWorkspacesControllerRegenerateApiKeyQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

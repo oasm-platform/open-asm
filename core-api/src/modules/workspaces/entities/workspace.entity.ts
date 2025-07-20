@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { User } from 'src/modules/auth/entities/user.entity';
+import { WorkspaceTarget } from 'src/modules/targets/entities/workspace-target.entity';
 import {
   Column,
   DeleteDateColumn,
@@ -10,9 +11,8 @@ import {
   OneToMany,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
-import { WorkspaceTarget } from 'src/modules/targets/entities/workspace-target.entity';
 
-@Entity('workspace')
+@Entity('workspaces')
 export class Workspace extends BaseEntity {
   @ApiProperty({
     example: 'My Workspace',
@@ -47,4 +47,11 @@ export class Workspace extends BaseEntity {
 
   @DeleteDateColumn()
   deletedAt?: Date;
+
+  @ApiProperty({
+    example: '1234567890',
+    description: 'The API key of the workspace',
+  })
+  @Column('text', { nullable: true })
+  apiKey?: string;
 }

@@ -1,4 +1,4 @@
-import { PartialType, PickType } from '@nestjs/swagger';
+import { ApiProperty, PartialType, PickType } from '@nestjs/swagger';
 import { Workspace } from '../entities/workspace.entity';
 
 export class CreateWorkspaceDto extends PickType(Workspace, [
@@ -14,4 +14,9 @@ export class WorkspaceStatisticsResponseDto {
   technologies: string[];
   cnameRecords: string[];
   statusCodes: number[];
+}
+
+export class GetApiKeyResponseDto {
+  @ApiProperty()
+  apiKey: string;
 }
