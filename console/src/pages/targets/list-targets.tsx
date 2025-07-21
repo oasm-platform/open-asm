@@ -1,7 +1,6 @@
 import { type ColumnDef } from "@tanstack/react-table"
-import { BadgeCheckIcon, Loader2Icon, MoreHorizontal, Trash2Icon } from "lucide-react"
+import { MoreHorizontal, Trash2Icon } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -16,6 +15,7 @@ import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector"
 import { useTargetsControllerDeleteTargetFromWorkspace, useTargetsControllerGetTargetsInWorkspace } from "@/services/apis/gen/queries"
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import TargetStatus from "@/components/ui/target-status"
 import { useServerDataTable } from "@/hooks/useServerDataTable"
 import type { Target } from "@/services/apis/gen/queries"
 import { useQueryClient } from "@tanstack/react-query"
@@ -52,17 +52,7 @@ export const targetColumns: ColumnDef<Target, any>[] = [
         header: "Scan status",
         cell: ({ row }) => {
             const value: string = row.getValue("status")
-            return value === "DONE" ? (
-                <Badge variant="secondary" className="bg-green-500 text-white">
-                    <BadgeCheckIcon className="mr-1 h-4 w-4" />
-                    Done
-                </Badge>
-            ) : (
-                <Badge variant="secondary" className="bg-yellow-500 text-white">
-                    <Loader2Icon className="animate-spin mr-1 h-4 w-4" />
-                    Running
-                </Badge>
-            )
+            return <TargetStatus status={value} />
         },
     },
     {

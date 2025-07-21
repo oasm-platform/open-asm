@@ -16,13 +16,9 @@ import { toast } from "sonner";
 
 export function ConnectWorker() {
     const { workspaces, selectedWorkspace } = useWorkspaceSelector()
-
-    if (!selectedWorkspace) return null;
-
     const apiKey = workspaces[workspaces.findIndex((workspace) => workspace.id === selectedWorkspace)]?.apiKey;
-
     const [open, setOpen] = useState(false);
-
+    if (!selectedWorkspace) return null;
     const rawCommand = `docker run -d --name open-asm-worker open-asm-worker -e API_KEY=${apiKey} -e API=${import.meta.env.VITE_API_URL} -e MAX_JOBS=10`;
 
     const handleCopyCommand = async () => {

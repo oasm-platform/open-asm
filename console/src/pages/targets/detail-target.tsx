@@ -1,6 +1,8 @@
 import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
+import TargetStatus from '@/components/ui/target-status';
 import { useTargetsControllerGetTargetById } from '@/services/apis/gen/queries';
+import dayjs from 'dayjs';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ListAssets } from '../assets/list-assets';
@@ -10,7 +12,7 @@ export function DetailTarget() {
     const navigate = useNavigate();
     const { data: target, isLoading, error } = useTargetsControllerGetTargetById(
         id || '',
-        { query: { enabled: !!id } }
+        { query: { enabled: !!id, refetchInterval: 1000 } }
     );
 
     if (isLoading) {
@@ -37,14 +39,17 @@ export function DetailTarget() {
 
     return (
         <Page>
-            <div className="flex items-center gap-4">
-                <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
-                    <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div>
+            <div className="flex items-center justify-between gap-2">
+                <div className='flex gap-3'>
+                    <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
                     <h1 className="text-2xl font-bold tracking-tight">{target.value}</h1>
+                </div>
+                <div className='flex flex-col justify-end items-end gap-1'>
+                    <TargetStatus status={target.status} />
                     <p className="text-muted-foreground">
-                        Last scanned: {new Date(target.lastDiscoveredAt).toLocaleString()}
+                        Last discovery: {dayjs(target.lastDiscoveredAt).fromNow()}
                     </p>
                 </div>
             </div>

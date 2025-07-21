@@ -17,6 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Loader2Icon, Target } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
@@ -36,7 +37,7 @@ export function CreateTarget() {
     } = useForm<FormValues>();
     const queryClient = useQueryClient()
     const { mutate, isPending } = useTargetsControllerCreateTarget()
-
+    const navigate = useNavigate()
     function onSubmit(data: FormValues) {
         selectedWorkspace && mutate({
             data: {
@@ -48,7 +49,9 @@ export function CreateTarget() {
                 console.log(e);
                 toast.error("Failed to create target")
             },
-            onSuccess: () => {
+            onSuccess: (res) => {
+                console.log(res);
+                navigate(`/targets/${res.id}`)
                 toast.success("Target created successfully")
                 setOpen(false);
                 reset();
