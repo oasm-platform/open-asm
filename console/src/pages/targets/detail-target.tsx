@@ -53,7 +53,7 @@ export function DetailTarget() {
                     </p>
                 </div>
             </div>
-            <ListAssets targetId={target.id} />
+            <ListAssets targetId={target.id} refetchInterval={target.status === "DONE" ? 5000 : 1000} />
         </Page>
     );
 }

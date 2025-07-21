@@ -94,7 +94,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
             const data = row.original
             const tls = data.metadata?.httpx?.tls
             if (!tls) return null
-            const daysLeft = Math.round(Math.abs((new Date(tls.not_before).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+            const daysLeft = Math.round(Math.abs((new Date(tls.not_after).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
             const color = daysLeft < 30 ? "red" : daysLeft < 60 ? "yellow" : "green"
             return (
                 <div className="flex flex-col flex-wrap gap-2 max-w-xs overflow-x-auto">
@@ -148,9 +148,10 @@ export const assetColumns: ColumnDef<any, any>[] = [
 ]
 
 interface ListAssetsProps {
-    targetId?: string
+    targetId?: string,
+    refetchInterval?: number
 }
-export function ListAssets({ targetId }: ListAssetsProps) {
+export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
     const { selectedWorkspace } = useWorkspaceSelector()
 
     const {
@@ -178,7 +179,7 @@ export function ListAssets({ targetId }: ListAssetsProps) {
         },
         {
             query: {
-                refetchInterval: 5000,
+                refetchInterval: refetchInterval ?? 5000,
             },
         },
     )

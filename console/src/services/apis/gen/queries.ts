@@ -26,6 +26,17 @@ import type {
 } from "@tanstack/react-query";
 
 import { orvalClient } from "../axios-client";
+export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const JobStatus = {
+  pending: "pending",
+  in_progress: "in_progress",
+  completed: "completed",
+  failed: "failed",
+  cancelled: "cancelled",
+} as const;
+
 export type Target = {
   id: string;
   createdAt: string;
@@ -34,7 +45,7 @@ export type Target = {
   value: string;
   lastDiscoveredAt: string;
   totalAssets: number;
-  status: string;
+  status: JobStatus;
 };
 
 export type AppResponseSerialization = { [key: string]: unknown };
