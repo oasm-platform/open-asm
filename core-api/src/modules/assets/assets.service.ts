@@ -15,6 +15,9 @@ export class AssetsService {
   constructor(
     @InjectRepository(Asset)
     public readonly repo: Repository<Asset>,
+
+    @InjectRepository(Target)
+    public readonly targetRepo: Repository<Target>,
     private jobRegistryService: JobsRegistryService,
   ) {}
 
@@ -253,10 +256,22 @@ export class AssetsService {
     if (!asset) {
       throw new NotFoundException('Asset not found');
     }
-
+    const target = await this.targetRepo.findOne({
+      where: {
+        id: targetId,
+      },
+    });
+    if (!target) {
+      throw new NotFoundException('Target not found');
+    }
+    const reScanCount = target.reScanCount + 1;
     this.jobRegistryService.createJob(asset, WorkerName.SUBDOMAINS);
+    this.targetRepo.update(targetId, {
+      reScanCount,
+      lastDiscoveredAt: new Date(),
+    });
     return {
-      message: 'Rescan started',
+      message: 'Scan started',
     };
   }
 }

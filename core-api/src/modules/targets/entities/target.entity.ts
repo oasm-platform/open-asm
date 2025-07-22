@@ -38,8 +38,8 @@ export class Target extends BaseEntity {
   })
   lastDiscoveredAt: Date;
 
-  @Column({ type: 'boolean', default: false })
-  isReScan: boolean;
+  @Column({ default: 0 })
+  reScanCount: number;
 
   @OneToMany(() => WorkspaceTarget, (workspaceTarget) => workspaceTarget.target)
   workspaceTargets: WorkspaceTarget[];

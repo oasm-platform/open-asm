@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ListAssets } from '../assets/list-assets';
+import SettingTarget from './setting-target';
 
 export function DetailTarget() {
     const { id } = useParams<{ id: string }>();
@@ -40,20 +41,22 @@ export function DetailTarget() {
     return (
         <Page>
             <div className="flex items-center justify-between gap-2">
-                <div className='flex gap-3'>
+                <div className='flex gap-3 items-center'>
                     <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <h1 className="text-2xl font-bold tracking-tight">{target.value}</h1>
+
                 </div>
-                <div className='flex flex-col justify-end items-end gap-1'>
+                <div className='flex items-center gap-3'>
                     <TargetStatus status={target.status} />
                     <p className="text-muted-foreground">
-                        Last discovery: {dayjs(target.lastDiscoveredAt).fromNow()}
+                        {dayjs(target.lastDiscoveredAt).fromNow()}
                     </p>
+                    <SettingTarget target={target} />
                 </div>
             </div>
-            <ListAssets targetId={target.id} refetchInterval={target.status === "DONE" ? 5000 : 1000} />
+            <ListAssets targetId={target.id} refetchInterval={5000} />
         </Page>
     );
 }

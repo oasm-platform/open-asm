@@ -1,24 +1,13 @@
 import { type ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, Trash2Icon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 
 import { DataTable } from "@/components/ui/data-table"
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector"
-import { useTargetsControllerDeleteTargetFromWorkspace, useTargetsControllerGetTargetsInWorkspace } from "@/services/apis/gen/queries"
+import { useTargetsControllerGetTargetsInWorkspace } from "@/services/apis/gen/queries"
 
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import TargetStatus from "@/components/ui/target-status"
 import { useServerDataTable } from "@/hooks/useServerDataTable"
-import type { Target } from "@/services/apis/gen/queries"
-import { useQueryClient } from "@tanstack/react-query"
+import type { JobStatus, Target } from "@/services/apis/gen/queries"
 import { useNavigate } from "react-router-dom"
 
 export const targetColumns: ColumnDef<Target, any>[] = [
@@ -51,56 +40,8 @@ export const targetColumns: ColumnDef<Target, any>[] = [
         accessorKey: "status",
         header: "Scan status",
         cell: ({ row }) => {
-            const value: string = row.getValue("status")
+            const value: JobStatus = row.getValue("status")
             return <TargetStatus status={value} />
-        },
-    },
-    {
-        id: "actions",
-        enableHiding: false,
-        cell: ({ row }) => {
-            const { selectedWorkspace } = useWorkspaceSelector()
-            const queryClient = useQueryClient()
-            const { mutate: deleteTarget } = useTargetsControllerDeleteTargetFromWorkspace({
-                mutation: {
-                    onSuccess: () => {
-                        queryClient.refetchQueries({
-                            queryKey: ["targets"],
-                        })
-                    },
-                },
-            })
-            const target = row.original
-            return (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <ConfirmDialog
-                            title="Delete target"
-                            description="Are you sure you want to delete this target?"
-                            onConfirm={() => {
-                                deleteTarget({
-                                    id: target.id,
-                                    workspaceId: selectedWorkspace ?? "",
-                                })
-                            }}
-                            trigger={
-                                <DropdownMenuItem
-                                    className="cursor-pointer"
-                                >
-                                    <Trash2Icon className="mr-1 h-4 w-4" />  Delete
-                                </DropdownMenuItem>
-                            }
-                        />
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            )
         },
     },
 ]
@@ -150,7 +91,7 @@ export function ListTargets() {
 
     return (
         <DataTable
-            data={targets}
+            data={targets as any}
             columns={targetColumns}
             isLoading={isLoading}
             page={page}
