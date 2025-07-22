@@ -25,4 +25,7 @@ export class Asset extends BaseEntity {
 
   @Column({ type: 'json', nullable: true })
   dnsRecords?: object;
+
+  @Column({ default: false })
+  isErrorPage?: boolean;
 }

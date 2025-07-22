@@ -90,9 +90,7 @@ export class WorkersService {
         await this.assetRepo.update(job.asset.id, {
           dnsRecords: primaryAsset,
         });
-
         assets.push(job.asset);
-
         await this.jobsRegistryService.startNextJob(assets, job.workerName);
       },
     },
@@ -108,6 +106,7 @@ export class WorkersService {
           .map((i) => Number(i.split(':')[1].replace('\r', '')))
           .sort();
         this.updateResultToDatabase(dataSource, job, parsed);
+
         await this.jobsRegistryService.startNextJob(
           [job.asset],
           job.workerName,
@@ -119,10 +118,16 @@ export class WorkersService {
       description:
         'HTTPX is a fast and multi-purpose HTTP toolkit that allows you to run multiple HTTP requests against a target.',
       command:
-        'httpx -u {{value}} -status-code -favicon -asn -title -web-server -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
+        'httpx -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         if (result) {
-          this.updateResultToDatabase(dataSource, job, JSON.parse(result));
+          const parsed = JSON.parse(result);
+          if (parsed.failed) {
+            this.assetRepo.update(job.asset.id, {
+              isErrorPage: true,
+            });
+          }
+          this.updateResultToDatabase(dataSource, job, parsed);
           await this.jobsRegistryService.startNextJob(
             [job.asset],
             job.workerName,
