@@ -71,7 +71,7 @@ import { ViewColumn, ViewEntity } from 'typeorm';
       COALESCE(wt."technologies", '[]'::jsonb) as "technologies",
       COALESCE(wc."cnameRecords", '[]'::jsonb) as "cnameRecords",
       COALESCE(wsc."statusCodes", '[]'::jsonb) as "statusCodes"
-    FROM public.workspace w
+    FROM public.workspaces w
     LEFT JOIN workspace_targets_count wtc ON wtc."workspaceId" = w.id
     LEFT JOIN workspace_assets_count wac ON wac."workspaceId" = w.id
     LEFT JOIN workspace_technologies wt ON wt."workspaceId" = w.id
