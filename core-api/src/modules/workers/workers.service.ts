@@ -132,11 +132,9 @@ export class WorkersService {
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         if (result) {
           const parsed = JSON.parse(result);
-          if (parsed.failed) {
-            this.assetRepo.update(job.asset.id, {
-              isErrorPage: true,
-            });
-          }
+          this.assetRepo.update(job.asset.id, {
+            isErrorPage: parsed.failed,
+          });
           this.updateResultToDatabase(dataSource, job, parsed);
           await this.jobsRegistryService.startNextJob(
             [job.asset],

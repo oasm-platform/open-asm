@@ -150,7 +150,7 @@ export class AssetsService {
     const offset = (page - 1) * limit;
     const sqlParams: any[] = [workspaceId];
 
-    let whereClosure = 'wt."workspaceId" = $1 ';
+    let whereClosure = 'wt."workspaceId" = $1 AND a."isErrorPage" = false ';
 
     if (targetIds) {
       whereClosure += `AND a."targetId" = ANY($2) `;
@@ -175,6 +175,7 @@ export class AssetsService {
         a."createdAt",
         a."updatedAt",
         a."dnsRecords",
+        a."isErrorPage",
         COALESCE(json_object_agg(j."workerName", j."rawResult") FILTER (WHERE j."workerName" IS NOT NULL), '{}') AS "metadata"
       FROM assets a
       LEFT JOIN latest_jobs j ON j."assetId" = a.id
@@ -205,6 +206,7 @@ export class AssetsService {
       asset.createdAt = item.createdAt;
       asset.updatedAt = item.updatedAt;
       asset.dnsRecords = item.dnsRecords;
+      asset.isErrorPage = item.isErrorPage;
       asset.metadata =
         typeof item.metadata === 'string'
           ? JSON.parse(item.metadata)

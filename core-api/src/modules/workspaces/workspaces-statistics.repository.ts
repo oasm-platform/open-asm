@@ -21,7 +21,9 @@ export class WorkspaceStatisticsRepository {
   ): Promise<WorkspaceStatisticsResponseDto | null> {
     const result = await this.statisticsViewRepository
       .createQueryBuilder('ws')
-      .where('ws.workspaceId = :workspaceId', { workspaceId })
+      .where('ws.workspaceId = :workspaceId', {
+        workspaceId,
+      })
       .getOne();
 
     if (!result) {

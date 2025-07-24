@@ -16,6 +16,7 @@ import { ViewColumn, ViewEntity } from 'typeorm';
       FROM workspace_targets wt
       LEFT JOIN targets t ON t.id = wt."targetId"
       LEFT JOIN assets a ON a."targetId" = t.id
+      WHERE a."isErrorPage" = false
       GROUP BY wt."workspaceId"
     ),
     workspace_technologies AS (

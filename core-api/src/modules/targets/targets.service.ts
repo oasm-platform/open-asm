@@ -152,7 +152,7 @@ export class TargetsService {
       .innerJoin('targets.workspaceTargets', 'workspaceTarget')
       .innerJoin('workspaceTarget.workspace', 'workspace')
       .innerJoin('workspace.workspaceMembers', 'workspaceMember')
-      .leftJoin('targets.assets', 'asset')
+      .leftJoin('targets.assets', 'asset', 'asset.isErrorPage = false')
       .leftJoin('asset.jobs', 'job')
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([

@@ -23,6 +23,9 @@ export class GetAssetsResponseDto {
 
   @ApiProperty({ type: Any, required: false })
   metadata: Record<string, any>;
+
+  @ApiProperty({ required: false })
+  isErrorPage?: boolean;
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {
