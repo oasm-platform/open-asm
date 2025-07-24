@@ -1,34 +1,48 @@
-FROM oven/bun:1.1.13 as builder
+FROM golang:1.24 AS tools
 
 WORKDIR /app
 
+# Cài các dependency cần thiết cho các tool ProjectDiscovery
+RUN apt-get update && apt-get install -y libpcap-dev
+
+# Cài các công cụ Go phổ biến
+RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+    go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
+    go install github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+
+FROM oven/bun:1.2 AS base
 RUN apt-get update && \
     apt-get install -y \
-    git curl unzip gcc g++ make \
-    libpcap-dev \
-    && curl -LO https://golang.org/dl/go1.21.3.linux-amd64.tar.gz \
-    && tar -C /usr/local -xzf go1.21.3.linux-amd64.tar.gz \
-    && ln -s /usr/local/go/bin/go /usr/bin/go \
-    && go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest \
-    && go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest \
-    && go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest \
-    && go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest \
-    && rm -rf /usr/local/go && rm -f go1.21.3.linux-amd64.tar.gz
+    curl
+
+FROM base AS builder
+
+WORKDIR /app
+# Set to production environment
+ENV NODE_ENV production
 
 COPY . .
 RUN bun install
 RUN bun build index.ts --outdir dist
+# Clean bun cache and remove unused files
+RUN bun pm cache clean && rm -rf src test
 
-FROM oven/bun:1.1.13 as runner
+FROM base AS runner
+# Set to production environment
+ENV NODE_ENV production
 
 WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/bun.lockb ./bun.lockb
+COPY --from=builder /app/bun.lock ./bun.lock
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
-COPY --from=builder /root/go/bin /usr/local/bin
+COPY --from=tools /go/bin/subfinder /usr/local/bin/
+COPY --from=tools /go/bin/dnsx /usr/local/bin/
+COPY --from=tools /go/bin/httpx /usr/local/bin/
+COPY --from=tools /go/bin/naabu /usr/local/bin/
 ENV PATH="/usr/local/bin:$PATH"
 
 CMD ["bun", "dist/index.js"]
