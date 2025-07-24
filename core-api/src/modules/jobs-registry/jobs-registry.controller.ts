@@ -1,19 +1,10 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseUUIDPipe,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { Public, UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
-  GetManyJobsQueryParams,
   GetNextJobResponseDto,
   UpdateResultDto,
   WorkerIdParams,
@@ -53,33 +44,33 @@ export class JobsRegistryController {
     return this.jobsRegistryService.getNextJob(workerId);
   }
 
-  @Doc({
-    summary: 'Gets jobs by asset ID, filtered by status and worker name.',
-    response: {
-      serialization: GetManyResponseDto(Job),
-    },
-  })
-  @Get('/asset/:assetId')
-  getJobsByAssetId(
-    @Param('assetId', new ParseUUIDPipe()) assetId: string,
-    @Query() query: GetManyJobsQueryParams,
-  ) {
-    return this.jobsRegistryService.getJobsByAssetId(assetId, query);
-  }
+  // @Doc({
+  //   summary: 'Gets jobs by asset ID, filtered by status and worker name.',
+  //   response: {
+  //     serialization: GetManyResponseDto(Job),
+  //   },
+  // })
+  // @Get('/asset/:assetId')
+  // getJobsByAssetId(
+  //   @Param('assetId', new ParseUUIDPipe()) assetId: string,
+  //   @Query() query: GetManyJobsQueryParams,
+  // ) {
+  //   return this.jobsRegistryService.getJobsByAssetId(assetId, query);
+  // }
 
-  @Doc({
-    summary: 'Gets jobs by target ID, filtered by status and worker name.',
-    response: {
-      serialization: GetManyResponseDto(Job),
-    },
-  })
-  @Get('/target/:targetId')
-  getJobsByTargetId(
-    @Param('targetId', new ParseUUIDPipe()) targetId: string,
-    @Query() query: GetManyJobsQueryParams,
-  ) {
-    return this.jobsRegistryService.getJobsByTargetId(targetId, query);
-  }
+  // @Doc({
+  //   summary: 'Gets jobs by target ID, filtered by status and worker name.',
+  //   response: {
+  //     serialization: GetManyResponseDto(Job),
+  //   },
+  // })
+  // @Get('/target/:targetId')
+  // getJobsByTargetId(
+  //   @Param('targetId', new ParseUUIDPipe()) targetId: string,
+  //   @Query() query: GetManyJobsQueryParams,
+  // ) {
+  //   return this.jobsRegistryService.getJobsByTargetId(targetId, query);
+  // }
 
   @Doc({ summary: 'Updates the result of a job with the given worker ID.' })
   @Public()

@@ -80,7 +80,7 @@ export class WorkersService {
           dnsRecords: parsed[i],
         })) as Asset[];
         // Fill to the asset table
-        await this.assetRepo
+        const insertResult = await this.assetRepo
           .createQueryBuilder()
           .insert()
           .values(assets)

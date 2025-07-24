@@ -289,6 +289,7 @@ export class JobsRegistryService {
     if (!nextWorkerHandleJob) {
       return null;
     }
+
     return this.repo
       .createQueryBuilder()
       .insert()
