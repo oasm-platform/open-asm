@@ -45,8 +45,6 @@ async function bootstrap() {
 
   // Configure global prefix
   app.setGlobalPrefix('api', { exclude: ['/api/auth/{*path}', '/'] });
-  app.useBodyParser('json', { limit: '50mb' });
-  app.useBodyParser('urlencoded', { limit: '50mb', extended: true });
 
   // Show Swagger UI in development: http://localhost:3000/api/docs
   const config = new DocumentBuilder()

@@ -1,23 +1,21 @@
 import { Injectable, type NestMiddleware } from '@nestjs/common';
-import type { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import * as express from 'express';
 
 @Injectable()
 export class SkipBodyParsingMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    // skip body parsing for better-auth routes
+    // Skip body parsing for /api/auth routes
     if (req.baseUrl.startsWith('/api/auth')) {
-      next();
-      return;
+      return next();
     }
 
-    // Parse the body as usual
-    express.json()(req, res, (err) => {
+    // For all other routes, parse JSON and URL-encoded with 1GB limit
+    express.json({ limit: '50mb' })(req, res, (err) => {
       if (err) {
-        next(err);
-        return;
+        return next(err);
       }
-      express.urlencoded({ extended: true })(req, res, next);
+      express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
     });
   }
 }
