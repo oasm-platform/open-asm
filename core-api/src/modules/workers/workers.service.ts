@@ -79,19 +79,29 @@ export class WorkersService {
           target: { id: job.asset.target.id },
           dnsRecords: parsed[i],
         })) as Asset[];
-        // Fill to the asset table
-        const insertResult = await this.assetRepo
-          .createQueryBuilder()
-          .insert()
-          .values(assets)
-          .orIgnore()
-          .execute();
-
-        await this.assetRepo.update(job.asset.id, {
-          dnsRecords: primaryAsset,
-        });
         assets.push(job.asset);
-        await this.jobsRegistryService.startNextJob(assets, job.workerName);
+        // Fill to the asset table
+        await Promise.all([
+          this.assetRepo
+            .createQueryBuilder()
+            .insert()
+            .values(assets)
+            .orIgnore()
+            .execute(),
+
+          this.assetRepo.update(job.asset.id, {
+            dnsRecords: primaryAsset,
+          }),
+        ]);
+        const assetsWithId = await this.assetRepo.find({
+          where: {
+            target: { id: job.asset.target.id },
+          },
+        });
+        await this.jobsRegistryService.startNextJob(
+          assetsWithId,
+          job.workerName,
+        );
       },
     },
     {
