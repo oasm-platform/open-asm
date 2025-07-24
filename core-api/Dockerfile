@@ -1,5 +1,10 @@
+## https://dawchihliou.github.io/articles/the-last-dockerfile-you-need-for-nestjs
+FROM node:22-alpine AS base
+# add the missing shared libraries from alpine base image
+RUN apk add --no-cache libc6-compat curl
+
 # Build stage
-FROM node:20-alpine AS builder
+FROM base AS builder
 
 WORKDIR /app
 
@@ -10,7 +15,7 @@ COPY ./core-api ./
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine
+FROM base
 
 WORKDIR /app
 
