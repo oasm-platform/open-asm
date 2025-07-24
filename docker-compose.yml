@@ -14,9 +14,15 @@ services:
       - "6276:6276"
     restart: "always"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     volumes:
       - ./open-api:/open-api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6276"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
 
   worker:
     build:
@@ -29,6 +35,10 @@ services:
     networks:
       - oasm
     restart: "always"
+    depends_on:
+      core-api:
+        condition: service_healthy
+
   postgres:
     container_name: postgres
     image: postgres:15
@@ -36,15 +46,23 @@ services:
     env_file:
       - ./core-api/.env
     environment:
-      POSTGRES_USER: ${POSTGRES_USERNAME}
+      POSTGRES_USER: "${POSTGRES_USERNAME:-postgres}"
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_HOST_AUTH_METHOD: trust
+      PGUSER: "${POSTGRES_USERNAME:-postgres}"
+      PGPASSWORD: "${POSTGRES_PASSWORD}"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data:rw
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     networks:
       - oasm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
 
 volumes:
   pgdata:
