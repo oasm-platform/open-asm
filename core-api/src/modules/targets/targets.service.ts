@@ -50,8 +50,8 @@ export class TargetsService {
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'COALESCE(COUNT(DISTINCT asset.id), 0) AS "totalAssets"',
         `CASE
-        WHEN COUNT(CASE WHEN job.status = 'pending' THEN 1 END) > 0 THEN 'pending'
         WHEN COUNT(CASE WHEN job.status = 'in_progress' THEN 1 END) > 0 THEN 'in_progress'
+        WHEN COUNT(CASE WHEN job.status = 'pending' THEN 1 END) > 0 THEN 'pending'
         WHEN COUNT(CASE WHEN job.status = 'completed' THEN 1 END) > 0 THEN 'completed'
         ELSE NULL
       END AS status`,
@@ -161,8 +161,8 @@ export class TargetsService {
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'COUNT(DISTINCT asset.id) AS "totalAssets"',
         `CASE
-        WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
+        WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.COMPLETED}' THEN 1 END) > 0 THEN '${JobStatus.COMPLETED}'
         ELSE NULL
       END AS status`,
