@@ -35,7 +35,7 @@ tasks:
   install:
     deps:
       - api:install
-      - console:instal
+      - console:install
   gen-api:
     cmd: npx swagger-typescript-api generate -n api.ts -p ./open-api/open-api.json -o ./worker/services/core-api --route-types --axios --extract-enums --unwrap-response-data --default-response any --module-name-index 1000
   docker-compose:
