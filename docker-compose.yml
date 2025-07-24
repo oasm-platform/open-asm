@@ -47,11 +47,11 @@ services:
       - ./core-api/.env
     environment:
       POSTGRES_USER: "${POSTGRES_USERNAME:-postgres}"
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_HOST_AUTH_METHOD: trust
       PGUSER: "${POSTGRES_USERNAME:-postgres}"
-      PGPASSWORD: "${POSTGRES_PASSWORD}"
+      PGPASSWORD: "${POSTGRES_PASSWORD:-postgres}"
     volumes:
       - pgdata:/var/lib/postgresql/data:rw
     ports:
