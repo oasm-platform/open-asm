@@ -7,6 +7,7 @@ import { TargetsModule } from './targets/targets.module';
 import { UsersModule } from './users/users.module';
 import { WorkersModule } from './workers/workers.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     JobsRegistryModule,
     AssetsModule,
     WorkersModule,
+    ProductsModule,
   ],
 })
 export class CombineModule {}
