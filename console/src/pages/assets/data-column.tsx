@@ -53,7 +53,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
       const remainingCount = technologies.length - maxTechDisplay;
 
       return (
-        <div className="flex flex-wrap gap-2 max-w-xs overflow-x-auto">
+        <div className="flex flex-wrap gap-2 max-w-xs">
           <BadgeList list={displayedTechs} Icon={Layers} />
           {remainingCount > 0 && (
             <Badge variant="outline">+{remainingCount}</Badge>

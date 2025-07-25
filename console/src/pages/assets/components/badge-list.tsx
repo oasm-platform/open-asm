@@ -6,13 +6,13 @@ export default function BadgeList({
   Icon,
 }: {
   list: string[] | number[];
-  Icon: LucideIcon;
+  Icon?: LucideIcon;
 }) {
   return (
-    <div className="flex gap-0.5">
+    <div className="flex flex-wrap gap-0.5">
       {list?.map((item: string | number) => (
         <Badge variant="outline" className="mr-1 h-7" key={item}>
-          <Icon />
+          {Icon && <Icon />}
           {item}
         </Badge>
       ))}
