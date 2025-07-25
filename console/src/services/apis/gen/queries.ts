@@ -177,6 +177,7 @@ export type GetAssetsResponseDto = {
   updatedAt: string;
   dnsRecords?: GetAssetsResponseDtoDnsRecords;
   metadata?: Any;
+  isErrorPage?: boolean;
 };
 
 export type GetManyGetAssetsResponseDtoDto = {
@@ -215,6 +216,36 @@ export type GetManyWorkerInstanceDto = {
   pageCount: number;
 };
 
+export type CreateProductDto = {
+  /** The name of the product */
+  name: string;
+  /** The description of the product */
+  description?: string;
+};
+
+export type Product = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  /** The name of the product */
+  name: string;
+  /** The description of the product */
+  description: string;
+};
+
+export type AddProductToWorkspaceDto = {
+  /** The ID of the product */
+  productId: string;
+  /** The ID of the workspace */
+  workspaceId: string;
+};
+
+export type WorkspaceProduct = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   page?: number;
   limit?: number;
@@ -237,84 +268,6 @@ export type JobsRegistryControllerGetManyJobsParams = {
   sortBy?: string;
   sortOrder?: string;
 };
-
-export type JobsRegistryControllerGetJobsByAssetIdParams = {
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: string;
-  /**
-   * Filter jobs by status
-   */
-  jobStatus?: JobsRegistryControllerGetJobsByAssetIdJobStatus;
-  /**
-   * Filter jobs by worker name
-   */
-  workerName?: JobsRegistryControllerGetJobsByAssetIdWorkerName;
-};
-
-export type JobsRegistryControllerGetJobsByAssetIdJobStatus =
-  (typeof JobsRegistryControllerGetJobsByAssetIdJobStatus)[keyof typeof JobsRegistryControllerGetJobsByAssetIdJobStatus];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const JobsRegistryControllerGetJobsByAssetIdJobStatus = {
-  pending: "pending",
-  in_progress: "in_progress",
-  completed: "completed",
-  failed: "failed",
-  cancelled: "cancelled",
-  all: "all",
-} as const;
-
-export type JobsRegistryControllerGetJobsByAssetIdWorkerName =
-  (typeof JobsRegistryControllerGetJobsByAssetIdWorkerName)[keyof typeof JobsRegistryControllerGetJobsByAssetIdWorkerName];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const JobsRegistryControllerGetJobsByAssetIdWorkerName = {
-  subdomains: "subdomains",
-  httpx: "httpx",
-  ports: "ports",
-  all: "all",
-} as const;
-
-export type JobsRegistryControllerGetJobsByTargetIdParams = {
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: string;
-  /**
-   * Filter jobs by status
-   */
-  jobStatus?: JobsRegistryControllerGetJobsByTargetIdJobStatus;
-  /**
-   * Filter jobs by worker name
-   */
-  workerName?: JobsRegistryControllerGetJobsByTargetIdWorkerName;
-};
-
-export type JobsRegistryControllerGetJobsByTargetIdJobStatus =
-  (typeof JobsRegistryControllerGetJobsByTargetIdJobStatus)[keyof typeof JobsRegistryControllerGetJobsByTargetIdJobStatus];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const JobsRegistryControllerGetJobsByTargetIdJobStatus = {
-  pending: "pending",
-  in_progress: "in_progress",
-  completed: "completed",
-  failed: "failed",
-  cancelled: "cancelled",
-  all: "all",
-} as const;
-
-export type JobsRegistryControllerGetJobsByTargetIdWorkerName =
-  (typeof JobsRegistryControllerGetJobsByTargetIdWorkerName)[keyof typeof JobsRegistryControllerGetJobsByTargetIdWorkerName];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const JobsRegistryControllerGetJobsByTargetIdWorkerName = {
-  subdomains: "subdomains",
-  httpx: "httpx",
-  ports: "ports",
-  all: "all",
-} as const;
 
 export type AssetsControllerGetAssetsParams = {
   page?: number;
@@ -2649,313 +2602,92 @@ export const useWorkspacesControllerDeleteWorkspace = <
 };
 
 /**
- * Regenerates the API key for a user.
- * @summary Regenerate API key
+ * Regenerates the API key for a workspace.
+ * @summary Rotate API key
  */
-export const workspacesControllerRegenerateApiKey = (
+export const workspacesControllerRotateApiKey = (
+  id: string,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<GetApiKeyResponseDto>(
-    { url: `/api/workspaces/api-key/regenerate`, method: "GET", signal },
+    { url: `/api/workspaces/${id}/api-key/rotate`, method: "POST", signal },
     options,
   );
 };
 
-export const getWorkspacesControllerRegenerateApiKeyQueryKey = () => {
-  return [`/api/workspaces/api-key/regenerate`] as const;
-};
-
-export const getWorkspacesControllerRegenerateApiKeyInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-  >,
+export const getWorkspacesControllerRotateApiKeyMutationOptions = <
   TError = unknown,
+  TContext = unknown,
 >(options?: {
-  query?: Partial<
-    UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-      TError,
-      TData
-    >
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+    TError,
+    { id: string },
+    TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["workspacesControllerRotateApiKey"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
-  const queryKey =
-    queryOptions?.queryKey ?? getWorkspacesControllerRegenerateApiKeyQueryKey();
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-  > = ({ signal }) =>
-    workspacesControllerRegenerateApiKey(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type WorkspacesControllerRegenerateApiKeyInfiniteQueryResult =
-  NonNullable<Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>>;
-export type WorkspacesControllerRegenerateApiKeyInfiniteQueryError = unknown;
-
-export function useWorkspacesControllerRegenerateApiKeyInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-  >,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerRegenerateApiKeyInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerRegenerateApiKeyInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Regenerate API key
- */
-
-export function useWorkspacesControllerRegenerateApiKeyInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getWorkspacesControllerRegenerateApiKeyInfiniteQueryOptions(options);
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
+    return workspacesControllerRotateApiKey(id, requestOptions);
   };
 
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getWorkspacesControllerRegenerateApiKeyQueryOptions = <
-  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getWorkspacesControllerRegenerateApiKeyQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-  > = ({ signal }) =>
-    workspacesControllerRegenerateApiKey(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
+  return { mutationFn, ...mutationOptions };
 };
 
-export type WorkspacesControllerRegenerateApiKeyQueryResult = NonNullable<
-  Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
+export type WorkspacesControllerRotateApiKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>
 >;
-export type WorkspacesControllerRegenerateApiKeyQueryError = unknown;
 
-export function useWorkspacesControllerRegenerateApiKey<
-  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerRegenerateApiKey<
-  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkspacesControllerRegenerateApiKey<
-  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
+export type WorkspacesControllerRotateApiKeyMutationError = unknown;
+
 /**
- * @summary Regenerate API key
+ * @summary Rotate API key
  */
-
-export function useWorkspacesControllerRegenerateApiKey<
-  TData = Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
+export const useWorkspacesControllerRotateApiKey = <
   TError = unknown,
+  TContext = unknown,
 >(
   options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workspacesControllerRegenerateApiKey>>,
-        TError,
-        TData
-      >
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+      TError,
+      { id: string },
+      TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getWorkspacesControllerRegenerateApiKeyQueryOptions(options);
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerRotateApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkspacesControllerRotateApiKeyMutationOptions(options);
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
+  return useMutation(mutationOptions, queryClient);
+};
 
 export const rootControllerGetHealth = (
   options?: SecondParameter<typeof orvalClient>,
@@ -4035,800 +3767,6 @@ export function useJobsRegistryControllerGetNextJob<
 }
 
 /**
- * @summary Gets jobs by asset ID, filtered by status and worker name.
- */
-export const jobsRegistryControllerGetJobsByAssetId = (
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyJobDto>(
-    {
-      url: `/api/jobs-registry/asset/${assetId}`,
-      method: "GET",
-      params,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getJobsRegistryControllerGetJobsByAssetIdQueryKey = (
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-) => {
-  return [
-    `/api/jobs-registry/asset/${assetId}`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getJobsRegistryControllerGetJobsByAssetIdInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-    JobsRegistryControllerGetJobsByAssetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByAssetIdParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getJobsRegistryControllerGetJobsByAssetIdQueryKey(assetId, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-    QueryKey,
-    JobsRegistryControllerGetJobsByAssetIdParams["page"]
-  > = ({ signal, pageParam }) =>
-    jobsRegistryControllerGetJobsByAssetId(
-      assetId,
-      { ...params, page: pageParam || params?.["page"] },
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!assetId,
-    ...queryOptions,
-  } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-    TError,
-    TData,
-    QueryKey,
-    JobsRegistryControllerGetJobsByAssetIdParams["page"]
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type JobsRegistryControllerGetJobsByAssetIdInfiniteQueryResult =
-  NonNullable<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>
-  >;
-export type JobsRegistryControllerGetJobsByAssetIdInfiniteQueryError = unknown;
-
-export function useJobsRegistryControllerGetJobsByAssetIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-    JobsRegistryControllerGetJobsByAssetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByAssetIdParams["page"]
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-          QueryKey
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerGetJobsByAssetIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-    JobsRegistryControllerGetJobsByAssetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByAssetIdParams["page"]
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-          QueryKey
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerGetJobsByAssetIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-    JobsRegistryControllerGetJobsByAssetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByAssetIdParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Gets jobs by asset ID, filtered by status and worker name.
- */
-
-export function useJobsRegistryControllerGetJobsByAssetIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-    JobsRegistryControllerGetJobsByAssetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByAssetIdParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getJobsRegistryControllerGetJobsByAssetIdInfiniteQueryOptions(
-      assetId,
-      params,
-      options,
-    );
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getJobsRegistryControllerGetJobsByAssetIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getJobsRegistryControllerGetJobsByAssetIdQueryKey(assetId, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>
-  > = ({ signal }) =>
-    jobsRegistryControllerGetJobsByAssetId(
-      assetId,
-      params,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!assetId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type JobsRegistryControllerGetJobsByAssetIdQueryResult = NonNullable<
-  Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>
->;
-export type JobsRegistryControllerGetJobsByAssetIdQueryError = unknown;
-
-export function useJobsRegistryControllerGetJobsByAssetId<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerGetJobsByAssetId<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerGetJobsByAssetId<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Gets jobs by asset ID, filtered by status and worker name.
- */
-
-export function useJobsRegistryControllerGetJobsByAssetId<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-  TError = unknown,
->(
-  assetId: string,
-  params: JobsRegistryControllerGetJobsByAssetIdParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByAssetId>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getJobsRegistryControllerGetJobsByAssetIdQueryOptions(
-    assetId,
-    params,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * @summary Gets jobs by target ID, filtered by status and worker name.
- */
-export const jobsRegistryControllerGetJobsByTargetId = (
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyJobDto>(
-    {
-      url: `/api/jobs-registry/target/${targetId}`,
-      method: "GET",
-      params,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getJobsRegistryControllerGetJobsByTargetIdQueryKey = (
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-) => {
-  return [
-    `/api/jobs-registry/target/${targetId}`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getJobsRegistryControllerGetJobsByTargetIdInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-    JobsRegistryControllerGetJobsByTargetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByTargetIdParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getJobsRegistryControllerGetJobsByTargetIdQueryKey(targetId, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-    QueryKey,
-    JobsRegistryControllerGetJobsByTargetIdParams["page"]
-  > = ({ signal, pageParam }) =>
-    jobsRegistryControllerGetJobsByTargetId(
-      targetId,
-      { ...params, page: pageParam || params?.["page"] },
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!targetId,
-    ...queryOptions,
-  } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-    TError,
-    TData,
-    QueryKey,
-    JobsRegistryControllerGetJobsByTargetIdParams["page"]
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type JobsRegistryControllerGetJobsByTargetIdInfiniteQueryResult =
-  NonNullable<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>
-  >;
-export type JobsRegistryControllerGetJobsByTargetIdInfiniteQueryError = unknown;
-
-export function useJobsRegistryControllerGetJobsByTargetIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-    JobsRegistryControllerGetJobsByTargetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByTargetIdParams["page"]
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-          QueryKey
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerGetJobsByTargetIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-    JobsRegistryControllerGetJobsByTargetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByTargetIdParams["page"]
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-          QueryKey
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerGetJobsByTargetIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-    JobsRegistryControllerGetJobsByTargetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByTargetIdParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Gets jobs by target ID, filtered by status and worker name.
- */
-
-export function useJobsRegistryControllerGetJobsByTargetIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-    JobsRegistryControllerGetJobsByTargetIdParams["page"]
-  >,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetJobsByTargetIdParams["page"]
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getJobsRegistryControllerGetJobsByTargetIdInfiniteQueryOptions(
-      targetId,
-      params,
-      options,
-    );
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getJobsRegistryControllerGetJobsByTargetIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getJobsRegistryControllerGetJobsByTargetIdQueryKey(targetId, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>
-  > = ({ signal }) =>
-    jobsRegistryControllerGetJobsByTargetId(
-      targetId,
-      params,
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!targetId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type JobsRegistryControllerGetJobsByTargetIdQueryResult = NonNullable<
-  Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>
->;
-export type JobsRegistryControllerGetJobsByTargetIdQueryError = unknown;
-
-export function useJobsRegistryControllerGetJobsByTargetId<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerGetJobsByTargetId<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useJobsRegistryControllerGetJobsByTargetId<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Gets jobs by target ID, filtered by status and worker name.
- */
-
-export function useJobsRegistryControllerGetJobsByTargetId<
-  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-  TError = unknown,
->(
-  targetId: string,
-  params: JobsRegistryControllerGetJobsByTargetIdParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsByTargetId>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getJobsRegistryControllerGetJobsByTargetIdQueryOptions(
-    targetId,
-    params,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
  * @summary Updates the result of a job with the given worker ID.
  */
 export const jobsRegistryControllerUpdateResult = (
@@ -5794,6 +4732,811 @@ export function useWorkersControllerGetWorkers<
     params,
     options,
   );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * @summary Create a new product
+ */
+export const productsControllerCreate = (
+  createProductDto: CreateProductDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Product>(
+    {
+      url: `/api/products`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: createProductDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getProductsControllerCreateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof productsControllerCreate>>,
+    TError,
+    { data: CreateProductDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof productsControllerCreate>>,
+  TError,
+  { data: CreateProductDto },
+  TContext
+> => {
+  const mutationKey = ["productsControllerCreate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof productsControllerCreate>>,
+    { data: CreateProductDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return productsControllerCreate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProductsControllerCreateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof productsControllerCreate>>
+>;
+export type ProductsControllerCreateMutationBody = CreateProductDto;
+export type ProductsControllerCreateMutationError = unknown;
+
+/**
+ * @summary Create a new product
+ */
+export const useProductsControllerCreate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof productsControllerCreate>>,
+      TError,
+      { data: CreateProductDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof productsControllerCreate>>,
+  TError,
+  { data: CreateProductDto },
+  TContext
+> => {
+  const mutationOptions = getProductsControllerCreateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * @summary Get all products
+ */
+export const productsControllerFindAll = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Product[]>(
+    { url: `/api/products`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getProductsControllerFindAllQueryKey = () => {
+  return [`/api/products`] as const;
+};
+
+export const getProductsControllerFindAllInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindAll>>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof productsControllerFindAll>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getProductsControllerFindAllQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof productsControllerFindAll>>
+  > = ({ signal }) => productsControllerFindAll(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof productsControllerFindAll>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProductsControllerFindAllInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof productsControllerFindAll>>
+>;
+export type ProductsControllerFindAllInfiniteQueryError = unknown;
+
+export function useProductsControllerFindAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindAll>>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof productsControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof productsControllerFindAll>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProductsControllerFindAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindAll>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof productsControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof productsControllerFindAll>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProductsControllerFindAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindAll>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all products
+ */
+
+export function useProductsControllerFindAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindAll>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getProductsControllerFindAllInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getProductsControllerFindAllQueryOptions = <
+  TData = Awaited<ReturnType<typeof productsControllerFindAll>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof productsControllerFindAll>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getProductsControllerFindAllQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof productsControllerFindAll>>
+  > = ({ signal }) => productsControllerFindAll(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof productsControllerFindAll>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProductsControllerFindAllQueryResult = NonNullable<
+  Awaited<ReturnType<typeof productsControllerFindAll>>
+>;
+export type ProductsControllerFindAllQueryError = unknown;
+
+export function useProductsControllerFindAll<
+  TData = Awaited<ReturnType<typeof productsControllerFindAll>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof productsControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof productsControllerFindAll>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProductsControllerFindAll<
+  TData = Awaited<ReturnType<typeof productsControllerFindAll>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof productsControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof productsControllerFindAll>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProductsControllerFindAll<
+  TData = Awaited<ReturnType<typeof productsControllerFindAll>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all products
+ */
+
+export function useProductsControllerFindAll<
+  TData = Awaited<ReturnType<typeof productsControllerFindAll>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getProductsControllerFindAllQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * @summary Add a product to a workspace
+ */
+export const productsControllerAddProductToWorkspace = (
+  addProductToWorkspaceDto: AddProductToWorkspaceDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspaceProduct>(
+    {
+      url: `/api/products/add-to-workspace`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: addProductToWorkspaceDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getProductsControllerAddProductToWorkspaceMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof productsControllerAddProductToWorkspace>>,
+    TError,
+    { data: AddProductToWorkspaceDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof productsControllerAddProductToWorkspace>>,
+  TError,
+  { data: AddProductToWorkspaceDto },
+  TContext
+> => {
+  const mutationKey = ["productsControllerAddProductToWorkspace"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof productsControllerAddProductToWorkspace>>,
+    { data: AddProductToWorkspaceDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return productsControllerAddProductToWorkspace(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProductsControllerAddProductToWorkspaceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof productsControllerAddProductToWorkspace>>
+>;
+export type ProductsControllerAddProductToWorkspaceMutationBody =
+  AddProductToWorkspaceDto;
+export type ProductsControllerAddProductToWorkspaceMutationError = unknown;
+
+/**
+ * @summary Add a product to a workspace
+ */
+export const useProductsControllerAddProductToWorkspace = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof productsControllerAddProductToWorkspace>>,
+      TError,
+      { data: AddProductToWorkspaceDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof productsControllerAddProductToWorkspace>>,
+  TError,
+  { data: AddProductToWorkspaceDto },
+  TContext
+> => {
+  const mutationOptions =
+    getProductsControllerAddProductToWorkspaceMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * @summary Get a product by ID
+ */
+export const productsControllerFindOne = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Product>(
+    { url: `/api/products/${id}`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getProductsControllerFindOneQueryKey = (id: string) => {
+  return [`/api/products/${id}`] as const;
+};
+
+export const getProductsControllerFindOneInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindOne>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getProductsControllerFindOneQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof productsControllerFindOne>>
+  > = ({ signal }) => productsControllerFindOne(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof productsControllerFindOne>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProductsControllerFindOneInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof productsControllerFindOne>>
+>;
+export type ProductsControllerFindOneInfiniteQueryError = unknown;
+
+export function useProductsControllerFindOneInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindOne>>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof productsControllerFindOne>>,
+          TError,
+          Awaited<ReturnType<typeof productsControllerFindOne>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProductsControllerFindOneInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindOne>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof productsControllerFindOne>>,
+          TError,
+          Awaited<ReturnType<typeof productsControllerFindOne>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProductsControllerFindOneInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindOne>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a product by ID
+ */
+
+export function useProductsControllerFindOneInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof productsControllerFindOne>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getProductsControllerFindOneInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getProductsControllerFindOneQueryOptions = <
+  TData = Awaited<ReturnType<typeof productsControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getProductsControllerFindOneQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof productsControllerFindOne>>
+  > = ({ signal }) => productsControllerFindOne(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof productsControllerFindOne>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProductsControllerFindOneQueryResult = NonNullable<
+  Awaited<ReturnType<typeof productsControllerFindOne>>
+>;
+export type ProductsControllerFindOneQueryError = unknown;
+
+export function useProductsControllerFindOne<
+  TData = Awaited<ReturnType<typeof productsControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof productsControllerFindOne>>,
+          TError,
+          Awaited<ReturnType<typeof productsControllerFindOne>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProductsControllerFindOne<
+  TData = Awaited<ReturnType<typeof productsControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof productsControllerFindOne>>,
+          TError,
+          Awaited<ReturnType<typeof productsControllerFindOne>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProductsControllerFindOne<
+  TData = Awaited<ReturnType<typeof productsControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a product by ID
+ */
+
+export function useProductsControllerFindOne<
+  TData = Awaited<ReturnType<typeof productsControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof productsControllerFindOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getProductsControllerFindOneQueryOptions(id, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

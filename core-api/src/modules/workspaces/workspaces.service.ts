@@ -244,11 +244,12 @@ export class WorkspacesService {
    * @param userId The ID of the user to regenerate the API key for.
    * @returns The new API key for the user.
    */
-  public async regenerateApiKey(
+  public async rotateApiKey(
+    workspaceId: string,
     userContext: UserContextPayload,
   ): Promise<GetApiKeyResponseDto> {
     const workspace = await this.getWorkspaceByIdAndOwner(
-      userContext.id,
+      workspaceId,
       userContext,
     );
     workspace.apiKey = generateToken(32);

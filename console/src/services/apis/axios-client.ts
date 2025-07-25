@@ -1,3 +1,4 @@
+import { getGlobalWorkspaceId } from "@/utils/workspaceState";
 import Axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import Qs from "qs";
 // Create a more descriptively named instance
@@ -5,6 +6,15 @@ export const axiosInstance = Axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   paramsSerializer: (params) => Qs.stringify(params, { arrayFormat: "repeat" }),
   withCredentials: true,
+});
+
+axiosInstance.interceptors.request.use((config) => {
+  const workspaceId = getGlobalWorkspaceId();
+  console.log(workspaceId, "workspaceId");
+  if (workspaceId) {
+    config.headers.set("X-Workspace-Id", workspaceId);
+  }
+  return config;
 });
 
 axiosInstance.interceptors.response.use(

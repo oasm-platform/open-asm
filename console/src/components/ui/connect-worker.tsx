@@ -10,16 +10,30 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
+import { useWorkspacesControllerRotateApiKey } from "@/services/apis/gen/queries";
 import { Copy, SquareTerminal } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "./confirm-dialog";
 
 export function ConnectWorker() {
-    const { workspaces, selectedWorkspace } = useWorkspaceSelector()
+    const { workspaces, selectedWorkspace, refetch } = useWorkspaceSelector()
     const apiKey = workspaces[workspaces.findIndex((workspace) => workspace.id === selectedWorkspace)]?.apiKey;
     const [open, setOpen] = useState(false);
     if (!selectedWorkspace) return null;
     const rawCommand = `docker run -d --name open-asm-worker open-asm-worker -e API_KEY=${apiKey} -e API=${import.meta.env.VITE_API_URL} -e MAX_JOBS=10`;
+
+    const { mutate } = useWorkspacesControllerRotateApiKey({
+        mutation: {
+            onSuccess: () => {
+                toast.success("API key rotated successfully");
+                refetch()
+            },
+            onError: () => {
+                toast.error("Failed to rotate API key");
+            }
+        }
+    })
 
     const handleCopyCommand = async () => {
         await navigator.clipboard.writeText(rawCommand);
@@ -73,7 +87,13 @@ export function ConnectWorker() {
                     </div>
 
                 </div>
-                <DialogFooter>
+                <DialogFooter className="flex justify-between items-center gap-2">
+                    <ConfirmDialog
+                        title="Rotate API key"
+                        description="Are you sure you want to rotate the API key?"
+                        onConfirm={() => mutate({ id: selectedWorkspace })}
+                        trigger={<Button variant="outline" type="button">Rotate API key</Button>}
+                    />
                     <DialogClose asChild>
                         <Button variant="outline" type="button">Close</Button>
                     </DialogClose>

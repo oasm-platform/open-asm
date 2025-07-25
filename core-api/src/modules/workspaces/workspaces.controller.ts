@@ -129,14 +129,17 @@ export class WorkspacesController {
   }
 
   @Doc({
-    summary: 'Regenerate API key',
-    description: 'Regenerates the API key for a user.',
+    summary: 'Rotate API key',
+    description: 'Regenerates the API key for a workspace.',
     response: {
       serialization: GetApiKeyResponseDto,
     },
   })
-  @Get('api-key/regenerate')
-  regenerateApiKey(@UserContext() userContext: UserContextPayload) {
-    return this.workspacesService.regenerateApiKey(userContext);
+  @Post(':id/api-key/rotate')
+  rotateApiKey(
+    @Param() { id }: IdQueryParamDto,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.workspacesService.rotateApiKey(id, userContext);
   }
 }

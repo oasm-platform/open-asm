@@ -1,4 +1,5 @@
 import { useWorkspacesControllerGetWorkspaces } from "@/services/apis/gen/queries";
+import { setGlobalWorkspaceId } from "@/utils/workspaceState";
 import React from "react";
 import createState from "./createState"; // adjust path as needed
 
@@ -12,10 +13,12 @@ const useWorkspaceState = createState<WorkspaceState>(
   "workspace",
   { selectedWorkspaceId: null },
   {
-    setSelectedWorkspace: (state, id: string | null) => ({
-      ...state,
-      selectedWorkspaceId: id,
-    }),
+    setSelectedWorkspace: (state, id: string | null) => {
+      return {
+        ...state,
+        selectedWorkspaceId: id,
+      };
+    },
     clearSelectedWorkspace: (state) => ({
       ...state,
       selectedWorkspaceId: null,
@@ -70,6 +73,7 @@ export function useWorkspaceSelector() {
         clearSelectedWorkspace();
       }
     }
+    setGlobalWorkspaceId(state.selectedWorkspaceId);
   }, [
     response,
     state.selectedWorkspaceId,
