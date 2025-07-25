@@ -14,6 +14,14 @@ export class UsersService {
   ) {}
 
   /**
+   * Counts the number of users in the system.
+   * @returns The total number of users.
+   */
+  public async count(): Promise<number> {
+    return this.usersRepository.count();
+  }
+
+  /**
    * Creates the first admin user in the system.
    * @param email The email address to use for the admin user.
    * @param password The password to use for the admin user.

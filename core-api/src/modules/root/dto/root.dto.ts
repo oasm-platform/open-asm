@@ -9,3 +9,8 @@ export class CreateFirstAdminDto {
   @ApiProperty()
   password: string;
 }
+
+export class GetMetadataDto {
+  @ApiProperty()
+  isInit: boolean;
+}

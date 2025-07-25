@@ -130,6 +130,10 @@ export type CreateFirstAdminDto = {
   password: string;
 };
 
+export type GetMetadataDto = {
+  isInit: boolean;
+};
+
 export type Job = {
   id: string;
   createdAt: string;
@@ -2693,11 +2697,14 @@ export const rootControllerGetHealth = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<void>({ url: `/`, method: "GET", signal }, options);
+  return orvalClient<void>(
+    { url: `/api/health`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getRootControllerGetHealthQueryKey = () => {
-  return [`/`] as const;
+  return [`/api/health`] as const;
 };
 
 export const getRootControllerGetHealthInfiniteQueryOptions = <
@@ -3065,6 +3072,303 @@ export const useRootControllerCreateFirstAdmin = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * Returns metadata about the system state, like whether it has been initialized.
+ * @summary Get system metadata.
+ */
+export const rootControllerGetMetadata = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetMetadataDto>(
+    { url: `/api/metadata`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getRootControllerGetMetadataQueryKey = () => {
+  return [`/api/metadata`] as const;
+};
+
+export const getRootControllerGetMetadataInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof rootControllerGetMetadata>>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getRootControllerGetMetadataQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof rootControllerGetMetadata>>
+  > = ({ signal }) => rootControllerGetMetadata(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type RootControllerGetMetadataInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof rootControllerGetMetadata>>
+>;
+export type RootControllerGetMetadataInfiniteQueryError = unknown;
+
+export function useRootControllerGetMetadataInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof rootControllerGetMetadata>>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+          TError,
+          Awaited<ReturnType<typeof rootControllerGetMetadata>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useRootControllerGetMetadataInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof rootControllerGetMetadata>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+          TError,
+          Awaited<ReturnType<typeof rootControllerGetMetadata>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useRootControllerGetMetadataInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof rootControllerGetMetadata>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get system metadata.
+ */
+
+export function useRootControllerGetMetadataInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof rootControllerGetMetadata>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getRootControllerGetMetadataInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getRootControllerGetMetadataQueryOptions = <
+  TData = Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getRootControllerGetMetadataQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof rootControllerGetMetadata>>
+  > = ({ signal }) => rootControllerGetMetadata(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type RootControllerGetMetadataQueryResult = NonNullable<
+  Awaited<ReturnType<typeof rootControllerGetMetadata>>
+>;
+export type RootControllerGetMetadataQueryError = unknown;
+
+export function useRootControllerGetMetadata<
+  TData = Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+          TError,
+          Awaited<ReturnType<typeof rootControllerGetMetadata>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useRootControllerGetMetadata<
+  TData = Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+          TError,
+          Awaited<ReturnType<typeof rootControllerGetMetadata>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useRootControllerGetMetadata<
+  TData = Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get system metadata.
+ */
+
+export function useRootControllerGetMetadata<
+  TData = Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getRootControllerGetMetadataQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * Retrieves a list of jobs that the user is a member of.

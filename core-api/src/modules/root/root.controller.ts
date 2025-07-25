@@ -1,16 +1,18 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { CreateFirstAdminDto } from './dto/root.dto';
+import { CreateFirstAdminDto, GetMetadataDto } from './dto/root.dto';
 import { RootService } from './root.service';
 
-@Controller('')
+@ApiTags('Root')
+@Controller()
 export class RootController {
   constructor(private readonly rootService: RootService) {}
 
   @Public()
-  @Get()
+  @Get('health')
   getHealth(): string {
     return this.rootService.getHealth();
   }
@@ -24,7 +26,23 @@ export class RootController {
     },
   })
   @Post('init-admin')
-  createFirstAdmin(@Body() dto: CreateFirstAdminDto) {
+  createFirstAdmin(
+    @Body() dto: CreateFirstAdminDto,
+  ): Promise<DefaultMessageResponseDto> {
     return this.rootService.createFirstAdmin(dto);
+  }
+
+  @Public()
+  @Doc({
+    summary: 'Get system metadata.',
+    description:
+      'Returns metadata about the system state, like whether it has been initialized.',
+    response: {
+      serialization: GetMetadataDto,
+    },
+  })
+  @Get('metadata')
+  getMetadata() {
+    return this.rootService.getMetadata();
   }
 }

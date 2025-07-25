@@ -20,8 +20,8 @@ export function ConnectWorker() {
     const { workspaces, selectedWorkspace, refetch } = useWorkspaceSelector()
     const apiKey = workspaces[workspaces.findIndex((workspace) => workspace.id === selectedWorkspace)]?.apiKey;
     const [open, setOpen] = useState(false);
-    if (!selectedWorkspace) return null;
-    const rawCommand = `docker run -d --name open-asm-worker open-asm-worker -e API_KEY=${apiKey} -e API=${import.meta.env.VITE_API_URL} -e MAX_JOBS=10`;
+
+    const rawCommand = `docker run -d --name open-asm-worker -e API_KEY=${apiKey} -e API=${import.meta.env.VITE_API_URL} -e MAX_JOBS=10 open-asm-worker:latest`;
 
     const { mutate } = useWorkspacesControllerRotateApiKey({
         mutation: {
@@ -45,6 +45,7 @@ export function ConnectWorker() {
         toast.success("API key copied to clipboard");
     };
 
+    if (!selectedWorkspace) return null;
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>

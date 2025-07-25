@@ -84,7 +84,7 @@ export default function Login() {
                                     </FormItem>
                                 )}
                             />
-                            <Button disabled={loading} type="submit" className="w-full">
+                            <Button disabled={loading} type="submit" variant="secondary" className="w-full">
                                 {loading && <Loader2Icon className="animate-spin" />}
                                 Sign In
                             </Button>
