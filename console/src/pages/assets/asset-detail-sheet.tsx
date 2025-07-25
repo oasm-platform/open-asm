@@ -371,7 +371,7 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                     />
                     HTTP Response
                   </h3>
-                  <div className="relative text-gray-100 font-mono rounded-xl p-4 sm:p-6 shadow-lg border border-gray-700 **w-full**">
+                  <div className="relative font-mono rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-stone-800 **w-full**">
                     <pre className="whitespace-pre-wrap leading-relaxed **overflow-x-auto**">
                       {httpx.raw_header}
                       {/* {httpx?.body} */}
