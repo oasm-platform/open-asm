@@ -9,17 +9,9 @@ import { AuthService } from './../auth/auth.service';
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    public usersRepository: Repository<User>,
     private authService: AuthService,
   ) {}
-
-  /**
-   * Counts the number of users in the system.
-   * @returns The total number of users.
-   */
-  public async count(): Promise<number> {
-    return this.usersRepository.count();
-  }
 
   /**
    * Creates the first admin user in the system.

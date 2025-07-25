@@ -31,7 +31,12 @@ export class RootService {
    * @returns A promise that resolves to a get metadata dto.
    */
   public async getMetadata(): Promise<GetMetadataDto> {
-    const userCount = await this.usersService.count();
+    const userCount = await this.usersService.usersRepository.count({
+      cache: {
+        id: 'isInit',
+        milliseconds: 1000 * 60 * 60 * 24 * 365,
+      },
+    });
     return {
       isInit: userCount > 0,
     };
