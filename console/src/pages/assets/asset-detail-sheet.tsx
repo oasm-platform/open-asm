@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils"; // Assuming this path is correct
+import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import {
@@ -17,9 +17,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
-import AssetValue from "./components/asset-value"; // Assuming this path is correct
-import BadgeList from "./components/badge-list"; // Assuming this path is correct
-import HTTPXStatusCode from "./components/status-code"; // Assuming this path is correct
+import AssetValue from "./components/asset-value";
+import BadgeList from "./components/badge-list";
+import HTTPXStatusCode from "./components/status-code";
 
 dayjs.extend(relativeTime);
 
@@ -56,24 +56,9 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
     ? dayjs(certAgeStartDate).fromNow()
     : "N/A";
 
-  // Handle copying HTTP header to clipboard
   const handleCopyHeader = async () => {
-    if (httpx?.raw_header) {
-      // Using document.execCommand('copy') for better compatibility in iframes
-      const textarea = document.createElement("textarea");
-      textarea.value = httpx.raw_header;
-      document.body.appendChild(textarea);
-      textarea.select();
-      try {
-        document.execCommand("copy");
-        toast.success("HTTP Response copied to clipboard!");
-      } catch (err) {
-        console.error("Failed to copy text: ", err);
-        toast.error("Failed to copy HTTP Response.");
-      } finally {
-        document.body.removeChild(textarea);
-      }
-    }
+    await navigator.clipboard.writeText(httpx?.raw_header);
+    toast.success("HTTP response copied to clipboard");
   };
 
   return (
@@ -329,4 +314,3 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
     </Sheet>
   );
 }
-
