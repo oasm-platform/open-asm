@@ -18,6 +18,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
   {
     accessorKey: "value",
     header: "Value",
+    enableHiding: false,
     cell: ({ row }) => {
       const data = row.original;
       const ports = data.metadata?.ports;
