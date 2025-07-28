@@ -9,6 +9,8 @@ import { createBrowserRouter } from "react-router-dom";
 import GuestRoute from "./GuestRoute";
 import NotFound from "./NotFound";
 import ProtectedRoute from "./ProtectedRoute";
+import Register from "@/pages/register/register";
+import RegisterRoute from "./RegisterRoute";
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +23,14 @@ export const router = createBrowserRouter([
           <GuestRoute>
             <Login />
           </GuestRoute>
+        ),
+      },
+      {
+        path: "init-admin",
+        element: (
+          <RegisterRoute>
+            <Register />
+          </RegisterRoute>
         ),
       },
       {
