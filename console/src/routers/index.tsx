@@ -1,7 +1,8 @@
-import Layout from "@/components/common/layout/Layout";
+import Layout from "@/components/common/layout/layout";
 import Assets from "@/pages/assets/assets";
 import Dashboard from "@/pages/dashboard/dashboard";
 import Login from "@/pages/login/login";
+import Register from "@/pages/register/register";
 import DetailTarget from "@/pages/targets/detail-target";
 import Targets from "@/pages/targets/targets";
 import Workers from "@/pages/workers/workers";
@@ -9,7 +10,6 @@ import { createBrowserRouter } from "react-router-dom";
 import GuestRoute from "./GuestRoute";
 import NotFound from "./NotFound";
 import ProtectedRoute from "./ProtectedRoute";
-import Register from "@/pages/register/register";
 import RegisterRoute from "./RegisterRoute";
 
 export const router = createBrowserRouter([

@@ -14,7 +14,7 @@ import {
     SidebarMenuItem,
     SidebarRail
 } from "@/components/ui/sidebar";
-import { CloudCheck, LayoutDashboard, Radar, SquareTerminal, Target } from "lucide-react";
+import { CloudCheck, LayoutDashboard, Radar, ShoppingCart, SquareTerminal, Target } from "lucide-react";
 import { NavUser } from "../../ui/nav-user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -51,6 +51,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     title: "Workers",
                     icon: <SquareTerminal />,
                     url: "/workers",
+                },
+                {
+                    title: "Marketplaces",
+                    icon: <ShoppingCart />,
+                    url: "/marketplaces",
                 },
 
 

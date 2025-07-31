@@ -17,13 +17,13 @@ tasks:
     cmds:
       - task api:dev &
       - task console:dev
-      - |
-        echo "Waiting for API to be ready..."
-        until curl -s http://localhost:$PORT > /dev/null; do
-          sleep 1
-        done
-        echo "API is up! Starting worker..."
-      - task worker:dev
+      # - |
+      #   echo "Waiting for API to be ready..."
+      #   until curl -s http://localhost:$PORT > /dev/null; do
+      #     sleep 1
+      #   done
+      #   echo "API is up! Starting worker..."
+      # - task worker:dev
 
   build:
     deps:

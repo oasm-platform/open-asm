@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
@@ -52,10 +53,15 @@ export class JobsRegistryService {
    * @param workerName the name of the worker to run on the asset
    * @returns the newly created job
    */
-  public createJob(asset: Asset, workerName: WorkerName): Promise<Job> {
+  public createJob(
+    asset: Asset,
+    workerName: WorkerName,
+    group?: string,
+  ): Promise<Job> {
     return this.repo.save({
       asset,
       workerName,
+      group: group || randomUUID(),
     });
   }
 
@@ -279,6 +285,7 @@ export class JobsRegistryService {
   public async startNextJob(
     assets: Asset[],
     currentWorkerName: WorkerName,
+    group?: string,
   ): Promise<InsertResult | null> {
     const currentJobIndex =
       Object.values(WorkerName).indexOf(currentWorkerName);
@@ -290,6 +297,10 @@ export class JobsRegistryService {
       return null;
     }
 
+    if (!group) {
+      group = randomUUID();
+    }
+
     return this.repo
       .createQueryBuilder()
       .insert()
@@ -297,6 +308,7 @@ export class JobsRegistryService {
         assets.map((i) => ({
           asset: i,
           workerName: nextWorkerHandleJob,
+          group,
         })),
       )
       .orIgnore()

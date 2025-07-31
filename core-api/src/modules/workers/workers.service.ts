@@ -101,6 +101,7 @@ export class WorkersService {
         await this.jobsRegistryService.startNextJob(
           assetsWithId,
           job.workerName,
+          job.group,
         );
       },
     },
@@ -120,6 +121,7 @@ export class WorkersService {
         await this.jobsRegistryService.startNextJob(
           [job.asset],
           job.workerName,
+          job.group,
         );
       },
     },
@@ -139,6 +141,7 @@ export class WorkersService {
           await this.jobsRegistryService.startNextJob(
             [job.asset],
             job.workerName,
+            job.group,
           );
         }
       },
