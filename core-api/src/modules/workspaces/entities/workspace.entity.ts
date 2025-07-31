@@ -3,6 +3,7 @@ import { IsString } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { User } from 'src/modules/auth/entities/user.entity';
 import { WorkspaceTarget } from 'src/modules/targets/entities/workspace-target.entity';
+import { WorkspaceTool } from 'src/modules/tools/entities/workspace_tools.entity';
 import {
   Column,
   DeleteDateColumn,
@@ -44,6 +45,12 @@ export class Workspace extends BaseEntity {
     (workspaceTarget) => workspaceTarget.workspace,
   )
   workspaceTargets: WorkspaceTarget[];
+
+  @OneToMany(
+    () => WorkspaceTool,
+    (workspaceTool) => workspaceTool.workspace,
+  )
+  workspaceTools: WorkspaceTool[];
 
   @DeleteDateColumn()
   deletedAt?: Date;
