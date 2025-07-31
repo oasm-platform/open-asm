@@ -46,10 +46,7 @@ export class Workspace extends BaseEntity {
   )
   workspaceTargets: WorkspaceTarget[];
 
-  @OneToMany(
-    () => WorkspaceTool,
-    (workspaceTool) => workspaceTool.workspace,
-  )
+  @OneToMany(() => WorkspaceTool, (workspaceTool) => workspaceTool.workspace)
   workspaceTools: WorkspaceTool[];
 
   @DeleteDateColumn()

@@ -19,7 +19,6 @@ import {
   CreateWorkspaceDto,
   GetApiKeyResponseDto,
   UpdateWorkspaceDto,
-  WorkspaceStatisticsResponseDto,
 } from './dto/workspaces.dto';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
@@ -101,27 +100,6 @@ export class WorkspacesService {
     });
 
     return getManyResponse(query, data, total);
-  }
-
-  /**
-   * Retrieves workspace statistics.
-   * @param id - The ID of the workspace for which to retrieve statistics.
-   * @param userContext - The user's context data, which includes the user's ID.
-   * @returns An object containing workspace statistics, including
-   * the number of targets, assets, technologies, CNAME records, and status codes.
-   */
-  public async getWorkspaceStatistics(
-    id: string,
-    userContext: UserContextPayload,
-  ): Promise<WorkspaceStatisticsResponseDto | null> {
-    const workspace = await this.getWorkspaceById(id, userContext);
-    if (!workspace) {
-      throw new NotFoundException('Workspace not found');
-    }
-
-    return await this.workspaceStatisticsRepository.getStatisticsByWorkspaceId(
-      id,
-    );
   }
 
   /**

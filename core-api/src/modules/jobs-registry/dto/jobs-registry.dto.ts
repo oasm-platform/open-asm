@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsObject, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, WorkerName } from 'src/common/enums/enum';
+import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 
 export class GetNextJobResponseDto {
   @ApiProperty()
@@ -9,7 +9,7 @@ export class GetNextJobResponseDto {
   @ApiProperty()
   value: string;
   @ApiProperty()
-  workerName: WorkerName;
+  category: ToolCategory;
   @ApiProperty({
     description: 'Command to run',
   })
@@ -45,9 +45,9 @@ export class GetManyJobsQueryParams extends GetManyBaseQueryParams {
 
   @ApiProperty({
     description: 'Filter jobs by worker name',
-    enum: [...Object.values(WorkerName), 'all'],
+    enum: [...Object.values(ToolCategory), 'all'],
     default: 'all',
   })
-  @IsIn([...Object.values(WorkerName), 'all'])
-  workerName: WorkerName | 'all';
+  @IsIn([...Object.values(ToolCategory), 'all'])
+  workerName: ToolCategory | 'all';
 }

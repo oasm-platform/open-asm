@@ -219,7 +219,7 @@ export enum JobsRegistryControllerGetJobsByAssetIdParamsJobStatusEnum {
  */
 export enum JobsRegistryControllerGetJobsByAssetIdParamsWorkerNameEnum {
   Subdomains = "subdomains",
-  Httpx = "httpx",
+  Httpx = "http_scraper",
   Ports = "ports",
   All = "all",
 }
@@ -243,7 +243,7 @@ export enum JobsRegistryControllerGetJobsByTargetIdParamsJobStatusEnum {
  */
 export enum JobsRegistryControllerGetJobsByTargetIdParamsWorkerNameEnum {
   Subdomains = "subdomains",
-  Httpx = "httpx",
+  Httpx = "http_scraperscraper",
   Ports = "ports",
   All = "all",
 }
@@ -282,7 +282,7 @@ export type RequestParams = Omit<
 export interface ApiConfig<SecurityDataType = unknown>
   extends Omit<AxiosRequestConfig, "data" | "cancelToken"> {
   securityWorker?: (
-    securityData: SecurityDataType | null,
+    securityData: SecurityDataType | null
   ) => Promise<AxiosRequestConfig | void> | AxiosRequestConfig | void;
   secure?: boolean;
   format?: ResponseType;
@@ -324,7 +324,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected mergeRequestParams(
     params1: AxiosRequestConfig,
-    params2?: AxiosRequestConfig,
+    params2?: AxiosRequestConfig
   ): AxiosRequestConfig {
     const method = params1.method || (params2 && params2.method);
 
@@ -365,7 +365,7 @@ export class HttpClient<SecurityDataType = unknown> {
         const isFileType = formItem instanceof Blob || formItem instanceof File;
         formData.append(
           key,
-          isFileType ? formItem : this.stringifyFormItem(formItem),
+          isFileType ? formItem : this.stringifyFormItem(formItem)
         );
       }
 
@@ -445,7 +445,7 @@ export class Api<
    */
   targetsControllerCreateTarget = (
     data: CreateTargetDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets`,
@@ -492,7 +492,7 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets/workspace/${id}`,
@@ -513,7 +513,7 @@ export class Api<
   targetsControllerDeleteTargetFromWorkspace = (
     id: string,
     workspaceId: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets/${id}/workspace/${workspaceId}`,
@@ -548,7 +548,7 @@ export class Api<
    */
   workspacesControllerCreateWorkspace = (
     data: CreateWorkspaceDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces`,
@@ -578,7 +578,7 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces`,
@@ -598,7 +598,7 @@ export class Api<
    */
   workspacesControllerGetWorkspaceStatistics = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}/statistics`,
@@ -617,7 +617,7 @@ export class Api<
    */
   workspacesControllerGetWorkspaceById = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}`,
@@ -637,7 +637,7 @@ export class Api<
   workspacesControllerUpdateWorkspace = (
     id: string,
     data: UpdateWorkspaceDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}`,
@@ -658,7 +658,7 @@ export class Api<
    */
   workspacesControllerDeleteWorkspace = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}`,
@@ -691,7 +691,7 @@ export class Api<
    */
   rootControllerCreateFirstAdmin = (
     data: CreateFirstAdminDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/init-admin`,
@@ -721,7 +721,7 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry`,
@@ -741,7 +741,7 @@ export class Api<
    */
   jobsRegistryControllerGetNextJob = (
     workerId: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/${workerId}/next`,
@@ -780,7 +780,7 @@ export class Api<
        */
       workerName: JobsRegistryControllerGetJobsByAssetIdParamsWorkerNameEnum;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/asset/${assetId}`,
@@ -820,7 +820,7 @@ export class Api<
        */
       workerName: JobsRegistryControllerGetJobsByTargetIdParamsWorkerNameEnum;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/target/${targetId}`,
@@ -841,7 +841,7 @@ export class Api<
   jobsRegistryControllerUpdateResult = (
     workerId: string,
     data: UpdateResultDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/${workerId}/result`,
@@ -872,7 +872,7 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/target/${id}`,
@@ -935,7 +935,7 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workers`,

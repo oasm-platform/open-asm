@@ -35,17 +35,17 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
   }
 
   const { value, metadata, dnsRecords } = currentRow;
-  const httpx = metadata?.httpx;
+  const http_scraper = metadata?.http_scraper;
   const ports = metadata?.ports;
   const ipAddresses = dnsRecords?.["A"];
-  const tls = httpx?.tls;
+  const tls = http_scraper?.tls;
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after
     ? Math.round(
-        (new Date(tls.not_after).getTime() - new Date().getTime()) /
-          (1000 * 60 * 60 * 24),
-      )
+      (new Date(tls.not_after).getTime() - new Date().getTime()) /
+      (1000 * 60 * 60 * 24),
+    )
     : undefined;
 
   // Calculate certificate age start date and display
@@ -57,7 +57,7 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
     : "N/A";
 
   const handleCopyHeader = async () => {
-    await navigator.clipboard.writeText(httpx?.raw_header);
+    await navigator.clipboard.writeText(http_scraper?.raw_header);
     toast.success("HTTP response copied to clipboard");
   };
 
@@ -80,7 +80,7 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
                 <div>
                   <span className="block mb-1">Domain</span>
-                  <AssetValue httpx={httpx} value={value} />
+                  <AssetValue http_scraper={http_scraper} value={value} />
                 </div>
 
                 {/* IP Addresses */}
@@ -96,10 +96,10 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                   </div>
                 )}
 
-                {httpx?.status_code && (
+                {http_scraper?.status_code && (
                   <div>
                     <span className="block mb-1">HTTP Status</span>
-                    <HTTPXStatusCode httpx={httpx} />
+                    <HTTPXStatusCode http_scraper={http_scraper} />
                   </div>
                 )}
 
@@ -127,18 +127,18 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                   </div>
                 )}
 
-                {httpx?.title && (
+                {http_scraper?.title && (
                   <div className="md:col-span-2">
                     <span className="block mb-1">Page Title</span>
-                    <p className="  break-words">{httpx.title}</p>
+                    <p className="  break-words">{http_scraper.title}</p>
                   </div>
                 )}
 
-                {httpx?.error && (
+                {http_scraper?.error && (
                   <div className="md:col-span-2">
                     <span className="block mb-1">Error</span>
                     <p className="text-red-600 dark:text-red-400 ">
-                      {httpx.error}
+                      {http_scraper.error}
                     </p>
                   </div>
                 )}
@@ -268,7 +268,7 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
               </>
             )}
 
-            {!!httpx?.tech && httpx.tech.length > 0 && (
+            {!!http_scraper?.tech && http_scraper.tech.length > 0 && (
               <>
                 <Separator className="my-5" />
                 <section>
@@ -277,13 +277,13 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                     Technologies
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    <BadgeList list={httpx.tech} />
+                    <BadgeList list={http_scraper.tech} />
                   </div>
                 </section>
               </>
             )}
 
-            {!!httpx?.raw_header && (
+            {!!http_scraper?.raw_header && (
               <>
                 <Separator className="my-5" />
                 <section className="pb-4">
@@ -293,8 +293,8 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                   </h3>
                   <div className="relative font-mono rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-stone-800 **w-full**">
                     <pre className="whitespace-pre-wrap leading-relaxed **overflow-x-auto**">
-                      {httpx.raw_header}
-                      {/* {httpx?.body} */}
+                      {http_scraper.raw_header}
+                      {/* {http_scraper?.body} */}
                     </pre>
                     <Button
                       onClick={handleCopyHeader}

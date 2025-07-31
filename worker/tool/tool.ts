@@ -5,7 +5,7 @@ import runCommand from "./runCommand";
 interface Job {
   jobId: string;
   value: string;
-  workerName: string;
+  category: string;
   command: string;
 }
 

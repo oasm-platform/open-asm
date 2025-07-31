@@ -15,8 +15,8 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, WorkerName } from 'src/common/enums/enum';
-import { ResultHandler, Worker } from 'src/common/interfaces/app.interface';
+import { JobStatus, ToolCategory } from 'src/common/enums/enum';
+import { ITool, ResultHandler } from 'src/common/interfaces/app.interface';
 import { generateToken } from 'src/utils/genToken';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, LessThan, Repository } from 'typeorm';
@@ -44,9 +44,9 @@ export class WorkersService {
     private configService: ConfigService,
   ) {}
 
-  public workers: Worker[] = [
+  public workers: any[] = [
     {
-      id: WorkerName.SUBDOMAINS,
+      category: ToolCategory.SUBDOMAINS,
       description: 'Fast passive subdomain enumeration tool.',
       command:
         '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
@@ -100,13 +100,13 @@ export class WorkersService {
         });
         await this.jobsRegistryService.startNextJob(
           assetsWithId,
-          job.workerName,
+          job.category,
           job.group,
         );
       },
     },
     {
-      id: WorkerName.PORTS,
+      category: ToolCategory.PORTS_SCANNER,
       description: 'Scan open ports and detect running services on each port.',
       command: 'naabu -host {{value}} -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
@@ -120,17 +120,17 @@ export class WorkersService {
 
         await this.jobsRegistryService.startNextJob(
           [job.asset],
-          job.workerName,
+          job.category,
           job.group,
         );
       },
     },
     {
-      id: WorkerName.HTTPX,
+      category: ToolCategory.HTTP_SCRAPER,
       description:
         'HTTPX is a fast and multi-purpose HTTP toolkit that allows you to run multiple HTTP requests against a target.',
       command:
-        'httpx -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
+        'http_scraper -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         if (result) {
           const parsed = JSON.parse(result);
@@ -140,7 +140,7 @@ export class WorkersService {
           this.updateResultToDatabase(dataSource, job, parsed);
           await this.jobsRegistryService.startNextJob(
             [job.asset],
-            job.workerName,
+            job.category,
             job.group,
           );
         }
@@ -177,8 +177,8 @@ export class WorkersService {
    * @param workerName the name of the worker to find
    * @returns the worker step, or undefined if not found
    */
-  public getWorkerStepByName(workerName: WorkerName): Worker | undefined {
-    return this.workers.find((step) => step.id === workerName);
+  public getWorkerStepByName(category: ToolCategory): ITool | undefined {
+    return this.workers.find((step) => step.category === category);
   }
 
   /**

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from 'src/common/entities/base.entity';
-import { JobStatus, WorkerName } from 'src/common/enums/enum';
+import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
 
@@ -12,8 +12,8 @@ export class Job extends BaseEntity {
   asset: Asset;
 
   @ApiProperty()
-  @Column({ type: 'enum', enum: WorkerName })
-  workerName: WorkerName;
+  @Column({ type: 'enum', enum: ToolCategory })
+  category: ToolCategory;
 
   @ApiProperty()
   @Column({ type: 'enum', enum: JobStatus, default: JobStatus.PENDING })

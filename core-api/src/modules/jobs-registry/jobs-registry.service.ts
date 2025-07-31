@@ -5,7 +5,7 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, WorkerName } from 'src/common/enums/enum';
+import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, InsertResult, Repository } from 'typeorm';
@@ -50,17 +50,17 @@ export class JobsRegistryService {
   /**
    * Creates a new job associated with the given asset and worker name.
    * @param asset the asset the job is associated with
-   * @param workerName the name of the worker to run on the asset
+   * @param category the name of the worker to run on the asset
    * @returns the newly created job
    */
   public createJob(
     asset: Asset,
-    workerName: WorkerName,
+    category: ToolCategory,
     group?: string,
   ): Promise<Job> {
     return this.repo.save({
       asset,
-      workerName,
+      category,
       group: group || randomUUID(),
     });
   }
@@ -98,21 +98,24 @@ export class JobsRegistryService {
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
-
-      await queryRunner.commitTransaction();
-
-      const workerStep = this.workerService.getWorkerStepByName(job.workerName);
+      console.log(job.category);
+      const workerStep = this.workerService.getWorkerStepByName(job.category);
+      console.log(workerStep);
       if (!workerStep) {
+        await queryRunner.rollbackTransaction();
         return null;
       }
+
+      await queryRunner.commitTransaction();
 
       return {
         jobId: job.id,
         value: job.asset.value,
-        workerName: job.workerName,
+        category: job.category,
         command: workerStep.command,
       };
     } catch (err) {
+      console.log(err);
       await queryRunner.rollbackTransaction();
       throw err;
     } finally {
@@ -212,10 +215,10 @@ export class JobsRegistryService {
       throw new NotFoundException('Job not found');
     }
 
-    const step = this.workerService.getWorkerStepByName(job.workerName);
+    const step = this.workerService.getWorkerStepByName(job.category);
 
     if (!step) {
-      throw new Error(`Worker step not found for worker: ${job.workerName}`);
+      throw new Error(`Worker step not found for worker: ${job.category}`);
     }
 
     const hasError = data?.error;
@@ -284,14 +287,14 @@ export class JobsRegistryService {
    */
   public async startNextJob(
     assets: Asset[],
-    currentWorkerName: WorkerName,
+    currentWorkerName: ToolCategory,
     group?: string,
   ): Promise<InsertResult | null> {
     const currentJobIndex =
-      Object.values(WorkerName).indexOf(currentWorkerName);
+      Object.values(ToolCategory).indexOf(currentWorkerName);
 
     const nextWorkerHandleJob =
-      Object.values(WorkerName)[currentJobIndex + 1] || null;
+      Object.values(ToolCategory)[currentJobIndex + 1] || null;
 
     if (!nextWorkerHandleJob) {
       return null;
@@ -307,7 +310,7 @@ export class JobsRegistryService {
       .values(
         assets.map((i) => ({
           asset: i,
-          workerName: nextWorkerHandleJob,
+          category: nextWorkerHandleJob,
           group,
         })),
       )

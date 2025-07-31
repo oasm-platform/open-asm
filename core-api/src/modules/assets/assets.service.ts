@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
-import { WorkerName } from 'src/common/enums/enum';
+import { ToolCategory } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -58,25 +58,25 @@ export class AssetsService {
   //     queryBuilder.andWhere('target.id IN (:...targetId)', { targetId });
   //   }
 
-  //   // Create list of workerNames to filter
-  //   const workerNames: WorkerName[] = [];
-  //   if (port?.length) workerNames.push(WorkerName.PORTS);
-  //   if (tech?.length || statusCode?.length) workerNames.push(WorkerName.HTTPX);
+  //   // Create list of categorys to filter
+  //   const categorys: category[] = [];
+  //   if (port?.length) categorys.push(category.PORTS);
+  //   if (tech?.length || statusCode?.length) categorys.push(category.HTTPX);
 
-  //   if (workerNames.length > 0) {
-  //     queryBuilder.andWhere('job.workerName IN (:...workerNames)', {
-  //       workerNames,
+  //   if (categorys.length > 0) {
+  //     queryBuilder.andWhere('job.category IN (:...categorys)', {
+  //       categorys,
   //     });
   //   }
   //   // Apply filter for port
   //   if (port?.length) {
   //     queryBuilder.andWhere(
   //       `
-  //       (job.workerName != :portWorkerName OR
+  //       (job.category != :portcategory OR
   //        EXISTS (SELECT 1 FROM jsonb_array_elements_text(job."rawResult"::jsonb) as p WHERE p = ANY(:port)))
   //     `,
   //       {
-  //         portWorkerName: WorkerName.PORTS,
+  //         portcategory: category.PORTS,
   //         port: port.map(String),
   //       },
   //     );
@@ -86,11 +86,11 @@ export class AssetsService {
   //   if (tech?.length) {
   //     queryBuilder.andWhere(
   //       `
-  //       (job.workerName != :techWorkerName OR
+  //       (job.category != :techcategory OR
   //        job."rawResult"::jsonb->'tech' ?| array[:...tech]::text[])
   //     `,
   //       {
-  //         techWorkerName: WorkerName.HTTPX,
+  //         techcategory: category.HTTPX,
   //         tech: tech.map(String),
   //       },
   //     );
@@ -100,11 +100,11 @@ export class AssetsService {
   //   if (statusCode?.length) {
   //     queryBuilder.andWhere(
   //       `
-  //       (job.workerName != :statusWorkerName OR
+  //       (job.category != :statuscategory OR
   //        job."rawResult"::jsonb->>'status_code' IN (:...statusCode))
   //     `,
   //       {
-  //         statusWorkerName: WorkerName.HTTPX,
+  //         statuscategory: category.HTTPX,
   //         statusCode: statusCode.map(Number),
   //       },
   //     );
@@ -158,14 +158,14 @@ export class AssetsService {
     }
 
     const sql = ` WITH latest_jobs AS (
-        SELECT DISTINCT ON ("assetId", "workerName")
+        SELECT DISTINCT ON ("assetId", "category")
           "assetId",
-          "workerName",
+          "category",
           "rawResult",
           "createdAt"
         FROM jobs
         WHERE "rawResult" IS NOT NULL
-        ORDER BY "assetId", "workerName", "createdAt" DESC
+        ORDER BY "assetId", "category", "createdAt" DESC
       )
       SELECT
         a.id,
@@ -176,7 +176,7 @@ export class AssetsService {
         a."updatedAt",
         a."dnsRecords",
         a."isErrorPage",
-        COALESCE(json_object_agg(j."workerName", j."rawResult") FILTER (WHERE j."workerName" IS NOT NULL), '{}') AS "metadata"
+        COALESCE(json_object_agg(j."category", j."rawResult") FILTER (WHERE j."category" IS NOT NULL), '{}') AS "metadata"
       FROM assets a
       LEFT JOIN latest_jobs j ON j."assetId" = a.id
       LEFT JOIN targets t ON t.id = a."targetId"
@@ -237,7 +237,7 @@ export class AssetsService {
       value,
       isPrimary: true,
     });
-    this.jobRegistryService.createJob(asset, WorkerName.SUBDOMAINS);
+    this.jobRegistryService.createJob(asset, ToolCategory.SUBDOMAINS);
     return asset;
   }
 
@@ -267,7 +267,7 @@ export class AssetsService {
       throw new NotFoundException('Target not found');
     }
     const reScanCount = target.reScanCount + 1;
-    this.jobRegistryService.createJob(asset, WorkerName.SUBDOMAINS);
+    this.jobRegistryService.createJob(asset, ToolCategory.SUBDOMAINS);
     this.targetRepo.update(targetId, {
       reScanCount,
       lastDiscoveredAt: new Date(),

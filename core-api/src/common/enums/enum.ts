@@ -3,10 +3,10 @@ export enum Role {
   USER = 'user',
 }
 
-export enum WorkerName {
+export enum ToolCategory {
   SUBDOMAINS = 'subdomains',
-  HTTPX = 'httpx',
-  PORTS = 'ports',
+  HTTP_SCRAPER = 'http_scraper',
+  PORTS_SCANNER = 'ports_scanner',
 }
 
 export enum JobStatus {

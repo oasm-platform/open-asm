@@ -28,7 +28,7 @@ Web user interface built with React, TypeScript, and Vite:
 Workers run scanning and information gathering tasks:
 
 - Built on Bun runtime for high performance
-- Support for different worker types (subdomains, httpx, ports)
+- Support for different worker types (subdomains, http_scraper, ports)
 - Process jobs from queue and report results back to Core API
 
 ## Installation and Development

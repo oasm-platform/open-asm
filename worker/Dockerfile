@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y libpcap-dev
 # Cài các công cụ Go phổ biến
 RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
     go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
-    go install github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    go install github.com/projectdiscovery/http_scraper/cmd/http_scraper@latest && \
     go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
 
 FROM oven/bun:1.2 AS base
@@ -41,7 +41,7 @@ COPY --from=builder /app/package.json ./package.json
 
 COPY --from=tools /go/bin/subfinder /usr/local/bin/
 COPY --from=tools /go/bin/dnsx /usr/local/bin/
-COPY --from=tools /go/bin/httpx /usr/local/bin/
+COPY --from=tools /go/bin/http_scraper /usr/local/bin/
 COPY --from=tools /go/bin/naabu /usr/local/bin/
 ENV PATH="/usr/local/bin:$PATH"
 

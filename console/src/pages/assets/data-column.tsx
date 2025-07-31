@@ -3,16 +3,16 @@ import { cn } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import {
-  Network,
+  BriefcaseBusiness,
   EthernetPort,
   Globe,
-  BriefcaseBusiness,
-  Lock,
   Layers,
+  Lock,
+  Network,
 } from "lucide-react";
 import AssetValue from "./components/asset-value";
-import HTTPXStatusCode from "./components/status-code";
 import BadgeList from "./components/badge-list";
+import HTTPXStatusCode from "./components/status-code";
 
 export const assetColumns: ColumnDef<any, any>[] = [
   {
@@ -22,16 +22,16 @@ export const assetColumns: ColumnDef<any, any>[] = [
     cell: ({ row }) => {
       const data = row.original;
       const ports = data.metadata?.ports;
-      const httpx = data.metadata?.httpx;
+      const http_scraper = data.metadata?.http_scraper;
       const ipAddresses = data.dnsRecords?.["A"];
       return (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2">
-            <AssetValue httpx={httpx} value={data.value} />
-            <HTTPXStatusCode httpx={httpx} />
+            <AssetValue http_scraper={http_scraper} value={data.value} />
+            <HTTPXStatusCode http_scraper={http_scraper} />
           </div>
-          {httpx?.title && <p>{httpx?.title}</p>}
-          {httpx?.error && <p className="text-red-500">{httpx?.error}</p>}
+          {http_scraper?.title && <p>{http_scraper?.title}</p>}
+          {http_scraper?.error && <p className="text-red-500">{http_scraper?.error}</p>}
           <BadgeList list={ipAddresses} Icon={Network} />
           <BadgeList
             list={ports?.sort((a: number, b: number) => a - b)}
@@ -48,7 +48,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
     maxSize: 30,
     cell: ({ row }) => {
       const data = row.original;
-      const technologies: string[] = data.metadata?.httpx?.tech ?? [];
+      const technologies: string[] = data.metadata?.http_scraper?.tech ?? [];
       const maxTechDisplay = 10;
       const displayedTechs = technologies.slice(0, maxTechDisplay);
       const remainingCount = technologies.length - maxTechDisplay;
@@ -70,12 +70,12 @@ export const assetColumns: ColumnDef<any, any>[] = [
     maxSize: 30,
     cell: ({ row }) => {
       const data = row.original;
-      const tls = data.metadata?.httpx?.tls;
+      const tls = data.metadata?.http_scraper?.tls;
       if (!tls) return null;
       const daysLeft = Math.round(
         Math.abs(
           (new Date(tls.not_after).getTime() - new Date().getTime()) /
-            (1000 * 60 * 60 * 24),
+          (1000 * 60 * 60 * 24),
         ),
       );
       const color = daysLeft < 30 ? "red" : daysLeft < 60 ? "yellow" : "green";
