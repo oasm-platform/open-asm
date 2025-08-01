@@ -13,7 +13,7 @@ export class GetNextJobResponseDto {
   @ApiProperty({
     description: 'Command to run',
   })
-  command: string;
+  command?: string;
 }
 
 export class WorkerIdParams {

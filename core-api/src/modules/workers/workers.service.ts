@@ -16,13 +16,14 @@ import {
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
-import { ITool, ResultHandler } from 'src/common/interfaces/app.interface';
+import { ResultHandler } from 'src/common/interfaces/app.interface';
 import { generateToken } from 'src/utils/genToken';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, LessThan, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { Tool } from '../tools/entities/tools.entity';
 import { WorkerAliveDto, WorkerJoinDto } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 
@@ -35,8 +36,6 @@ export class WorkersService {
 
     @InjectRepository(Asset)
     public readonly assetRepo: Repository<Asset>,
-
-    private readonly dataSource: DataSource,
 
     @Inject(forwardRef(() => JobsRegistryService))
     private jobsRegistryService: JobsRegistryService,
@@ -130,7 +129,7 @@ export class WorkersService {
       description:
         'HTTPX is a fast and multi-purpose HTTP toolkit that allows you to run multiple HTTP requests against a target.',
       command:
-        'http_scraper -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
+        'httpx - -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         if (result) {
           const parsed = JSON.parse(result);
@@ -177,7 +176,7 @@ export class WorkersService {
    * @param workerName the name of the worker to find
    * @returns the worker step, or undefined if not found
    */
-  public getWorkerStepByName(category: ToolCategory): ITool | undefined {
+  public getWorkerStepByName(category: ToolCategory): Tool | undefined {
     return this.workers.find((step) => step.category === category);
   }
 
@@ -341,9 +340,20 @@ export class WorkersService {
     return getManyResponse(query, workers, total);
   }
 
+  /**
+   * Registers a worker in the database by inserting a new record
+   * with a unique worker index for the given worker name ID.
+   *
+   * This function runs within a transaction to ensure that the worker
+   * index is generated atomically and without conflicts even with
+   * concurrent requests. It attempts to find the smallest available
+   * index for the worker name and assigns it to the new worker.
+   *
+   * @param dto - The data transfer object containing the token of the worker.
+   * @returns A promise that resolves to the assigned worker index.
+   */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance | null> {
     const { token } = dto;
-
     // Retrieve the admin token from configuration
     const adminToken = this.configService.get('OASM_ADMIN_TOKEN');
 

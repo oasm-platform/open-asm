@@ -98,9 +98,7 @@ export class JobsRegistryService {
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
-      console.log(job.category);
       const workerStep = this.workerService.getWorkerStepByName(job.category);
-      console.log(workerStep);
       if (!workerStep) {
         await queryRunner.rollbackTransaction();
         return null;

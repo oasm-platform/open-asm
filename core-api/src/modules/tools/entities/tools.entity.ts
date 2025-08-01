@@ -20,5 +20,8 @@ export class Tool extends BaseEntity {
   @Column({ type: 'enum', enum: ToolCategory })
   category: ToolCategory;
 
+  @Column({ nullable: true })
+  version?: string;
+
   resultHandler: ({ dataSource, result, job }: ResultHandler) => Promise<void>;
 }
