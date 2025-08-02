@@ -3,7 +3,6 @@ import {
   Inject,
   Injectable,
   Logger,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -15,15 +14,13 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory } from 'src/common/enums/enum';
-import { ResultHandler } from 'src/common/interfaces/app.interface';
+import { JobStatus } from 'src/common/enums/enum';
 import { generateToken } from 'src/utils/genToken';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, LessThan, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
-import { Tool } from '../tools/entities/tools.entity';
 import { WorkerAliveDto, WorkerJoinDto } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 
@@ -43,121 +40,13 @@ export class WorkersService {
     private configService: ConfigService,
   ) {}
 
-  public workers: any[] = [
-    {
-      category: ToolCategory.SUBDOMAINS,
-      description: 'Fast passive subdomain enumeration tool.',
-      command:
-        '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
-      resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
-        const parsed = {};
-
-        result.split('\n').forEach((line) => {
-          const cleaned = line.replace(/\x1B\[[0-9;]*m/g, '').trim();
-
-          const match = cleaned.match(/^([^\[]+)\s+\[([A-Z]+)\]\s+\[(.+)\]$/);
-          if (!match) return;
-
-          const [, domain, type, value] = match;
-
-          if (!parsed[domain]) parsed[domain] = {};
-          if (!parsed[domain][type]) parsed[domain][type] = [];
-
-          parsed[domain][type].push(value);
-        });
-
-        const primaryAsset = parsed[job.asset.value];
-
-        delete parsed[job.asset.value];
-        this.updateResultToDatabase(dataSource, job, {
-          total: Object.keys(parsed).length,
-        });
-        const assets: Asset[] = Object.keys(parsed).map((i) => ({
-          id: randomUUID(),
-          value: i,
-          target: { id: job.asset.target.id },
-          dnsRecords: parsed[i],
-        })) as Asset[];
-        assets.push(job.asset);
-        // Fill to the asset table
-        await Promise.all([
-          this.assetRepo
-            .createQueryBuilder()
-            .insert()
-            .values(assets)
-            .orIgnore()
-            .execute(),
-
-          this.assetRepo.update(job.asset.id, {
-            dnsRecords: primaryAsset,
-          }),
-        ]);
-        const assetsWithId = await this.assetRepo.find({
-          where: {
-            target: { id: job.asset.target.id },
-          },
-        });
-        await this.jobsRegistryService.startNextJob(
-          assetsWithId,
-          job.category,
-          job.group,
-        );
-      },
-    },
-    {
-      category: ToolCategory.PORTS_SCANNER,
-      description: 'Scan open ports and detect running services on each port.',
-      command: 'naabu -host {{value}} -silent',
-      resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
-        const parsed = result
-          .trim()
-          .split('\n')
-          .filter((i) => i.includes(':'))
-          .map((i) => Number(i.split(':')[1].replace('\r', '')))
-          .sort();
-        this.updateResultToDatabase(dataSource, job, parsed);
-
-        await this.jobsRegistryService.startNextJob(
-          [job.asset],
-          job.category,
-          job.group,
-        );
-      },
-    },
-    {
-      category: ToolCategory.HTTP_SCRAPER,
-      description:
-        'HTTPX is a fast and multi-purpose HTTP toolkit that allows you to run multiple HTTP requests against a target.',
-      command:
-        'httpx - -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
-      resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
-        if (result) {
-          const parsed = JSON.parse(result);
-          this.assetRepo.update(job.asset.id, {
-            isErrorPage: parsed.failed,
-          });
-          this.updateResultToDatabase(dataSource, job, parsed);
-          await this.jobsRegistryService.startNextJob(
-            [job.asset],
-            job.category,
-            job.group,
-          );
-        }
-      },
-    },
-  ];
-
   /**
    * Updates the result of a job with the given worker ID.
    * @param dataSource the DataSource to use for the update
    * @param job the job to update
    * @param result the result of the job
    */
-  private updateResultToDatabase(
-    dataSource: DataSource,
-    job: Job,
-    result: any,
-  ) {
+  public updateResultToDatabase(dataSource: DataSource, job: Job, result: any) {
     // Update parsed result to database
     dataSource
       .createQueryBuilder()
@@ -169,15 +58,6 @@ export class WorkersService {
       })
       .where('id = :id', { id: job.id })
       .execute();
-  }
-
-  /**
-   * Finds a worker by name.
-   * @param workerName the name of the worker to find
-   * @returns the worker step, or undefined if not found
-   */
-  public getWorkerStepByName(category: ToolCategory): Tool | undefined {
-    return this.workers.find((step) => step.category === category);
   }
 
   /**
@@ -277,25 +157,6 @@ export class WorkersService {
       .andWhere('jobs.status = :status', { status: JobStatus.IN_PROGRESS })
       .execute();
     return this.repo.delete(id);
-  }
-
-  /**
-   * Retrieves a worker by its unique identifier.
-   *
-   * @param id - The unique identifier of the worker to retrieve.
-   * @returns A promise that resolves to the worker if found, otherwise null.
-   * @throws NotFoundException if the worker is not found.
-   */
-  public async getWorkerById(id: string): Promise<WorkerInstance | null> {
-    const worker = await this.repo.findOne({
-      where: { id },
-    });
-
-    if (!worker) {
-      throw new NotFoundException(`Worker with ID ${id} not found`);
-    }
-
-    return worker;
   }
 
   /**

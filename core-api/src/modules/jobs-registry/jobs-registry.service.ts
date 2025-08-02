@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import {
@@ -10,6 +15,7 @@ import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, InsertResult, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
+import { ToolsService } from '../tools/tools.service';
 import { WorkersService } from '../workers/workers.service';
 import {
   GetManyJobsQueryParams,
@@ -24,6 +30,9 @@ export class JobsRegistryService {
     @InjectRepository(Job) public readonly repo: Repository<Job>,
     private workerService: WorkersService,
     private dataSource: DataSource,
+
+    @Inject(forwardRef(() => ToolsService))
+    private toolsService: ToolsService,
   ) {}
   public async getManyJobs(
     query: GetManyBaseQueryParams,
@@ -98,7 +107,7 @@ export class JobsRegistryService {
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
-      const workerStep = this.workerService.getWorkerStepByName(job.category);
+      const workerStep = this.toolsService.getWorkerStepByName(job.category);
       if (!workerStep) {
         await queryRunner.rollbackTransaction();
         return null;
@@ -213,7 +222,7 @@ export class JobsRegistryService {
       throw new NotFoundException('Job not found');
     }
 
-    const step = this.workerService.getWorkerStepByName(job.category);
+    const step = this.toolsService.getWorkerStepByName(job.category);
 
     if (!step) {
       throw new Error(`Worker step not found for worker: ${job.category}`);
