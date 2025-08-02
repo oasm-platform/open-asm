@@ -3,6 +3,7 @@ import { BaseEntity } from 'src/common/entities/base.entity';
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
+import { JobHistory } from './job-history.entity';
 
 @Entity('jobs')
 export class Job extends BaseEntity {
@@ -35,4 +36,9 @@ export class Job extends BaseEntity {
   @ApiProperty()
   @Column({ nullable: true })
   completedAt?: Date;
+
+  @ManyToOne(() => JobHistory, (jobHistory) => jobHistory.jobs, {
+    onDelete: 'CASCADE',
+  })
+  jobHistory: JobHistory;
 }
