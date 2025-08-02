@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import {
   flexRender,
   getCoreRowModel,
@@ -11,7 +12,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import * as React from "react";
-import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -155,6 +155,7 @@ export function DataTable<TData, TValue>({
     return mergedPages;
   };
 
+  const showSkeleton = isLoading && data.length === 0;
   return (
     <div className="w-full space-y-4">
       {/* Filter and column visibility controls */}
@@ -229,7 +230,17 @@ export function DataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.length ? (
+            {showSkeleton ? (
+              [...Array(5)].map((_, rowIndex) => (
+                <TableRow key={`skeleton-${rowIndex}`}>
+                  {[...Array(table.getAllLeafColumns().length)].map((_, colIndex) => (
+                    <TableCell key={`skeleton-cell-${colIndex}`}>
+                      <div className="h-4 w-full bg-muted rounded animate-pulse" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -242,25 +253,21 @@ export function DataTable<TData, TValue>({
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
+                <TableCell colSpan={columns.length} className="h-24 text-center">
                   {emptyMessage}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
+
+
         </Table>
       </div>
 
