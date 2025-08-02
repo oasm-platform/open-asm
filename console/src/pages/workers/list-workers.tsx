@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { ConnectWorker } from "@/components/ui/connect-worker"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkersControllerGetWorkers } from "@/services/apis/gen/queries"
 import dayjs from "dayjs"
@@ -46,11 +47,12 @@ const ListWorkers = () => {
     // Empty state
     if (!data?.data?.length) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                     <Loader2Icon className="h-6 w-6 text-muted-foreground animate-spin" />
                 </div>
                 <h3 className="mt-4 text-lg font-medium text-muted-foreground">Pending connect workers...</h3>
+                <ConnectWorker />
             </div>
         )
     }

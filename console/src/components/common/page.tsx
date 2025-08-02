@@ -1,6 +1,6 @@
 
 interface PageProps {
-    children: React.ReactNode;
+    children?: React.ReactNode;
     title?: string;
 }
 const Page = ({ children, title }: PageProps) => {

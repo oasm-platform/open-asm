@@ -231,6 +231,35 @@ export type AddToolToWorkspaceDto = {
   toolId: string;
 };
 
+export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ToolCategory = {
+  subdomains: "subdomains",
+  http_scraper: "http_scraper",
+  ports_scanner: "ports_scanner",
+} as const;
+
+export type Tool = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  description: string;
+  category: ToolCategory;
+  logoUrl: string;
+  isInstalled: boolean;
+};
+
+export type GetManyToolDto = {
+  data: Tool[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   page?: number;
   limit?: number;
@@ -4757,3 +4786,310 @@ export const useToolsControllerAddToolToWorkspace = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * Retrieves a list of built-in tools.
+ * @summary Get built-in tools
+ */
+export const toolsControllerGetBuiltInTools = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyToolDto>(
+    { url: `/api/tools/built-in-tools`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getToolsControllerGetBuiltInToolsQueryKey = () => {
+  return [`/api/tools/built-in-tools`] as const;
+};
+
+export const getToolsControllerGetBuiltInToolsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getToolsControllerGetBuiltInToolsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+  > = ({ signal }) => toolsControllerGetBuiltInTools(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetBuiltInToolsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+>;
+export type ToolsControllerGetBuiltInToolsInfiniteQueryError = unknown;
+
+export function useToolsControllerGetBuiltInToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetBuiltInToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetBuiltInToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get built-in tools
+ */
+
+export function useToolsControllerGetBuiltInToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getToolsControllerGetBuiltInToolsInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getToolsControllerGetBuiltInToolsQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getToolsControllerGetBuiltInToolsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+  > = ({ signal }) => toolsControllerGetBuiltInTools(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetBuiltInToolsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+>;
+export type ToolsControllerGetBuiltInToolsQueryError = unknown;
+
+export function useToolsControllerGetBuiltInTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetBuiltInTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetBuiltInTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get built-in tools
+ */
+
+export function useToolsControllerGetBuiltInTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetBuiltInToolsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}

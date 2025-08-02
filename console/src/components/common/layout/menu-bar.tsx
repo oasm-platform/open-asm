@@ -31,6 +31,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     url: "",
                 },
                 {
+                    title: "Marketplaces",
+                    icon: <ShoppingCart />,
+                    url: "/marketplaces",
+                },
+                {
                     title: "Targets",
                     icon: <Target />,
                     url: "/targets",
@@ -40,6 +45,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     icon: <CloudCheck />,
                     url: "/assets",
                 },
+
 
             ],
         },
@@ -52,13 +58,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     icon: <SquareTerminal />,
                     url: "/workers",
                 },
-                {
-                    title: "Marketplaces",
-                    icon: <ShoppingCart />,
-                    url: "/marketplaces",
-                },
-
-
             ],
         },
     ];
