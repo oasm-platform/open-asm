@@ -23,5 +23,8 @@ export class Tool extends BaseEntity {
   @Column({ nullable: true })
   version?: string;
 
+  @Column({ nullable: true })
+  logoUrl?: string;
+
   resultHandler: ({ dataSource, result, job }: ResultHandler) => Promise<void>;
 }

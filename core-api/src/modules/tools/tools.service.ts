@@ -36,8 +36,11 @@ export class ToolsService {
 
   public builtInTools: BuiltInTool[] = [
     {
+      name: 'subfinder',
       category: ToolCategory.SUBDOMAINS,
       description: 'Fast passive subdomain enumeration tool.',
+      logoUrl:
+        'https://github.com/projectdiscovery/subfinder/blob/main/static/subfinder-logo.png?raw=true',
       command:
         '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
@@ -96,8 +99,12 @@ export class ToolsService {
       },
     },
     {
+      name: 'naabu',
       category: ToolCategory.PORTS_SCANNER,
-      description: 'Scan open ports and detect running services on each port.',
+      description:
+        'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
+      logoUrl:
+        'https://github.com/projectdiscovery/naabu/blob/main/static/naabu-logo.png?raw=true',
       command: 'naabu -host {{value}} -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
         const parsed = result
@@ -116,9 +123,12 @@ export class ToolsService {
       },
     },
     {
+      name: 'httpx',
       category: ToolCategory.HTTP_SCRAPER,
       description:
         'HTTPX is a fast and multi-purpose HTTP toolkit that allows you to run multiple HTTP requests against a target.',
+      logoUrl:
+        'https://raw.githubusercontent.com/projectdiscovery/httpx/main/static/httpx-logo.png',
       command:
         'httpx -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: async ({ result, job, dataSource }: ResultHandler) => {
