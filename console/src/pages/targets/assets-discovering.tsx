@@ -34,16 +34,52 @@ const AssetsDiscovering = ({ domains, targetId }: AssetsDiscoveringProps) => {
     }, [domains?.length]);
 
     return (
-        <div className="flex items-center justify-center top-0">
-            {/* The main container now has a simpler, cleaner appearance without background effects */}
-            <div className="relative my-5 w-full h-96 overflow-hidden rounded-xl p-8 flex flex-col items-center justify-center transition-colors duration-500">
+        <div className="flex items-center justify-center top-0 my-5 relative">
+            {/* Animated border */}
+            <motion.div
+                className="absolute inset-0 rounded-2xl p-0.5"
+                style={{
+                    backgroundImage: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #10b981, #f59e0b, #3b82f6)',
+                    backgroundSize: '400% 100%',
+                    zIndex: 10
+                }}
+                animate={{
+                    backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                }}
+                transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: 'linear',
+                }}
+            >
+                <div className="bg-background rounded-2xl w-full h-full"></div>
+            </motion.div>
+
+            <div className="relative my-5 w-full h-96 overflow-hidden rounded-2xl p-8 flex flex-col items-center justify-center transition-colors duration-500" style={{ zIndex: 20 }}>
 
                 {/* Main content with a more prominent style, using flexbox for equidistant spacing */}
                 {/* The text color is set to be visible on any default background */}
                 <div className="relative z-20 w-full h-full flex flex-col justify-around items-center text-center text-gray-900 dark:text-white transition-colors duration-500">
                     {/* Header */}
-                    <div className="text-3xl h-12 md:text-4xl font-extrabold tracking-wide bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text">
-                        <span>Discovering assets...</span>
+                    <div className="relative text-3xl h-16 md:text-4xl font-extrabold tracking-wide flex items-center">
+                        <motion.span
+                            className="inline-block text-transparent bg-clip-text leading-tight"
+                            style={{
+                                backgroundSize: '400% 100%',
+                                backgroundImage: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #10b981, #f59e0b, #3b82f6)',
+                            }}
+                            animate={{
+                                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                            }}
+                            transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: 'linear',
+                            }}
+
+                        >
+                            Discovering assets...
+                        </motion.span>
                     </div>
 
                     {/* AnimatePresence for the fade-in/fade-out effect of the domain */}
