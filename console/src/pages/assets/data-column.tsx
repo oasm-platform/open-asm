@@ -43,9 +43,6 @@ export const assetColumns: ColumnDef<any, any>[] = [
   },
   {
     header: "Technologies",
-    size: 25,
-    minSize: 10,
-    maxSize: 30,
     cell: ({ row }) => {
       const data = row.original;
       const technologies: string[] = data.metadata?.http_scraper?.tech ?? [];
@@ -65,9 +62,6 @@ export const assetColumns: ColumnDef<any, any>[] = [
   },
   {
     header: "Certificate",
-    size: 25,
-    minSize: 10,
-    maxSize: 30,
     cell: ({ row }) => {
       const data = row.original;
       const tls = data.metadata?.http_scraper?.tls;
@@ -102,9 +96,6 @@ export const assetColumns: ColumnDef<any, any>[] = [
   },
   {
     header: "Time",
-    size: 25,
-    minSize: 10,
-    maxSize: 30,
     cell: ({ row }) => {
       const data = row.original;
       const createdAt = data.createdAt;

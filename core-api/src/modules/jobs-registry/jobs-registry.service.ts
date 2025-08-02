@@ -13,10 +13,9 @@ import {
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { DataSource, InsertResult, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { ToolsService } from '../tools/tools.service';
-import { WorkersService } from '../workers/workers.service';
 import {
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
@@ -31,7 +30,6 @@ export class JobsRegistryService {
     @InjectRepository(Job) public readonly repo: Repository<Job>,
     @InjectRepository(JobHistory)
     public readonly jobHistoryRepo: Repository<JobHistory>,
-    private workerService: WorkersService,
     private dataSource: DataSource,
 
     @Inject(forwardRef(() => ToolsService))
@@ -295,31 +293,34 @@ export class JobsRegistryService {
    * @param assets the assets to start the next job for
    * @param currentWorkerName the name of the current worker
    */
-  public async startNextJob(
-    assets: Asset[],
-    currentWorkerName: ToolCategory,
-    jobHistory: JobHistory,
-  ): Promise<InsertResult | null> {
-    const currentJobIndex =
-      Object.values(ToolCategory).indexOf(currentWorkerName);
-
-    const nextWorkerHandleJob =
-      Object.values(ToolCategory)[currentJobIndex + 1] || null;
-
-    if (!nextWorkerHandleJob) {
+  public async startNextJob({
+    assets,
+    jobHistory,
+    nextJob,
+  }: {
+    assets: Asset[];
+    jobHistory: JobHistory;
+    nextJob: ToolCategory[];
+  }) {
+    if (!nextJob.length) {
       return null;
     }
-    return this.repo
-      .createQueryBuilder()
-      .insert()
-      .values(
-        assets.map((i) => ({
-          asset: i,
-          category: nextWorkerHandleJob,
-          jobHistory,
-        })),
-      )
-      .orIgnore()
-      .execute();
+
+    return Promise.all(
+      nextJob.map((nextWorkerHandleJob) =>
+        this.repo
+          .createQueryBuilder()
+          .insert()
+          .values(
+            assets.map((i) => ({
+              asset: i,
+              category: nextWorkerHandleJob,
+              jobHistory,
+            })),
+          )
+          .orIgnore()
+          .execute(),
+      ),
+    );
   }
 }

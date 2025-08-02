@@ -56,7 +56,7 @@ export function DetailTarget() {
                     <SettingTarget target={target} />
                 </div>
             </div>
-            <ListAssets targetId={target.id} refetchInterval={5000} />
+            <ListAssets targetId={target.id} refetchInterval={target.status === 'in_progress' ? 1000 : 5000} />
         </Page>
     );
 }

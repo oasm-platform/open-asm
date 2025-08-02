@@ -8,10 +8,9 @@ const GuestRoute = ({ children }: { children: JSX.Element }) => {
   const { data, isPending } = useSession();
 
   const { data: metadata, isFetched } = useRootControllerGetMetadata();
-  console.log(metadata);
 
   if (!isFetched) return null;
-  if (!metadata!.isInit) {
+  if (!metadata?.isInit) {
     return <Navigate to="/init-admin" />;
   }
 

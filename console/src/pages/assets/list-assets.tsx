@@ -2,9 +2,9 @@ import { DataTable } from "@/components/ui/data-table";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { useAssetsControllerGetAssets } from "@/services/apis/gen/queries";
-import { assetColumns } from "./data-column";
-import AssetDetailSheet from "./asset-detail-sheet";
 import { useState } from "react";
+import AssetDetailSheet from "./asset-detail-sheet";
+import { assetColumns } from "./data-column";
 
 interface ListAssetsProps {
   targetId?: string;

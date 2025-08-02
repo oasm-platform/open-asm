@@ -37,27 +37,19 @@ export class ToolsService {
 
   public builtInTools: BuiltInTool[] = [
     {
+      id: 'subfinder',
       name: 'Subfinder',
       category: ToolCategory.SUBDOMAINS,
       description:
         'Subfinder is a subdomain discovery tool that returns valid subdomains for websites, using passive online sources.',
       logoUrl:
-        'https://github.com/projectdiscovery/subfinder/blob/main/static/subfinder-logo.png?raw=true',
+        'https://raw.githubusercontent.com/projectdiscovery/subfinder/refs/heads/main/static/subfinder-logo.png',
       command:
         '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
       resultHandler: this.handleSubfinderResult.bind(this),
     },
     {
-      name: 'Naabu',
-      category: ToolCategory.PORTS_SCANNER,
-      description:
-        'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
-      logoUrl:
-        'https://github.com/projectdiscovery/naabu/blob/main/static/naabu-logo.png?raw=true',
-      command: 'naabu -host {{value}} -silent',
-      resultHandler: this.handleNaabuResult.bind(this),
-    },
-    {
+      id: 'httpx',
       name: 'Httpx',
       category: ToolCategory.HTTP_SCRAPER,
       description:
@@ -67,6 +59,17 @@ export class ToolsService {
       command:
         'httpx -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: this.handleHttpxResult.bind(this),
+    },
+    {
+      id: 'naabu',
+      name: 'Naabu',
+      category: ToolCategory.PORTS_SCANNER,
+      description:
+        'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
+      logoUrl:
+        'https://raw.githubusercontent.com/projectdiscovery/naabu/refs/heads/main/static/naabu-logo.png',
+      command: 'naabu -host {{value}} -silent',
+      resultHandler: this.handleNaabuResult.bind(this),
     },
   ];
 
@@ -125,11 +128,12 @@ export class ToolsService {
         target: { id: job.asset.target.id },
       },
     });
-    await this.jobsRegistryService.startNextJob(
-      assetsWithId,
-      job.category,
-      job.jobHistory,
-    );
+
+    await this.jobsRegistryService.startNextJob({
+      assets: assetsWithId,
+      nextJob: [ToolCategory.PORTS_SCANNER, ToolCategory.HTTP_SCRAPER],
+      jobHistory: job.jobHistory,
+    });
   }
 
   /**
@@ -145,12 +149,6 @@ export class ToolsService {
       .map((i) => Number(i.split(':')[1].replace('\r', '')))
       .sort();
     this.workerService.updateResultToDatabase(dataSource, job, parsed);
-
-    await this.jobsRegistryService.startNextJob(
-      [job.asset],
-      job.category,
-      job.jobHistory,
-    );
   }
 
   /**
@@ -165,11 +163,6 @@ export class ToolsService {
         isErrorPage: parsed.failed,
       });
       this.workerService.updateResultToDatabase(dataSource, job, parsed);
-      await this.jobsRegistryService.startNextJob(
-        [job.asset],
-        job.category,
-        job.jobHistory,
-      );
     }
   }
 
@@ -209,7 +202,6 @@ export class ToolsService {
    */
   async getBuiltInTools() {
     const data = this.builtInTools.map((tool) => ({
-      id: tool.name,
       ...pick(tool, ['name', 'category', 'description', 'logoUrl']),
       isInstalled: true,
     }));
