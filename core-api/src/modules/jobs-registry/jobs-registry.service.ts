@@ -65,9 +65,9 @@ export class JobsRegistryService {
    * @param category the name of the worker to run on the asset
    * @returns the newly created job
    */
-  public createJob(asset: Asset, category: ToolCategory): Promise<Job> {
+  public async createJob(asset: Asset, category: ToolCategory): Promise<Job> {
     const jobHistory = this.jobHistoryRepo.create({});
-    this.jobHistoryRepo.save(jobHistory);
+    await this.jobHistoryRepo.save(jobHistory);
     return this.repo.save({
       asset,
       category,
