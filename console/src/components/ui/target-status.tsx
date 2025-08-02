@@ -1,5 +1,6 @@
 import { JobStatus } from "@/services/apis/gen/queries";
 import { BadgeCheckIcon, ClockIcon, Loader2Icon, XCircleIcon } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { Badge } from "./badge";
 
 interface StatusConfig {
@@ -55,9 +56,22 @@ interface TargetStatusProps {
 
 const TargetStatus = ({ status }: TargetStatusProps) => {
     const config = statusConfigs[status] || defaultConfig;
-
+    const [params, setParams] = useSearchParams();
     return (
-        <Badge variant={config.variant} className={config.className + " h-8 text-md"}>
+        <Badge
+            variant={config.variant}
+            className={config.className + " h-8 text-md cursor-pointer"}
+            onClick={() => {
+                if (status === JobStatus.pending || status === JobStatus.in_progress) {
+                    params.set("animation", "true");
+                    setParams(params);
+                }
+                else {
+                    params.delete("animation");
+                    setParams(params);
+                }
+            }}
+        >
             {config.icon}
             {config.label}
         </Badge>

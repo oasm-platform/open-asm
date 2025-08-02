@@ -10,7 +10,6 @@ export const axiosInstance = Axios.create({
 
 axiosInstance.interceptors.request.use((config) => {
   const workspaceId = getGlobalWorkspaceId();
-  console.log(workspaceId, "workspaceId");
   if (workspaceId) {
     config.headers.set("X-Workspace-Id", workspaceId);
   }
@@ -24,7 +23,7 @@ axiosInstance.interceptors.response.use(
       window.location.href = "/login";
     }
     return Promise.reject(error);
-  },
+  }
 );
 /**
  * Axios client implementation for Orval-generated API clients
@@ -32,7 +31,7 @@ axiosInstance.interceptors.response.use(
  */
 export const orvalClient = <T>(
   config: AxiosRequestConfig,
-  options?: AxiosRequestConfig,
+  options?: AxiosRequestConfig
 ): Promise<T> & { cancel: () => void } => {
   const source = Axios.CancelToken.source();
   const promise = axiosInstance<T>({

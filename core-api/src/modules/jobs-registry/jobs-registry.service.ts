@@ -122,7 +122,6 @@ export class JobsRegistryService {
         command: workerStep.command,
       };
     } catch (err) {
-      console.log(err);
       await queryRunner.rollbackTransaction();
       throw err;
     } finally {

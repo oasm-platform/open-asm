@@ -6,10 +6,14 @@ import dayjs from 'dayjs';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ListAssets } from '../assets/list-assets';
+import AssetsDiscovering from './assets-discovering';
 import SettingTarget from './setting-target';
 
 export function DetailTarget() {
     const { id } = useParams<{ id: string }>();
+
+    const { searchParams } = new URL(window.location.href);
+    const animation = searchParams.get('animation') === 'true';
     const navigate = useNavigate();
     const { data: target, isLoading, error } = useTargetsControllerGetTargetById(
         id || '',
@@ -23,6 +27,7 @@ export function DetailTarget() {
             </div>
         );
     }
+
 
     if (error || !target) {
         return (
@@ -56,6 +61,9 @@ export function DetailTarget() {
                     <SettingTarget target={target} />
                 </div>
             </div>
+            {animation && (target.status === 'in_progress' || target.status === 'pending') && (
+                <AssetsDiscovering targetId={target.id} />
+            )}
             <ListAssets targetId={target.id} refetchInterval={target.status === 'in_progress' ? 1000 : 5000} />
         </Page>
     );

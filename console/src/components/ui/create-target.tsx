@@ -46,17 +46,15 @@ export function CreateTarget() {
             }
         }, {
             onError: (e) => {
-                console.log(e);
                 toast.error("Failed to create target")
             },
             onSuccess: (res) => {
-                console.log(res);
-                navigate(`/targets/${res.id}`)
+                navigate(`/targets/${res.id}?animation=true&page=1&pageSize=100`)
                 toast.success("Target created successfully")
                 setOpen(false);
                 reset();
                 queryClient.refetchQueries({
-                    queryKey: ["targets"],
+                    queryKey: ["targets", res.id],
                 })
             }
         })

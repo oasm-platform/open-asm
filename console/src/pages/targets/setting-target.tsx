@@ -40,7 +40,7 @@ const SettingTarget = ({ target }: { target: Target }) => {
                         rediscoverTarget({
                             id: target.id,
                         })
-                        navigate(-1)
+                        navigate(`/targets/${target.id}?animation=true&page=1&pageSize=100`)
                     }}
                     trigger={
                         <DropdownMenuItem disabled={target.status !== JobStatus.completed}
