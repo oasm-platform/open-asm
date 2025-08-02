@@ -194,10 +194,10 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                     <div>
                       <span className="block mb-1">Issuer</span>
                       <div className="flex items-center gap-2">
-                        <span className="">{tls.issuer_org[0]}</span>
-                        {tls.issuer_org.length > 1 && (
+                        <span className="">{tls?.issuer_org?.[0]}</span>
+                        {tls?.issuer_org?.length > 1 && (
                           <Badge className="text-gray-700 border-gray-300 dark:text-gray-300 dark:border-gray-600 rounded-md">
-                            +{tls.issuer_org.length - 1}
+                            +{tls?.issuer_org?.length - 1}
                           </Badge>
                         )}
                       </div>

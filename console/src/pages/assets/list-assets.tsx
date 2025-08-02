@@ -36,7 +36,7 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
     {
       query: {
         refetchInterval: refetchInterval ?? 5000,
-        queryKey: ["assets", targetId, filter],
+        queryKey: ["assets", targetId],
       },
     },
   );
