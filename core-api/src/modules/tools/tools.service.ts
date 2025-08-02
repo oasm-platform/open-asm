@@ -91,7 +91,7 @@ export class ToolsService {
         await this.jobsRegistryService.startNextJob(
           assetsWithId,
           job.category,
-          job.group,
+          job.jobHistory,
         );
       },
     },
@@ -111,7 +111,7 @@ export class ToolsService {
         await this.jobsRegistryService.startNextJob(
           [job.asset],
           job.category,
-          job.group,
+          job.jobHistory,
         );
       },
     },
@@ -131,7 +131,7 @@ export class ToolsService {
           await this.jobsRegistryService.startNextJob(
             [job.asset],
             job.category,
-            job.group,
+            job.jobHistory,
           );
         }
       },

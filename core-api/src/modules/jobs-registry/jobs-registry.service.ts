@@ -22,12 +22,15 @@ import {
   GetNextJobResponseDto,
   UpdateResultDto,
 } from './dto/jobs-registry.dto';
+import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 
 @Injectable()
 export class JobsRegistryService {
   constructor(
     @InjectRepository(Job) public readonly repo: Repository<Job>,
+    @InjectRepository(JobHistory)
+    public readonly jobHistoryRepo: Repository<JobHistory>,
     private workerService: WorkersService,
     private dataSource: DataSource,
 
@@ -62,15 +65,14 @@ export class JobsRegistryService {
    * @param category the name of the worker to run on the asset
    * @returns the newly created job
    */
-  public createJob(
-    asset: Asset,
-    category: ToolCategory,
-    group?: string,
-  ): Promise<Job> {
+  public createJob(asset: Asset, category: ToolCategory): Promise<Job> {
+    const jobHistory = this.jobHistoryRepo.create({});
+    this.jobHistoryRepo.save(jobHistory);
     return this.repo.save({
       asset,
       category,
-      group: group || randomUUID(),
+      group: randomUUID(),
+      jobHistory,
     });
   }
 
@@ -249,6 +251,7 @@ export class JobsRegistryService {
         asset: {
           target: true,
         },
+        jobHistory: true,
       },
     });
   }
@@ -295,7 +298,7 @@ export class JobsRegistryService {
   public async startNextJob(
     assets: Asset[],
     currentWorkerName: ToolCategory,
-    group?: string,
+    jobHistory: JobHistory,
   ): Promise<InsertResult | null> {
     const currentJobIndex =
       Object.values(ToolCategory).indexOf(currentWorkerName);
@@ -306,11 +309,6 @@ export class JobsRegistryService {
     if (!nextWorkerHandleJob) {
       return null;
     }
-
-    if (!group) {
-      group = randomUUID();
-    }
-
     return this.repo
       .createQueryBuilder()
       .insert()
@@ -318,7 +316,7 @@ export class JobsRegistryService {
         assets.map((i) => ({
           asset: i,
           category: nextWorkerHandleJob,
-          group,
+          jobHistory,
         })),
       )
       .orIgnore()
