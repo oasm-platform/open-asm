@@ -20,9 +20,9 @@ export function getManyResponse<T>(
   const { limit, page } = query;
   return {
     data,
-    total,
-    page,
-    limit,
+    total: +total,
+    page: +page,
+    limit: +limit,
     pageCount: Math.ceil(total / limit),
     hasNextPage: page * limit < total,
   };

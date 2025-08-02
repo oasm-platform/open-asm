@@ -25,7 +25,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
       const http_scraper = data.metadata?.http_scraper;
       const ipAddresses = data.dnsRecords?.["A"];
       return (
-        <div className="flex flex-col gap-4 justify-center">
+        <div className="flex flex-col gap-2 py-2 justify-center items-start">
           <div className="flex items-center gap-2">
             <AssetValue http_scraper={http_scraper} value={data.value} />
             <HTTPXStatusCode http_scraper={http_scraper} />

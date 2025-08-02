@@ -288,6 +288,7 @@ export type AssetsControllerGetAssetsParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  value?: string;
   workspaceId: string;
   targetIds?: string[];
   ports?: string[];

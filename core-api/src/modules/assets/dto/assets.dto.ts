@@ -29,6 +29,11 @@ export class GetAssetsResponseDto {
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  value?: string;
+
   @ApiProperty()
   @IsUUID(4)
   workspaceId?: string;

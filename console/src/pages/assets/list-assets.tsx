@@ -27,6 +27,7 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
     {
       workspaceId: selectedWorkspace ?? "",
       targetIds: targetId ? [targetId] : undefined,
+      value: filter,
       limit: pageSize,
       page,
       sortBy,

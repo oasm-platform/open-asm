@@ -68,6 +68,7 @@ interface DataTableProps<TData, TValue> {
   sortOrder?: "ASC" | "DESC";
   onSortChange?: (sortBy: string, sortOrder: "ASC" | "DESC") => void;
   emptyMessage?: string;
+  filterComponents?: React.JSX.Element[];
 }
 
 export function DataTable<TData, TValue>({
@@ -91,6 +92,7 @@ export function DataTable<TData, TValue>({
   sortOrder,
   onSortChange,
   emptyMessage = "No data",
+  filterComponents,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -197,6 +199,8 @@ export function DataTable<TData, TValue>({
           )}
         </div>
       )}
+
+      {filterComponents}
 
       {/* Table */}
       <div className="rounded-md border">

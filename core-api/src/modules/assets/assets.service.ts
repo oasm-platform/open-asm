@@ -141,7 +141,7 @@ export class AssetsService {
   public async getAssets(
     query: GetAssetsQueryDto,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
-    let { limit, page, sortOrder, targetIds, workspaceId } = query;
+    let { limit, page, sortOrder, targetIds, workspaceId, value } = query;
 
     let sortBy = query.sortBy;
     if (!(sortBy in Asset)) {
@@ -152,9 +152,22 @@ export class AssetsService {
 
     let whereClosure = 'wt."workspaceId" = $1 AND a."isErrorPage" = false ';
 
-    if (targetIds) {
-      whereClosure += `AND a."targetId" = ANY($2) `;
-      sqlParams.push(targetIds);
+    const whereBuilder = {
+      targetIds: (paramIndex: number) => ({
+        sql: `a."targetId" = ANY($${paramIndex})`,
+        params: [targetIds],
+      }),
+      value: (paramIndex: number) => ({
+        sql: `a."value" ILIKE $${paramIndex}`,
+        params: [`%${value}%`],
+      }),
+    };
+
+    for (const key in whereBuilder) {
+      if (query[key]) {
+        whereClosure += ` AND ${whereBuilder[key](sqlParams.length + 1).sql}`;
+        sqlParams.push(...whereBuilder[key](sqlParams.length + 1).params);
+      }
     }
 
     const sql = ` WITH latest_jobs AS (
@@ -185,6 +198,7 @@ export class AssetsService {
       WHERE ${whereClosure}
       GROUP BY a.id
        `;
+
     const rawData = await this.repo.query(
       `${sql} ORDER BY a."${sortBy}" ${sortOrder} LIMIT ${limit} OFFSET ${offset}`,
       sqlParams,
@@ -193,8 +207,6 @@ export class AssetsService {
     const total = await this.repo
       .query(`SELECT COUNT(*) FROM (${sql}) AS sub`, sqlParams)
       .then((res) => res[0].count);
-
-    // const total = await this.repo.count({ where: { target: { id: targetId[0] } } });
 
     // Map raw data to GetAssetsResponseDto
     const data: GetAssetsResponseDto[] = rawData.map((item: any) => {
