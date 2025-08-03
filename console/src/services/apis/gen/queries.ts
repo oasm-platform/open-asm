@@ -242,6 +242,39 @@ export type GetManyWorkerInstanceDto = {
   pageCount: number;
 };
 
+export type SearchAssetsTargetsResponseDtoDataItem = { [key: string]: unknown };
+
+export type SearchAssetsTargetsResponseDto = {
+  data: SearchAssetsTargetsResponseDtoDataItem[];
+  total: number;
+  page: number;
+  limit: number;
+  pageCount: number;
+  hasNextPage: boolean;
+};
+
+export type GetSearchHistoryResponseDtoFilter = { [key: string]: unknown };
+
+export type GetSearchHistoryResponseDtoResult = { [key: string]: unknown };
+
+export type GetSearchHistoryResponseDto = {
+  id: string;
+  filter: GetSearchHistoryResponseDtoFilter;
+  result: GetSearchHistoryResponseDtoResult;
+  workspaceId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GetManyGetSearchHistoryResponseDtoDto = {
+  data: GetSearchHistoryResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type WorkspaceTool = {
   id: string;
   createdAt: string;
@@ -307,7 +340,7 @@ export type JobsRegistryControllerGetManyJobsParams = {
   sortOrder?: string;
 };
 
-export type AssetsControllerGetAssetsParams = {
+export type AssetsControllerGetAssetsInWorkspaceParams = {
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -325,6 +358,23 @@ export type WorkersControllerGetWorkersParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type SearchControllerSearchAssetsTargetsParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  value: string;
+  workspaceId: string;
+};
+
+export type SearchControllerGetSearchHistoryParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  workspaceId: string;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -3931,8 +3981,8 @@ export const useJobsRegistryControllerUpdateResult = <
  * Retrieves a list of assets associated with the given target.
  * @summary Get assets in target
  */
-export const assetsControllerGetAssets = (
-  params: AssetsControllerGetAssetsParams,
+export const assetsControllerGetAssetsInWorkspace = (
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -3942,28 +3992,28 @@ export const assetsControllerGetAssets = (
   );
 };
 
-export const getAssetsControllerGetAssetsQueryKey = (
-  params: AssetsControllerGetAssetsParams,
+export const getAssetsControllerGetAssetsInWorkspaceQueryKey = (
+  params: AssetsControllerGetAssetsInWorkspaceParams,
 ) => {
   return [`/api/assets`, ...(params ? [params] : [])] as const;
 };
 
-export const getAssetsControllerGetAssetsInfiniteQueryOptions = <
+export const getAssetsControllerGetAssetsInWorkspaceInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssets>>,
-    AssetsControllerGetAssetsParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetsParams["page"]
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -3972,56 +4022,56 @@ export const getAssetsControllerGetAssetsInfiniteQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAssetsControllerGetAssetsQueryKey(params);
+    queryOptions?.queryKey ??
+    getAssetsControllerGetAssetsInWorkspaceQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
     QueryKey,
-    AssetsControllerGetAssetsParams["page"]
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
   > = ({ signal, pageParam }) =>
-    assetsControllerGetAssets(
+    assetsControllerGetAssetsInWorkspace(
       { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal,
     );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
     TError,
     TData,
     QueryKey,
-    AssetsControllerGetAssetsParams["page"]
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AssetsControllerGetAssetsInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof assetsControllerGetAssets>>
->;
-export type AssetsControllerGetAssetsInfiniteQueryError = unknown;
+export type AssetsControllerGetAssetsInWorkspaceInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>>;
+export type AssetsControllerGetAssetsInWorkspaceInfiniteQueryError = unknown;
 
-export function useAssetsControllerGetAssetsInfinite<
+export function useAssetsControllerGetAssetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssets>>,
-    AssetsControllerGetAssetsParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetsParams["page"]
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
           QueryKey
         >,
         "initialData"
@@ -4032,29 +4082,29 @@ export function useAssetsControllerGetAssetsInfinite<
 ): DefinedUseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetsControllerGetAssetsInfinite<
+export function useAssetsControllerGetAssetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssets>>,
-    AssetsControllerGetAssetsParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetsParams["page"]
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
           QueryKey
         >,
         "initialData"
@@ -4065,22 +4115,22 @@ export function useAssetsControllerGetAssetsInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetsControllerGetAssetsInfinite<
+export function useAssetsControllerGetAssetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssets>>,
-    AssetsControllerGetAssetsParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetsParams["page"]
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -4093,22 +4143,22 @@ export function useAssetsControllerGetAssetsInfinite<
  * @summary Get assets in target
  */
 
-export function useAssetsControllerGetAssetsInfinite<
+export function useAssetsControllerGetAssetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssets>>,
-    AssetsControllerGetAssetsParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+    AssetsControllerGetAssetsInWorkspaceParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetsParams["page"]
+        AssetsControllerGetAssetsInWorkspaceParams["page"]
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -4117,10 +4167,11 @@ export function useAssetsControllerGetAssetsInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAssetsControllerGetAssetsInfiniteQueryOptions(
-    params,
-    options,
-  );
+  const queryOptions =
+    getAssetsControllerGetAssetsInWorkspaceInfiniteQueryOptions(
+      params,
+      options,
+    );
 
   const query = useInfiniteQuery(
     queryOptions,
@@ -4134,15 +4185,15 @@ export function useAssetsControllerGetAssetsInfinite<
   return query;
 }
 
-export const getAssetsControllerGetAssetsQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+export const getAssetsControllerGetAssetsInWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData
       >
@@ -4153,42 +4204,44 @@ export const getAssetsControllerGetAssetsQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAssetsControllerGetAssetsQueryKey(params);
+    queryOptions?.queryKey ??
+    getAssetsControllerGetAssetsInWorkspaceQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerGetAssets>>
-  > = ({ signal }) => assetsControllerGetAssets(params, requestOptions, signal);
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
+  > = ({ signal }) =>
+    assetsControllerGetAssetsInWorkspace(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AssetsControllerGetAssetsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof assetsControllerGetAssets>>
+export type AssetsControllerGetAssetsInWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
 >;
-export type AssetsControllerGetAssetsQueryError = unknown;
+export type AssetsControllerGetAssetsInWorkspaceQueryError = unknown;
 
-export function useAssetsControllerGetAssets<
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+export function useAssetsControllerGetAssetsInWorkspace<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssets>>
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
         >,
         "initialData"
       >;
@@ -4198,24 +4251,24 @@ export function useAssetsControllerGetAssets<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetsControllerGetAssets<
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+export function useAssetsControllerGetAssetsInWorkspace<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssets>>
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
         >,
         "initialData"
       >;
@@ -4225,15 +4278,15 @@ export function useAssetsControllerGetAssets<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetsControllerGetAssets<
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+export function useAssetsControllerGetAssetsInWorkspace<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData
       >
@@ -4248,15 +4301,15 @@ export function useAssetsControllerGetAssets<
  * @summary Get assets in target
  */
 
-export function useAssetsControllerGetAssets<
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+export function useAssetsControllerGetAssetsInWorkspace<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetsParams,
+  params: AssetsControllerGetAssetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssets>>,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
         TData
       >
@@ -4267,7 +4320,7 @@ export function useAssetsControllerGetAssets<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAssetsControllerGetAssetsQueryOptions(
+  const queryOptions = getAssetsControllerGetAssetsInWorkspaceQueryOptions(
     params,
     options,
   );
@@ -4796,6 +4849,719 @@ export function useWorkersControllerGetWorkers<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getWorkersControllerGetWorkersQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Search assets and targets
+ * @summary Search assets and targets
+ */
+export const searchControllerSearchAssetsTargets = (
+  params: SearchControllerSearchAssetsTargetsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SearchAssetsTargetsResponseDto>(
+    { url: `/api/search`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getSearchControllerSearchAssetsTargetsQueryKey = (
+  params: SearchControllerSearchAssetsTargetsParams,
+) => {
+  return [`/api/search`, ...(params ? [params] : [])] as const;
+};
+
+export const getSearchControllerSearchAssetsTargetsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+    SearchControllerSearchAssetsTargetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerSearchAssetsTargetsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getSearchControllerSearchAssetsTargetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+    QueryKey,
+    SearchControllerSearchAssetsTargetsParams["page"]
+  > = ({ signal, pageParam }) =>
+    searchControllerSearchAssetsTargets(
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+    TError,
+    TData,
+    QueryKey,
+    SearchControllerSearchAssetsTargetsParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SearchControllerSearchAssetsTargetsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>>;
+export type SearchControllerSearchAssetsTargetsInfiniteQueryError = unknown;
+
+export function useSearchControllerSearchAssetsTargetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+    SearchControllerSearchAssetsTargetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerSearchAssetsTargetsParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+          TError,
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchControllerSearchAssetsTargetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+    SearchControllerSearchAssetsTargetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerSearchAssetsTargetsParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+          TError,
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchControllerSearchAssetsTargetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+    SearchControllerSearchAssetsTargetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerSearchAssetsTargetsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Search assets and targets
+ */
+
+export function useSearchControllerSearchAssetsTargetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+    SearchControllerSearchAssetsTargetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerSearchAssetsTargetsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getSearchControllerSearchAssetsTargetsInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getSearchControllerSearchAssetsTargetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getSearchControllerSearchAssetsTargetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
+  > = ({ signal }) =>
+    searchControllerSearchAssetsTargets(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SearchControllerSearchAssetsTargetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
+>;
+export type SearchControllerSearchAssetsTargetsQueryError = unknown;
+
+export function useSearchControllerSearchAssetsTargets<
+  TData = Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+          TError,
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchControllerSearchAssetsTargets<
+  TData = Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+          TError,
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchControllerSearchAssetsTargets<
+  TData = Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Search assets and targets
+ */
+
+export function useSearchControllerSearchAssetsTargets<
+  TData = Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+  TError = unknown,
+>(
+  params: SearchControllerSearchAssetsTargetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSearchControllerSearchAssetsTargetsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get search history
+ * @summary Get search history
+ */
+export const searchControllerGetSearchHistory = (
+  params: SearchControllerGetSearchHistoryParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetSearchHistoryResponseDtoDto>(
+    { url: `/api/search/history`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getSearchControllerGetSearchHistoryQueryKey = (
+  params: SearchControllerGetSearchHistoryParams,
+) => {
+  return [`/api/search/history`, ...(params ? [params] : [])] as const;
+};
+
+export const getSearchControllerGetSearchHistoryInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+    SearchControllerGetSearchHistoryParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerGetSearchHistoryParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getSearchControllerGetSearchHistoryQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+    QueryKey,
+    SearchControllerGetSearchHistoryParams["page"]
+  > = ({ signal, pageParam }) =>
+    searchControllerGetSearchHistory(
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+    TError,
+    TData,
+    QueryKey,
+    SearchControllerGetSearchHistoryParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SearchControllerGetSearchHistoryInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
+>;
+export type SearchControllerGetSearchHistoryInfiniteQueryError = unknown;
+
+export function useSearchControllerGetSearchHistoryInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+    SearchControllerGetSearchHistoryParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerGetSearchHistoryParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+          TError,
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchControllerGetSearchHistoryInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+    SearchControllerGetSearchHistoryParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerGetSearchHistoryParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+          TError,
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchControllerGetSearchHistoryInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+    SearchControllerGetSearchHistoryParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerGetSearchHistoryParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get search history
+ */
+
+export function useSearchControllerGetSearchHistoryInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+    SearchControllerGetSearchHistoryParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData,
+        QueryKey,
+        SearchControllerGetSearchHistoryParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSearchControllerGetSearchHistoryInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getSearchControllerGetSearchHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getSearchControllerGetSearchHistoryQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
+  > = ({ signal }) =>
+    searchControllerGetSearchHistory(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SearchControllerGetSearchHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
+>;
+export type SearchControllerGetSearchHistoryQueryError = unknown;
+
+export function useSearchControllerGetSearchHistory<
+  TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+          TError,
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchControllerGetSearchHistory<
+  TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+          TError,
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchControllerGetSearchHistory<
+  TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get search history
+ */
+
+export function useSearchControllerGetSearchHistory<
+  TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+  TError = unknown,
+>(
+  params: SearchControllerGetSearchHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSearchControllerGetSearchHistoryQueryOptions(
     params,
     options,
   );

@@ -1,7 +1,7 @@
 import { DataTable } from "@/components/ui/data-table";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useAssetsControllerGetAssets } from "@/services/apis/gen/queries";
+import { useAssetsControllerGetAssetsInWorkspace } from "@/services/apis/gen/queries";
 import { useState } from "react";
 import AssetDetailSheet from "./asset-detail-sheet";
 import { assetColumns } from "./data-column";
@@ -23,7 +23,7 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
     defaultSortOrder: "ASC",
   });
 
-  const { data, isLoading } = useAssetsControllerGetAssets(
+  const { data, isLoading } = useAssetsControllerGetAssetsInWorkspace(
     {
       workspaceId: selectedWorkspace ?? "",
       targetIds: targetId ? [targetId] : undefined,

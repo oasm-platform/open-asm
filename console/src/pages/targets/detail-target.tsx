@@ -54,10 +54,10 @@ export function DetailTarget() {
 
                 </div>
                 <div className='flex items-center gap-3'>
-                    <TargetStatus status={target.status} />
                     <p className="text-muted-foreground">
                         {dayjs(target.lastDiscoveredAt).fromNow()}
                     </p>
+                    <TargetStatus status={target.status} />
                     <SettingTarget target={target} />
                 </div>
             </div>

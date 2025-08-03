@@ -39,7 +39,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="dark" storageKey="theme">
         <RouterProvider router={router} />
-        <Toaster />
+        <Toaster position="bottom-center" />
       </ThemeProvider>
     </QueryClientProvider>
   )

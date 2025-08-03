@@ -66,7 +66,7 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
       <SheetContent
         className={cn(
           "flex flex-col w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-[95%] sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl",
-          "shadow-xl rounded-l-xl p-5",
+          "shadow-xl p-5",
           "inset-y-0 right-0 fixed",
         )}
       >

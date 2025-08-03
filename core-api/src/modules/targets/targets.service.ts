@@ -50,6 +50,7 @@ export class TargetsService {
         'targets.value as value',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'COALESCE(COUNT(DISTINCT asset.id), 0) AS "totalAssets"',
+        'targets.scanSchedule as "scanSchedule"',
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
@@ -57,7 +58,9 @@ export class TargetsService {
         ELSE '${JobStatus.COMPLETED}'
       END AS status`,
       ])
-      .groupBy('targets.id, targets.value, targets.lastDiscoveredAt')
+      .groupBy(
+        'targets.id, targets.value, targets.lastDiscoveredAt, targets.scanSchedule',
+      )
       .getRawOne();
 
     return result;
