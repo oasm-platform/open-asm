@@ -3,7 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
+import { CronJob } from 'cron';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
@@ -28,7 +30,10 @@ export class TargetsService {
     private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private readonly workspacesService: WorkspacesService,
     public assetService: AssetsService,
-  ) {}
+    private schedulerRegistry: SchedulerRegistry,
+  ) {
+    this.handleUpdateScanSchedule();
+  }
 
   /**
    * Retrieves a target entity by its ID.
@@ -256,5 +261,33 @@ export class TargetsService {
         workspaceTargets: { workspace: { id: workspaceId } },
       },
     });
+  }
+
+  /**
+   * Handles scheduling of targets for rescan based on their scan schedules.
+   *
+   * This function is scheduled to run every day at 00:00.
+   * It retrieves all targets with a scan schedule, and adds a new cron job for each target.
+   * The cron job will trigger a rescan of the target every time it runs.
+   */
+  @Cron('0 0 */1 * * *')
+  async handleUpdateScanSchedule(): Promise<void> {
+    const targetSchedules = await this.repo
+      .createQueryBuilder('target')
+      .select(['target.value', 'target.id', 'target.scanSchedule'])
+      .where('target.scanSchedule IS NOT NULL')
+      .getMany();
+
+    if (targetSchedules.length === 0) return;
+
+    Promise.all(
+      targetSchedules.map(({ id, scanSchedule }) => {
+        const newCron = new CronJob(scanSchedule, () => {
+          this.assetService.reScan(id);
+        });
+        this.schedulerRegistry.addCronJob(id, newCron);
+        return newCron.start();
+      }),
+    );
   }
 }
