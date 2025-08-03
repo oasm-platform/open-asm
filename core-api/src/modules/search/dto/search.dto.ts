@@ -9,8 +9,6 @@ import {
 } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { Transform } from 'class-transformer';
-import { GetAssetsResponseDto } from 'src/modules/assets/dto/assets.dto';
-import { Target } from 'src/modules/targets/entities/target.entity';
 
 export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   @ApiProperty({ required: true })
@@ -32,10 +30,7 @@ export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
 
 export class SearchAssetsTargetsResponseDto {
   @ApiProperty({ isArray: true })
-  data: {
-    assets: GetAssetsResponseDto[];
-    targets: Target[];
-  };
+  data: object;
 
   @ApiProperty()
   total: number;
@@ -51,4 +46,38 @@ export class SearchAssetsTargetsResponseDto {
 
   @ApiProperty()
   hasNextPage: boolean;
+}
+
+export class GetManySearchHistoryDto extends GetManyBaseQueryParams {
+  @ApiProperty({ required: true })
+  @IsUUID(4)
+  workspaceId: string;
+
+  @ApiProperty({ required: false, example: 10 })
+  @Min(1)
+  @Max(10)
+  @IsNumber()
+  @Transform(({ value }) => Number(value))
+  @IsOptional()
+  limit: number = 10;
+}
+
+export class GetSearchHistoryResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  filter: Record<string, any>;
+
+  @ApiProperty()
+  result: object;
+
+  @ApiProperty()
+  workspaceId: string;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
 }

@@ -4,11 +4,11 @@ import { User } from 'src/modules/auth/entities/user.entity';
 
 @Entity('search_history')
 export class SearchHistory extends BaseEntity {
-  @Column()
-  query: string;
-
   @Column({ type: 'jsonb', nullable: true })
   filters?: Record<string, any>;
+
+  @Column({ type: 'jsonb', nullable: true })
+  result: object;
 
   @Column()
   userId: string;

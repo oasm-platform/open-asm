@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import {
+  GetManySearchHistoryDto,
   SearchAssetsTargetsDto,
   SearchAssetsTargetsResponseDto,
 } from './dto/search.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { SearchHistory } from './entities/search-history.entity';
-import { Repository } from 'typeorm';
+import { Like, Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import { TargetsService } from '../targets/targets.service';
 import { getManyResponse } from 'src/utils/getManyResponse';
+import { User } from '../auth/entities/user.entity';
 
 @Injectable()
 export class SearchService {
@@ -27,6 +29,7 @@ export class SearchService {
    * @returns A promise that resolves to an object containing the combined results of assets and targets, along with pagination information.
    */
   public async searchAssetsTargets(
+    user: User,
     query: SearchAssetsTargetsDto,
   ): Promise<SearchAssetsTargetsResponseDto> {
     // First, get the total count for both assets and targets
@@ -74,7 +77,7 @@ export class SearchService {
       targets: targets.data || [],
     };
 
-    return {
+    const response = {
       data: combinedResults,
       total: (assets.total || 0) + (targets.total || 0),
       page: +query.page,
@@ -82,5 +85,38 @@ export class SearchService {
       pageCount: Math.ceil((assets.total + targets.total) / query.limit),
       hasNextPage: query.page * query.limit < totalItems,
     };
+
+    // Save search history
+    const searchHistory = this.searchHistoryRepo.create({
+      filters: query,
+      result: response,
+      userId: user.id,
+    });
+
+    await this.searchHistoryRepo.save(searchHistory);
+
+    return response;
+  }
+
+  /**
+   * Retrieves a paginated list of search history for a specific workspace.
+   *
+   * @param user - The user object containing the user ID.
+   * @param query - The query parameters to filter and paginate the search history.
+   * @returns A promise that resolves to a paginated list of search history, including total count and pagination information.
+   */
+  public async getSearchHistory(user: User, query: GetManySearchHistoryDto) {
+    const [searchHistory, total] = await this.searchHistoryRepo
+      .createQueryBuilder('searchHistory')
+      .where('searchHistory.userId = :userId', { userId: user.id })
+      .andWhere('"searchHistory".filters->>\'workspaceId\' = :workspaceId', {
+        workspaceId: query.workspaceId,
+      })
+      .orderBy('searchHistory.createdAt', 'DESC')
+      .take(query.limit)
+      .skip((query.page - 1) * query.limit)
+      .getManyAndCount();
+
+    return getManyResponse(query, searchHistory, total);
   }
 }
