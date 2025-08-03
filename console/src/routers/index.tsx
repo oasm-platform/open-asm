@@ -1,4 +1,4 @@
-import Layout from "@/components/common/layout/layout";
+import Layout from "@/components/common/layout/Layout";
 import Assets from "@/pages/assets/assets";
 import Dashboard from "@/pages/dashboard/dashboard";
 import Login from "@/pages/login/login";
