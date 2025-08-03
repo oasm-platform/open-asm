@@ -240,4 +240,18 @@ export class TargetsService {
     }
     return this.repo.update(id, dto);
   }
+
+  /**
+   * Counts the number of targets in a workspace.
+   *
+   * @param workspaceId - The ID of the workspace.
+   * @returns The count of targets in the workspace.
+   */
+  public async countTargetsInWorkspace(workspaceId: string) {
+    return this.repo.count({
+      where: {
+        workspaceTargets: { workspace: { id: workspaceId } },
+      },
+    });
+  }
 }

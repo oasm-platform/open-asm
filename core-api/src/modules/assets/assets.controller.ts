@@ -18,7 +18,7 @@ export class AssetsController {
     },
   })
   @Get()
-  getAssets(@Query() query: GetAssetsQueryDto) {
-    return this.assetsService.getAssets(query);
+  getAssetsInWorkspace(@Query() query: GetAssetsQueryDto) {
+    return this.assetsService.getAssetsInWorkspace(query);
   }
 }

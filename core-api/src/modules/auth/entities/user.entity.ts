@@ -5,6 +5,7 @@ import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { Account } from './account.entity';
 import { Session } from './session.entity';
+import { SearchHistory } from 'src/modules/search/entities/search-history.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -49,4 +50,7 @@ export class User extends BaseEntity {
 
   @Column('text', { nullable: true })
   apiKey?: string;
+
+  @OneToMany(() => SearchHistory, (searchHistory) => searchHistory.user)
+  searchHistory: SearchHistory[];
 }

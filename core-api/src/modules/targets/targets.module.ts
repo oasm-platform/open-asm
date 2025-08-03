@@ -14,5 +14,6 @@ import { Asset } from '../assets/entities/assets.entity';
   ],
   controllers: [TargetsController],
   providers: [TargetsService],
+  exports: [TargetsService],
 })
 export class TargetsModule {}

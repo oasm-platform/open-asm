@@ -138,7 +138,7 @@ export class AssetsService {
    * @param query - The query parameters to filter and paginate the assets.
    * @returns A promise that resolves to a paginated list of assets, including total count and pagination information.
    */
-  public async getAssets(
+  public async getAssetsInWorkspace(
     query: GetAssetsQueryDto,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
     let { limit, page, sortOrder, targetIds, workspaceId, value } = query;
@@ -287,5 +287,19 @@ export class AssetsService {
     return {
       message: 'Scan started',
     };
+  }
+
+  /**
+   * Counts the number of assets in a workspace.
+   *
+   * @param workspaceId - The ID of the workspace.
+   * @returns The count of assets in the workspace.
+   */
+  public async countAssetsInWorkspace(workspaceId: string) {
+    return this.repo.count({
+      where: {
+        target: { workspaceTargets: { workspace: { id: workspaceId } } },
+      },
+    });
   }
 }

@@ -15,7 +15,7 @@ export class CreateTargetDto extends PickType(Target, ['value'] as const) {
 
 export class GetManyTargetResponseDto {
   @ApiProperty({ enum: ScanStatus, example: ScanStatus.DONE })
-  status: ScanStatus;
+  status?: ScanStatus;
 
   @ApiProperty({ example: 100 })
   totalAssets: number;
