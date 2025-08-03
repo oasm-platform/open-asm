@@ -23,7 +23,7 @@ const useWorkspaceState = createState<WorkspaceState>(
       ...state,
       selectedWorkspaceId: null,
     }),
-  }
+  },
 );
 
 export function useWorkspaceSelector() {
@@ -44,7 +44,7 @@ export function useWorkspaceSelector() {
       setSelectedWorkspace(id);
       // Remove window.location.reload() since we're using global state
     },
-    [setSelectedWorkspace]
+    [setSelectedWorkspace],
   );
 
   // Auto-select workspace logic
@@ -66,14 +66,15 @@ export function useWorkspaceSelector() {
       // Update state only if different
       if (state.selectedWorkspaceId !== finalSelectedId) {
         setSelectedWorkspace(finalSelectedId);
+        setGlobalWorkspaceId(finalSelectedId);
       }
     } else if (response?.data && response.data.length === 0) {
       // Clear selection when no workspaces
       if (state.selectedWorkspaceId !== null) {
         clearSelectedWorkspace();
+        setGlobalWorkspaceId(null);
       }
     }
-    setGlobalWorkspaceId(state.selectedWorkspaceId);
   }, [
     response,
     state.selectedWorkspaceId,
