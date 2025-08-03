@@ -12,13 +12,15 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarRail
+    SidebarRail,
+    useSidebar
 } from "@/components/ui/sidebar";
 import { CloudCheck, LayoutDashboard, Radar, ShoppingCart, SquareTerminal, Target } from "lucide-react";
 import { NavUser } from "../../ui/nav-user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const location = useLocation();
+    const { state } = useSidebar();
 
     const menu = [
         {
@@ -62,12 +64,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         },
     ];
     return (
-        <Sidebar {...props}>
-            <SidebarHeader>
+        <Sidebar {...props} collapsible="icon">
+            <SidebarHeader className="pt-4">
                 <div className="flex h-13 justify-start items-center gap-3">
                     <Radar size={40} />
-                    <b className="text-lg">OASM</b>
-                </div>
+   
+                     {state === "expanded" && <b className="text-lg">OASM</b>}
+                 </div>
             </SidebarHeader>
             <SidebarContent>
                 {menu.map((item) => (
@@ -85,6 +88,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                             <SidebarMenuButton
                                                 asChild
                                                 isActive={isActive}
+                                                tooltip={item.title}
                                                 className="hover:cursor-pointer"
                                             >
                                                 <Link
