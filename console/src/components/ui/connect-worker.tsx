@@ -34,6 +34,7 @@ export function ConnectWorker() {
             }
         }
     })
+    if (import.meta.env.DEV) return null;
 
     const handleCopyCommand = async () => {
         await navigator.clipboard.writeText(rawCommand);

@@ -14,6 +14,7 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   CreateTargetDto,
   GetManyWorkspaceQueryParamsDto,
+  UpdateTargetDto,
 } from './dto/targets.dto';
 import { Target } from './entities/target.entity';
 import { WorkspaceTarget } from './entities/workspace-target.entity';
@@ -222,5 +223,21 @@ export class TargetsService {
     });
 
     return { message: 'Target deleted successfully' };
+  }
+
+  /**
+   * Updates a target.
+   *
+   * @param id - The ID of the target to be updated.
+   * @param dto - The data transfer object containing the target details to be updated.
+   * @throws NotFoundException if the target is not found.
+   * @returns The updated target entity.
+   */
+  public async updateTarget(id: string, dto: UpdateTargetDto) {
+    const target = await this.repo.findOneBy({ id });
+    if (!target) {
+      throw new NotFoundException('Target not found');
+    }
+    return this.repo.update(id, dto);
   }
 }

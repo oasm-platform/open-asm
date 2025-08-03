@@ -37,6 +37,15 @@ export const JobStatus = {
   cancelled: "cancelled",
 } as const;
 
+export type CronSchedule = (typeof CronSchedule)[keyof typeof CronSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const CronSchedule = {
+  "0_0_*_*_0": "0 0 * * 0",
+  "0_0_*/14_*_*": "0 0 */14 * *",
+  "0_0_1_*_*": "0 0 1 * *",
+} as const;
+
 export type Target = {
   id: string;
   createdAt: string;
@@ -46,6 +55,7 @@ export type Target = {
   lastDiscoveredAt: string;
   totalAssets: number;
   status: JobStatus;
+  scanSchedule: CronSchedule;
 };
 
 export type AppResponseSerialization = { [key: string]: unknown };
@@ -82,6 +92,20 @@ export type GetManyGetManyTargetResponseDtoDto = {
 
 export type DefaultMessageResponseDto = {
   message: string;
+};
+
+export type UpdateTargetDtoScanSchedule =
+  (typeof UpdateTargetDtoScanSchedule)[keyof typeof UpdateTargetDtoScanSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UpdateTargetDtoScanSchedule = {
+  "0_0_*_*_0": "0 0 * * 0",
+  "0_0_*/14_*_*": "0 0 */14 * *",
+  "0_0_1_*_*": "0 0 1 * *",
+} as const;
+
+export type UpdateTargetDto = {
+  scanSchedule: UpdateTargetDtoScanSchedule;
 };
 
 export type Workspace = {
@@ -1097,6 +1121,99 @@ export function useTargetsControllerGetTargetById<
 
   return query;
 }
+
+/**
+ * Updates a target.
+ * @summary Update a target
+ */
+export const targetsControllerUpdateTarget = (
+  id: string,
+  updateTargetDto: UpdateTargetDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<Target>(
+    {
+      url: `/api/targets/${id}`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: updateTargetDto,
+    },
+    options,
+  );
+};
+
+export const getTargetsControllerUpdateTargetMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+    TError,
+    { id: string; data: UpdateTargetDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+  TError,
+  { id: string; data: UpdateTargetDto },
+  TContext
+> => {
+  const mutationKey = ["targetsControllerUpdateTarget"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+    { id: string; data: UpdateTargetDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return targetsControllerUpdateTarget(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TargetsControllerUpdateTargetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerUpdateTarget>>
+>;
+export type TargetsControllerUpdateTargetMutationBody = UpdateTargetDto;
+export type TargetsControllerUpdateTargetMutationError = unknown;
+
+/**
+ * @summary Update a target
+ */
+export const useTargetsControllerUpdateTarget = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+      TError,
+      { id: string; data: UpdateTargetDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof targetsControllerUpdateTarget>>,
+  TError,
+  { id: string; data: UpdateTargetDto },
+  TContext
+> => {
+  const mutationOptions =
+    getTargetsControllerUpdateTargetMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * Deletes a target from a workspace.

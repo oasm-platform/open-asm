@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import {
   CreateTargetDto,
   GetManyTargetResponseDto,
   GetManyWorkspaceQueryParamsDto,
+  UpdateTargetDto,
 } from './dto/targets.dto';
 import { Target } from './entities/target.entity';
 import { TargetsService } from './targets.service';
@@ -96,5 +98,17 @@ export class TargetsController {
   @Post(':id/re-scan')
   reScanTarget(@Param() { id }: IdQueryParamDto) {
     return this.targetsService.assetService.reScan(id);
+  }
+
+  @Doc({
+    summary: 'Update a target',
+    description: 'Updates a target.',
+    response: {
+      serialization: Target,
+    },
+  })
+  @Patch(':id')
+  updateTarget(@Param() { id }: IdQueryParamDto, @Body() dto: UpdateTargetDto) {
+    return this.targetsService.updateTarget(id, dto);
   }
 }

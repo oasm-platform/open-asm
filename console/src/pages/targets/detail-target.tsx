@@ -1,7 +1,7 @@
 import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
 import TargetStatus from '@/components/ui/target-status';
-import { useTargetsControllerGetTargetById } from '@/services/apis/gen/queries';
+import { JobStatus, useTargetsControllerGetTargetById } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -61,10 +61,10 @@ export function DetailTarget() {
                     <SettingTarget target={target} />
                 </div>
             </div>
-            {animation && (target.status === 'in_progress' || target.status === 'pending') && (
+            {animation && (target.status === JobStatus.in_progress || target.status === JobStatus.pending) && (
                 <AssetsDiscovering targetId={target.id} />
             )}
-            <ListAssets targetId={target.id} refetchInterval={target.status === 'in_progress' ? 1000 : 5000} />
+            <ListAssets targetId={target.id} refetchInterval={target.status === JobStatus.in_progress ? 1000 : 5000} />
         </Page>
     );
 }

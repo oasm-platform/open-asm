@@ -26,3 +26,9 @@ export enum WorkerType {
   BUILT_IN = 'built_in',
   PLUGIN = 'plugin',
 }
+
+export enum CronSchedule {
+  WEEKLY = '0 0 * * 0',
+  BI_WEEKLY = '0 0 */14 * *',
+  MONTHLY = '0 0 1 * *',
+}

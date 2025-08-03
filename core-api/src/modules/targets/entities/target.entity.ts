@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsString, Matches } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
-import { JobStatus } from 'src/common/enums/enum';
+import { CronSchedule, JobStatus } from 'src/common/enums/enum';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
@@ -52,4 +52,8 @@ export class Target extends BaseEntity {
 
   @ApiProperty({ enum: JobStatus, enumName: 'JobStatus' })
   status: JobStatus;
+
+  @ApiProperty({ enum: CronSchedule, enumName: 'CronSchedule' })
+  @Column({ type: 'enum', enum: CronSchedule, default: CronSchedule.BI_WEEKLY })
+  scanSchedule: CronSchedule;
 }
