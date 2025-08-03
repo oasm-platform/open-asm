@@ -1,5 +1,5 @@
 import { ApiProperty, PickType } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { CronSchedule, ScanStatus } from 'src/common/enums/enum';
 import { Target } from '../entities/target.entity';
@@ -35,6 +35,7 @@ export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
 export class UpdateTargetDto {
   @ApiProperty({ enum: CronSchedule, example: CronSchedule.BI_WEEKLY })
   @IsString()
+  @IsEnum(CronSchedule)
   @IsOptional()
   scanSchedule?: CronSchedule;
 }
