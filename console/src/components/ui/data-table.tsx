@@ -6,10 +6,7 @@ import {
   type ColumnDef,
   type VisibilityState,
 } from "@tanstack/react-table";
-import {
-  ArrowDownNarrowWide,
-  ArrowUpNarrowWide
-} from "lucide-react";
+import { ArrowDownNarrowWide, ArrowUpNarrowWide } from "lucide-react";
 import * as React from "react";
 
 import { Input } from "@/components/ui/input";
@@ -89,23 +86,8 @@ export function DataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
 
-  const [searchValue, setSearchValue] = React.useState(filterValue || "");
+  const [searchValue, setSearchValue] = React.useState(filterValue);
 
-  const timeoutRef = React.useRef<any>(null);
-
-  React.useEffect(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-    timeoutRef.current = setTimeout(() => {
-      onFilterChange?.(searchValue);
-    }, 300);
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [onFilterChange, searchValue]);
-
-  // Initialize table with react-table
   const table = useReactTable({
     data,
     columns,
@@ -158,9 +140,9 @@ export function DataTable<TData, TValue>({
           {filterColumnKey && (
             <Input
               placeholder={filterPlaceholder}
+              className="max-w-sm"
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
-              className="max-w-sm"
             />
           )}
         </div>
@@ -203,11 +185,13 @@ export function DataTable<TData, TValue>({
             {showSkeleton ? (
               [...Array(5)].map((_, rowIndex) => (
                 <TableRow key={`skeleton-${rowIndex}`}>
-                  {[...Array(table.getAllLeafColumns().length)].map((_, colIndex) => (
-                    <TableCell key={`skeleton-cell-${colIndex}`}>
-                      <div className="h-4 w-full bg-muted rounded animate-pulse" />
-                    </TableCell>
-                  ))}
+                  {[...Array(table.getAllLeafColumns().length)].map(
+                    (_, colIndex) => (
+                      <TableCell key={`skeleton-cell-${colIndex}`}>
+                        <div className="h-4 w-full bg-muted rounded animate-pulse" />
+                      </TableCell>
+                    ),
+                  )}
                 </TableRow>
               ))
             ) : table.getRowModel().rows.length ? (
@@ -223,21 +207,25 @@ export function DataTable<TData, TValue>({
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   {emptyMessage}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
-
-
         </Table>
       </div>
 

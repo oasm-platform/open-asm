@@ -30,7 +30,7 @@ export function useServerDataTable({
       }
       setParams(params, { replace: true });
     },
-    [params, setParams]
+    [params, setParams],
   );
 
   return {
