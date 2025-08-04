@@ -1,109 +1,145 @@
-# Open-ASM
+# 🎯 Open-Attack Surface Management (OASM)
 
-Open-ASM is an open-source platform for cybersecurity Attack Surface Management (ASM). Built to help security teams identify, monitor, and manage external assets and exposure.
+Open-source platform for cybersecurity Attack Surface Management. Built to help security teams identify, monitor, and manage external assets and potential security exposures across their digital infrastructure.
 
-## Project Architecture
+## ✨ Core Features
 
-The Open-ASM project is divided into three main components:
+- **🎯 Asset Management**: Auto-discovery, classification, tracking & inventory
+- **👥 Auth & Authorization**: User management, RBAC, API keys & sessions  
+- **⚙️ Job Management**: Scheduling, queuing, monitoring & history
+- **🎯 Target Management**: Define, group, validate & monitor scan targets
+- **🤖 Worker Management**: Distributed workers with auto-scaling & health monitoring
+- **🏢 Workspace Management**: Multi-tenant isolation with team collaboration
+- **🔧 Security Tools**: Integrated Subfinder, DNSX, HTTPX & Naabu
 
-### 1. Core API (NestJS)
+## 🏗️ System Architecture
 
-Central API built on NestJS, providing RESTful endpoints and data management:
+- **🖥️ Core API** (NestJS + TypeScript + Better Auth + PostgreSQL): RESTful endpoints, job orchestration, data persistence & worker coordination
+- **🌐 Console** (React + TypeScript + Vite): Modern UI with real-time monitoring, data visualization & asset management  
+- **⚡ Workers** (Bun + TypeScript): High-performance distributed scanning with horizontal scalability
 
-- User authentication and authorization
-- Job management and task distribution to workers
-- Data storage and querying from PostgreSQL database
-- Automatic API documentation with Swagger
+## 🔧 Worker Types & Tools
 
-### 2. Console (React + TypeScript + Vite)
+| Worker Type | Tool | Description | Purpose |
+|-------------|------|-------------|---------|
+| **🔍 Subdomain** | Subfinder | Passive subdomain enumeration | Discover hidden subdomains |
+| **🌐 DNS** | DNSX | DNS resolution and validation | Validate and resolve domains |
+| **🔗 HTTP** | HTTPX | HTTP/HTTPS service analysis | Identify web services and technologies |
+| **🔌 Port** | Naabu | Network port scanning | Discover exposed services and entry points |
 
-Web user interface built with React, TypeScript, and Vite:
+## 🚀 Quick Start
 
-- Modern interface with Material UI
-- Routing with React Router
-- Rapid development with Vite HMR
+### Prerequisites
+- **Node.js** v18+
+- **Bun** runtime (latest)
+- **PostgreSQL** v12+
+- **Docker & Docker Compose** (optional)
 
-### 3. Worker (Bun)
-
-Workers run scanning and information gathering tasks:
-
-- Built on Bun runtime for high performance
-- Support for different worker types (subdomains, http_scraper, ports)
-- Process jobs from queue and report results back to Core API
-
-## Installation and Development
-
-### Requirements
-
-- Node.js (latest version)
-- Bun runtime
-- PostgreSQL
-- Docker and Docker Compose (optional)
-
-### Installing Dependencies
-
+### 🐳 Docker Deployment (Recommended)
 ```bash
-# Install dependencies for all components
-npm run install
-```
+# Clone repository
+git clone https://github.com/oasm-platform/open-asm.git
+cd open-asm
 
-### Development
-
-```bash
-# Run all components in development mode
-task dev
-
-# Or run each component separately
-task api:dev
-task console:dev
-task worker:dev
-```
-
-### Building
-
-```bash
-# Build all components
-task build
-```
-
-### Deployment with Docker
-
-```bash
-# Create .env files from examples
+# Configure environment
 cp core-api/example.env core-api/.env
 cp worker/example.env worker/.env
 
-# Edit .env files according to your configuration
+# Edit configuration
+nano core-api/.env
+nano worker/.env
 
-# Start containers
+# Start all services
 task docker-compose
 ```
 
-## Project Structure
+### 💻 Development Setup
+```bash
+# Install dependencies
+npm run install
 
+# Start all services
+task dev
+
+# Or run individually:
+task api:dev     # API server
+task console:dev # Web console
+task worker:dev  # Worker processes
 ```
-├── core-api/            # Central API (NestJS)
-├── console/             # User interface (React)
-├── worker/              # Job processing workers (Bun)
-├── open-api/            # Auto-generated OpenAPI documentation
-├── docker-compose.yml   # Docker Compose configuration
-└── taskfile.yml         # Task Runner configuration file
+
+## 📁 Project Structure
+```
+open-asm/
+├── 🖥️ core-api/           # NestJS API server
+│   ├── src/               # Source code
+│   ├── example.env        # Environment template
+│   └── package.json
+├── 🌐 console/            # React web interface
+│   ├── src/               # React components
+│   ├── public/            # Static assets
+│   └── package.json
+├── ⚡ worker/             # Bun-based workers
+│   ├── services/          # Worker services
+│   ├── tools/             # Security tools integration
+│   ├── example.env        # Worker environment
+│   └── package.json
+├── 📚 open-api/           # Auto-generated API docs
+├── 🐳 docker-compose.yml  # Container orchestration
+├── ⚙️ taskfile.yml        # Task automation
+└── 📖 README.md           # Documentation
 ```
 
-## Workers
+## 🔗 Access Points
 
-The project supports three main types of workers:
+| Service | URL | Description |
+|---------|-----|-------------|
+| **🌐 Web Console** | `http://localhost:5173` | Main web interface |
+| **📚 API Docs** | `http://localhost:6276/api/docs` | Swagger UI documentation |
+| **🔐 Auth Docs** | `http://localhost:6276/api/auth/docs` | Authentication endpoints |
+| **📋 OpenAPI Spec** | `http://localhost:6276/api/docs-json` | OpenAPI specification |
 
-1. **Subdomains Worker**: Scans and detects subdomains
-2. **HTTPX Worker**: Checks and analyzes HTTP/HTTPS services
-3. **Ports Worker**: Scans and detects open ports
+## ⚙️ Configuration
 
-Each worker can be scaled independently in a Docker environment.
+### Core API (.env)
+```env
+# Config database
+POSTGRES_HOST=localhost
+POSTGRES_USERNAME=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=open_asm
+POSTGRES_SSL=false
 
-## Contributing
+# API 
+PORT=6276
+OASM_ADMIN_TOKEN=change_me
+```
 
-We welcome all contributions! Please refer to the [contribution guidelines](https://github.com/oasm-platform/open-asm/issues) for more details.
+### Worker (.env)
+```env
+# API Connection
+API=http://localhost:6276
+API_KEY=change_me
 
-## License
+# Worker Configuration
+MAX_JOBS=10
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## 🤝 Contributing
+
+1. **🍴 Fork** the repository
+2. **🌿 Create** feature branch: `git checkout -b feature/amazing-feature`
+3. **💾 Commit** changes: `git commit -m 'Add amazing feature'`
+4. **📤 Push** to branch: `git push origin feature/amazing-feature`
+5. **🔄 Open** Pull Request
+
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+**⭐ If you find Open-ASM useful, please star us on GitHub!**
+
+**🛡️ Built for security teams, by security professionals.**
