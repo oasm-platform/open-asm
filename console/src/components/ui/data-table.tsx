@@ -116,7 +116,7 @@ export function DataTable<TData, TValue>({
   const getPaginationPages = () => {
     const pageCount = Math.ceil(totalItems / pageSize);
     const pages = Array.from({ length: pageCount }, (_, i) => i + 1).filter(
-      (p) => p === 1 || p === pageCount || Math.abs(p - page) <= 2,
+      (p) => p === 1 || p === pageCount || Math.abs(p - page) <= 2
     );
 
     const mergedPages: (number | "...")[] = [];
@@ -167,7 +167,7 @@ export function DataTable<TData, TValue>({
                     <div className="flex items-center gap-2">
                       {flexRender(
                         header.column.columnDef.header,
-                        header.getContext(),
+                        header.getContext()
                       )}
                       {sortBy === header.column.id &&
                         (sortOrder === "ASC" ? (
@@ -190,7 +190,7 @@ export function DataTable<TData, TValue>({
                       <TableCell key={`skeleton-cell-${colIndex}`}>
                         <div className="h-4 w-full bg-muted rounded animate-pulse" />
                       </TableCell>
-                    ),
+                    )
                   )}
                 </TableRow>
               ))
@@ -201,7 +201,7 @@ export function DataTable<TData, TValue>({
                   data-state={row.getIsSelected() && "selected"}
                   className={cn(
                     rowClassName,
-                    onRowClick && "cursor-pointer hover:bg-muted/50",
+                    onRowClick && "cursor-pointer hover:bg-muted/50"
                   )}
                   onClick={() => onRowClick?.(row.original)}
                 >
@@ -209,7 +209,7 @@ export function DataTable<TData, TValue>({
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext(),
+                        cell.getContext()
                       )}
                     </TableCell>
                   ))}
@@ -237,12 +237,16 @@ export function DataTable<TData, TValue>({
               value={pageSize.toString()}
               onValueChange={(value) => onPageSizeChange?.(parseInt(value))}
             >
-              <SelectTrigger className="w-[70px]">
+              <SelectTrigger className="w-[100px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {[10, 20, 50, 100].map((size) => (
-                  <SelectItem key={size} value={size.toString()}>
+                  <SelectItem
+                    key={size}
+                    value={size.toString()}
+                    className="justify-center"
+                  >
                     {size}
                   </SelectItem>
                 ))}
@@ -281,7 +285,7 @@ export function DataTable<TData, TValue>({
                       {p}
                     </PaginationLink>
                   </PaginationItem>
-                ),
+                )
               )}
 
               <PaginationItem>
