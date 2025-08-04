@@ -115,6 +115,12 @@ PORT=6276
 OASM_ADMIN_TOKEN=change_me
 ```
 
+### Console (.env)
+```env
+# API Connection
+VITE_API_URL=http://localhost:6276
+```
+
 ### Worker (.env)
 ```env
 # API Connection
