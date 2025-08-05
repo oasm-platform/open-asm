@@ -7,6 +7,7 @@ export enum ToolCategory {
   SUBDOMAINS = 'subdomains',
   HTTP_SCRAPER = 'http_scraper',
   PORTS_SCANNER = 'ports_scanner',
+  VULNERABILITIES = 'vulnerabilities',
 }
 
 export enum JobStatus {

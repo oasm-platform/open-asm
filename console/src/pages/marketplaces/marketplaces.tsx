@@ -1,10 +1,10 @@
 import Page from "@/components/common/page";
 import BuiltInTools from "./built-in-tools";
 
-const Marketplaces = () => {
-    return <Page title="Marketplaces">
+const Tools = () => {
+    return <Page title="Tools">
         <BuiltInTools />
     </Page>
 };
 
-export default Marketplaces;
+export default Tools;

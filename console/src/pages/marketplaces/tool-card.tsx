@@ -1,9 +1,9 @@
-
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import type { Tool } from '@/services/apis/gen/queries';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Verified } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const ToolCard = (tool: Tool) => {
     return (
@@ -24,7 +24,21 @@ const ToolCard = (tool: Tool) => {
                     {tool.isInstalled ? "Installed" : "Install"}
                 </Button>
                 <div className="flex gap-3 items-center justify-between">
-                    <CardTitle className="text-left text-lg">{tool.name}</CardTitle>
+                    <div className="flex items-center gap-2">
+                        <CardTitle className="text-left text-lg">{tool.name}</CardTitle>
+                        {tool.isOfficialSupport && (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Verified className="w-4 h-4 text-blue-500" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Official Support</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
+                    </div>
                     <Badge variant="outline" className="w-fit">
                         {tool.category
                             .split('_')
@@ -32,9 +46,20 @@ const ToolCard = (tool: Tool) => {
                             .join(' ')}
                     </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground line-clamp-4">
-                    {tool.description}
-                </p>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <p className="text-sm text-muted-foreground line-clamp-4">
+                                {tool.description}
+                            </p>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="w-full max-w-[300px] p-2">
+                            <p className="text-sm">
+                                {tool.description}
+                            </p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             </CardContent>
         </Card>
     );

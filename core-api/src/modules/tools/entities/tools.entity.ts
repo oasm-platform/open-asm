@@ -35,4 +35,7 @@ export class Tool extends BaseEntity {
 
   @ApiProperty()
   isInstalled?: boolean;
+
+  @ApiProperty()
+  isOfficialSupport: boolean;
 }

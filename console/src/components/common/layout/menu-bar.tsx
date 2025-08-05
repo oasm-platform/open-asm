@@ -15,7 +15,7 @@ import {
     SidebarRail,
     useSidebar
 } from "@/components/ui/sidebar";
-import { CloudCheck, LayoutDashboard, Radar, ShoppingCart, SquareTerminal, Target } from "lucide-react";
+import { CloudCheck, Cpu, LayoutDashboard, Radar, SquareTerminal, Target } from "lucide-react";
 import { NavUser } from "../../ui/nav-user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -33,9 +33,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     url: "",
                 },
                 {
-                    title: "Marketplaces",
-                    icon: <ShoppingCart />,
-                    url: "/marketplaces",
+                    title: "Tools",
+                    icon: <Cpu />,
+                    url: "/tools",
                 },
                 {
                     title: "Targets",
@@ -68,9 +68,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarHeader className="pt-4">
                 <div className="flex h-13 justify-start items-center gap-3">
                     <Radar size={40} />
-   
-                     {state === "expanded" && <b className="text-lg">OASM</b>}
-                 </div>
+
+                    {state === "expanded" && <b className="text-xl">OASM</b>}
+                </div>
             </SidebarHeader>
             <SidebarContent>
                 {menu.map((item) => (
@@ -93,7 +93,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                             >
                                                 <Link
                                                     to={toUrl}
-                                                    className="flex items-center justify-start gap-2 w-full h-full"
+                                                    className="flex items-center justify-start gap-2 w-full h-full text-base"
                                                 >
                                                     {item.icon} {item.title}
                                                 </Link>

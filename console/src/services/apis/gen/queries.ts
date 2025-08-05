@@ -295,6 +295,7 @@ export const ToolCategory = {
   subdomains: "subdomains",
   http_scraper: "http_scraper",
   ports_scanner: "ports_scanner",
+  vulnerabilities: "vulnerabilities",
 } as const;
 
 export type Tool = {
@@ -306,6 +307,7 @@ export type Tool = {
   category: ToolCategory;
   logoUrl: string;
   isInstalled: boolean;
+  isOfficialSupport: boolean;
 };
 
 export type GetManyToolDto = {

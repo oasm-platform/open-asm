@@ -1,8 +1,8 @@
-import Layout from "@/components/common/layout/Layout";
+import Layout from "@/components/common/layout/layout";
 import Assets from "@/pages/assets/assets";
 import Dashboard from "@/pages/dashboard/dashboard";
 import Login from "@/pages/login/login";
-import Marketplaces from "@/pages/marketplaces/marketplaces";
+import Tools from "@/pages/marketplaces/marketplaces";
 import Register from "@/pages/register/register";
 import DetailTarget from "@/pages/targets/detail-target";
 import Targets from "@/pages/targets/targets";
@@ -59,8 +59,8 @@ export const router = createBrowserRouter([
             path: "workers",
           },
           {
-            element: <Marketplaces />,
-            path: "marketplaces",
+            element: <Tools />,
+            path: "tools",
           },
           {
             element: <Assets />,

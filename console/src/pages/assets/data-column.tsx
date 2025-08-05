@@ -90,7 +90,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
       const daysLeft = Math.round(
         Math.abs(
           (new Date(tls.not_after).getTime() - new Date().getTime()) /
-            (1000 * 60 * 60 * 24)
+          (1000 * 60 * 60 * 24)
         )
       );
       const color = daysLeft < 30 ? "red" : daysLeft < 60 ? "yellow" : "green";
@@ -131,7 +131,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
 
       return (
         <div className="flex flex-col gap-1 max-w-[120px] min-h-[60px] justify-center">
-          <span className="text-xs text-gray-600">
+          <span>
             {dayjs(createdAt).fromNow()}
           </span>
         </div>

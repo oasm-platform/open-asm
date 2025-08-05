@@ -12,13 +12,13 @@ import { ResultHandler } from 'src/common/interfaces/app.interface';
 import { BuiltInTool } from 'src/common/types/app.types';
 import { Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
+import { Httpx } from '../assets/entities/httpxs.entity';
+import { Port } from '../assets/entities/ports.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkersService } from '../workers/workers.service';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
-import { Port } from '../assets/entities/ports.entity';
-import { Httpx } from '../assets/entities/httpxs.entity';
 
 @Injectable()
 export class ToolsService {
@@ -70,6 +70,17 @@ export class ToolsService {
         'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
       logoUrl:
         'https://raw.githubusercontent.com/projectdiscovery/naabu/refs/heads/main/static/naabu-logo.png',
+      command: 'naabu -host {{value}} -silent',
+      resultHandler: this.handleNaabuResult.bind(this),
+    },
+    {
+      id: 'nuclei',
+      name: 'Nuclei',
+      category: ToolCategory.VULNERABILITIES,
+      description:
+        'Nuclei is a fast, customizable vulnerability scanner powered by the global security community and built on a simple YAML-based DSL, enabling collaboration to tackle trending vulnerabilities on the internet. It helps you find vulnerabilities in your applications, APIs, networks, DNS, and cloud configurations.',
+      logoUrl:
+        'https://raw.githubusercontent.com/projectdiscovery/nuclei/refs/heads/dev/static/nuclei-logo.png',
       command: 'naabu -host {{value}} -silent',
       resultHandler: this.handleNaabuResult.bind(this),
     },
@@ -284,6 +295,7 @@ export class ToolsService {
     const data = this.builtInTools.map((tool) => ({
       ...pick(tool, ['name', 'category', 'description', 'logoUrl']),
       isInstalled: true,
+      isOfficialSupport: true,
     }));
 
     return {
