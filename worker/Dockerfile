@@ -6,14 +6,14 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y libpcap-dev
 
 # Cài các công cụ Go phổ biến
-RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
-    go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
-    go install github.com/projectdiscovery/http_scraper/cmd/http_scraper@latest && \
-    go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+RUN go install github.com/projectdiscovery/httpx/cmd/httpx@v1.7.1 && \
+	go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@v2.8.0 && \
+	go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.4.7 && \
+	go install github.com/projectdiscovery/dnsx/cmd/dnsx@v1.2.2 && \
+	go install github.com/projectdiscovery/naabu/v2/cmd/naabu@v2.3.5
 
 FROM oven/bun:1.2 AS base
-RUN apt-get update && \
-    apt-get install -y \
+RUN apt-get update && apt-get install -y \
     curl
 
 FROM base AS builder
