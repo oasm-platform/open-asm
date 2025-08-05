@@ -5,6 +5,7 @@ export enum Role {
 
 export enum ToolCategory {
   SUBDOMAINS = 'subdomains',
+  HTTP_PROBE = 'http_probe',
   HTTP_SCRAPER = 'http_scraper',
   PORTS_SCANNER = 'ports_scanner',
   VULNERABILITIES = 'vulnerabilities',

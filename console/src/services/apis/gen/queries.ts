@@ -305,9 +305,11 @@ export type Tool = {
   name: string;
   description: string;
   category: ToolCategory;
+  version: string;
   logoUrl: string;
   isInstalled: boolean;
   isOfficialSupport: boolean;
+  type: string;
 };
 
 export type GetManyToolDto = {
@@ -4337,12 +4339,16 @@ export function useAssetsControllerGetAssetsInWorkspace<
   return query;
 }
 
+/**
+ * Worker alive
+ * @summary Worker alive
+ */
 export const workersControllerAlive = (
   workerAliveDto: WorkerAliveDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<void>(
+  return orvalClient<DefaultMessageResponseDto>(
     {
       url: `/api/workers/alive`,
       method: "POST",
@@ -4398,6 +4404,9 @@ export type WorkersControllerAliveMutationResult = NonNullable<
 export type WorkersControllerAliveMutationBody = WorkerAliveDto;
 export type WorkersControllerAliveMutationError = unknown;
 
+/**
+ * @summary Worker alive
+ */
 export const useWorkersControllerAlive = <TError = unknown, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<

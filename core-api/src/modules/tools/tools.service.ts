@@ -3,11 +3,11 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { pick } from 'lodash';
-import { ToolCategory } from 'src/common/enums/enum';
+import { ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { ResultHandler } from 'src/common/interfaces/app.interface';
 import { BuiltInTool } from 'src/common/types/app.types';
 import { Repository } from 'typeorm';
@@ -21,7 +21,7 @@ import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
 
 @Injectable()
-export class ToolsService {
+export class ToolsService implements OnModuleInit {
   constructor(
     @InjectRepository(Tool)
     private readonly toolsRepository: Repository<Tool>,
@@ -39,8 +39,7 @@ export class ToolsService {
 
   public builtInTools: BuiltInTool[] = [
     {
-      id: 'subfinder',
-      name: 'Subfinder',
+      name: 'subfinder',
       category: ToolCategory.SUBDOMAINS,
       description:
         'Subfinder is a subdomain discovery tool that returns valid subdomains for websites, using passive online sources.',
@@ -49,11 +48,11 @@ export class ToolsService {
       command:
         '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
       resultHandler: this.handleSubfinderResult.bind(this),
+      version: '2.8.0',
     },
     {
-      id: 'httpx',
-      name: 'Httpx',
-      category: ToolCategory.HTTP_SCRAPER,
+      name: 'httpx',
+      category: ToolCategory.HTTP_PROBE,
       description:
         'Httpx is a fast and multi-purpose HTTP toolkit that allows running multiple probes using the retryable http library. It is designed to maintain result reliability with an increased number of threads.',
       logoUrl:
@@ -61,10 +60,10 @@ export class ToolsService {
       command:
         'httpx -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
       resultHandler: this.handleHttpxResult.bind(this),
+      version: '1.7.1',
     },
     {
-      id: 'naabu',
-      name: 'Naabu',
+      name: 'naabu',
       category: ToolCategory.PORTS_SCANNER,
       description:
         'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
@@ -72,10 +71,10 @@ export class ToolsService {
         'https://raw.githubusercontent.com/projectdiscovery/naabu/refs/heads/main/static/naabu-logo.png',
       command: 'naabu -host {{value}} -silent',
       resultHandler: this.handleNaabuResult.bind(this),
+      version: '2.3.5',
     },
     {
-      id: 'nuclei',
-      name: 'Nuclei',
+      name: 'nuclei',
       category: ToolCategory.VULNERABILITIES,
       description:
         'Nuclei is a fast, customizable vulnerability scanner powered by the global security community and built on a simple YAML-based DSL, enabling collaboration to tackle trending vulnerabilities on the internet. It helps you find vulnerabilities in your applications, APIs, networks, DNS, and cloud configurations.',
@@ -84,8 +83,40 @@ export class ToolsService {
       command:
         'nuclei -u {{value}} -t vulnerabilities/,miscellaneous/,exposures/,default-logins/,cves/ -s critical,high,medium,low,info -j --silent',
       resultHandler: this.handleNucleiResult.bind(this),
+      version: '3.4.7',
     },
   ];
+
+  async onModuleInit() {
+    try {
+      // Convert builtInTools to Tool entities
+      const toolsToInsert = this.builtInTools.map((tool) => ({
+        id: randomUUID(),
+        name: tool.name,
+        category: tool.category,
+        description: tool.description,
+        logoUrl: tool.logoUrl,
+        command: tool.command,
+        version: tool.version,
+        isBuiltIn: true,
+        isOfficialSupport: true,
+        type: WorkerType.BUILT_IN,
+      }));
+
+      // Insert tools using upsert to avoid duplicates
+      await this.toolsRepository
+        .createQueryBuilder()
+        .insert()
+        .orUpdate({
+          conflict_target: ['name', 'category'],
+          overwrite: ['description', 'logoUrl', 'version'],
+        })
+        .values(toolsToInsert)
+        .execute();
+    } catch (error) {
+      console.error('Error initializing built-in tools:', error);
+    }
+  }
 
   private async handleNucleiResult({ result, job, dataSource }: ResultHandler) {
     console.log(result, job, dataSource);
@@ -245,11 +276,14 @@ export class ToolsService {
    * @returns An array of built-in tools.
    */
   async getBuiltInTools() {
-    const data = this.builtInTools.map((tool) => ({
-      ...pick(tool, ['name', 'category', 'description', 'logoUrl']),
-      isInstalled: true,
-      isOfficialSupport: true,
-    }));
+    const data = await this.toolsRepository.find({
+      where: {
+        type: WorkerType.BUILT_IN,
+      },
+      order: {
+        name: 'ASC',
+      },
+    });
 
     return {
       data,

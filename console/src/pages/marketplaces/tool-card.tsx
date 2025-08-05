@@ -1,9 +1,8 @@
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
-import type { Tool } from '@/services/apis/gen/queries';
-import { CheckCircle, Verified } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { Tool } from '@/services/apis/gen/queries';
+import { Verified } from 'lucide-react';
 
 const ToolCard = (tool: Tool) => {
     return (
@@ -16,13 +15,13 @@ const ToolCard = (tool: Tool) => {
                 />
             </div>
             <CardContent className="flex flex-col gap-4">
-                <Button
+                {/* <Button
                     color={tool.isInstalled ? "green" : "outline"}
                     disabled={tool.isInstalled}
                 >
                     <CheckCircle className="w-4 h-4" />
                     {tool.isInstalled ? "Installed" : "Install"}
-                </Button>
+                </Button> */}
                 <div className="flex gap-3 items-center justify-between">
                     <div className="flex items-center gap-2">
                         <CardTitle className="text-left text-lg">{tool.name}</CardTitle>
@@ -37,7 +36,9 @@ const ToolCard = (tool: Tool) => {
                                     </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
+
                         )}
+                        <Badge variant="outline">{tool.version}</Badge>
                     </div>
                     <Badge variant="outline" className="w-fit">
                         {tool.category
