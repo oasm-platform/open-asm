@@ -12,7 +12,7 @@ import { ResultHandler } from 'src/common/interfaces/app.interface';
 import { BuiltInTool } from 'src/common/types/app.types';
 import { Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
-import { Httpx } from '../assets/entities/httpxs.entity';
+import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkersService } from '../workers/workers.service';
@@ -81,10 +81,15 @@ export class ToolsService {
         'Nuclei is a fast, customizable vulnerability scanner powered by the global security community and built on a simple YAML-based DSL, enabling collaboration to tackle trending vulnerabilities on the internet. It helps you find vulnerabilities in your applications, APIs, networks, DNS, and cloud configurations.',
       logoUrl:
         'https://raw.githubusercontent.com/projectdiscovery/nuclei/refs/heads/dev/static/nuclei-logo.png',
-      command: 'naabu -host {{value}} -silent',
-      resultHandler: this.handleNaabuResult.bind(this),
+      command:
+        'nuclei -u {{value}} -t vulnerabilities/,miscellaneous/,exposures/,default-logins/,cves/ -s critical,high,medium,low,info -j --silent',
+      resultHandler: this.handleNucleiResult.bind(this),
     },
   ];
+
+  private async handleNucleiResult({ result, job, dataSource }: ResultHandler) {
+    console.log(result, job, dataSource);
+  }
 
   /**
    * Handles the result of the Subfinder tool.
@@ -192,7 +197,7 @@ export class ToolsService {
       dataSource
         .createQueryBuilder()
         .insert()
-        .into(Httpx)
+        .into(HttpResponse)
         .values({
           assetId: job.asset.id,
           jobHistoryId: job.jobHistory.id,

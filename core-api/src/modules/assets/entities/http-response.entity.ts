@@ -1,7 +1,7 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
-import { Asset } from './assets.entity';
-import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { JobHistory } from 'src/modules/jobs-registry/entities/job-history.entity';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Asset } from './assets.entity';
 
 // Interface cho TLS information
 interface TlsInfo {
@@ -40,8 +40,8 @@ interface KnowledgebaseInfo {
   pHash: number;
 }
 
-@Entity('httpxs')
-export class Httpx extends BaseEntity {
+@Entity('http_responses')
+export class HttpResponse extends BaseEntity {
   @Column({ type: 'timestamp with time zone', nullable: true })
   timestamp?: Date;
 
@@ -132,7 +132,7 @@ export class Httpx extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   assetId: string;
 
-  @ManyToOne(() => Asset, (asset) => asset.httpxs, {
+  @ManyToOne(() => Asset, (asset) => asset.httpResponses, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'assetId' })
@@ -141,7 +141,7 @@ export class Httpx extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   jobHistoryId: string;
 
-  @ManyToOne(() => JobHistory, (jobHistory) => jobHistory.httpxs, {
+  @ManyToOne(() => JobHistory, (jobHistory) => jobHistory.httpResponses, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'jobHistoryId' })

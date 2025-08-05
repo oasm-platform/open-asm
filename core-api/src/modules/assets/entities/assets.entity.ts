@@ -2,8 +2,8 @@ import { BaseEntity } from 'src/common/entities/base.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { Target } from 'src/modules/targets/entities/target.entity';
 import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
+import { HttpResponse } from './http-response.entity';
 import { Port } from './ports.entity';
-import { Httpx } from './httpxs.entity';
 
 @Entity('assets')
 @Unique(['value', 'target'])
@@ -36,8 +36,8 @@ export class Asset extends BaseEntity {
   @Column({ default: false })
   isErrorPage?: boolean;
 
-  @OneToMany(() => Httpx, (httpx) => httpx.asset, {
+  @OneToMany(() => HttpResponse, (httpResponse) => httpResponse.asset, {
     onDelete: 'CASCADE',
   })
-  httpxs?: Httpx[];
+  httpResponses?: HttpResponse[];
 }

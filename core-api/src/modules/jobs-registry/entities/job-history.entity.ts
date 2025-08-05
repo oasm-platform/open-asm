@@ -1,8 +1,8 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
+import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
+import { Port } from 'src/modules/assets/entities/ports.entity';
 import { Entity, OneToMany } from 'typeorm';
 import { Job } from './job.entity';
-import { Port } from 'src/modules/assets/entities/ports.entity';
-import { Httpx } from 'src/modules/assets/entities/httpxs.entity';
 
 @Entity('job_histories')
 export class JobHistory extends BaseEntity {
@@ -16,8 +16,8 @@ export class JobHistory extends BaseEntity {
   })
   ports?: Port[];
 
-  @OneToMany(() => Httpx, (httpx) => httpx.jobHistory, {
+  @OneToMany(() => HttpResponse, (httpResponse) => httpResponse.jobHistory, {
     onDelete: 'CASCADE',
   })
-  httpxs?: Httpx[];
+  httpResponses?: HttpResponse[];
 }
