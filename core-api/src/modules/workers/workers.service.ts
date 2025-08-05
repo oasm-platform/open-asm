@@ -23,6 +23,7 @@ import { Job } from '../jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkerAliveDto, WorkerJoinDto } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+import { Port } from '../assets/entities/ports.entity';
 
 @Injectable()
 export class WorkersService {
@@ -47,7 +48,7 @@ export class WorkersService {
    * @param result the result of the job
    */
   public updateResultToDatabase(dataSource: DataSource, job: Job, result: any) {
-    // Update parsed result to database
+    // Update job
     dataSource
       .createQueryBuilder()
       .update(Job)

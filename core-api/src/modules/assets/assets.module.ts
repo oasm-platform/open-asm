@@ -5,10 +5,12 @@ import { Target } from '../targets/entities/target.entity';
 import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
 import { Asset } from './entities/assets.entity';
+import { Port } from './entities/ports.entity';
+import { Httpx } from './entities/httpxs.entity';
 
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([Asset, Job, Target])],
+  imports: [TypeOrmModule.forFeature([Asset, Job, Target, Port, Httpx])],
   controllers: [AssetsController],
   providers: [AssetsService],
   exports: [AssetsService],

@@ -17,6 +17,8 @@ import { WorkersService } from '../workers/workers.service';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
+import { Port } from '../assets/entities/ports.entity';
+import { Httpx } from '../assets/entities/httpxs.entity';
 
 @Injectable()
 export class ToolsService {
@@ -148,6 +150,19 @@ export class ToolsService {
       .filter((i) => i.includes(':'))
       .map((i) => Number(i.split(':')[1].replace('\r', '')))
       .sort();
+
+    // Save table ports
+    dataSource
+      .createQueryBuilder()
+      .insert()
+      .into(Port)
+      .values({
+        assetId: job.asset.id,
+        ports: parsed,
+        jobHistoryId: job.jobHistory.id,
+      })
+      .execute();
+
     this.workerService.updateResultToDatabase(dataSource, job, parsed);
   }
 
@@ -157,14 +172,79 @@ export class ToolsService {
    * @param {ResultHandler} handlerData - The data object containing result, job, and dataSource.
    */
   private async handleHttpxResult({ result, job, dataSource }: ResultHandler) {
-    if (result) {
-      const parsed = JSON.parse(result);
-      this.assetRepo.update(job.asset.id, {
-        isErrorPage: parsed.failed,
-      });
-      this.workerService.updateResultToDatabase(dataSource, job, parsed);
-    }
+    if (!result) return;
+
+    const parsed = JSON.parse(result);
+
+    await Promise.all([
+      this.assetRepo.update(job.asset.id, { isErrorPage: parsed.failed }),
+      dataSource
+        .createQueryBuilder()
+        .insert()
+        .into(Httpx)
+        .values({
+          assetId: job.asset.id,
+          jobHistoryId: job.jobHistory.id,
+          ...parsed,
+          timestamp: parsed.timestamp ? new Date(parsed.timestamp) : undefined,
+        })
+        .execute(),
+    ]);
+
+    this.workerService.updateResultToDatabase(dataSource, job, parsed);
   }
+  // private async handleHttpxResult({ result, job, dataSource }: ResultHandler) {
+  //   if (result) {
+  //     const parsed = JSON.parse(result);
+  //     this.assetRepo.update(job.asset.id, {
+  //       isErrorPage: parsed.failed,
+  //     });
+
+  //     const httpxData = {
+  //       assetId: job.asset.id,
+  //       jobHistoryId: job.jobHistory.id,
+  //       timestamp: parsed.timestamp ? new Date(parsed.timestamp) : undefined,
+  //       tls: parsed.tls || null,
+  //       port: parsed.port || null,
+  //       url: parsed.url || null,
+  //       input: parsed.input || null,
+  //       title: parsed.title || null,
+  //       scheme: parsed.scheme || null,
+  //       webserver: parsed.webserver || null,
+  //       body: parsed.body || null,
+  //       content_type: parsed.content_type || null,
+  //       method: parsed.method || null,
+  //       host: parsed.host || null,
+  //       path: parsed.path || null,
+  //       favicon: parsed.favicon || null,
+  //       favicon_md5: parsed.favicon_md5 || null,
+  //       favicon_url: parsed.favicon_url || null,
+  //       header: parsed.header || null,
+  //       raw_header: parsed.raw_header || null,
+  //       request: parsed.request || null,
+  //       time: parsed.time || null,
+  //       a: parsed.a || null,
+  //       tech: parsed.tech || null,
+  //       words: parsed.words || null,
+  //       lines: parsed.lines || null,
+  //       status_code: parsed.status_code || null,
+  //       content_length: parsed.content_length || null,
+  //       failed: parsed.failed || false,
+  //       knowledgebase: parsed.knowledgebase || null,
+  //       resolvers: parsed.resolvers || null,
+  //     };
+
+  //     // Save to Httpxs table
+  //     await dataSource
+  //       .createQueryBuilder()
+  //       .insert()
+  //       .into(Httpx)
+  //       .values(httpxData)
+  //       .execute();
+
+  //     this.workerService.updateResultToDatabase(dataSource, job, parsed);
+  //   }
+  // }
 
   /**
    * Get a built-in tool by category.
