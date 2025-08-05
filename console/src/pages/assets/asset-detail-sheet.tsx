@@ -36,7 +36,7 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
 
   const { value, metadata, dnsRecords } = currentRow;
   const http_scraper = metadata?.http_scraper;
-  const ports = metadata?.ports;
+  const ports_scanner = metadata?.ports_scanner;
   const ipAddresses = dnsRecords?.["A"];
   const tls = http_scraper?.tls;
 
@@ -165,11 +165,11 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                     <span className="">{tls.port}</span>
                   </div>
                 )}
-                {ports && ports.length > 0 ? (
+                {ports_scanner && ports_scanner.length > 0 ? (
                   <div>
                     <span className="block mb-1">Open Ports</span>
                     <BadgeList
-                      list={ports.sort((a: number, b: number) => a - b)}
+                      list={ports_scanner.sort((a: number, b: number) => a - b)}
                       Icon={EthernetPort}
                     />
                   </div>

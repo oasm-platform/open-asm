@@ -22,7 +22,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
-      const ports = data.metadata?.ports;
+      const ports_scanner = data.metadata?.ports_scanner;
       const http_scraper = data.metadata?.http_scraper;
       const ipAddresses = data.dnsRecords?.["A"];
       return (
@@ -49,7 +49,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
           </div>
           <div className="w-full">
             <BadgeList
-              list={ports?.sort((a: number, b: number) => a - b)}
+              list={ports_scanner?.sort((a: number, b: number) => a - b)}
               Icon={EthernetPort}
             />
           </div>

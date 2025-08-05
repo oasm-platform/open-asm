@@ -1,6 +1,7 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { Target } from 'src/modules/targets/entities/target.entity';
+import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
 import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { HttpResponse } from './http-response.entity';
 import { Port } from './ports.entity';
@@ -40,4 +41,9 @@ export class Asset extends BaseEntity {
     onDelete: 'CASCADE',
   })
   httpResponses?: HttpResponse[];
+
+  @OneToMany(() => Vulnerability, (vulnerability) => vulnerability.asset, {
+    onDelete: 'CASCADE',
+  })
+  vulnerabilities?: Vulnerability[];
 }
