@@ -39,10 +39,7 @@ COPY --from=builder /app/bun.lock ./bun.lock
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
-COPY --from=tools /go/bin/subfinder /usr/local/bin/
-COPY --from=tools /go/bin/dnsx /usr/local/bin/
-COPY --from=tools /go/bin/http_scraper /usr/local/bin/
-COPY --from=tools /go/bin/naabu /usr/local/bin/
+COPY --from=tools /root/go/bin /usr/local/bin
 ENV PATH="/usr/local/bin:$PATH"
 
 CMD ["bun", "dist/index.js"]
