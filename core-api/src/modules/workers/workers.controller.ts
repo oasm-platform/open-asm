@@ -6,11 +6,21 @@ import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { WorkerAliveDto, WorkerJoinDto } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Workers')
 @Controller('workers')
 export class WorkersController {
   constructor(private readonly workersService: WorkersService) {}
 
+  @Doc({
+    summary: 'Worker alive',
+    description: 'Worker alive',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
   @Public()
   @Post('/alive')
   alive(@Body() dto: WorkerAliveDto) {

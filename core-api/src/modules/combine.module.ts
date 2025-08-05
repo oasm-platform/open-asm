@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { WorkersModule } from './workers/workers.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { SearchModule } from './search/search.module';
+import { ToolsModule } from './tools/tools.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { SearchModule } from './search/search.module';
     AssetsModule,
     WorkersModule,
     SearchModule,
+    ToolsModule,
   ],
 })
 export class CombineModule {}

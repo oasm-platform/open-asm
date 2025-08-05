@@ -204,58 +204,6 @@ export class ToolsService {
 
     this.workerService.updateResultToDatabase(dataSource, job, parsed);
   }
-  // private async handleHttpxResult({ result, job, dataSource }: ResultHandler) {
-  //   if (result) {
-  //     const parsed = JSON.parse(result);
-  //     this.assetRepo.update(job.asset.id, {
-  //       isErrorPage: parsed.failed,
-  //     });
-
-  //     const httpxData = {
-  //       assetId: job.asset.id,
-  //       jobHistoryId: job.jobHistory.id,
-  //       timestamp: parsed.timestamp ? new Date(parsed.timestamp) : undefined,
-  //       tls: parsed.tls || null,
-  //       port: parsed.port || null,
-  //       url: parsed.url || null,
-  //       input: parsed.input || null,
-  //       title: parsed.title || null,
-  //       scheme: parsed.scheme || null,
-  //       webserver: parsed.webserver || null,
-  //       body: parsed.body || null,
-  //       content_type: parsed.content_type || null,
-  //       method: parsed.method || null,
-  //       host: parsed.host || null,
-  //       path: parsed.path || null,
-  //       favicon: parsed.favicon || null,
-  //       favicon_md5: parsed.favicon_md5 || null,
-  //       favicon_url: parsed.favicon_url || null,
-  //       header: parsed.header || null,
-  //       raw_header: parsed.raw_header || null,
-  //       request: parsed.request || null,
-  //       time: parsed.time || null,
-  //       a: parsed.a || null,
-  //       tech: parsed.tech || null,
-  //       words: parsed.words || null,
-  //       lines: parsed.lines || null,
-  //       status_code: parsed.status_code || null,
-  //       content_length: parsed.content_length || null,
-  //       failed: parsed.failed || false,
-  //       knowledgebase: parsed.knowledgebase || null,
-  //       resolvers: parsed.resolvers || null,
-  //     };
-
-  //     // Save to Httpxs table
-  //     await dataSource
-  //       .createQueryBuilder()
-  //       .insert()
-  //       .into(Httpx)
-  //       .values(httpxData)
-  //       .execute();
-
-  //     this.workerService.updateResultToDatabase(dataSource, job, parsed);
-  //   }
-  // }
 
   /**
    * Get a built-in tool by category.

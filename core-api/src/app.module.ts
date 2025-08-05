@@ -1,4 +1,3 @@
-import { ToolsModule } from './modules/tools/tools.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
@@ -14,7 +13,6 @@ import { ScheduleModule } from '@nestjs/schedule';
     ScheduleModule.forRoot(),
     DatabaseModule,
     CombineModule,
-    ToolsModule,
   ],
 })
 export class AppModule {}

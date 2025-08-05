@@ -22,7 +22,6 @@ import {
 } from './dto/workspaces.dto';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
-import { WorkspaceStatisticsRepository } from './workspaces-statistics.repository';
 
 @Injectable()
 export class WorkspacesService {
@@ -31,7 +30,6 @@ export class WorkspacesService {
     private readonly repo: Repository<Workspace>,
     @InjectRepository(WorkspaceMembers)
     private readonly workspaceMembersRepository: Repository<WorkspaceMembers>,
-    private readonly workspaceStatisticsRepository: WorkspaceStatisticsRepository,
   ) {}
 
   /**
