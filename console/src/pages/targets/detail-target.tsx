@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import TargetStatus from '@/components/ui/target-status';
 import { JobStatus, useTargetsControllerGetTargetById } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { Bug, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ListAssets } from '../assets/list-assets';
 import AssetsDiscovering from './assets-discovering';
@@ -44,20 +44,23 @@ export function DetailTarget() {
     }
 
     return (
-        <Page>
-            <div className="flex items-center justify-between gap-2">
+        <Page title={target.value} isShowButtonGoBack>
+            <div className="flex items-center justify-between">
                 <div className='flex gap-3 items-center'>
-                    <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <h1 className="text-2xl font-bold tracking-tight">{target.value}</h1>
-
+                    <TargetStatus status={target.status} />
                 </div>
                 <div className='flex items-center gap-3'>
                     <p className="text-muted-foreground">
                         {dayjs(target.lastDiscoveredAt).fromNow()}
                     </p>
-                    <TargetStatus status={target.status} />
+                    <Button
+                        onClick={() => navigate(`/vulnerabilities?targetId=${target.id}`)}
+                        variant="outline"
+                        className="hover:cursor-pointer"
+                        title={`Start scan vulnerabilities for target ${target.value}`}
+                    >
+                        <Bug className="h-4 w-4" />Scan
+                    </Button>
                     <SettingTarget target={target} />
                 </div>
             </div>

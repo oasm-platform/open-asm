@@ -6,6 +6,7 @@ import Tools from "@/pages/marketplaces/marketplaces";
 import Register from "@/pages/register/register";
 import DetailTarget from "@/pages/targets/detail-target";
 import Targets from "@/pages/targets/targets";
+import Vulnerabilities from "@/pages/vulnerabilities/vulnerabilities";
 import Workers from "@/pages/workers/workers";
 import { createBrowserRouter } from "react-router-dom";
 import GuestRoute from "./GuestRoute";
@@ -53,6 +54,10 @@ export const router = createBrowserRouter([
                 element: <DetailTarget />,
               },
             ],
+          },
+          {
+            path: "vulnerabilities",
+            element: <Vulnerabilities />,
           },
           {
             element: <Workers />,
