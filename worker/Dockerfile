@@ -14,7 +14,7 @@ RUN go install github.com/projectdiscovery/httpx/cmd/httpx@v1.7.1 && \
 
 FROM oven/bun:1.2 AS base
 RUN apt-get update && apt-get install -y \
-    curl
+    curl nmap
 
 FROM base AS builder
 
