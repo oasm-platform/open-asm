@@ -301,8 +301,12 @@ export class ToolsService implements OnModuleInit {
     const { page, limit } = query;
     const skip = (page - 1) * limit;
 
+    const where: any = {};
+    if (query.type) where.type = query.type;
+    if (query.category) where.category = query.category;
+
     const [data, total] = await this.toolsRepository.findAndCount({
-      where: query.type ? { type: query.type } : undefined,
+      where: Object.keys(where).length ? where : undefined,
       take: limit,
       skip: skip,
       order: {
