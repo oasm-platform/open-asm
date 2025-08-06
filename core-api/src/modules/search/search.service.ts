@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
@@ -12,6 +12,11 @@ import {
 } from './dto/search.dto';
 import { SearchHistory } from './entities/search-history.entity';
 
+/**
+ * Service for managing search operations and search history.
+ * It allows searching for assets and targets within a workspace,
+ * retrieving search history, and managing search history entries.
+ */
 @Injectable()
 export class SearchService {
   constructor(
@@ -129,5 +134,39 @@ export class SearchService {
       .getManyAndCount();
 
     return getManyResponse(query, searchHistory, total);
+  }
+
+  /**
+   * Deletes a specific search history entry by its ID.
+   *
+   * @param user - The user object containing the user ID.
+   * @param id - The ID of the search history entry to be deleted.
+   * @returns A promise that resolves to an object containing the success status.
+   */
+  async deleteSearchHistory(user: User, id: string) {
+    const searchHistory = await this.searchHistoryRepo.findOne({
+      where: {
+        id,
+        user: { id: user.id },
+      },
+    });
+
+    if (!searchHistory) {
+      throw new NotFoundException('Search history not found');
+    }
+
+    await this.searchHistoryRepo.delete(id);
+    return { success: true };
+  }
+
+  /**
+   * Deletes all search history entries for the user.
+   *
+   * @param user - The user object containing the user ID.
+   * @returns A promise that resolves to an object containing the success status.
+   */
+  async deleteAllSearchHistories(user: User) {
+    await this.searchHistoryRepo.delete({ user });
+    return { success: true };
   }
 }

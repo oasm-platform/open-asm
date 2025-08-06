@@ -285,6 +285,11 @@ export type GetManyGetSearchHistoryResponseDtoDto = {
   pageCount: number;
 };
 
+export type DeleteResponseDto = {
+  /** Trạng thái xóa thành công */
+  success: boolean;
+};
+
 export type WorkspaceTool = {
   id: string;
   createdAt: string;
@@ -5627,6 +5632,178 @@ export function useSearchControllerGetSearchHistory<
 
   return query;
 }
+
+/**
+ * Delete all search history entries for the user
+ * @summary Delete all search history
+ */
+export const searchControllerDeleteAllSearchHistories = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteResponseDto>(
+    { url: `/api/search/histories`, method: "DELETE" },
+    options,
+  );
+};
+
+export const getSearchControllerDeleteAllSearchHistoriesMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["searchControllerDeleteAllSearchHistories"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+    void
+  > = () => {
+    return searchControllerDeleteAllSearchHistories(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SearchControllerDeleteAllSearchHistoriesMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>
+  >;
+
+export type SearchControllerDeleteAllSearchHistoriesMutationError = unknown;
+
+/**
+ * @summary Delete all search history
+ */
+export const useSearchControllerDeleteAllSearchHistories = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof searchControllerDeleteAllSearchHistories>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getSearchControllerDeleteAllSearchHistoriesMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Delete a specific search history entry by its ID
+ * @summary Delete search history by ID
+ */
+export const searchControllerDeleteSearchHistory = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteResponseDto>(
+    { url: `/api/search/histories/${id}`, method: "DELETE" },
+    options,
+  );
+};
+
+export const getSearchControllerDeleteSearchHistoryMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["searchControllerDeleteSearchHistory"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return searchControllerDeleteSearchHistory(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SearchControllerDeleteSearchHistoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>
+>;
+
+export type SearchControllerDeleteSearchHistoryMutationError = unknown;
+
+/**
+ * @summary Delete search history by ID
+ */
+export const useSearchControllerDeleteSearchHistory = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof searchControllerDeleteSearchHistory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getSearchControllerDeleteSearchHistoryMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * Adds a tool to a specific workspace.

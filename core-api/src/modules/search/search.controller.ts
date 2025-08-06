@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Delete, Param } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
@@ -10,6 +10,7 @@ import {
   SearchAssetsTargetsDto,
   SearchResponseDto,
 } from './dto/search.dto';
+import { DeleteResponseDto } from './dto/delete-response.dto';
 import { SearchService } from './search.service';
 
 @ApiTags('Search')
@@ -45,5 +46,34 @@ export class SearchController {
     @Query() query: GetManySearchHistoryDto,
   ) {
     return this.searchService.getSearchHistory(user, query);
+  }
+
+  @Doc({
+    summary: 'Delete search history by ID',
+    description: 'Delete a specific search history entry by its ID',
+    response: {
+      serialization: DeleteResponseDto,
+    },
+  })
+  @Delete('histories/:id')
+  deleteSearchHistory(
+    @UserContext() user: User,
+    @Param('id') id: string,
+  ) {
+    return this.searchService.deleteSearchHistory(user, id);
+  }
+
+  @Doc({
+    summary: 'Delete all search history',
+    description: 'Delete all search history entries for the user',
+    response: {
+      serialization: DeleteResponseDto,
+    },
+  })
+  @Delete('histories')
+  deleteAllSearchHistories(
+    @UserContext() user: User,
+  ) {
+    return this.searchService.deleteAllSearchHistories(user);
   }
 }
