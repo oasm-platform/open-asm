@@ -260,11 +260,11 @@ const ResultCard = React.memo(
                     <div
                       key={e.id}
                       className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors group"
-                      onClick={() => setSearchValue(e.filters["value"])}
+                      onClick={() => setSearchValue(e.query)}
                     >
                       <Search className="size-4 text-gray-400 group-hover:text-gray-600" />
                       <span className="text-gray-700 dark:text-gray-300 truncate">
-                        {e.filters["value"]}
+                        {e.query}
                       </span>
                     </div>
                   ))}

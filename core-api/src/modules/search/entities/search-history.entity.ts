@@ -1,14 +1,13 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { User } from 'src/modules/auth/entities/user.entity';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
-@Entity('search_history')
+@Entity('search_histories')
 export class SearchHistory extends BaseEntity {
-  @Column({ type: 'jsonb', nullable: true })
-  filters?: Record<string, any>;
-
-  @Column({ type: 'jsonb', nullable: true })
-  result: object;
+  @ApiProperty()
+  @Column({ nullable: true })
+  query: string;
 
   @Column()
   userId: string;

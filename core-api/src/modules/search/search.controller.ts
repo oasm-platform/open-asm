@@ -1,16 +1,16 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { SearchService } from './search.service';
 import { ApiTags } from '@nestjs/swagger';
+import { UserContext } from 'src/common/decorators/app.decorator';
+import { Doc } from 'src/common/doc/doc.decorator';
+import { GetManyResponseDto } from 'src/utils/getManyResponse';
+import { User } from '../auth/entities/user.entity';
 import {
+  GetManySearchHistoryDto,
   GetSearchHistoryResponseDto,
   SearchAssetsTargetsDto,
-  SearchAssetsTargetsResponseDto,
+  SearchResponseDto,
 } from './dto/search.dto';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { User } from '../auth/entities/user.entity';
-import { UserContext } from 'src/common/decorators/app.decorator';
-import { GetManySearchHistoryDto } from './dto/search.dto';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
+import { SearchService } from './search.service';
 
 @ApiTags('Search')
 @Controller('search')
@@ -21,7 +21,7 @@ export class SearchController {
     summary: 'Search assets and targets',
     description: 'Search assets and targets',
     response: {
-      serialization: SearchAssetsTargetsResponseDto,
+      serialization: SearchResponseDto,
     },
   })
   @Get()
@@ -39,7 +39,7 @@ export class SearchController {
       serialization: GetManyResponseDto(GetSearchHistoryResponseDto),
     },
   })
-  @Get('history')
+  @Get('histories')
   getSearchHistory(
     @UserContext() user: User,
     @Query() query: GetManySearchHistoryDto,

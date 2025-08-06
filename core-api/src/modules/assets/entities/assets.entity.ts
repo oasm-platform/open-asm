@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { Target } from 'src/modules/targets/entities/target.entity';
@@ -9,6 +10,7 @@ import { Port } from './ports.entity';
 @Entity('assets')
 @Unique(['value', 'target'])
 export class Asset extends BaseEntity {
+  @ApiProperty()
   @Column()
   value: string;
 
@@ -18,6 +20,7 @@ export class Asset extends BaseEntity {
   })
   target: Target;
 
+  @ApiProperty()
   @Column({ default: false })
   isPrimary?: boolean;
 
@@ -31,9 +34,11 @@ export class Asset extends BaseEntity {
   })
   ports?: Port[];
 
+  @ApiProperty()
   @Column({ type: 'json', nullable: true })
   dnsRecords?: object;
 
+  @ApiProperty()
   @Column({ default: false })
   isErrorPage?: boolean;
 

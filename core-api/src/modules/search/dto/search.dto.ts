@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsNumber,
   IsOptional,
@@ -8,7 +9,8 @@ import {
   Min,
 } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
-import { Transform } from 'class-transformer';
+import { Asset } from 'src/modules/assets/entities/assets.entity';
+import { Target } from 'src/modules/targets/entities/target.entity';
 
 export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   @ApiProperty({ required: true })
@@ -27,10 +29,17 @@ export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   @IsOptional()
   limit: number = 10;
 }
+export class SearchData {
+  @ApiProperty({ type: [Asset] })
+  assets: Asset[];
 
-export class SearchAssetsTargetsResponseDto {
-  @ApiProperty({ isArray: true })
-  data: object;
+  @ApiProperty({ type: [Target] })
+  targets: Target[];
+}
+
+export class SearchResponseDto {
+  @ApiProperty({ type: SearchData })
+  data: SearchData;
 
   @ApiProperty()
   total: number;
@@ -67,10 +76,7 @@ export class GetSearchHistoryResponseDto {
   id: string;
 
   @ApiProperty()
-  filter: Record<string, any>;
-
-  @ApiProperty()
-  result: object;
+  query: string;
 
   @ApiProperty()
   workspaceId: string;

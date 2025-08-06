@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { getManyResponse } from 'src/utils/getManyResponse';
+import { Repository } from 'typeorm';
+import { AssetsService } from '../assets/assets.service';
+import { User } from '../auth/entities/user.entity';
+import { TargetsService } from '../targets/targets.service';
 import {
   GetManySearchHistoryDto,
   SearchAssetsTargetsDto,
-  SearchAssetsTargetsResponseDto,
+  SearchResponseDto,
 } from './dto/search.dto';
-import { InjectRepository } from '@nestjs/typeorm';
 import { SearchHistory } from './entities/search-history.entity';
-import { Like, Repository } from 'typeorm';
-import { AssetsService } from '../assets/assets.service';
-import { TargetsService } from '../targets/targets.service';
-import { getManyResponse } from 'src/utils/getManyResponse';
-import { User } from '../auth/entities/user.entity';
 
 @Injectable()
 export class SearchService {
@@ -31,7 +31,7 @@ export class SearchService {
   public async searchAssetsTargets(
     user: User,
     query: SearchAssetsTargetsDto,
-  ): Promise<SearchAssetsTargetsResponseDto> {
+  ): Promise<SearchResponseDto> {
     // First, get the total count for both assets and targets
     const [assetsCount, targetsCount] = await Promise.all([
       this.assetService.countAssetsInWorkspace(query.workspaceId),
@@ -86,16 +86,30 @@ export class SearchService {
       hasNextPage: query.page * query.limit < totalItems,
     };
 
-    // Save search history
-    const searchHistory = this.searchHistoryRepo.create({
-      filters: query,
-      result: response,
-      userId: user.id,
+    // Check if search history already exists
+    const existingHistory = await this.searchHistoryRepo.findOne({
+      where: {
+        query: query.value,
+        userId: user.id,
+      },
     });
 
-    await this.searchHistoryRepo.save(searchHistory);
+    if (existingHistory) {
+      // Update existing history
+      await this.searchHistoryRepo.update(existingHistory.id, {
+        updatedAt: new Date(),
+        createdAt: new Date(),
+      });
+    } else {
+      // Create new history
+      const searchHistory = this.searchHistoryRepo.create({
+        query: query.value,
+        userId: user.id,
+      });
+      await this.searchHistoryRepo.save(searchHistory);
+    }
 
-    return response;
+    return response as any;
   }
 
   /**
@@ -109,9 +123,6 @@ export class SearchService {
     const [searchHistory, total] = await this.searchHistoryRepo
       .createQueryBuilder('searchHistory')
       .where('searchHistory.userId = :userId', { userId: user.id })
-      .andWhere('"searchHistory".filters->>\'workspaceId\' = :workspaceId', {
-        workspaceId: query.workspaceId,
-      })
       .orderBy('searchHistory.createdAt', 'DESC')
       .take(query.limit)
       .skip((query.page - 1) * query.limit)
