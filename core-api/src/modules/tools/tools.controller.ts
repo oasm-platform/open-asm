@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
+import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
@@ -26,7 +27,6 @@ export class ToolsController {
 
   @Doc({
     summary: 'Get built-in tools',
-    description: 'Retrieves a list of built-in tools.',
     response: {
       serialization: GetManyResponseDto(Tool),
     },
@@ -34,5 +34,17 @@ export class ToolsController {
   @Get('built-in-tools')
   async getBuiltInTools() {
     return this.toolsService.getBuiltInTools();
+  }
+
+  @Doc({
+    summary: 'Get tools',
+    description: 'Retrieves a list of tools with pagination.',
+    response: {
+      serialization: GetManyResponseDto(Tool),
+    },
+  })
+  @Get()
+  async getManyTools(@Query() query: ToolsQueryDto) {
+    return this.toolsService.getManyTools(query);
   }
 }

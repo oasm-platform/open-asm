@@ -10,12 +10,14 @@ import { randomUUID } from 'crypto';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { ResultHandler } from 'src/common/interfaces/app.interface';
 import { BuiltInTool } from 'src/common/types/app.types';
+import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkersService } from '../workers/workers.service';
+import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
@@ -288,5 +290,26 @@ export class ToolsService implements OnModuleInit {
     return {
       data,
     };
+  }
+
+  /**
+   * Retrieves a list of tools with pagination.
+   * @param {ToolsQueryDto} query - The query parameters.
+   * @returns {Promise<GetManyBaseResponseDto<Tool>>} The tools.
+   */
+  async getManyTools(query: ToolsQueryDto) {
+    const { page, limit } = query;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.toolsRepository.findAndCount({
+      where: query.type ? { type: query.type } : undefined,
+      take: limit,
+      skip: skip,
+      order: {
+        name: 'ASC',
+      },
+    });
+
+    return getManyResponse(query, data, total);
   }
 }
