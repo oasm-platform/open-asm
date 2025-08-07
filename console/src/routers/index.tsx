@@ -13,6 +13,7 @@ import GuestRoute from "./GuestRoute";
 import NotFound from "./NotFound";
 import ProtectedRoute from "./ProtectedRoute";
 import RegisterRoute from "./RegisterRoute";
+import Search from "@/pages/search/search";
 
 export const router = createBrowserRouter([
   {
@@ -66,6 +67,10 @@ export const router = createBrowserRouter([
           {
             element: <Tools />,
             path: "tools",
+          },
+          {
+            element: <Search />,
+            path: "search",
           },
           {
             element: <Assets />,

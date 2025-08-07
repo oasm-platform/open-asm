@@ -8,13 +8,13 @@ import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import {
   useSearchControllerDeleteSearchHistory,
   useSearchControllerGetSearchHistory,
-  useSearchControllerSearchAssetsTargets,
 } from "@/services/apis/gen/queries";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 import { HistoryIcon, Search, X } from "lucide-react";
 import * as React from "react";
 import { useForm, type UseFormSetValue } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Form, FormField } from "./form";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
@@ -24,7 +24,7 @@ const formSchema = z.object({
 });
 
 export function SearchForm({ ...props }: React.ComponentProps<"form">) {
-  const { selectedWorkspace } = useWorkspaceSelector();
+  // const { selectedWorkspace } = useWorkspaceSelector();
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -32,17 +32,18 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
       value: "",
     },
   });
+  const navigate = useNavigate();
 
-  const { data, refetch } = useSearchControllerSearchAssetsTargets(
-    {
-      value: form.watch("value"),
-      workspaceId: selectedWorkspace?.toString() || "",
-    },
-    { query: { enabled: false } },
-  );
+  // const { data, refetch } = useSearchControllerSearchAssetsTargets(
+  //   {
+  //     value: form.watch("value"),
+  //     workspaceId: selectedWorkspace?.toString() || "",
+  //   },
+  //   { query: { enabled: false } },
+  // );
 
-  const onSubmit = () => {
-    refetch();
+  const onSubmit = (formValue: z.infer<typeof formSchema>) => {
+    navigate(`/search?query=${formValue.value}`);
   };
 
   return (
@@ -59,6 +60,7 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
                 Search
               </Label>
               <Popover>
+                {/* FIX: make trigger only open popover content */}
                 <PopoverTrigger className="w-full">
                   <FormField
                     control={form.control}
@@ -96,8 +98,8 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
 const DropdownCard = React.memo(
   ({ setValue }: { setValue: UseFormSetValue<{ value: string }> }) => {
     const { selectedWorkspace } = useWorkspaceSelector();
+    //TODO:: invalidate queries after mutate
     const { mutate } = useSearchControllerDeleteSearchHistory();
-    const queryClient = useQueryClient();
 
     const { data: historyData } = useSearchControllerGetSearchHistory(
       {
