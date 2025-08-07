@@ -192,4 +192,23 @@ export class AssetsService {
       },
     });
   }
+
+  /**
+   * Retrieves a single asset by its ID.
+   *
+   * @param id - The ID of the asset to retrieve.
+   * @returns A promise that resolves to the found asset.
+   * @throws NotFoundException if the asset with the given ID is not found.
+   */
+  public async getAssetById(id: string): Promise<Asset> {
+    const asset = await this.repo.findOne({
+      where: { id },
+    });
+
+    if (!asset) {
+      throw new NotFoundException(`Asset with ID ${id} not found`);
+    }
+
+    return asset;
+  }
 }
