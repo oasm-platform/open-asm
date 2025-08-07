@@ -4,7 +4,9 @@ import {
   SidebarGroupContent,
   SidebarInput,
 } from "@/components/ui/sidebar";
+import useDebounce from "@/hooks/use-debounce";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
+import AssetDetailSheet from "@/pages/assets/asset-detail-sheet";
 import {
   useSearchControllerDeleteSearchHistory,
   useSearchControllerGetSearchHistory,
@@ -12,7 +14,6 @@ import {
   type Asset,
 } from "@/services/apis/gen/queries";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { keepPreviousData } from "@tanstack/react-query";
 import { CloudCheck, HistoryIcon, Search, Target, X } from "lucide-react";
 import * as React from "react";
 import { useForm, type UseFormSetValue } from "react-hook-form";
@@ -20,9 +21,8 @@ import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Form, FormField } from "./form";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
-import useDebounce from "@/hooks/use-debounce";
 import { Skeleton } from "./skeleton";
-import AssetDetailSheet from "@/pages/assets/asset-detail-sheet";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
   value: z.string().min(1),
@@ -107,6 +107,7 @@ const DropdownCard = React.memo(
 
     const debouncedValue = useDebounce(value, 500);
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     const { data, isFetching } = useSearchControllerSearchAssetsTargets(
       {
@@ -117,12 +118,15 @@ const DropdownCard = React.memo(
       { query: { enabled: value.length > 0 } },
     );
 
-    const { data: historyData, isFetching: isHistoryFetching } =
-      useSearchControllerGetSearchHistory({
-        workspaceId: selectedWorkspace?.toString() || "",
-        query: debouncedValue,
-        limit: value.length > 0 ? 3 : 10,
-      });
+    const {
+      data: historyData,
+      isFetching: isHistoryFetching,
+      queryKey,
+    } = useSearchControllerGetSearchHistory({
+      workspaceId: selectedWorkspace?.toString() || "",
+      query: debouncedValue,
+      limit: value.length > 0 ? 3 : 10,
+    });
 
     return (
       <>
@@ -171,7 +175,16 @@ const DropdownCard = React.memo(
                   aria-label="Delete search history"
                   onClick={(evt) => {
                     evt.stopPropagation();
-                    mutate({ id: e.id });
+                    mutate(
+                      { id: e.id },
+                      {
+                        onSuccess: () => {
+                          queryClient.invalidateQueries({
+                            queryKey: queryKey,
+                          });
+                        },
+                      },
+                    );
                   }}
                 />
               </div>

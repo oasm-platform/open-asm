@@ -37,6 +37,7 @@ export default function Search() {
     value: searchQuery,
     workspaceId: selectedWorkspace as string,
     page: page,
+    isSaveHistory: true,
   });
 
   if (isFetching) {
