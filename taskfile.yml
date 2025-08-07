@@ -51,4 +51,4 @@ tasks:
       - node -e "require('fs').copyFileSync('console/example.env', 'console/.env')"
       - task install
       - docker rm -f open-asm-postgres || true
-      - docker run --name open-asm-postgres --env-file ./core-api/.env -p 5432:5432 -d postgres:12
+      - docker run --name open-asm-postgres --env-file ./core-api/.env -p 5432:5432 -d -v open-asm-postgres:/var/lib/postgresql/data postgres:17
