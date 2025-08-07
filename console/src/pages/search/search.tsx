@@ -34,7 +34,7 @@ export default function Search() {
       <div className="flex items-center justify-center min-h-96">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-gray-600">Searching...</p>
+          <p>Searching...</p>
         </div>
       </div>
     );
@@ -49,7 +49,7 @@ export default function Search() {
         </div>
         <div className="flex gap-2 ">
           <span>Query:</span>
-          <code>{searchQuery}</code>
+          <span className="font-bold">{searchQuery}</span>
           <span>•</span>
           <span>{data?.total || 0} results found</span>
         </div>
