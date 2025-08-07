@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsNumber,
   IsOptional,
   IsString,
@@ -28,6 +29,11 @@ export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   @Transform(({ value }) => Number(value))
   @IsOptional()
   limit: number = 10;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  isSaveHistory: boolean;
 }
 export class SearchData {
   @ApiProperty({ type: [Asset] })

@@ -91,29 +91,30 @@ export class SearchService {
       hasNextPage: query.page * query.limit < totalItems,
     };
 
-    // Check if search history already exists
-    const existingHistory = await this.searchHistoryRepo.findOne({
-      where: {
-        query: query.value,
-        userId: user.id,
-      },
-    });
+    if (query.isSaveHistory) {
+      // Check if search history already exists
+      const existingHistory = await this.searchHistoryRepo.findOne({
+        where: {
+          query: query.value,
+          userId: user.id,
+        },
+      });
 
-    if (existingHistory) {
-      // Update existing history
-      await this.searchHistoryRepo.update(existingHistory.id, {
-        updatedAt: new Date(),
-        createdAt: new Date(),
-      });
-    } else {
-      // Create new history
-      const searchHistory = this.searchHistoryRepo.create({
-        query: query.value,
-        userId: user.id,
-      });
-      await this.searchHistoryRepo.save(searchHistory);
+      if (existingHistory) {
+        // Update existing history
+        await this.searchHistoryRepo.update(existingHistory.id, {
+          updatedAt: new Date(),
+          createdAt: new Date(),
+        });
+      } else {
+        // Create new history
+        const searchHistory = this.searchHistoryRepo.create({
+          query: query.value,
+          userId: user.id,
+        });
+        this.searchHistoryRepo.save(searchHistory);
+      }
     }
-
     return response as any;
   }
 
