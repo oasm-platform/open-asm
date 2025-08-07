@@ -4,7 +4,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { Tool } from '@/services/apis/gen/queries';
 import { Verified } from 'lucide-react';
 
-const ToolCard = (tool: Tool) => {
+interface ToolCardProps {
+    tool: Tool;
+    button?: React.ReactNode;
+}
+
+const ToolCard = ({ tool, button }: ToolCardProps) => {
     return (
         <Card key={tool.id} className="flex flex-col overflow-hidden pt-0">
             <div className="w-full dark:bg-white p-2 flex justify-center">
@@ -15,13 +20,6 @@ const ToolCard = (tool: Tool) => {
                 />
             </div>
             <CardContent className="flex flex-col gap-4">
-                {/* <Button
-                    color={tool.isInstalled ? "green" : "outline"}
-                    disabled={tool.isInstalled}
-                >
-                    <CheckCircle className="w-4 h-4" />
-                    {tool.isInstalled ? "Installed" : "Install"}
-                </Button> */}
                 <div className="flex gap-3 items-center justify-between">
                     <div className="flex items-center gap-2">
                         <CardTitle className="text-left text-lg">{tool.name}</CardTitle>
@@ -39,13 +37,14 @@ const ToolCard = (tool: Tool) => {
 
                         )}
                         <Badge variant="outline">{tool.version}</Badge>
+                        <Badge variant="outline" className="w-fit">
+                            {tool.category
+                                .split('_')
+                                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                .join(' ')}
+                        </Badge>
                     </div>
-                    <Badge variant="outline" className="w-fit">
-                        {tool.category
-                            .split('_')
-                            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                            .join(' ')}
-                    </Badge>
+                    {button}
                 </div>
                 <TooltipProvider>
                     <Tooltip>
@@ -61,6 +60,7 @@ const ToolCard = (tool: Tool) => {
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
+
             </CardContent>
         </Card>
     );

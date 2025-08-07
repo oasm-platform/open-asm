@@ -59,7 +59,7 @@ export function DetailTarget() {
                         className="hover:cursor-pointer"
                         title={`Start scan vulnerabilities for target ${target.value}`}
                     >
-                        <Bug className="h-4 w-4" />Scan
+                        <Bug className="h-4 w-4" />Scan vulnerability
                     </Button>
                     <SettingTarget target={target} />
                 </div>
