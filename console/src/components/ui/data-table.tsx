@@ -68,7 +68,6 @@ export function DataTable<TData, TValue>({
   filterValue = "",
   onRowClick,
   rowClassName,
-  onFilterChange,
   filterPlaceholder = "Filter...",
   showColumnVisibility = true,
   showPagination = true,

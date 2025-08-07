@@ -41,7 +41,6 @@ const JobsRegistry = () => {
                                     className="border mb-1 rounded-xl p-3 shadow-sm bg-muted/50"
                                 >
                                     <div className="flex justify-between items-center">
-                                        <span className="font-medium">{job.workerName}</span>
                                         <Badge className={getStatusColor(job.status)}>
                                             {job.status.replace(/_/g, " ")}
                                         </Badge>

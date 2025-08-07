@@ -45,7 +45,7 @@ export function CreateTarget() {
                 workspaceId: selectedWorkspace
             }
         }, {
-            onError: (e) => {
+            onError: () => {
                 toast.error("Failed to create target")
             },
             onSuccess: (res) => {

@@ -10,7 +10,7 @@ dayjs.extend(relativeTime)
 
 
 const ListWorkers = () => {
-    const { data, isLoading, isError } = useWorkersControllerGetWorkers({
+    const { data, isLoading } = useWorkersControllerGetWorkers({
         limit: 100,
         page: 1,
         sortBy: "createdAt",
