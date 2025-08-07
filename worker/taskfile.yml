@@ -10,3 +10,7 @@ tasks:
         done
         wait
     silent: false
+  
+  install:
+    cmds:
+      - bun install

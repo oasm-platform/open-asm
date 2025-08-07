@@ -1,12 +1,28 @@
 version: "3"
 
 tasks:
+  # Development environment setup and start
+  # Starts the development server with hot-reload enabled
+  # Environment: development mode
   dev:
     cmds:
       - npm run dev
     env:
       NODE_ENV: "development"
+  # Production build
+  # Creates optimized production build of the application
+  # Includes minification and bundling
   build:
     cmds:
       - npm run build
-  install: npm install
+  # Install dependencies
+  # Installs all project dependencies from package.json
+  install:
+    cmds:
+      - npm install
+  # API documentation generation
+  # Generates API documentation after ensuring API server is ready
+  # Waits for API server health check before generating docs
+  gen:api:
+    cmds:
+      - npm run gen:api
