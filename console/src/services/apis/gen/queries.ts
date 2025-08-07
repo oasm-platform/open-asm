@@ -215,6 +215,18 @@ export type GetManyGetAssetsResponseDtoDto = {
   pageCount: number;
 };
 
+export type AssetDnsRecords = { [key: string]: unknown };
+
+export type Asset = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  value: string;
+  isPrimary: boolean;
+  dnsRecords: AssetDnsRecords;
+  isErrorPage: boolean;
+};
+
 export type WorkerAliveDto = {
   token: string;
 };
@@ -240,18 +252,6 @@ export type GetManyWorkerInstanceDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-};
-
-export type AssetDnsRecords = { [key: string]: unknown };
-
-export type Asset = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  value: string;
-  isPrimary: boolean;
-  dnsRecords: AssetDnsRecords;
-  isErrorPage: boolean;
 };
 
 export type SearchData = {
@@ -387,6 +387,7 @@ export type SearchControllerSearchAssetsTargetsParams = {
   sortOrder?: string;
   value: string;
   workspaceId: string;
+  isSaveHistory?: boolean;
 };
 
 export type SearchControllerGetSearchHistoryParams = {
@@ -395,6 +396,7 @@ export type SearchControllerGetSearchHistoryParams = {
   sortBy?: string;
   sortOrder?: string;
   workspaceId: string;
+  query?: string;
 };
 
 export type ToolsControllerGetManyToolsParams = {
@@ -420,6 +422,26 @@ export type ToolsControllerGetManyToolsCategory =
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ToolsControllerGetManyToolsCategory = {
+  subdomains: "subdomains",
+  http_probe: "http_probe",
+  http_scraper: "http_scraper",
+  ports_scanner: "ports_scanner",
+  vulnerabilities: "vulnerabilities",
+} as const;
+
+export type ToolsControllerGetInstalledToolsParams = {
+  /**
+   * The ID of the workspace
+   */
+  workspaceId: string;
+  category?: ToolsControllerGetInstalledToolsCategory;
+};
+
+export type ToolsControllerGetInstalledToolsCategory =
+  (typeof ToolsControllerGetInstalledToolsCategory)[keyof typeof ToolsControllerGetInstalledToolsCategory];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ToolsControllerGetInstalledToolsCategory = {
   subdomains: "subdomains",
   http_probe: "http_probe",
   http_scraper: "http_scraper",
@@ -4386,6 +4408,340 @@ export function useAssetsControllerGetAssetsInWorkspace<
 }
 
 /**
+ * Retrieves a single asset by its ID.
+ * @summary Get asset by ID
+ */
+export const assetsControllerGetAssetById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Asset>(
+    { url: `/api/assets/${id}`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetAssetByIdQueryKey = (id: string) => {
+  return [`/api/assets/${id}`] as const;
+};
+
+export const getAssetsControllerGetAssetByIdInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetAssetByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+  > = ({ signal }) => assetsControllerGetAssetById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetAssetByIdInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+>;
+export type AssetsControllerGetAssetByIdInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetAssetByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get asset by ID
+ */
+
+export function useAssetsControllerGetAssetByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetAssetByIdInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetsControllerGetAssetByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetAssetByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+  > = ({ signal }) => assetsControllerGetAssetById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetAssetByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+>;
+export type AssetsControllerGetAssetByIdQueryError = unknown;
+
+export function useAssetsControllerGetAssetById<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetById<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetById<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get asset by ID
+ */
+
+export function useAssetsControllerGetAssetById<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetAssetByIdQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Worker alive
  * @summary Worker alive
  */
@@ -6548,6 +6904,364 @@ export function useToolsControllerGetManyTools<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getToolsControllerGetManyToolsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves a list of installed tools for a specific workspace, including built-in tools.
+ * @summary Get installed tools for a workspace
+ */
+export const toolsControllerGetInstalledTools = (
+  params: ToolsControllerGetInstalledToolsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyToolDto>(
+    { url: `/api/tools/installed`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getToolsControllerGetInstalledToolsQueryKey = (
+  params: ToolsControllerGetInstalledToolsParams,
+) => {
+  return [`/api/tools/installed`, ...(params ? [params] : [])] as const;
+};
+
+export const getToolsControllerGetInstalledToolsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+    ToolsControllerGetInstalledToolsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetInstalledToolsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getToolsControllerGetInstalledToolsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+    QueryKey,
+    ToolsControllerGetInstalledToolsParams["page"]
+  > = ({ signal, pageParam }) =>
+    toolsControllerGetInstalledTools(
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+    TError,
+    TData,
+    QueryKey,
+    ToolsControllerGetInstalledToolsParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetInstalledToolsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
+>;
+export type ToolsControllerGetInstalledToolsInfiniteQueryError = unknown;
+
+export function useToolsControllerGetInstalledToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+    ToolsControllerGetInstalledToolsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetInstalledToolsParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetInstalledToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+    ToolsControllerGetInstalledToolsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetInstalledToolsParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetInstalledToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+    ToolsControllerGetInstalledToolsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetInstalledToolsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get installed tools for a workspace
+ */
+
+export function useToolsControllerGetInstalledToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+    ToolsControllerGetInstalledToolsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetInstalledToolsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetInstalledToolsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getToolsControllerGetInstalledToolsQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getToolsControllerGetInstalledToolsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
+  > = ({ signal }) =>
+    toolsControllerGetInstalledTools(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetInstalledToolsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
+>;
+export type ToolsControllerGetInstalledToolsQueryError = unknown;
+
+export function useToolsControllerGetInstalledTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetInstalledTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetInstalledTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get installed tools for a workspace
+ */
+
+export function useToolsControllerGetInstalledTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+  TError = unknown,
+>(
+  params: ToolsControllerGetInstalledToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetInstalledToolsQueryOptions(
     params,
     options,
   );
