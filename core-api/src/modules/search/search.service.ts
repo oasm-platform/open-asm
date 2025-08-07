@@ -91,7 +91,7 @@ export class SearchService {
       hasNextPage: query.page * query.limit < totalItems,
     };
 
-    if (query.isSaveHistory) {
+    if (query.isSaveHistory === true || !query.isSaveHistory) {
       // Check if search history already exists
       const existingHistory = await this.searchHistoryRepo.findOne({
         where: {
@@ -126,13 +126,22 @@ export class SearchService {
    * @returns A promise that resolves to a paginated list of search history, including total count and pagination information.
    */
   public async getSearchHistory(user: User, query: GetManySearchHistoryDto) {
-    const [searchHistory, total] = await this.searchHistoryRepo
+    const { query: searchQuery } = query;
+
+    const queryBuilder = this.searchHistoryRepo
       .createQueryBuilder('searchHistory')
       .where('searchHistory.userId = :userId', { userId: user.id })
       .orderBy('searchHistory.createdAt', 'DESC')
       .take(query.limit)
-      .skip((query.page - 1) * query.limit)
-      .getManyAndCount();
+      .skip((query.page - 1) * query.limit);
+
+    if (searchQuery) {
+      queryBuilder.andWhere('searchHistory.query LIKE :query', {
+        query: `%${searchQuery}%`,
+      });
+    }
+
+    const [searchHistory, total] = await queryBuilder.getManyAndCount();
 
     return getManyResponse(query, searchHistory, total);
   }

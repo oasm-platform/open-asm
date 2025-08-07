@@ -75,6 +75,11 @@ export class GetManySearchHistoryDto extends GetManyBaseQueryParams {
   @Transform(({ value }) => Number(value))
   @IsOptional()
   limit: number = 10;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  query: string;
 }
 
 export class GetSearchHistoryResponseDto {
