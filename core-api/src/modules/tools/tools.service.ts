@@ -182,7 +182,7 @@ export class ToolsService implements OnModuleInit {
 
     await this.jobsRegistryService.startNextJob({
       assets: assetsWithId,
-      nextJob: [ToolCategory.PORTS_SCANNER, ToolCategory.HTTP_SCRAPER],
+      nextJob: [ToolCategory.PORTS_SCANNER, ToolCategory.HTTP_PROBE],
       jobHistory: job.jobHistory,
     });
   }

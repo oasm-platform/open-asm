@@ -23,25 +23,25 @@ export const assetColumns: ColumnDef<any, any>[] = [
     cell: ({ row }) => {
       const data = row.original;
       const ports_scanner = data.metadata?.ports_scanner;
-      const http_scraper = data.metadata?.http_scraper;
+      const http_probe = data.metadata?.http_probe;
       const ipAddresses = data.dnsRecords?.["A"];
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
           <div className="flex items-center gap-2 w-full">
-            <AssetValue http_scraper={http_scraper} value={data.value} />
-            <HTTPXStatusCode http_scraper={http_scraper} />
+            <AssetValue http_probe={http_probe} value={data.value} />
+            <HTTPXStatusCode http_probe={http_probe} />
           </div>
-          {http_scraper?.title && (
-            <p className="truncate w-full text-sm" title={http_scraper?.title}>
-              {http_scraper?.title}
+          {http_probe?.title && (
+            <p className="truncate w-full text-sm" title={http_probe?.title}>
+              {http_probe?.title}
             </p>
           )}
-          {http_scraper?.error && (
+          {http_probe?.error && (
             <p
               className="text-red-500 truncate w-full text-sm"
-              title={http_scraper?.error}
+              title={http_probe?.error}
             >
-              {http_scraper?.error}
+              {http_probe?.error}
             </p>
           )}
           <div className="w-full">
@@ -62,7 +62,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
-      const technologies: string[] = data.metadata?.http_scraper?.tech ?? [];
+      const technologies: string[] = data.metadata?.http_probe?.tech ?? [];
       const maxTechDisplay = 6;
       const displayedTechs = technologies.slice(0, maxTechDisplay);
       const remainingCount = technologies.length - maxTechDisplay;
@@ -84,7 +84,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
     size: 200,
     cell: ({ row }) => {
       const data = row.original;
-      const tls = data.metadata?.http_scraper?.tls;
+      const tls = data.metadata?.http_probe?.tls;
       if (!tls) return <div className="min-h-[60px]" />;
 
       const daysLeft = Math.round(

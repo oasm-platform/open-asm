@@ -87,7 +87,6 @@ export class JobsRegistryService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-
     try {
       const job = await queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
@@ -97,7 +96,6 @@ export class JobsRegistryService {
         .setLock('pessimistic_write')
         .limit(1)
         .getOne();
-
       if (!job) {
         await queryRunner.rollbackTransaction();
         return null;
@@ -108,6 +106,7 @@ export class JobsRegistryService {
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
       const workerStep = this.toolsService.getWorkerStepByName(job.category);
+      console.log(workerStep);
       if (!workerStep) {
         await queryRunner.rollbackTransaction();
         return null;

@@ -35,10 +35,10 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
   }
 
   const { value, metadata, dnsRecords } = currentRow;
-  const http_scraper = metadata?.http_scraper;
+  const http_probe = metadata?.http_probe;
   const ports_scanner = metadata?.ports_scanner;
   const ipAddresses = dnsRecords?.["A"];
-  const tls = http_scraper?.tls;
+  const tls = http_probe?.tls;
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after
@@ -57,7 +57,7 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
     : "N/A";
 
   const handleCopyHeader = async () => {
-    await navigator.clipboard.writeText(http_scraper?.raw_header);
+    await navigator.clipboard.writeText(http_probe?.raw_header);
     toast.success("HTTP response copied to clipboard");
   };
 
@@ -80,7 +80,7 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
                 <div>
                   <span className="block mb-1">Domain</span>
-                  <AssetValue http_scraper={http_scraper} value={value} />
+                  <AssetValue http_probe={http_probe} value={value} />
                 </div>
 
                 {/* IP Addresses */}
@@ -96,10 +96,10 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                   </div>
                 )}
 
-                {http_scraper?.status_code && (
+                {http_probe?.status_code && (
                   <div>
                     <span className="block mb-1">HTTP Status</span>
-                    <HTTPXStatusCode http_scraper={http_scraper} />
+                    <HTTPXStatusCode http_probe={http_probe} />
                   </div>
                 )}
 
@@ -127,18 +127,18 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                   </div>
                 )}
 
-                {http_scraper?.title && (
+                {http_probe?.title && (
                   <div className="md:col-span-2">
                     <span className="block mb-1">Page Title</span>
-                    <p className="  break-words">{http_scraper.title}</p>
+                    <p className="  break-words">{http_probe.title}</p>
                   </div>
                 )}
 
-                {http_scraper?.error && (
+                {http_probe?.error && (
                   <div className="md:col-span-2">
                     <span className="block mb-1">Error</span>
                     <p className="text-red-600 dark:text-red-400 ">
-                      {http_scraper.error}
+                      {http_probe.error}
                     </p>
                   </div>
                 )}
@@ -268,7 +268,7 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
               </>
             )}
 
-            {!!http_scraper?.tech && http_scraper.tech.length > 0 && (
+            {!!http_probe?.tech && http_probe.tech.length > 0 && (
               <>
                 <Separator className="my-5" />
                 <section>
@@ -277,13 +277,13 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                     Technologies
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    <BadgeList list={http_scraper.tech} />
+                    <BadgeList list={http_probe.tech} />
                   </div>
                 </section>
               </>
             )}
 
-            {!!http_scraper?.raw_header && (
+            {!!http_probe?.raw_header && (
               <>
                 <Separator className="my-5" />
                 <section className="pb-4">
@@ -293,8 +293,8 @@ export default function AssetDetailSheet({ open, setOpen, currentRow }: Props) {
                   </h3>
                   <div className="relative font-mono rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-stone-800 **w-full**">
                     <pre className="whitespace-pre-wrap leading-relaxed **overflow-x-auto**">
-                      {http_scraper.raw_header}
-                      {/* {http_scraper?.body} */}
+                      {http_probe.raw_header}
+                      {/* {http_probe?.body} */}
                     </pre>
                     <Button
                       onClick={handleCopyHeader}
