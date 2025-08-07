@@ -1,146 +1,116 @@
-# 🎯 Open-Attack Surface Management (OASM)
+# 🎯 Open Attack Surface Management (OASM)
 
 Open-source platform for cybersecurity Attack Surface Management. Built to help security teams identify, monitor, and manage external assets and potential security exposures across their digital infrastructure.
 
-## ✨ Core Features
+## Table of Contents
 
-- **🎯 Asset Management**: Auto-discovery, classification, tracking & inventory
-- **👥 Auth & Authorization**: User management, RBAC, API keys & sessions  
-- **⚙️ Job Management**: Scheduling, queuing, monitoring & history
-- **🎯 Target Management**: Define, group, validate & monitor scan targets
-- **🤖 Worker Management**: Distributed workers with auto-scaling & health monitoring
-- **🏢 Workspace Management**: Multi-tenant isolation with team collaboration
-- **🔧 Security Tools**: Integrated Subfinder, DNSX, HTTPX & Naabu
+- [Core Features](#core-features)
+- [System Architecture](#system-architecture)
+- [Worker Types & Tools](#worker-types--tools)
+- [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Developer Guide](#developer-guide)
+    - [Project Structure](#project-structure)
+    - [Initialize Developer Environment](#initialize-developer-environment)
+- [Access Points](#access-points)
+- [Contributing](#contributing)
+- [License](#license)
 
-## 🏗️ System Architecture
+## Core Features
 
-- **🖥️ Core API** (NestJS + TypeScript + Better Auth + PostgreSQL): RESTful endpoints, job orchestration, data persistence & worker coordination
-- **🌐 Console** (React + TypeScript + Vite): Modern UI with real-time monitoring, data visualization & asset management  
-- **⚡ Workers** (Bun + TypeScript): High-performance distributed scanning with horizontal scalability
+- Asset Management: Auto-discovery, classification, tracking & inventory
+- Auth & Authorization: User management, RBAC, API keys & sessions
+- Job Management: Scheduling, queuing, monitoring & history
+- Target Management: Define, group, validate & monitor scan targets
+- Worker Management: Distributed workers with auto-scaling & health monitoring
+- Workspace Management: Multi-tenant isolation with team collaboration
+- Security Tools: Integrated Subfinder, DNSX, HTTPX & Naabu
 
-## 🔧 Worker Types & Tools
+## System Architecture
 
-| Worker Type | Tool | Description | Purpose |
-|-------------|------|-------------|---------|
-| **🔍 Subdomain** | Subfinder | Passive subdomain enumeration | Discover hidden subdomains |
-| **🌐 DNS** | DNSX | DNS resolution and validation | Validate and resolve domains |
-| **🔗 HTTP** | HTTPX | HTTP/HTTPS service analysis | Identify web services and technologies |
-| **🔌 Port** | Naabu | Network port scanning | Discover exposed services and entry points |
+- Core API (NestJS + TypeScript + Better Auth + PostgreSQL): RESTful endpoints, job orchestration, data persistence & worker coordination
+- Console (React + TypeScript + Vite): Modern UI with real-time monitoring, data visualization & asset management
+- Workers (Bun + TypeScript): High-performance distributed scanning with horizontal scalability
 
-## 🚀 Quick Start
+## Worker Types & Tools
+
+| Worker Type | Tool      | Description                   | Purpose                                    |
+| ----------- | --------- | ----------------------------- | ------------------------------------------ |
+| Subdomain   | Subfinder | Passive subdomain enumeration | Discover hidden subdomains                 |
+| DNS         | DNSX      | DNS resolution and validation | Validate and resolve domains               |
+| HTTP        | HTTPX     | HTTP/HTTPS service analysis   | Identify web services and technologies     |
+| Port        | Naabu     | Network port scanning         | Discover exposed services and entry points |
+
+## Installation
 
 ### Prerequisites
-- **Node.js** v18+
-- **Bun** runtime (latest)
-- **PostgreSQL** v12+
-- **Docker & Docker Compose** (optional)
 
-### 🐳 Docker Deployment (Recommended)
-```bash
-# Clone repository
-git clone https://github.com/oasm-platform/open-asm.git
-cd open-asm
+- Task (taskfile) - [Installation Guide](https://taskfile.dev/#/installation)
+- Node.js v18+ - [Installation Guide](https://nodejs.org/en/download/package-manager)
+- Bun runtime (latest) - [Installation Guide](https://bun.sh/docs/installation)
+- PostgreSQL v12+
+- Docker & Docker Compose (optional)
 
-# Configure environment
-cp core-api/example.env core-api/.env
-cp worker/example.env worker/.env
+## Developer Guide
 
-# Edit configuration
-nano core-api/.env
-nano worker/.env
+### Project Structure
 
-# Start all services
-task docker-compose
-```
-
-### 💻 Development Setup
-```bash
-# Install dependencies
-npm run install
-
-# Start all services
-task dev
-
-# Or run individually:
-task api:dev     # API server
-task console:dev # Web console
-task worker:dev  # Worker processes
-```
-
-## 📁 Project Structure
 ```
 open-asm/
-├── 🖥️ core-api/           # NestJS API server
+├── core-api/           # NestJS API server
 │   ├── src/               # Source code
 │   ├── example.env        # Environment template
 │   └── package.json
-├── 🌐 console/            # React web interface
+├── console/            # React web interface
 │   ├── src/               # React components
 │   ├── public/            # Static assets
 │   └── package.json
-├── ⚡ worker/             # Bun-based workers
+├── worker/             # Bun-based workers
 │   ├── services/          # Worker services
 │   ├── tools/             # Security tools integration
 │   ├── example.env        # Worker environment
 │   └── package.json
-├── 📚 open-api/           # Auto-generated API docs
-├── 🐳 docker-compose.yml  # Container orchestration
-├── ⚙️ taskfile.yml        # Task automation
-└── 📖 README.md           # Documentation
+├── open-api/           # Auto-generated API docs
+├── docker-compose.yml  # Container orchestration
+├── taskfile.yml        # Task automation
+└── README.md           # Documentation
 ```
 
-## 🔗 Access Points
+### Initialize Developer Environment
 
-| Service | URL | Description |
-|---------|-----|-------------|
-| **🌐 Web Console** | `http://localhost:5173` | Main web interface |
-| **📚 API Docs** | `http://localhost:6276/api/docs` | Swagger UI documentation |
-| **🔐 Auth Docs** | `http://localhost:6276/api/auth/docs` | Authentication endpoints |
-| **📋 OpenAPI Spec** | `http://localhost:6276/api/docs-json` | OpenAPI specification |
+To set up your local development environment, run the following command:
 
-## ⚙️ Configuration
-
-### Core API (.env)
-```env
-# Config database
-POSTGRES_HOST=localhost
-POSTGRES_USERNAME=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_PORT=5432
-POSTGRES_DB=open_asm
-POSTGRES_SSL=false
-
-# API 
-PORT=6276
-OASM_ADMIN_TOKEN=change_me
+```bash
+task init
 ```
 
-### Console (.env)
-```env
-# API Connection
-VITE_API_URL=http://localhost:6276
-```
+This command will:
 
-### Worker (.env)
-```env
-# API Connection
-API=http://localhost:6276
-API_KEY=change_me
+- Install project dependencies.
+- Copy example environment files (`.env`) for `core-api` and `worker`.
+- Generate API documentation.
+- Prepare the database.
 
-# Worker Configuration
-MAX_JOBS=10
-```
+After running `task init`, you can start all services using `task dev` or run them individually as described below.
 
-## 🤝 Contributing
+## Access Points
 
-1. **🍴 Fork** the repository
-2. **🌿 Create** feature branch: `git checkout -b feature/amazing-feature`
-3. **💾 Commit** changes: `git commit -m 'Add amazing feature'`
-4. **📤 Push** to branch: `git push origin feature/amazing-feature`
-5. **🔄 Open** Pull Request
+| Service      | URL                                   | Description              |
+| ------------ | ------------------------------------- | ------------------------ |
+| Web Console  | `http://localhost:5173`               | Main web interface       |
+| API Docs     | `http://localhost:6276/api/docs`      | Swagger UI documentation |
+| Auth Docs    | `http://localhost:6276/api/auth/docs` | Authentication endpoints |
+| OpenAPI Spec | `http://localhost:6276/api/docs-json` | OpenAPI specification    |
 
+## Contributing
 
-## 📄 License
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open Pull Request
+
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
