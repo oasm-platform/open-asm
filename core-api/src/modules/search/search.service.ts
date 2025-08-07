@@ -91,7 +91,7 @@ export class SearchService {
       hasNextPage: query.page * query.limit < totalItems,
     };
 
-    if (query.isSaveHistory == true || !query.isSaveHistory) {
+    if (query.isSaveHistory === true) {
       const existingHistory = await this.searchHistoryRepo.findOne({
         where: {
           query: query.value,
