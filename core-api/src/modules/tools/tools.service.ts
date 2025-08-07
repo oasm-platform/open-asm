@@ -17,6 +17,7 @@ import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkersService } from '../workers/workers.service';
+import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -314,5 +315,37 @@ export class ToolsService implements OnModuleInit {
       },
     });
     return getManyResponse(query, data, total);
+  }
+
+  async getInstalledTools(dto: GetInstalledToolsDto) {
+    const builtInTools = await this.toolsRepository.find({
+      where: {
+        type: WorkerType.BUILT_IN,
+        ...(dto.category && { category: dto.category }),
+      },
+    });
+
+    const workspaceTools = await this.workspaceToolRepository.find({
+      where: {
+        workspace: { id: dto.workspaceId },
+        ...(dto.category && { tool: { category: dto.category } }),
+      },
+      relations: ['tool'],
+    });
+
+    const installedTools = workspaceTools.map((wt) => wt.tool);
+
+    // Combine built-in and workspace tools, ensuring no duplicates
+    const combinedTools = [...builtInTools];
+    installedTools.forEach((tool) => {
+      if (!combinedTools.some((bt) => bt.id === tool.id)) {
+        combinedTools.push(tool);
+      }
+    });
+
+    return {
+      data: combinedTools,
+      total: combinedTools.length,
+    };
   }
 }

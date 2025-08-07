@@ -2,6 +2,8 @@ import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
+
+import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -46,5 +48,18 @@ export class ToolsController {
   @Get()
   async getManyTools(@Query() query: ToolsQueryDto) {
     return this.toolsService.getManyTools(query);
+  }
+
+  @Doc({
+    summary: 'Get installed tools for a workspace',
+    description:
+      'Retrieves a list of installed tools for a specific workspace, including built-in tools.',
+    response: {
+      serialization: GetManyResponseDto(Tool),
+    },
+  })
+  @Get('installed')
+  async getInstalledTools(@Query() dto: GetInstalledToolsDto) {
+    return this.toolsService.getInstalledTools(dto);
   }
 }
