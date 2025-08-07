@@ -33,6 +33,7 @@ export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
+  @Transform(({ value }) => Boolean(value))
   isSaveHistory: boolean;
 }
 export class SearchData {

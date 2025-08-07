@@ -91,8 +91,7 @@ export class SearchService {
       hasNextPage: query.page * query.limit < totalItems,
     };
 
-    if (query.isSaveHistory === true || !query.isSaveHistory) {
-      // Check if search history already exists
+    if (query.isSaveHistory == true || !query.isSaveHistory) {
       const existingHistory = await this.searchHistoryRepo.findOne({
         where: {
           query: query.value,
