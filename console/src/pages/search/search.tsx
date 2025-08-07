@@ -14,11 +14,20 @@ import {
 import * as React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AssetDetailSheet from "../assets/asset-detail-sheet";
+import {
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationEllipsis,
+  PaginationLink,
+  PaginationNext,
+} from "@/components/ui/pagination";
 
 export default function Search() {
   const [param] = useSearchParams();
   const [currentRow, setCurrentRow] = React.useState<Asset>();
   const [open, setOpen] = React.useState(false);
+  const [page, setPage] = React.useState(1);
   const { selectedWorkspace } = useWorkspaceSelector();
   const navigate = useNavigate();
 
@@ -27,6 +36,7 @@ export default function Search() {
   const { data, isFetching } = useSearchControllerSearchAssetsTargets({
     value: searchQuery,
     workspaceId: selectedWorkspace as string,
+    page: page,
   });
 
   if (isFetching) {
@@ -134,6 +144,101 @@ export default function Search() {
       )}
 
       <AssetDetailSheet currentRow={currentRow} open={open} setOpen={setOpen} />
+      {data && data.pageCount > 1 && (
+        <div className="flex justify-center">
+          <Pagination
+            page={page}
+            pageCount={data.pageCount}
+            setPage={setPage}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+function Pagination({
+  page,
+  pageCount,
+  setPage,
+}: {
+  page: number;
+  pageCount: number;
+  setPage: (value: number) => void;
+}) {
+  const getPaginationPages = () => {
+    const pages = Array.from({ length: pageCount }, (_, i) => i + 1).filter(
+      (p) => p === 1 || p === pageCount || Math.abs(p - page) <= 2,
+    );
+
+    const mergedPages: (number | "...")[] = [];
+
+    pages.forEach((curr, i) => {
+      if (i === 0 || curr - pages[i - 1] === 1) {
+        mergedPages.push(curr);
+      } else {
+        mergedPages.push("...", curr);
+      }
+    });
+
+    return mergedPages;
+  };
+
+  return (
+    pageCount > 0 && (
+      <div className="flex flex-row-reverse justify-end items-center">
+        <PaginationContent>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+
+                  setPage(page - 1);
+                }}
+                className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+
+            {getPaginationPages().map((p, idx) =>
+              p === "..." ? (
+                <PaginationItem key={`ellipsis-${idx}`}>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              ) : (
+                <PaginationItem key={p}>
+                  <PaginationLink
+                    href="#"
+                    isActive={p === page}
+                    onClick={(e) => {
+                      e.preventDefault();
+
+                      setPage(p);
+                    }}
+                  >
+                    {p}
+                  </PaginationLink>
+                </PaginationItem>
+              ),
+            )}
+
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+
+                  setPage(page + 1);
+                }}
+                className={
+                  page >= pageCount ? "pointer-events-none opacity-50" : ""
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </PaginationContent>
+      </div>
+    )
   );
 }
