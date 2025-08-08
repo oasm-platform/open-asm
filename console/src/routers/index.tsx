@@ -1,9 +1,11 @@
 import Layout from "@/components/common/layout/layout";
 import Assets from "@/pages/assets/assets";
+import DetailAsset from "@/pages/assets/detail-asset";
 import Dashboard from "@/pages/dashboard/dashboard";
 import Login from "@/pages/login/login";
 import Tools from "@/pages/marketplaces/marketplaces";
 import Register from "@/pages/register/register";
+import Search from "@/pages/search/search";
 import DetailTarget from "@/pages/targets/detail-target";
 import Targets from "@/pages/targets/targets";
 import Vulnerabilities from "@/pages/vulnerabilities/vulnerabilities";
@@ -13,7 +15,6 @@ import GuestRoute from "./GuestRoute";
 import NotFound from "./NotFound";
 import ProtectedRoute from "./ProtectedRoute";
 import RegisterRoute from "./RegisterRoute";
-import Search from "@/pages/search/search";
 
 export const router = createBrowserRouter([
   {
@@ -73,8 +74,17 @@ export const router = createBrowserRouter([
             path: "search",
           },
           {
-            element: <Assets />,
             path: "assets",
+            children: [
+              {
+                path: "",
+                element: <Assets />,
+              },
+              {
+                path: ":id",
+                element: <DetailAsset />,
+              },
+            ],
           },
         ],
       },

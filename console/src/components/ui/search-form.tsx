@@ -6,14 +6,13 @@ import {
 } from "@/components/ui/sidebar";
 import useDebounce from "@/hooks/use-debounce";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import AssetDetailSheet from "@/pages/assets/asset-detail-sheet";
 import {
   useSearchControllerDeleteSearchHistory,
   useSearchControllerGetSearchHistory,
   useSearchControllerSearchAssetsTargets,
-  type Asset,
 } from "@/services/apis/gen/queries";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { CloudCheck, HistoryIcon, Search, Target, X } from "lucide-react";
 import * as React from "react";
 import { useForm, type UseFormSetValue } from "react-hook-form";
@@ -22,7 +21,6 @@ import { z } from "zod";
 import { Form, FormField } from "./form";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Skeleton } from "./skeleton";
-import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
   value: z.string().min(1),
@@ -35,6 +33,7 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
       value: "",
     },
   });
+
   const navigate = useNavigate();
 
   const onSubmit = (formValue: z.infer<typeof formSchema>) => {
@@ -102,8 +101,6 @@ const DropdownCard = React.memo(
   }) => {
     const { selectedWorkspace } = useWorkspaceSelector();
     const { mutate } = useSearchControllerDeleteSearchHistory();
-    const [currentRow, setCurrentRow] = React.useState<Asset>();
-    const [open, setOpen] = React.useState(false);
 
     const debouncedValue = useDebounce(value, 500);
     const navigate = useNavigate();
@@ -210,10 +207,7 @@ const DropdownCard = React.memo(
             data.data.assets.map((asset) => (
               <div
                 key={asset.id}
-                onClick={() => {
-                  setCurrentRow(asset);
-                  setOpen(true);
-                }}
+                onClick={() => navigate("assets/" + asset.id)}
                 className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors group"
               >
                 <CloudCheck className="size-4 text-gray-400 group-hover:text-gray-600" />
@@ -223,11 +217,6 @@ const DropdownCard = React.memo(
               </div>
             ))}
         </div>
-        <AssetDetailSheet
-          currentRow={currentRow}
-          open={open}
-          setOpen={setOpen}
-        />
       </>
     );
   },

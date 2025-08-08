@@ -13,7 +13,7 @@ interface ListAssetsProps {
 export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
   const { selectedWorkspace } = useWorkspaceSelector();
   const [isOpen, setIsOpen] = useState(false);
-  const [currentRow, setCurrentRow] = useState(null);
+  const [rowID, setRowID] = useState("");
 
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
@@ -67,15 +67,11 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
         onFilterChange={setFilter}
         totalItems={total}
         onRowClick={(row) => {
-          setCurrentRow(row);
+          setRowID(row.id);
           setIsOpen(!isOpen);
         }}
       />
-      <AssetDetailSheet
-        open={isOpen}
-        setOpen={setIsOpen}
-        currentRow={currentRow}
-      />
+      <AssetDetailSheet open={isOpen} setOpen={setIsOpen} id={rowID} />
     </>
   );
 }

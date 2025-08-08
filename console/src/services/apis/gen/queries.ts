@@ -215,18 +215,6 @@ export type GetManyGetAssetsResponseDtoDto = {
   pageCount: number;
 };
 
-export type AssetDnsRecords = { [key: string]: unknown };
-
-export type Asset = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  value: string;
-  isPrimary: boolean;
-  dnsRecords: AssetDnsRecords;
-  isErrorPage: boolean;
-};
-
 export type WorkerAliveDto = {
   token: string;
 };
@@ -252,6 +240,18 @@ export type GetManyWorkerInstanceDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type AssetDnsRecords = { [key: string]: unknown };
+
+export type Asset = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  value: string;
+  isPrimary: boolean;
+  dnsRecords: AssetDnsRecords;
+  isErrorPage: boolean;
 };
 
 export type SearchData = {
@@ -4416,7 +4416,7 @@ export const assetsControllerGetAssetById = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<Asset>(
+  return orvalClient<GetAssetsResponseDto>(
     { url: `/api/assets/${id}`, method: "GET", signal },
     options,
   );

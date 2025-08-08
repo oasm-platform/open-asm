@@ -1,32 +1,26 @@
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import {
-  useSearchControllerSearchAssetsTargets,
-  type Asset,
-} from "@/services/apis/gen/queries";
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
+import { useSearchControllerSearchAssetsTargets } from "@/services/apis/gen/queries";
 import {
   CloudCheckIcon,
+  ExternalLink,
+  FileText,
+  Loader2,
   Search as SearchIcon,
   TargetIcon,
-  Loader2,
-  FileText,
-  ExternalLink,
 } from "lucide-react";
 import * as React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import AssetDetailSheet from "../assets/asset-detail-sheet";
-import {
-  PaginationContent,
-  PaginationItem,
-  PaginationPrevious,
-  PaginationEllipsis,
-  PaginationLink,
-  PaginationNext,
-} from "@/components/ui/pagination";
 
 export default function Search() {
   const [param] = useSearchParams();
-  const [currentRow, setCurrentRow] = React.useState<Asset>();
-  const [open, setOpen] = React.useState(false);
   const [page, setPage] = React.useState(1);
   const { selectedWorkspace } = useWorkspaceSelector();
   const navigate = useNavigate();
@@ -120,8 +114,7 @@ export default function Search() {
               <div
                 key={asset.id || index}
                 onClick={() => {
-                  setCurrentRow(asset);
-                  setOpen(true);
+                  navigate("assets/" + asset.id);
                 }}
                 className="px-6 py-4 cursor-pointer transition-colors group"
               >
@@ -144,7 +137,6 @@ export default function Search() {
         </div>
       )}
 
-      <AssetDetailSheet currentRow={currentRow} open={open} setOpen={setOpen} />
       {data && data.pageCount > 1 && (
         <div className="flex justify-center">
           <Pagination
