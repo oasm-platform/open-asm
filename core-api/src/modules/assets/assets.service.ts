@@ -200,15 +200,58 @@ export class AssetsService {
    * @returns A promise that resolves to the found asset.
    * @throws NotFoundException if the asset with the given ID is not found.
    */
-  public async getAssetById(id: string): Promise<Asset> {
-    const asset = await this.repo.findOne({
-      where: { id },
+  public async getAssetById(id: string): Promise<GetAssetsResponseDto> {
+    const sql = ` WITH latest_jobs AS (
+        SELECT DISTINCT ON ("assetId", "category")
+          "assetId",
+          "category",
+          "rawResult",
+          "createdAt"
+        FROM jobs
+        WHERE "rawResult" IS NOT NULL
+        ORDER BY "assetId", "category", "createdAt" DESC
+      )
+      SELECT
+        a.id,
+        a.value,
+        a."targetId",
+        a."isPrimary",
+        a."createdAt",
+        a."updatedAt",
+        a."dnsRecords",
+        a."isErrorPage",
+        COALESCE(json_object_agg(j."category", j."rawResult") FILTER (WHERE j."category" IS NOT NULL), '{}') AS "metadata"
+      FROM assets a
+      LEFT JOIN latest_jobs j ON j."assetId" = a.id
+      LEFT JOIN targets t ON t.id = a."targetId"
+      LEFT JOIN workspace_targets wt ON wt."targetId" = t.id
+
+      WHERE a.id = '${id}'
+      GROUP BY a.id
+       `;
+
+    const rawData = await this.repo.query(sql);
+    const data: GetAssetsResponseDto[] = rawData.map((item: any) => {
+      const asset = new GetAssetsResponseDto();
+      asset.id = item.id;
+      asset.value = item.value;
+      asset.targetId = item.targetId;
+      asset.isPrimary = item.isPrimary;
+      asset.createdAt = item.createdAt;
+      asset.updatedAt = item.updatedAt;
+      asset.dnsRecords = item.dnsRecords;
+      asset.isErrorPage = item.isErrorPage;
+      asset.metadata =
+        typeof item.metadata === 'string'
+          ? JSON.parse(item.metadata)
+          : item.metadata || {};
+      return asset;
     });
 
-    if (!asset) {
+    if (data.length == 0) {
       throw new NotFoundException(`Asset with ID ${id} not found`);
     }
 
-    return asset;
+    return data[0];
   }
 }

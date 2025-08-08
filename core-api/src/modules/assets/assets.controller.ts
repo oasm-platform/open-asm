@@ -27,7 +27,7 @@ export class AssetsController {
     summary: 'Get asset by ID',
     description: 'Retrieves a single asset by its ID.',
     response: {
-      serialization: Asset,
+      serialization: GetAssetsResponseDto,
     },
   })
   @Get(':id')
