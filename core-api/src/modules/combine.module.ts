@@ -3,12 +3,13 @@ import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { JobsRegistryModule } from './jobs-registry/jobs-registry.module';
 import { RootModule } from './root/root.module';
+import { SearchModule } from './search/search.module';
 import { TargetsModule } from './targets/targets.module';
+import { ToolsModule } from './tools/tools.module';
 import { UsersModule } from './users/users.module';
+import { VulnerabilitiesModule } from './vulnerabilities/vulnerabilities.module';
 import { WorkersModule } from './workers/workers.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
-import { SearchModule } from './search/search.module';
-import { ToolsModule } from './tools/tools.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ToolsModule } from './tools/tools.module';
     WorkersModule,
     SearchModule,
     ToolsModule,
+    VulnerabilitiesModule,
   ],
 })
 export class CombineModule {}

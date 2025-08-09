@@ -105,8 +105,8 @@ export class JobsRegistryService {
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
-      const workerStep = this.toolsService.getWorkerStepByName(job.category);
-      console.log(workerStep);
+      const workerStep = this.toolsService.getBuiltInByName(job.category);
+
       if (!workerStep) {
         await queryRunner.rollbackTransaction();
         return null;
@@ -215,12 +215,11 @@ export class JobsRegistryService {
     const { jobId, data } = dto;
 
     const job = await this.findJobForUpdate(workerId, jobId);
-
     if (!job) {
       throw new NotFoundException('Job not found');
     }
 
-    const step = this.toolsService.getWorkerStepByName(job.category);
+    const step = this.toolsService.getBuiltInByName(job.category);
 
     if (!step) {
       throw new Error(`Worker step not found for worker: ${job.category}`);
@@ -228,7 +227,6 @@ export class JobsRegistryService {
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
-
     await this.updateJobStatus(job.id, newStatus);
 
     await this.processStepResult(step, job, dto.data);
@@ -297,11 +295,16 @@ export class JobsRegistryService {
     nextJob,
   }: {
     assets: Asset[];
-    jobHistory: JobHistory;
+    jobHistory?: JobHistory;
     nextJob: ToolCategory[];
   }) {
     if (!nextJob.length) {
       return null;
+    }
+
+    if (!jobHistory) {
+      jobHistory = this.jobHistoryRepo.create({});
+      await this.jobHistoryRepo.save(jobHistory);
     }
 
     return Promise.all(

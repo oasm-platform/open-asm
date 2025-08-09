@@ -34,3 +34,11 @@ export enum CronSchedule {
   BI_WEEKLY = '0 0 */14 * *',
   MONTHLY = '0 0 1 * *',
 }
+
+export enum Severity {
+  INFO = 'info',
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical',
+}

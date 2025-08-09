@@ -14,7 +14,7 @@ import { Asset } from './entities/assets.entity';
 export class AssetsService {
   constructor(
     @InjectRepository(Asset)
-    public readonly repo: Repository<Asset>,
+    public readonly assetRepo: Repository<Asset>,
 
     @InjectRepository(Target)
     public readonly targetRepo: Repository<Target>,
@@ -89,12 +89,12 @@ export class AssetsService {
       GROUP BY a.id
        `;
 
-    const rawData = await this.repo.query(
+    const rawData = await this.assetRepo.query(
       `${sql} ORDER BY a."${sortBy}" ${sortOrder} LIMIT ${limit} OFFSET ${offset}`,
       sqlParams,
     );
 
-    const total = await this.repo
+    const total = await this.assetRepo
       .query(`SELECT COUNT(*) FROM (${sql}) AS sub`, sqlParams)
       .then((res) => res[0].count);
 
@@ -133,7 +133,7 @@ export class AssetsService {
     value: string;
     isPrimary?: boolean;
   }): Promise<Asset> {
-    const asset = await this.repo.save({
+    const asset = await this.assetRepo.save({
       id: randomUUID(),
       target,
       value,
@@ -150,7 +150,7 @@ export class AssetsService {
    * @throws Error if the asset is not found.
    */
   public async reScan(targetId: string): Promise<DefaultMessageResponseDto> {
-    const asset = await this.repo.findOne({
+    const asset = await this.assetRepo.findOne({
       where: {
         target: { id: targetId },
         isPrimary: true,
@@ -186,7 +186,7 @@ export class AssetsService {
    * @returns The count of assets in the workspace.
    */
   public async countAssetsInWorkspace(workspaceId: string) {
-    return this.repo.count({
+    return this.assetRepo.count({
       where: {
         target: { workspaceTargets: { workspace: { id: workspaceId } } },
       },
@@ -230,7 +230,7 @@ export class AssetsService {
       GROUP BY a.id
        `;
 
-    const rawData = await this.repo.query(sql);
+    const rawData = await this.assetRepo.query(sql);
     const data: GetAssetsResponseDto[] = rawData.map((item: any) => {
       const asset = new GetAssetsResponseDto();
       asset.id = item.id;

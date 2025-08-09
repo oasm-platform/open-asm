@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { ResultHandler } from 'src/common/interfaces/app.interface';
+import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
 import { Column, Entity, OneToMany, Unique } from 'typeorm';
 import { WorkspaceTool } from './workspace_tools.entity';
 
@@ -45,4 +46,9 @@ export class Tool extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'enum', enum: WorkerType, default: WorkerType.BUILT_IN })
   type: WorkerType;
+
+  @OneToMany(() => Vulnerability, (vulnerability) => vulnerability.tool, {
+    onDelete: 'CASCADE',
+  })
+  vulnerabilities?: Vulnerability[];
 }

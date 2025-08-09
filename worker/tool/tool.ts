@@ -222,7 +222,7 @@ export class Tool {
       logger
         .color("green")
         .log(
-          `[DONE] - JobId: ${job.jobId} - WorkerId: ${Tool.workerId} - Time: ${executionTime}ms`
+          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId} - Time: ${executionTime}ms`
         );
     } catch (e) {
       logger.error(`Failed to handle job ${job.jobId}:`, e);

@@ -16,13 +16,13 @@ import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkersService } from '../workers/workers.service';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
-
 @Injectable()
 export class ToolsService implements OnModuleInit {
   constructor(
@@ -33,6 +33,9 @@ export class ToolsService implements OnModuleInit {
 
     @InjectRepository(Asset)
     public readonly assetRepo: Repository<Asset>,
+
+    @InjectRepository(Vulnerability)
+    public readonly vulnerabilityRepo: Repository<Vulnerability>,
 
     @Inject(forwardRef(() => JobsRegistryService))
     private jobsRegistryService: JobsRegistryService,
@@ -122,7 +125,12 @@ export class ToolsService implements OnModuleInit {
   }
 
   private async handleNucleiResult({ result, job, dataSource }: ResultHandler) {
-    console.log(result, job, dataSource);
+    if (result.length !== 0) {
+      const data = result.split('\n').map((i) => {
+        const json = JSON.parse(i);
+        return json;
+      });
+    }
   }
 
   /**
@@ -249,7 +257,7 @@ export class ToolsService implements OnModuleInit {
    * @param {ToolCategory} category - The category of the tool.
    * @returns {BuiltInTool | undefined} The built-in tool if found, otherwise undefined.
    */
-  public getWorkerStepByName(category: ToolCategory): BuiltInTool | undefined {
+  public getBuiltInByName(category: ToolCategory): BuiltInTool | undefined {
     return this.builtInTools.find((step) => step.category === category);
   }
 
