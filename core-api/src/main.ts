@@ -13,11 +13,20 @@ import {
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
+import * as path from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
   });
   app.set('query parser', 'extended');
+
+  // Serve files from .storage directory
+  app.useStaticAssets(path.join(__dirname, '..', '.storage'), {
+    prefix: '/storage/',
+    setHeaders: (res) => {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    },
+  });
 
   // Configure CORS
   app.enableCors({
