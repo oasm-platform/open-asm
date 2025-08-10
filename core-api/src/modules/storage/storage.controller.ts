@@ -20,7 +20,18 @@ import { StorageService } from './storage.service';
 @Controller('storage')
 @ApiTags('Storage')
 export class StorageController {
-  private readonly restrictedExtensions = ['exe', 'dll', 'bat', 'sh', 'js', 'php', 'py', 'pl', 'rb', 'jar'];
+  private readonly restrictedExtensions = [
+    'exe',
+    'dll',
+    'bat',
+    'sh',
+    'js',
+    'php',
+    'py',
+    'pl',
+    'rb',
+    'jar',
+  ];
 
   constructor(private readonly storageService: StorageService) {}
 

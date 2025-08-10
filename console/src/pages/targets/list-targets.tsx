@@ -55,22 +55,33 @@ export function ListTargets() {
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder, setFilter },
   } = useServerDataTable();
 
-  const { data, isLoading } = useTargetsControllerGetTargetsInWorkspace(
-    {
-      workspaceId: selectedWorkspace ?? "",
-      limit: pageSize,
-      page,
-      sortBy,
-      sortOrder,
-      value: filter,
-    },
-    {
-      query: {
-        refetchInterval: 3000,
-        queryKey: ["targets", selectedWorkspace],
+  const { data, isLoading, queryKey } =
+    useTargetsControllerGetTargetsInWorkspace(
+      {
+        workspaceId: selectedWorkspace ?? "",
+        limit: pageSize,
+        page,
+        sortBy,
+        sortOrder,
+        value: filter,
       },
-    },
-  );
+      {
+        query: {
+          refetchInterval: 3000,
+          queryKey: [
+            "targets",
+            selectedWorkspace,
+            pageSize,
+            page,
+            sortBy,
+            sortOrder,
+            filter,
+          ],
+        },
+      },
+    );
+
+  console.log(queryKey);
 
   const targets = data?.data ?? [];
   const total = data?.total ?? 0;
