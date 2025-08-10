@@ -21,7 +21,6 @@ import BadgeList from "./badge-list";
 import HTTPXStatusCode from "./status-code";
 
 export default function AssetDetail({ id }: { id: string }) {
-  console.log(id);
   const { data } = useAssetsControllerGetAssetById(id);
   if (!data) return "Loading";
 

@@ -22,8 +22,9 @@ export const assetColumns: ColumnDef<any, any>[] = [
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
-      const ports_scanner = data.metadata?.ports_scanner;
-      const http_probe = data.metadata?.http_probe;
+      console.log(data);
+      const ports_scanner = data.ports.ports;
+      const http_probe = data.httpResponses;
       const ipAddresses = data.dnsRecords?.["A"];
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
@@ -62,7 +63,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
-      const technologies: string[] = data.metadata?.http_probe?.tech ?? [];
+      const technologies: string[] = data.httpResponses.tech ?? [];
       const maxTechDisplay = 6;
       const displayedTechs = technologies.slice(0, maxTechDisplay);
       const remainingCount = technologies.length - maxTechDisplay;
@@ -84,14 +85,14 @@ export const assetColumns: ColumnDef<any, any>[] = [
     size: 200,
     cell: ({ row }) => {
       const data = row.original;
-      const tls = data.metadata?.http_probe?.tls;
+      const tls = data.httpResponses.tls;
       if (!tls) return <div className="min-h-[60px]" />;
 
       const daysLeft = Math.round(
         Math.abs(
           (new Date(tls.not_after).getTime() - new Date().getTime()) /
-          (1000 * 60 * 60 * 24)
-        )
+            (1000 * 60 * 60 * 24),
+        ),
       );
       const color = daysLeft < 30 ? "red" : daysLeft < 60 ? "yellow" : "green";
 
@@ -105,7 +106,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
                 ? "text-red-500 border-red-500"
                 : color === "yellow"
                   ? "text-yellow-500 border-yellow-500"
-                  : "text-green-500 border-green-500"
+                  : "text-green-500 border-green-500",
             )}
           >
             <Lock size={14} color={color} className="mr-1" />
@@ -131,9 +132,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
 
       return (
         <div className="flex flex-col gap-1 max-w-[120px] min-h-[60px] justify-center">
-          <span>
-            {dayjs(createdAt).fromNow()}
-          </span>
+          <span>{dayjs(createdAt).fromNow()}</span>
         </div>
       );
     },
