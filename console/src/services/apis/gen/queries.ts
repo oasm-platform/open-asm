@@ -337,6 +337,41 @@ export type GetManyToolDto = {
   pageCount: number;
 };
 
+export type ScanDto = {
+  /** Target ID */
+  targetId: string;
+};
+
+export type Vulnerability = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  description: string;
+  severity: string;
+  tags: string[];
+  references: string[];
+  authors: string[];
+  affectedUrl: string;
+  ipAddress: string;
+  host: string;
+  port: string;
+  cvssMetric: string;
+  cveId: string;
+  cweId: string;
+  extractorName: string;
+  extractedResults: string[];
+};
+
+export type GetManyVulnerabilityDto = {
+  data: Vulnerability[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   page?: number;
   limit?: number;
@@ -448,6 +483,23 @@ export const ToolsControllerGetInstalledToolsCategory = {
   ports_scanner: "ports_scanner",
   vulnerabilities: "vulnerabilities",
 } as const;
+
+export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  workspaceId: string;
+  targetIds?: string[];
+};
+
+export type StorageControllerUploadFileBody = {
+  file?: Blob;
+};
+
+export type StorageControllerUploadFile200 = {
+  path?: string;
+};
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -7275,3 +7327,578 @@ export function useToolsControllerGetInstalledTools<
 
   return query;
 }
+
+export const vulnerabilitiesControllerScan = (
+  scanDto: ScanDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>(
+    {
+      url: `/api/vulnerabilities/scan`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: scanDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerScanMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+    TError,
+    { data: ScanDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+  TError,
+  { data: ScanDto },
+  TContext
+> => {
+  const mutationKey = ["vulnerabilitiesControllerScan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+    { data: ScanDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return vulnerabilitiesControllerScan(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VulnerabilitiesControllerScanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>
+>;
+export type VulnerabilitiesControllerScanMutationBody = ScanDto;
+export type VulnerabilitiesControllerScanMutationError = unknown;
+
+export const useVulnerabilitiesControllerScan = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+      TError,
+      { data: ScanDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerScan>>,
+  TError,
+  { data: ScanDto },
+  TContext
+> => {
+  const mutationOptions =
+    getVulnerabilitiesControllerScanMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Get vulnerabilities
+ * @summary Get vulnerabilities
+ */
+export const vulnerabilitiesControllerGetVulnerabilities = (
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyVulnerabilityDto>(
+    { url: `/api/vulnerabilities`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerGetVulnerabilitiesQueryKey = (
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+) => {
+  return [`/api/vulnerabilities`, ...(params ? [params] : [])] as const;
+};
+
+export const getVulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+      VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+    >,
+    TError = unknown,
+  >(
+    params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+          >,
+          TError,
+          TData,
+          QueryKey,
+          VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getVulnerabilitiesControllerGetVulnerabilitiesQueryKey(params);
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+      QueryKey,
+      VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+    > = ({ signal, pageParam }) =>
+      vulnerabilitiesControllerGetVulnerabilities(
+        { ...params, page: pageParam || params?.["page"] },
+        requestOptions,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+      TError,
+      TData,
+      QueryKey,
+      VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type VulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
+  >;
+export type VulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryError =
+  unknown;
+
+export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+    VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+          >,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+    VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+          >,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+    VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get vulnerabilities
+ */
+
+export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+    VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetVulnerabilitiesParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getVulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getVulnerabilitiesControllerGetVulnerabilitiesQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getVulnerabilitiesControllerGetVulnerabilitiesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
+  > = ({ signal }) =>
+    vulnerabilitiesControllerGetVulnerabilities(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type VulnerabilitiesControllerGetVulnerabilitiesQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
+  >;
+export type VulnerabilitiesControllerGetVulnerabilitiesQueryError = unknown;
+
+export function useVulnerabilitiesControllerGetVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+          >
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+          >
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get vulnerabilities
+ */
+
+export function useVulnerabilitiesControllerGetVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getVulnerabilitiesControllerGetVulnerabilitiesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * @summary Upload a file to storage
+ */
+export const storageControllerUploadFile = (
+  storageControllerUploadFileBody: StorageControllerUploadFileBody,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  if (storageControllerUploadFileBody.file !== undefined) {
+    formData.append(`file`, storageControllerUploadFileBody.file);
+  }
+
+  return orvalClient<StorageControllerUploadFile200>(
+    {
+      url: `/api/storage/upload`,
+      method: "POST",
+      headers: { "Content-Type": "multipart/form-data" },
+      data: formData,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerUploadFileMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storageControllerUploadFile>>,
+    TError,
+    { data: StorageControllerUploadFileBody },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerUploadFile>>,
+  TError,
+  { data: StorageControllerUploadFileBody },
+  TContext
+> => {
+  const mutationKey = ["storageControllerUploadFile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerUploadFile>>,
+    { data: StorageControllerUploadFileBody }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerUploadFile(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StorageControllerUploadFileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerUploadFile>>
+>;
+export type StorageControllerUploadFileMutationBody =
+  StorageControllerUploadFileBody;
+export type StorageControllerUploadFileMutationError = unknown;
+
+/**
+ * @summary Upload a file to storage
+ */
+export const useStorageControllerUploadFile = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerUploadFile>>,
+      TError,
+      { data: StorageControllerUploadFileBody },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerUploadFile>>,
+  TError,
+  { data: StorageControllerUploadFileBody },
+  TContext
+> => {
+  const mutationOptions =
+    getStorageControllerUploadFileMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
