@@ -15,7 +15,7 @@ import {
     SidebarRail,
     useSidebar
 } from "@/components/ui/sidebar";
-import { CloudCheck, Cpu, LayoutDashboard, Radar, SquareTerminal, Target } from "lucide-react";
+import { Bug, CloudCheck, Cpu, LayoutDashboard, Radar, SquareTerminal, Target } from "lucide-react";
 import { NavUser } from "../../ui/nav-user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -48,7 +48,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     url: "/assets",
                 },
 
-
+                {
+                    title: "Vulnerabilities",
+                    icon: <Bug />,
+                    url: "/vulnerabilities",
+                },
             ],
         },
         {
