@@ -10,6 +10,7 @@ import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { Asset } from './entities/assets.entity';
+import { HttpResponse } from './entities/http-response.entity';
 @Injectable()
 export class AssetsService {
   constructor(
@@ -30,6 +31,7 @@ export class AssetsService {
    */
   public async getAssetsInWorkspace(
     query: GetAssetsQueryDto,
+    assetID?: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
     let { limit, page, sortOrder, targetIds, workspaceId, value } = query;
 
@@ -38,85 +40,54 @@ export class AssetsService {
       sortBy = 'createdAt';
     }
     const offset = (page - 1) * limit;
-    const sqlParams: any[] = [workspaceId];
 
-    let whereClosure = 'wt."workspaceId" = $1 AND a."isErrorPage" = false ';
+    const queryBuilder = this.assetRepo
+      .createQueryBuilder('assets')
+      .leftJoinAndSelect('assets.httpResponses', 'httpResponses')
+      .leftJoinAndSelect('assets.ports', 'ports')
+      .leftJoinAndSelect('assets.target', 'targets')
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .where('assets.isErrorPage = false')
+      .orderBy(`assets.${sortBy}`, sortOrder)
+      .limit(limit)
+      .offset(offset);
 
-    const whereBuilder = {
-      targetIds: (paramIndex: number) => ({
-        sql: `a."targetId" = ANY($${paramIndex})`,
-        params: [targetIds],
-      }),
-      value: (paramIndex: number) => ({
-        sql: `a."value" ILIKE $${paramIndex}`,
-        params: [`%${value}%`],
-      }),
-    };
+    if (value)
+      queryBuilder.andWhere('assets.value ILIKE :value', {
+        value: `%${value}%`,
+      });
 
-    for (const key in whereBuilder) {
-      if (query[key]) {
-        whereClosure += ` AND ${whereBuilder[key](sqlParams.length + 1).sql}`;
-        sqlParams.push(...whereBuilder[key](sqlParams.length + 1).params);
-      }
-    }
+    if (targetIds)
+      queryBuilder.andWhere('assets.targetId = ANY(:targetID)', {
+        targetID: targetIds,
+      });
 
-    const sql = ` WITH latest_jobs AS (
-        SELECT DISTINCT ON ("assetId", "category")
-          "assetId",
-          "category",
-          "rawResult",
-          "createdAt"
-        FROM jobs
-        WHERE "rawResult" IS NOT NULL
-        ORDER BY "assetId", "category", "createdAt" DESC
-      )
-      SELECT
-        a.id,
-        a.value,
-        a."targetId",
-        a."isPrimary",
-        a."createdAt",
-        a."updatedAt",
-        a."dnsRecords",
-        a."isErrorPage",
-        COALESCE(json_object_agg(j."category", j."rawResult") FILTER (WHERE j."category" IS NOT NULL), '{}') AS "metadata"
-      FROM assets a
-      LEFT JOIN latest_jobs j ON j."assetId" = a.id
-      LEFT JOIN targets t ON t.id = a."targetId"
-      LEFT JOIN workspace_targets wt ON wt."targetId" = t.id
+    if (workspaceId)
+      queryBuilder.andWhere('workspaceTargets.workspaceId = :workspaceId', {
+        workspaceId,
+      });
 
-      WHERE ${whereClosure}
-      GROUP BY a.id
-       `;
+    if (assetID)
+      queryBuilder.andWhere('assets.id = :assetID', {
+        assetID,
+      });
 
-    const rawData = await this.assetRepo.query(
-      `${sql} ORDER BY a."${sortBy}" ${sortOrder} LIMIT ${limit} OFFSET ${offset}`,
-      sqlParams,
-    );
-
-    const total = await this.assetRepo
-      .query(`SELECT COUNT(*) FROM (${sql}) AS sub`, sqlParams)
-      .then((res) => res[0].count);
-
-    // Map raw data to GetAssetsResponseDto
-    const data: GetAssetsResponseDto[] = rawData.map((item: any) => {
+    const assets = (await queryBuilder.getMany()).map((item) => {
       const asset = new GetAssetsResponseDto();
       asset.id = item.id;
       asset.value = item.value;
-      asset.targetId = item.targetId;
+      asset.targetId = item.target.id;
       asset.isPrimary = item.isPrimary;
       asset.createdAt = item.createdAt;
       asset.updatedAt = item.updatedAt;
       asset.dnsRecords = item.dnsRecords;
       asset.isErrorPage = item.isErrorPage;
-      asset.metadata =
-        typeof item.metadata === 'string'
-          ? JSON.parse(item.metadata)
-          : item.metadata || {};
+      asset.httpResponses = item.httpResponses ? item.httpResponses[0] : null;
+      asset.ports = item.ports ? item.ports[0] : null;
       return asset;
     });
 
-    return getManyResponse(query, data, total);
+    return getManyResponse(query, assets, assets.length);
   }
 
   /**
@@ -201,57 +172,7 @@ export class AssetsService {
    * @throws NotFoundException if the asset with the given ID is not found.
    */
   public async getAssetById(id: string): Promise<GetAssetsResponseDto> {
-    const sql = ` WITH latest_jobs AS (
-        SELECT DISTINCT ON ("assetId", "category")
-          "assetId",
-          "category",
-          "rawResult",
-          "createdAt"
-        FROM jobs
-        WHERE "rawResult" IS NOT NULL
-        ORDER BY "assetId", "category", "createdAt" DESC
-      )
-      SELECT
-        a.id,
-        a.value,
-        a."targetId",
-        a."isPrimary",
-        a."createdAt",
-        a."updatedAt",
-        a."dnsRecords",
-        a."isErrorPage",
-        COALESCE(json_object_agg(j."category", j."rawResult") FILTER (WHERE j."category" IS NOT NULL), '{}') AS "metadata"
-      FROM assets a
-      LEFT JOIN latest_jobs j ON j."assetId" = a.id
-      LEFT JOIN targets t ON t.id = a."targetId"
-      LEFT JOIN workspace_targets wt ON wt."targetId" = t.id
-
-      WHERE a.id = '${id}'
-      GROUP BY a.id
-       `;
-
-    const rawData = await this.assetRepo.query(sql);
-    const data: GetAssetsResponseDto[] = rawData.map((item: any) => {
-      const asset = new GetAssetsResponseDto();
-      asset.id = item.id;
-      asset.value = item.value;
-      asset.targetId = item.targetId;
-      asset.isPrimary = item.isPrimary;
-      asset.createdAt = item.createdAt;
-      asset.updatedAt = item.updatedAt;
-      asset.dnsRecords = item.dnsRecords;
-      asset.isErrorPage = item.isErrorPage;
-      asset.metadata =
-        typeof item.metadata === 'string'
-          ? JSON.parse(item.metadata)
-          : item.metadata || {};
-      return asset;
-    });
-
-    if (data.length == 0) {
-      throw new NotFoundException(`Asset with ID ${id} not found`);
-    }
-
-    return data[0];
+    const asset = await this.getAssetsInWorkspace(new GetAssetsQueryDto(), id);
+    return asset.data[0];
   }
 }

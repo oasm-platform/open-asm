@@ -3,6 +3,8 @@ import { Transform } from 'class-transformer';
 import { IsOptional, IsString, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { Any } from 'typeorm';
+import { HttpResponse } from '../entities/http-response.entity';
+import { Port } from '../entities/ports.entity';
 
 export class GetAssetsResponseDto {
   @ApiProperty()
@@ -21,8 +23,11 @@ export class GetAssetsResponseDto {
   @ApiProperty({ required: false })
   dnsRecords?: object;
 
-  @ApiProperty({ type: Any, required: false })
-  metadata: Record<string, any>;
+  @ApiProperty({ required: false })
+  httpResponses?: any;
+
+  @ApiProperty({ required: false })
+  ports?: any;
 
   @ApiProperty({ required: false })
   isErrorPage?: boolean;
