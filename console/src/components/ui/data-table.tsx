@@ -141,7 +141,10 @@ export function DataTable<TData, TValue>({
               placeholder={filterPlaceholder}
               className="max-w-sm"
               value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
+              onChange={(e) => {
+                setSearchValue(e.target.value);
+                onFilterChange?.(e.target.value);
+              }}
             />
           )}
         </div>

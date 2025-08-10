@@ -5,6 +5,7 @@ import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilitiesService } from './vulnerabilities.service';
+import { GetVulnerabilitiesStatisticsQueryDto, GetVulnerabilitiesStatisticsResponseDto } from './dto/get-vulnerability-statistics.dto';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
@@ -27,5 +28,17 @@ export class VulnerabilitiesController {
   @Get()
   async getVulnerabilities(@Query() query: GetVulnerabilitiesQueryDto) {
     return this.vulnerabilitiesService.getVulnerabilities(query);
+  }
+
+  @Doc({
+    summary: 'Get vulnerabilities statistics',
+    description: 'Get count of vulnerabilities by severity level',
+    response: {
+      serialization: GetVulnerabilitiesStatisticsResponseDto,
+    },
+  })
+  @Get('statistics')
+  async getVulnerabilitiesStatistics(@Query() query: GetVulnerabilitiesStatisticsQueryDto) {
+    return this.vulnerabilitiesService.getVulnerabilitiesStatistics(query);
   }
 }
