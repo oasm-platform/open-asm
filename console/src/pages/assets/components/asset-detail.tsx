@@ -21,14 +21,15 @@ import BadgeList from "./badge-list";
 import HTTPXStatusCode from "./status-code";
 
 export default function AssetDetail({ id }: { id: string }) {
+  console.log(id);
   const { data } = useAssetsControllerGetAssetById(id);
   if (!data) return "Loading";
 
-  const { value, metadata, dnsRecords } = data;
-  const http_scraper = metadata?.http_scraper as any;
-  const ports_scanner = metadata?.ports_scanner as number[];
+  const { value, httpResponses, ports, dnsRecords } = data;
+  console.log(data);
+  const ports_scanner = ports as unknown as number[];
   const ipAddresses = dnsRecords?.["A"] as string[];
-  const tls = http_scraper?.tls;
+  const tls = httpResponses?.tls as any;
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after
@@ -47,7 +48,7 @@ export default function AssetDetail({ id }: { id: string }) {
     : "N/A";
 
   const handleCopyHeader = async () => {
-    await navigator.clipboard.writeText(http_scraper?.raw_header);
+    await navigator.clipboard.writeText(httpResponses?.raw_header ?? "");
     toast.success("HTTP response copied to clipboard");
   };
 
@@ -62,7 +63,7 @@ export default function AssetDetail({ id }: { id: string }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
             <div>
               <span className="block mb-1">Domain</span>
-              <AssetValue http_probe={http_scraper} value={value} />
+              <AssetValue http_probe={httpResponses} value={value} />
             </div>
 
             {/* IP Addresses */}
@@ -78,10 +79,10 @@ export default function AssetDetail({ id }: { id: string }) {
               </div>
             )}
 
-            {http_scraper?.status_code && (
+            {httpResponses?.status_code && (
               <div>
                 <span className="block mb-1">HTTP Status</span>
-                <HTTPXStatusCode http_probe={http_scraper} />
+                <HTTPXStatusCode http_probe={httpResponses} />
               </div>
             )}
 
@@ -109,18 +110,18 @@ export default function AssetDetail({ id }: { id: string }) {
               </div>
             )}
 
-            {http_scraper?.title && (
+            {httpResponses?.title && (
               <div className="md:col-span-2">
                 <span className="block mb-1">Page Title</span>
-                <p className="  break-words">{http_scraper.title}</p>
+                <p className="  break-words">{httpResponses.title}</p>
               </div>
             )}
 
-            {http_scraper?.error && (
+            {httpResponses?.error && (
               <div className="md:col-span-2">
                 <span className="block mb-1">Error</span>
                 <p className="text-red-600 dark:text-red-400 ">
-                  {http_scraper.error}
+                  {httpResponses.error}
                 </p>
               </div>
             )}
@@ -249,7 +250,7 @@ export default function AssetDetail({ id }: { id: string }) {
           </>
         )}
 
-        {!!http_scraper?.tech && http_scraper.tech.length > 0 && (
+        {!!httpResponses?.tech && httpResponses.tech.length > 0 && (
           <>
             <Separator className="my-5" />
             <section>
@@ -258,13 +259,13 @@ export default function AssetDetail({ id }: { id: string }) {
                 Technologies
               </h3>
               <div className="flex flex-wrap gap-2">
-                <BadgeList list={http_scraper.tech} />
+                <BadgeList list={httpResponses.tech} />
               </div>
             </section>
           </>
         )}
 
-        {!!http_scraper?.raw_header && (
+        {!!httpResponses?.raw_header && (
           <>
             <Separator className="my-5" />
             <section className="pb-4">
@@ -274,7 +275,7 @@ export default function AssetDetail({ id }: { id: string }) {
               </h3>
               <div className="relative font-mono rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-stone-800 **w-full**">
                 <pre className="whitespace-pre-wrap leading-relaxed **overflow-x-auto**">
-                  {http_scraper.raw_header}
+                  {httpResponses.raw_header}
                   {/* {http_probe?.body} */}
                 </pre>
                 <Button
