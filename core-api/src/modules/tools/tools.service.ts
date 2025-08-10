@@ -207,7 +207,6 @@ export class ToolsService implements OnModuleInit {
         groupedVulnerabilities.values(),
       ) as DeepPartial<Vulnerability>[];
 
-      console.log(vulnerabilitiesData, 'vulnerabilitiesData');
       await this.vulnerabilityRepo.save(vulnerabilitiesData, { chunk: 100 });
 
       this.workerService.updateResultToDatabase({

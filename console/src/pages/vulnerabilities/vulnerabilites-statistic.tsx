@@ -4,13 +4,21 @@ import { useVulnerabilitiesControllerGetVulnerabilitiesStatistics } from "@/serv
 import { AlertTriangle, Bug, Eye, Flame, Info } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
-const VulnerabilitiesStatistic = () => {
+interface VulnerabilitiesStatisticProps {
+    targetId?: string;
+}
+const VulnerabilitiesStatistic = ({ targetId }: VulnerabilitiesStatisticProps) => {
     const { selectedWorkspace } = useWorkspaceSelector();
     const location = useLocation();
 
     // Extract targetId from URL search params if present
     const urlParams = new URLSearchParams(location.search);
-    const targetId = urlParams.get("targetId") || undefined;
+    const urlTargetId = urlParams.get("targetId") || undefined;
+
+    // Use targetId from props if provided, otherwise use from URL
+    if (!targetId) {
+        targetId = urlTargetId;
+    }
 
     const { data, isLoading } = useVulnerabilitiesControllerGetVulnerabilitiesStatistics(
         {

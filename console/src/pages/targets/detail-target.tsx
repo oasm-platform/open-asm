@@ -1,5 +1,6 @@
 import Page from "@/components/common/page";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TargetStatus from "@/components/ui/target-status";
 import {
@@ -8,18 +9,27 @@ import {
 } from "@/services/apis/gen/queries";
 import dayjs from "dayjs";
 import { Bug, Loader2 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ListAssets } from "../assets/list-assets";
 import { ListVulnerabilities } from "../vulnerabilities/list-vulnerabilitys";
+import VulnerabilitiesStatistic from "../vulnerabilities/vulnerabilites-statistic";
 import AssetsDiscovering from "./assets-discovering";
 import SettingTarget from "./setting-target";
 
+// Define tabs configuration
+const TABS = [
+  { value: "assets", label: "Assets" },
+  { value: "vulnerabilities", label: "Vulnerabilities" },
+];
+
 export function DetailTarget() {
   const { id } = useParams<{ id: string }>();
-
-  const { searchParams } = new URL(window.location.href);
-  const animation = searchParams.get("animation") === "true";
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const animation = searchParams.get("animation") === "true";
+  const tab = searchParams.get("tab");
+
   const {
     data: target,
     isLoading,
@@ -27,6 +37,17 @@ export function DetailTarget() {
   } = useTargetsControllerGetTargetById(id || "", {
     query: { enabled: !!id, refetchInterval: 1000 },
   });
+
+  // Determine active tab, default to "assets" if not specified
+  const activeTab = TABS.some(t => t.value === tab) ? tab : "assets";
+
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    // Create new search params with the selected tab
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set("tab", value);
+    navigate(`?${newSearchParams.toString()}`);
+  };
 
   if (isLoading) {
     return (
@@ -61,15 +82,21 @@ export function DetailTarget() {
           <p className="text-muted-foreground">
             {dayjs(target.lastDiscoveredAt).fromNow()}
           </p>
-          <Button
-            onClick={() => navigate(`/vulnerabilities?targetId=${target.id}`)}
-            variant="outline"
-            className="hover:cursor-pointer"
-            title={`Start scan vulnerabilities for target ${target.value}`}
-          >
-            <Bug className="h-4 w-4" />
-            Scan vulnerability
-          </Button>
+          <ConfirmDialog
+            title="Scan vulnerabilities"
+            description={`Are you sure you want to scan vulnerabilities for target ${target.value}?`}
+            onConfirm={() => navigate(`/vulnerabilities?targetId=${target.id}`)}
+            trigger={
+              <Button
+                variant="outline"
+                className="hover:cursor-pointer"
+                title={`Start scan vulnerabilities for target ${target.value}`}
+              >
+                <Bug className="h-4 w-4" />
+                Scan vulnerability
+              </Button>
+            }
+          />
           <SettingTarget target={target} />
         </div>
       </div>
@@ -78,10 +105,13 @@ export function DetailTarget() {
           target.status === JobStatus.pending) && (
           <AssetsDiscovering targetId={target.id} />
         )}
-      <Tabs defaultValue="assets" className="w-full my-6">
+      <Tabs value={activeTab as any} onValueChange={handleTabChange} className="w-full my-6">
         <TabsList>
-          <TabsTrigger value="assets" className="hover:cursor-pointer">Assets</TabsTrigger>
-          <TabsTrigger value="vulnerabilities" className="hover:cursor-pointer">Vulnerabilities</TabsTrigger>
+          {TABS.map((t) => (
+            <TabsTrigger key={t.value} value={t.value} className="hover:cursor-pointer">
+              {t.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
         <TabsContent value="assets">
           <ListAssets
@@ -89,7 +119,8 @@ export function DetailTarget() {
             refetchInterval={target.status === JobStatus.in_progress ? 1000 : 5000}
           />
         </TabsContent>
-        <TabsContent value="vulnerabilities">
+        <TabsContent value="vulnerabilities" className="flex flex-col gap-3">
+          <VulnerabilitiesStatistic targetId={target.id} />
           <ListVulnerabilities targetId={target.id} />
         </TabsContent>
       </Tabs>
