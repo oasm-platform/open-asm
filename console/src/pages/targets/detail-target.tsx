@@ -6,10 +6,12 @@ import TargetStatus from "@/components/ui/target-status";
 import {
   JobStatus,
   useTargetsControllerGetTargetById,
+  useVulnerabilitiesControllerScan,
 } from "@/services/apis/gen/queries";
 import dayjs from "dayjs";
 import { Bug, Loader2 } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { ListAssets } from "../assets/list-assets";
 import { ListVulnerabilities } from "../vulnerabilities/list-vulnerabilitys";
 import VulnerabilitiesStatistic from "../vulnerabilities/vulnerabilites-statistic";
@@ -37,6 +39,8 @@ export function DetailTarget() {
   } = useTargetsControllerGetTargetById(id || "", {
     query: { enabled: !!id, refetchInterval: 1000 },
   });
+
+  const { mutate: scanVulnerabilities } = useVulnerabilitiesControllerScan()
 
   // Determine active tab, default to "assets" if not specified
   const activeTab = TABS.some(t => t.value === tab) ? tab : "assets";
@@ -85,7 +89,18 @@ export function DetailTarget() {
           <ConfirmDialog
             title="Scan vulnerabilities"
             description={`Are you sure you want to scan vulnerabilities for target ${target.value}?`}
-            onConfirm={() => navigate(`/vulnerabilities?targetId=${target.id}`)}
+            onConfirm={() => scanVulnerabilities({
+              data: { targetId: target.id, }
+            }, {
+              onSuccess: () => {
+                toast.success("Scan started successfully")
+                navigate(`?tab=vulnerabilities`)
+
+              },
+              onError: () => {
+                toast.error("Failed to start scan")
+              },
+            })}
             trigger={
               <Button
                 variant="outline"
