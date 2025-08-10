@@ -190,50 +190,9 @@ export type UpdateResultDto = {
   data: UpdateResultDtoData;
 };
 
-export type HttpResponseTls = { [key: string]: unknown };
-
-export type HttpResponseHeader = { [key: string]: unknown };
-
-export type HttpResponseKnowledgebase = { [key: string]: unknown };
-
-export type HttpResponse = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  timestamp: string;
-  tls: HttpResponseTls;
-  port: string;
-  url: string;
-  input: string;
-  title: string;
-  scheme: string;
-  webserver: string;
-  body: string;
-  content_type: string;
-  method: string;
-  host: string;
-  path: string;
-  favicon: string;
-  favicon_md5: string;
-  favicon_url: string;
-  header: HttpResponseHeader;
-  raw_header: string;
-  request: string;
-  time: string;
-  a: string[];
-  tech: string[];
-  words: number;
-  lines: number;
-  status_code: number;
-  content_length: number;
-  failed: boolean;
-  knowledgebase: HttpResponseKnowledgebase;
-  resolvers: string[];
-  assetId: string;
-  jobHistoryId: string;
-};
-
 export type GetAssetsResponseDtoDnsRecords = { [key: string]: unknown };
+
+export type GetAssetsResponseDtoHttpResponses = { [key: string]: unknown };
 
 export type GetAssetsResponseDtoPorts = { [key: string]: unknown };
 
@@ -245,7 +204,7 @@ export type GetAssetsResponseDto = {
   createdAt: string;
   updatedAt: string;
   dnsRecords?: GetAssetsResponseDtoDnsRecords;
-  httpResponses?: HttpResponse;
+  httpResponses?: GetAssetsResponseDtoHttpResponses;
   ports?: GetAssetsResponseDtoPorts;
   isErrorPage?: boolean;
 };
