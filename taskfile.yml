@@ -14,9 +14,9 @@ includes:
 
 tasks:
   dev:
-    cmds:
-      - task api:dev &
-      - task console:dev
+    deps:
+      - api:dev
+      - console:dev
       # - |
       #   echo "Waiting for API to be ready..."
       #   until curl -s http://localhost:$PORT > /dev/null; do
