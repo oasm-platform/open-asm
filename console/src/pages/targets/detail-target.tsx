@@ -78,7 +78,7 @@ export function DetailTarget() {
           target.status === JobStatus.pending) && (
           <AssetsDiscovering targetId={target.id} />
         )}
-      <Tabs defaultValue="assets" className="w-full my-5">
+      <Tabs defaultValue="assets" className="w-full my-6">
         <TabsList>
           <TabsTrigger value="assets" className="hover:cursor-pointer">Assets</TabsTrigger>
           <TabsTrigger value="vulnerabilities" className="hover:cursor-pointer">Vulnerabilities</TabsTrigger>

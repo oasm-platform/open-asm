@@ -16,6 +16,7 @@ import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkersService } from '../workers/workers.service';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
@@ -41,6 +42,8 @@ export class ToolsService implements OnModuleInit {
     private jobsRegistryService: JobsRegistryService,
 
     private workerService: WorkersService,
+
+    private storageService: StorageService,
   ) {}
 
   public builtInTools: BuiltInTool[] = [
@@ -129,52 +132,94 @@ export class ToolsService implements OnModuleInit {
       return;
     }
     try {
-      const vulnerabilitiesData = result
+      const initialVulnerabilities = result
         .split('\n')
+        .filter((line) => line.trim())
         .map((line) => {
           try {
             const finding = JSON.parse(line.trim());
+            const vulId = randomUUID();
+            const filePath = `${vulId}.json`;
+            this.storageService.uploadFile(filePath, Buffer.from(line));
             return {
+              id: vulId,
               name: finding['info']['name'] as string,
               description: finding['info']['description'] as string,
               severity: Severity[
                 finding['info']['severity'].toLowerCase()
               ] as Severity,
               createdAt: new Date(),
-              tags: finding['info']['tags'] as string[],
-              references: finding['info']['reference'] as string[],
-              authors: finding['info']['author'] as string[],
-              affectedUrl: finding['url'] as string,
+              tags: finding['info']['tags'] || [],
+              references: finding['info']['reference'] || [],
+              authors: finding['info']['author'] || [],
+              affectedUrl: finding['matched-at'] as string,
               ipAddress: finding['ip'] as string,
               host: finding['host'] as string,
-              port: finding['port'].toString(),
+              port: finding['port']?.toString(),
               cvssMetric: finding['info']['classification']?.[
                 'cvss-metrics'
               ] as string,
               cveId: finding['info']['classification']?.[
                 'cve-id'
               ]?.[0] as string,
-              // tool: { id: job.category },
               asset: { id: job.asset.id },
               jobHistory: { id: job.jobHistory.id },
               extractorName: finding['extractor-name'] as string,
-              extractedResults: finding['extracted-results'] as string[],
+              extractedResults: finding['extracted-results'] || [],
+              filePath,
             };
           } catch (e) {
             console.error('Error processing nuclei result:', e);
             return null;
           }
         })
-        .filter(Boolean) as DeepPartial<Vulnerability>[];
+        .filter((v): v is NonNullable<typeof v> => v !== null);
 
+      const groupedVulnerabilities = new Map<
+        string,
+        (typeof initialVulnerabilities)[0]
+      >();
+
+      for (const vuln of initialVulnerabilities) {
+        if (groupedVulnerabilities.has(vuln.name)) {
+          const existingVuln = groupedVulnerabilities.get(vuln.name)!;
+          existingVuln.tags = [
+            ...new Set([...existingVuln.tags, ...vuln.tags]),
+          ];
+          existingVuln.references = [
+            ...new Set([...existingVuln.references, ...vuln.references]),
+          ];
+          existingVuln.authors = [
+            ...new Set([...existingVuln.authors, ...vuln.authors]),
+          ];
+          existingVuln.extractedResults = [
+            ...new Set([
+              ...existingVuln.extractedResults,
+              ...vuln.extractedResults,
+            ]),
+          ];
+        } else {
+          groupedVulnerabilities.set(vuln.name, { ...vuln });
+        }
+      }
+
+      const vulnerabilitiesData = Array.from(
+        groupedVulnerabilities.values(),
+      ) as DeepPartial<Vulnerability>[];
+
+      console.log(vulnerabilitiesData, 'vulnerabilitiesData');
       await this.vulnerabilityRepo.save(vulnerabilitiesData, { chunk: 100 });
 
-      this.workerService.updateResultToDatabase(dataSource, job, {
-        vulnerabilities: vulnerabilitiesData.map((vuln) => ({
-          name: vuln.name,
-          severity: vuln.severity,
-          url: vuln.affectedUrl,
-        })),
+      this.workerService.updateResultToDatabase({
+        dataSource,
+        job,
+        result: {
+          vulnerabilities: vulnerabilitiesData.map((vuln) => ({
+            name: vuln.name,
+            severity: vuln.severity,
+            url: vuln.affectedUrl,
+          })),
+        },
       });
     } catch (error) {
       console.error('Error processing nuclei results:', error);
@@ -207,8 +252,12 @@ export class ToolsService implements OnModuleInit {
     const primaryAsset = parsed[job.asset.value];
     delete parsed[job.asset.value];
 
-    this.workerService.updateResultToDatabase(dataSource, job, {
-      total: Object.keys(parsed).length,
+    this.workerService.updateResultToDatabase({
+      dataSource,
+      job,
+      result: {
+        total: Object.keys(parsed).length,
+      },
     });
 
     const assets: Asset[] = Object.keys(parsed).map((i) => ({
@@ -270,7 +319,11 @@ export class ToolsService implements OnModuleInit {
       })
       .execute();
 
-    this.workerService.updateResultToDatabase(dataSource, job, parsed);
+    this.workerService.updateResultToDatabase({
+      dataSource,
+      job,
+      result: parsed,
+    });
   }
 
   /**
@@ -298,7 +351,11 @@ export class ToolsService implements OnModuleInit {
         .execute(),
     ]);
 
-    this.workerService.updateResultToDatabase(dataSource, job, parsed);
+    this.workerService.updateResultToDatabase({
+      dataSource,
+      job,
+      result: parsed,
+    });
   }
 
   /**

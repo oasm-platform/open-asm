@@ -46,7 +46,15 @@ export class WorkersService {
    * @param job the job to update
    * @param result the result of the job
    */
-  public updateResultToDatabase(dataSource: DataSource, job: Job, result: any) {
+  public updateResultToDatabase({
+    dataSource,
+    job,
+    result,
+  }: {
+    dataSource: DataSource;
+    job: Job;
+    result: any;
+  }) {
     // Update job
     dataSource
       .createQueryBuilder()

@@ -1,9 +1,9 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   UploadedFile,
   UseInterceptors,
-  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -13,6 +13,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { randomUUID } from 'crypto';
 import { Roles } from 'src/common/decorators/app.decorator';
 import { Role } from 'src/common/enums/enum';
 import { StorageService } from './storage.service';
@@ -73,7 +74,9 @@ export class StorageController {
       throw new BadRequestException(`File type .${extension} is not allowed`);
     }
 
-    const result = this.storageService.uploadFile(file);
+    const filename = `${randomUUID()}.${extension}`;
+
+    const result = this.storageService.uploadFile(filename, file.buffer);
     return { path: result.path };
   }
 }
