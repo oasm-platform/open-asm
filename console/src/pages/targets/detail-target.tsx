@@ -1,5 +1,6 @@
 import Page from "@/components/common/page";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TargetStatus from "@/components/ui/target-status";
 import {
   JobStatus,
@@ -9,6 +10,7 @@ import dayjs from "dayjs";
 import { Bug, Loader2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ListAssets } from "../assets/list-assets";
+import { ListVulnerabilities } from "../vulnerabilities/list-vulnerabilitys";
 import AssetsDiscovering from "./assets-discovering";
 import SettingTarget from "./setting-target";
 
@@ -76,10 +78,21 @@ export function DetailTarget() {
           target.status === JobStatus.pending) && (
           <AssetsDiscovering targetId={target.id} />
         )}
-      <ListAssets
-        targetId={target.id}
-        refetchInterval={target.status === JobStatus.in_progress ? 1000 : 5000}
-      />
+      <Tabs defaultValue="assets" className="w-full my-5">
+        <TabsList>
+          <TabsTrigger value="assets" className="hover:cursor-pointer">Assets</TabsTrigger>
+          <TabsTrigger value="vulnerabilities" className="hover:cursor-pointer">Vulnerabilities</TabsTrigger>
+        </TabsList>
+        <TabsContent value="assets">
+          <ListAssets
+            targetId={target.id}
+            refetchInterval={target.status === JobStatus.in_progress ? 1000 : 5000}
+          />
+        </TabsContent>
+        <TabsContent value="vulnerabilities">
+          <ListVulnerabilities targetId={target.id} />
+        </TabsContent>
+      </Tabs>
     </Page>
   );
 }
