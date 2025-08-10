@@ -7,11 +7,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { ToolCategory, WorkerType } from 'src/common/enums/enum';
+import { Severity, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { ResultHandler } from 'src/common/interfaces/app.interface';
 import { BuiltInTool } from 'src/common/types/app.types';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
@@ -125,11 +125,60 @@ export class ToolsService implements OnModuleInit {
   }
 
   private async handleNucleiResult({ result, job, dataSource }: ResultHandler) {
-    if (result.length !== 0) {
-      const data = result.split('\n').map((i) => {
-        const json = JSON.parse(i);
-        return json;
+    if (!result || result.length === 0) {
+      return;
+    }
+    try {
+      const vulnerabilitiesData = result
+        .split('\n')
+        .map((line) => {
+          try {
+            const finding = JSON.parse(line.trim());
+            return {
+              name: finding['info']['name'] as string,
+              description: finding['info']['description'] as string,
+              severity: Severity[
+                finding['info']['severity'].toLowerCase()
+              ] as Severity,
+              createdAt: new Date(),
+              tags: finding['info']['tags'] as string[],
+              references: finding['info']['reference'] as string[],
+              authors: finding['info']['author'] as string[],
+              affectedUrl: finding['url'] as string,
+              ipAddress: finding['ip'] as string,
+              host: finding['host'] as string,
+              port: finding['port'].toString(),
+              cvssMetric: finding['info']['classification']?.[
+                'cvss-metrics'
+              ] as string,
+              cveId: finding['info']['classification']?.[
+                'cve-id'
+              ]?.[0] as string,
+              // tool: { id: job.category },
+              asset: { id: job.asset.id },
+              jobHistory: { id: job.jobHistory.id },
+              extractorName: finding['extractor-name'] as string,
+              extractedResults: finding['extracted-results'] as string[],
+            };
+          } catch (e) {
+            console.error('Error processing nuclei result:', e);
+            return null;
+          }
+        })
+        .filter(Boolean) as DeepPartial<Vulnerability>[];
+
+      await this.vulnerabilityRepo.save(vulnerabilitiesData, { chunk: 100 });
+
+      this.workerService.updateResultToDatabase(dataSource, job, {
+        vulnerabilities: vulnerabilitiesData.map((vuln) => ({
+          name: vuln.name,
+          severity: vuln.severity,
+          url: vuln.affectedUrl,
+        })),
       });
+    } catch (error) {
+      console.error('Error processing nuclei results:', error);
+      throw error;
     }
   }
 
