@@ -89,8 +89,7 @@ export class ToolsService implements OnModuleInit {
         'Nuclei is a fast, customizable vulnerability scanner powered by the global security community and built on a simple YAML-based DSL, enabling collaboration to tackle trending vulnerabilities on the internet. It helps you find vulnerabilities in your applications, APIs, networks, DNS, and cloud configurations.',
       logoUrl:
         'https://raw.githubusercontent.com/projectdiscovery/nuclei/refs/heads/dev/static/nuclei-logo.png',
-      command:
-        'nuclei -u {{value}} -t vulnerabilities/,miscellaneous/,exposures/,default-logins/,cves/ -s critical,high,medium,low,info -j --silent',
+      command: 'nuclei -u {{value}} -j --silent',
       resultHandler: this.handleNucleiResult.bind(this),
       version: '3.4.7',
     },

@@ -37,7 +37,7 @@ export function DetailTarget() {
     isLoading,
     error,
   } = useTargetsControllerGetTargetById(id || "", {
-    query: { enabled: !!id, refetchInterval: 1000 },
+    query: { enabled: !!id, refetchInterval: 5000 },
   });
 
   const { mutate: scanVulnerabilities } = useVulnerabilitiesControllerScan()
@@ -103,6 +103,7 @@ export function DetailTarget() {
             })}
             trigger={
               <Button
+                disabled={target.status !== JobStatus.completed}
                 variant="outline"
                 className="hover:cursor-pointer"
                 title={`Start scan vulnerabilities for target ${target.value}`}
