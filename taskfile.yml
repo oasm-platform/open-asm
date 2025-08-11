@@ -47,5 +47,7 @@ tasks:
       - node -e "require('fs').copyFileSync('core-api/example.env', 'core-api/.env')"
       - node -e "require('fs').copyFileSync('worker/example.env', 'worker/.env')"
       - node -e "require('fs').copyFileSync('console/example.env', 'console/.env')"
-      - task: install
       - docker compose up -d postgres --force-recreate
+    deps:
+      - install
+      - worker:tools
