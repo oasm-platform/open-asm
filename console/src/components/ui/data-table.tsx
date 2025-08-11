@@ -88,8 +88,11 @@ export function DataTable<TData, TValue>({
     React.useState<VisibilityState>({});
 
   const [searchValue, setSearchValue] = React.useState(filterValue);
-  // const debouncedSearchValue = useDebounce(searchValue, 500);
-  // onFilterChange?.(debouncedSearchValue);
+  const debouncedSearchValue = useDebounce(searchValue, 500);
+
+  React.useEffect(() => {
+    onFilterChange?.(debouncedSearchValue);
+  }, [debouncedSearchValue, onFilterChange]);
 
   const table = useReactTable({
     data,
@@ -147,7 +150,6 @@ export function DataTable<TData, TValue>({
               value={searchValue}
               onChange={(e) => {
                 setSearchValue(e.target.value);
-                onFilterChange?.(e.target.value);
               }}
             />
           )}
