@@ -34,6 +34,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "./pagination";
+import useDebounce from "@/hooks/use-debounce";
 
 // Define props interface
 interface DataTableProps<TData, TValue> {
@@ -66,6 +67,7 @@ export function DataTable<TData, TValue>({
   isLoading = false,
   filterColumnKey,
   filterValue = "",
+  onFilterChange,
   onRowClick,
   rowClassName,
   filterPlaceholder = "Filter...",
@@ -86,6 +88,8 @@ export function DataTable<TData, TValue>({
     React.useState<VisibilityState>({});
 
   const [searchValue, setSearchValue] = React.useState(filterValue);
+  // const debouncedSearchValue = useDebounce(searchValue, 500);
+  // onFilterChange?.(debouncedSearchValue);
 
   const table = useReactTable({
     data,
@@ -115,7 +119,7 @@ export function DataTable<TData, TValue>({
   const getPaginationPages = () => {
     const pageCount = Math.ceil(totalItems / pageSize);
     const pages = Array.from({ length: pageCount }, (_, i) => i + 1).filter(
-      (p) => p === 1 || p === pageCount || Math.abs(p - page) <= 2
+      (p) => p === 1 || p === pageCount || Math.abs(p - page) <= 2,
     );
 
     const mergedPages: (number | "...")[] = [];
@@ -169,7 +173,7 @@ export function DataTable<TData, TValue>({
                     <div className="flex items-center gap-2">
                       {flexRender(
                         header.column.columnDef.header,
-                        header.getContext()
+                        header.getContext(),
                       )}
                       {sortBy === header.column.id &&
                         (sortOrder === "ASC" ? (
@@ -192,7 +196,7 @@ export function DataTable<TData, TValue>({
                       <TableCell key={`skeleton-cell-${colIndex}`}>
                         <div className="h-4 w-full bg-muted rounded animate-pulse" />
                       </TableCell>
-                    )
+                    ),
                   )}
                 </TableRow>
               ))
@@ -203,7 +207,7 @@ export function DataTable<TData, TValue>({
                   data-state={row.getIsSelected() && "selected"}
                   className={cn(
                     rowClassName,
-                    onRowClick && "cursor-pointer hover:bg-muted/50"
+                    onRowClick && "cursor-pointer hover:bg-muted/50",
                   )}
                   onClick={() => onRowClick?.(row.original)}
                 >
@@ -211,7 +215,7 @@ export function DataTable<TData, TValue>({
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}
@@ -287,7 +291,7 @@ export function DataTable<TData, TValue>({
                       {p}
                     </PaginationLink>
                   </PaginationItem>
-                )
+                ),
               )}
 
               <PaginationItem>

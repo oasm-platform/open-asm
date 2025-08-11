@@ -23,7 +23,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
     cell: ({ row }) => {
       const data = row.original;
       console.log(data);
-      const ports_scanner = data.ports.ports;
+      const ports_scanner = data.ports?.ports;
       const http_probe = data.httpResponses;
       const ipAddresses = data.dnsRecords?.["A"];
       return (
@@ -63,7 +63,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
-      const technologies: string[] = data.httpResponses.tech ?? [];
+      const technologies: string[] = data.httpResponses?.tech ?? [];
       const maxTechDisplay = 6;
       const displayedTechs = technologies.slice(0, maxTechDisplay);
       const remainingCount = technologies.length - maxTechDisplay;
@@ -85,7 +85,7 @@ export const assetColumns: ColumnDef<any, any>[] = [
     size: 200,
     cell: ({ row }) => {
       const data = row.original;
-      const tls = data.httpResponses.tls;
+      const tls = data.httpResponses?.tls;
       if (!tls) return <div className="min-h-[60px]" />;
 
       const daysLeft = Math.round(

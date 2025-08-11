@@ -48,9 +48,7 @@ export class AssetsService {
       .leftJoinAndSelect('assets.target', 'targets')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .where('assets.isErrorPage = false')
-      .orderBy(`assets.${sortBy}`, sortOrder)
-      .limit(limit)
-      .offset(offset);
+      .orderBy(`assets.${sortBy}`, sortOrder);
 
     if (value)
       queryBuilder.andWhere('assets.value ILIKE :value', {
@@ -72,7 +70,11 @@ export class AssetsService {
         assetID,
       });
 
-    const assets = (await queryBuilder.getMany()).map((item) => {
+    const total = await queryBuilder.getCount();
+
+    const assets = (
+      await queryBuilder.limit(limit).offset(offset).getMany()
+    ).map((item) => {
       const asset = new GetAssetsResponseDto();
       asset.id = item.id;
       asset.value = item.value;
@@ -87,7 +89,7 @@ export class AssetsService {
       return asset;
     });
 
-    return getManyResponse(query, assets, assets.length);
+    return getManyResponse(query, assets, total);
   }
 
   /**
