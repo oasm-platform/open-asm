@@ -7,7 +7,6 @@ includes:
   console:
     taskfile: ./console/taskfile.yml
     dir: ./console
-
   worker:
     taskfile: ./worker/taskfile.yml
     dir: ./worker
@@ -43,12 +42,10 @@ tasks:
     cmds:
       - |
         docker compose --env-file ./core-api/.env up -d --build --force-recreate --scale worker=3
-
   init:
     cmds:
       - node -e "require('fs').copyFileSync('core-api/example.env', 'core-api/.env')"
       - node -e "require('fs').copyFileSync('worker/example.env', 'worker/.env')"
       - node -e "require('fs').copyFileSync('console/example.env', 'console/.env')"
-      - task install
-      - docker rm -f open-asm-postgres || true
-      - docker run --name open-asm-postgres --env-file ./core-api/.env -p 5432:5432 -d -v open-asm-postgres:/var/lib/postgresql/data postgres:17
+      - task: install
+      - docker compose up -d postgres --force-recreate
