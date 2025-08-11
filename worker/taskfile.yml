@@ -14,3 +14,10 @@ tasks:
   install:
     cmds:
       - bun install
+  tools:
+    cmds:
+      - go install github.com/projectdiscovery/httpx/cmd/httpx@v1.7.1
+      - go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@v2.8.0
+      - go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.4.7
+      - go install github.com/projectdiscovery/dnsx/cmd/dnsx@v1.2.2
+      - go install github.com/projectdiscovery/naabu/v2/cmd/naabu@v2.3.5

@@ -1,16 +1,17 @@
-FROM golang:1.24 AS tools
+FROM golang:1.24 AS tools-base
 
 WORKDIR /app
 
-# Cài các dependency cần thiết cho các tool ProjectDiscovery
-RUN apt-get update && apt-get install -y libpcap-dev
+RUN apt-get update && apt-get install -y libpcap-dev && \
+    go install github.com/go-task/task/v3/cmd/task@latest
 
-# Cài các công cụ Go phổ biến
-RUN go install github.com/projectdiscovery/httpx/cmd/httpx@v1.7.1 && \
-	go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@v2.8.0 && \
-	go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.4.7 && \
-	go install github.com/projectdiscovery/dnsx/cmd/dnsx@v1.2.2 && \
-	go install github.com/projectdiscovery/naabu/v2/cmd/naabu@v2.3.5
+FROM tools-base AS tools
+
+WORKDIR /app
+
+COPY taskfile.yml .
+
+RUN task tools
 
 FROM oven/bun:1.2 AS base
 RUN apt-get update && apt-get install -y \
