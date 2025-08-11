@@ -144,9 +144,7 @@ export class ToolsService implements OnModuleInit {
               id: vulId,
               name: finding['info']['name'] as string,
               description: finding['info']['description'] as string,
-              severity: Severity[
-                finding['info']['severity'].toLowerCase()
-              ] as Severity,
+              severity: finding['info']['severity'].toLowerCase() as Severity,
               createdAt: new Date(),
               tags: finding['info']['tags'] || [],
               references: finding['info']['reference'] || [],
@@ -162,7 +160,7 @@ export class ToolsService implements OnModuleInit {
                 'cve-id'
               ]?.[0] as string,
               asset: { id: job.asset.id },
-              jobHistory: { id: job.jobHistory.id },
+              jobHistoryId: job.jobHistory.id,
               extractorName: finding['extractor-name'] as string,
               extractedResults: finding['extracted-results'] || [],
               filePath,

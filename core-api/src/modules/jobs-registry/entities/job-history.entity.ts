@@ -1,6 +1,7 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
 import { Port } from 'src/modules/assets/entities/ports.entity';
+import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
 import { Entity, OneToMany } from 'typeorm';
 import { Job } from './job.entity';
 
@@ -15,6 +16,11 @@ export class JobHistory extends BaseEntity {
     onDelete: 'CASCADE',
   })
   ports?: Port[];
+
+  @OneToMany(() => Vulnerability, (vulnerability) => vulnerability.jobHistory, {
+    onDelete: 'CASCADE',
+  })
+  vulnerabilities?: Vulnerability[];
 
   @OneToMany(() => HttpResponse, (httpResponse) => httpResponse.jobHistory, {
     onDelete: 'CASCADE',
