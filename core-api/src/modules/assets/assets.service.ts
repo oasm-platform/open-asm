@@ -50,22 +50,22 @@ export class AssetsService {
       .where('assets.isErrorPage = false')
       .orderBy(`assets.${sortBy}`, sortOrder);
 
-    if (value)
+    if (!!value)
       queryBuilder.andWhere('assets.value ILIKE :value', {
         value: `%${value}%`,
       });
 
-    if (targetIds)
+    if (!!targetIds)
       queryBuilder.andWhere('assets.targetId = ANY(:targetID)', {
         targetID: targetIds,
       });
 
-    if (workspaceId)
+    if (!!workspaceId)
       queryBuilder.andWhere('workspaceTargets.workspaceId = :workspaceId', {
         workspaceId,
       });
 
-    if (assetID)
+    if (!!assetID)
       queryBuilder.andWhere('assets.id = :assetID', {
         assetID,
       });
