@@ -60,7 +60,7 @@ const TargetStatus = ({ status }: TargetStatusProps) => {
     return (
         <Badge
             variant={config.variant}
-            className={config.className + " h-8 text-md cursor-pointer"}
+            className={config.className + " h-9 text-md cursor-pointer"}
             onClick={() => {
                 if (status === JobStatus.pending || status === JobStatus.in_progress) {
                     params.set("animation", "true");

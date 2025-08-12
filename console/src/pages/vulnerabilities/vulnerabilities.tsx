@@ -4,7 +4,7 @@ import VulnerabilitiesStatistic from './vulnerabilites-statistic';
 
 const Vulnerabilities = () => {
     return (
-        <Page title='Vulnerabilities' isShowButtonGoBack>
+        <Page title='Vulnerabilities' className='flex flex-col gap-5'>
             <VulnerabilitiesStatistic />
             <ListVulnerabilities />
         </Page>

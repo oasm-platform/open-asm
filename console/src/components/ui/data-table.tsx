@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import useDebounce from "@/hooks/use-debounce";
 import {
   Pagination,
   PaginationContent,
@@ -34,7 +35,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "./pagination";
-import useDebounce from "@/hooks/use-debounce";
 
 // Define props interface
 interface DataTableProps<TData, TValue> {
@@ -139,10 +139,10 @@ export function DataTable<TData, TValue>({
 
   const showSkeleton = isLoading && data.length === 0;
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full">
       {/* Filter and column visibility controls */}
       {(filterColumnKey || showColumnVisibility) && (
-        <div className="flex items-center gap-4 py-4">
+        <div className="flex items-center gap-4 py-1">
           {filterColumnKey && (
             <Input
               placeholder={filterPlaceholder}
@@ -240,7 +240,7 @@ export function DataTable<TData, TValue>({
       {/* Pagination */}
       {showPagination && (
         <div className="flex flex-row-reverse justify-end items-center">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 my-5">
             <Select
               value={pageSize.toString()}
               onValueChange={(value) => onPageSizeChange?.(parseInt(value))}

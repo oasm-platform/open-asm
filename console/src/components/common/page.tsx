@@ -7,12 +7,13 @@ interface PageProps {
     title?: string | React.ReactNode;
     header?: React.ReactNode;
     isShowButtonGoBack?: boolean;
+    className?: string;
 }
-const Page = ({ children, title, header, isShowButtonGoBack }: PageProps) => {
+const Page = ({ children, title, header, isShowButtonGoBack, className }: PageProps) => {
     const navigate = useNavigate();
 
     return (
-        <div>
+        <div className={className}>
             <div className="flex items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
                     {isShowButtonGoBack && (

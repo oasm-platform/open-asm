@@ -82,11 +82,8 @@ export function DetailTarget() {
       isShowButtonGoBack
       header={
         <div className="flex items-center gap-3 justify-between">
-          <TargetStatus status={target.status} />
           <div className="flex items-center gap-3">
-            <p className="text-muted-foreground">
-              {dayjs(target.lastDiscoveredAt).fromNow()}
-            </p>
+            <TargetStatus status={target.status} />
             <ConfirmDialog
               title="Scan vulnerabilities"
               description={`Are you sure you want to scan vulnerabilities for target ${target.value}?`}
@@ -113,6 +110,11 @@ export function DetailTarget() {
                 </Button>
               }
             />
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-muted-foreground">
+              {dayjs(target.lastDiscoveredAt).fromNow()}
+            </p>
             <SettingTarget target={target} />
           </div>
         </div>
@@ -137,7 +139,7 @@ export function DetailTarget() {
             refetchInterval={target.status === JobStatus.in_progress ? 1000 : 5000}
           />
         </TabsContent>
-        <TabsContent value="vulnerabilities" className="flex flex-col gap-3">
+        <TabsContent value="vulnerabilities" className="flex flex-col gap-5">
           <VulnerabilitiesStatistic targetId={target.id} />
           <ListVulnerabilities targetId={target.id} />
         </TabsContent>
