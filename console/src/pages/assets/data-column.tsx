@@ -22,7 +22,6 @@ export const assetColumns: ColumnDef<any, any>[] = [
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
-      console.log(data);
       const ports_scanner = data.ports?.ports;
       const http_probe = data.httpResponses;
       const ipAddresses = data.dnsRecords?.["A"];

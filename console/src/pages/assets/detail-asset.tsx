@@ -4,7 +4,6 @@ import AssetDetail from "./components/asset-detail";
 
 export default function DetailAsset() {
   const { id } = useParams<{ id: string }>();
-  console.log(id);
 
   if (!id) return null;
 

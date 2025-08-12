@@ -50,8 +50,6 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
     },
   );
 
-  console.log(data);
-
   const targets = data?.data ?? [];
   const total = data?.total ?? 0;
 

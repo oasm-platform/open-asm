@@ -46,7 +46,7 @@ export function useServerDataTable({
       setPageSize: (v: number) => setParam("pageSize", v),
       setSortBy: (v: string) => setParam("sortBy", v),
       setSortOrder: (v: "ASC" | "DESC") => setParam("sortOrder", v),
-      setFilter: (v: string) => setParam("filter", v),
+      setFilter: useCallback((v: string) => setParam("filter", v), [setParam]),
     },
   };
 }

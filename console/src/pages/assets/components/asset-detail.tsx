@@ -25,7 +25,6 @@ export default function AssetDetail({ id }: { id: string }) {
   if (!data) return "Loading";
 
   const { value, httpResponses, ports, dnsRecords } = data;
-  console.log(data);
   const ports_scanner = ports as unknown as number[];
   const ipAddresses = dnsRecords?.["A"] as string[];
   const tls = httpResponses?.tls as any;

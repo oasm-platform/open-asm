@@ -49,46 +49,42 @@ export const targetColumns: ColumnDef<Target, any>[] = [
 
 export function ListTargets() {
   const { selectedWorkspace } = useWorkspaceSelector();
+  const navigate = useNavigate();
 
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder, setFilter },
   } = useServerDataTable();
 
-  const { data, isLoading, queryKey } =
-    useTargetsControllerGetTargetsInWorkspace(
-      {
-        workspaceId: selectedWorkspace ?? "",
-        limit: pageSize,
-        page,
-        sortBy,
-        sortOrder,
-        value: filter,
+  const { data, isLoading } = useTargetsControllerGetTargetsInWorkspace(
+    {
+      workspaceId: selectedWorkspace ?? "",
+      limit: pageSize,
+      page,
+      sortBy,
+      sortOrder,
+      value: filter,
+    },
+    {
+      query: {
+        refetchInterval: 3000,
+        queryKey: [
+          "targets",
+          selectedWorkspace,
+          pageSize,
+          page,
+          sortBy,
+          sortOrder,
+          filter,
+        ],
       },
-      {
-        query: {
-          refetchInterval: 3000,
-          queryKey: [
-            "targets",
-            selectedWorkspace,
-            pageSize,
-            page,
-            sortBy,
-            sortOrder,
-            filter,
-          ],
-        },
-      },
-    );
-
-  console.log(queryKey);
+    },
+  );
 
   const targets = data?.data ?? [];
   const total = data?.total ?? 0;
 
   if (!data && !isLoading) return <div>Error loading targets.</div>;
-
-  const navigate = useNavigate();
 
   const handleRowClick = (target: Target) => {
     navigate(`/targets/${target.id}`);
