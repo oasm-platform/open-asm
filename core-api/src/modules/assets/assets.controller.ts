@@ -24,6 +24,18 @@ export class AssetsController {
   }
 
   @Doc({
+    summary: 'Get IP asset',
+    description: 'Retrieves a list of ip with number of assets.',
+    response: {
+      serialization: GetAssetsResponseDto,
+    },
+  })
+  @Get('/ip')
+  getAssetIp(@Query() query: GetAssetsQueryDto) {
+    return this.assetsService.getAssetIp(query);
+  }
+
+  @Doc({
     summary: 'Get asset by ID',
     description: 'Retrieves a single asset by its ID.',
     response: {

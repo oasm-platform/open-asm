@@ -5,12 +5,13 @@ import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-respo
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { ToolCategory } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
+import { GetAssetsIpDTO } from './dto/get-asset-ip.dto';
 import { Asset } from './entities/assets.entity';
-import { HttpResponse } from './entities/http-response.entity';
+
 @Injectable()
 export class AssetsService {
   constructor(
@@ -20,6 +21,8 @@ export class AssetsService {
     @InjectRepository(Target)
     public readonly targetRepo: Repository<Target>,
     private jobRegistryService: JobsRegistryService,
+
+    private dataSource: DataSource,
   ) {}
 
   /**
@@ -176,5 +179,57 @@ export class AssetsService {
   public async getAssetById(id: string): Promise<GetAssetsResponseDto> {
     const asset = await this.getAssetsInWorkspace(new GetAssetsQueryDto(), id);
     return asset.data[0];
+  }
+
+  /**
+   * Retrieves a list of IP with number of asset
+   *
+   * @returns A promise that resolves to the list of ip.
+   *
+   */
+  public async getAssetIp(
+    query: GetAssetsQueryDto,
+  ): Promise<GetManyBaseResponseDto<GetAssetsIpDTO>> {
+    let { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+
+    const offset = (page - 1) * limit;
+
+    const queryBuilder = this.dataSource
+      .createQueryBuilder()
+      .addCommonTableExpression(
+        `SELECT
+        a.id AS asset_id,
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'A') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL
+
+    UNION ALL
+
+    SELECT
+        a.id AS asset_id,
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'AAAA') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL`,
+        'cte',
+      )
+      .select('t.ip', 'ip')
+      .addSelect('COUNT(DISTINCT t.asset_id)', 'assetCount')
+      .from('cte', 't')
+      .groupBy('"ip"')
+      .orderBy('"assetCount"', sortOrder);
+
+    console.log(await queryBuilder.getRawOne());
+
+    const total = (await queryBuilder.getRawMany()).length;
+
+    const result = await queryBuilder.limit(limit).offset(offset).getRawMany();
+    const list = result.map((item) => {
+      const obj = new GetAssetsIpDTO();
+      obj.assetCount = item.assetCount;
+      obj.ip = item.ip;
+      return obj;
+    });
+
+    return getManyResponse(query, list, total);
   }
 }
