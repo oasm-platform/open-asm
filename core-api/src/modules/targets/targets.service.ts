@@ -150,7 +150,9 @@ export class TargetsService {
   public async getTargetsInWorkspace(
     query: GetManyWorkspaceQueryParamsDto,
   ): Promise<
-    GetManyBaseResponseDto<Target & { totalAssets: number; status: string }>
+    GetManyBaseResponseDto<
+      Target & { totalAssets: number; status: string; duration: number }
+    >
   > {
     const { limit, page, sortBy, sortOrder, workspaceId, value } = query;
 
@@ -168,7 +170,9 @@ export class TargetsService {
         'targets.id as id',
         'targets.value as value',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
-        'COUNT(DISTINCT asset.id) AS "totalAssets"',
+        'targets.reScanCount as "reScanCount"',
+        'targets.scanSchedule as "scanSchedule"',
+        'CAST(COUNT(DISTINCT asset.id) AS INTEGER) AS "totalAssets"',
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
@@ -176,6 +180,16 @@ export class TargetsService {
         ELSE '${JobStatus.COMPLETED}'
       END AS status`,
       ])
+      .addSelect((subQuery) => {
+        return subQuery
+          .select(
+            'COALESCE(CAST(EXTRACT(EPOCH FROM MAX(j."completedAt") - targets."lastDiscoveredAt") AS INTEGER), 0)',
+          )
+          .from('jobs', 'j')
+          .innerJoin('assets', 'a', 'a.id = j."assetId"')
+          .where('a."targetId" = targets.id')
+          .andWhere('j."completedAt" IS NOT NULL');
+      }, 'duration')
       .groupBy('targets.id');
 
     if (value) {
@@ -184,7 +198,9 @@ export class TargetsService {
       });
     }
 
-    if (sortBy in Target) {
+    if (sortBy === 'totalAssets' || sortBy === 'duration') {
+      queryBuilder.orderBy(`"${sortBy}"`, sortOrder);
+    } else if (sortBy in Target) {
       queryBuilder.orderBy(`targets.${sortBy}`, sortOrder);
     } else {
       queryBuilder.orderBy('targets.createdAt', sortOrder);
