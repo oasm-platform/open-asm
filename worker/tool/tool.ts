@@ -25,6 +25,12 @@ export class Tool {
   public async run() {
     await this.connectToCore();
     this.alive();
+    
+    // Log worker status every 5 seconds
+    setInterval(() => {
+      const status = this.getStatus();
+      logger.info(`Worker ${Tool.workerId} status - Running: ${status.processingJobs}/${status.maxConcurrentJobs} jobs | Queue: ${status.queueLength}/${status.maxJobsQueue}`);
+    }, 5000);
 
     // Handle graceful shutdown
     this.setupGracefulShutdown();

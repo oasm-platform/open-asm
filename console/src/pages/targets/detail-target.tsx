@@ -84,6 +84,32 @@ export function DetailTarget() {
         <div className="flex items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
             <TargetStatus status={target.status} />
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-muted-foreground">
+              {dayjs(target.lastDiscoveredAt).fromNow()}
+            </p>
+
+            <SettingTarget target={target} />
+          </div>
+        </div>
+      }
+    >
+      {animation &&
+        (target.status === JobStatus.in_progress ||
+          target.status === JobStatus.pending) && (
+          <AssetsDiscovering targetId={target.id} />
+        )}
+      <Tabs value={activeTab as any} onValueChange={handleTabChange} className="w-full my-6">
+        <div className="flex justify-between items-center gap-5">
+          <TabsList>
+            {TABS.map((t) => (
+              <TabsTrigger key={t.value} value={t.value} className="hover:cursor-pointer">
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {tab === "vulnerabilities" && (
             <ConfirmDialog
               title="Scan vulnerabilities"
               description={`Are you sure you want to scan vulnerabilities for target ${target.value}?`}
@@ -101,8 +127,9 @@ export function DetailTarget() {
               trigger={
                 <Button
                   disabled={target.status !== JobStatus.completed}
-                  variant="outline"
-                  className="hover:cursor-pointer"
+                  variant="secondary"
+                  className="hover:cursor-pointer text-sm"
+                  size={"sm"}
                   title={`Start scan vulnerabilities for target ${target.value}`}
                 >
                   <Bug className="h-4 w-4" />
@@ -110,36 +137,15 @@ export function DetailTarget() {
                 </Button>
               }
             />
-          </div>
-          <div className="flex items-center gap-3">
-            <p className="text-muted-foreground">
-              {dayjs(target.lastDiscoveredAt).fromNow()}
-            </p>
-            <SettingTarget target={target} />
-          </div>
+          )}
         </div>
-      }
-    >
-      {animation &&
-        (target.status === JobStatus.in_progress ||
-          target.status === JobStatus.pending) && (
-          <AssetsDiscovering targetId={target.id} />
-        )}
-      <Tabs value={activeTab as any} onValueChange={handleTabChange} className="w-full my-6">
-        <TabsList>
-          {TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value} className="hover:cursor-pointer">
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
         <TabsContent value="assets">
           <ListAssets
             targetId={target.id}
             refetchInterval={target.status === JobStatus.in_progress ? 1000 : 5000}
           />
         </TabsContent>
-        <TabsContent value="vulnerabilities" className="flex flex-col gap-5">
+        <TabsContent value="vulnerabilities" className="flex flex-col gap-5 py-3">
           <VulnerabilitiesStatistic targetId={target.id} />
           <ListVulnerabilities targetId={target.id} />
         </TabsContent>

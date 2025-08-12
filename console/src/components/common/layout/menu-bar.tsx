@@ -69,7 +69,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     ];
     return (
         <Sidebar {...props} collapsible="icon">
-            <SidebarHeader className="pt-4">
+            <SidebarHeader >
                 <div className="flex h-13 justify-start items-center gap-3">
                     <Radar size={40} />
 
