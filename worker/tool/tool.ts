@@ -74,7 +74,7 @@ export class Tool {
           token: Tool.token!,
         });
         if (this.isAliveError) {
-          logger.success("Reconnected to core.");
+          logger.success(`RECONNECTED ✅ WorkerId: ${Tool.workerId}`);
           this.isAliveError = false;
         }
       } catch (error: any) {

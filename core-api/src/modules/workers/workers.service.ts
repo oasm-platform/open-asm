@@ -122,7 +122,7 @@ export class WorkersService {
    *
    */
   @Interval(WORKER_TIMEOUT * 1000)
-  async autoRemoveWorkersOffline() {
+  async autoCleanupWorkersAndJobs() {
     const workers = await this.repo
       .find({
         where: {
@@ -137,16 +137,23 @@ export class WorkersService {
       }
     }
 
-    // Retry job failed
-    this.jobsRegistryService.repo.update(
-      {
-        status: JobStatus.FAILED,
-      },
-      {
-        status: JobStatus.PENDING,
-        workerId: null as any,
-      },
-    );
+    // Update both in_progress jobs with missing workers and failed jobs
+    await this.repo.manager.query(`
+      UPDATE jobs j
+      SET status = CASE 
+          WHEN j.status = '${JobStatus.IN_PROGRESS}' AND j."workerId"::uuid NOT IN (
+            SELECT id FROM workers
+          ) THEN '${JobStatus.PENDING}'
+          WHEN j.status = '${JobStatus.FAILED}' THEN '${JobStatus.PENDING}'
+          ELSE j.status
+        END,
+        "workerId" = NULL
+      WHERE j.status = '${JobStatus.IN_PROGRESS}'
+        AND j."workerId"::uuid NOT IN (
+          SELECT id FROM workers
+        )
+        OR j.status = '${JobStatus.FAILED}'
+    `);
   }
 
   /**
