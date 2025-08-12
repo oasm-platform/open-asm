@@ -77,45 +77,47 @@ export function DetailTarget() {
   }
 
   return (
-    <Page title={target.value} isShowButtonGoBack>
-      <div className="flex items-center justify-between">
-        <div className="flex gap-3 items-center">
+    <Page
+      title={target.value}
+      isShowButtonGoBack
+      header={
+        <div className="flex items-center gap-3 justify-between">
           <TargetStatus status={target.status} />
+          <div className="flex items-center gap-3">
+            <p className="text-muted-foreground">
+              {dayjs(target.lastDiscoveredAt).fromNow()}
+            </p>
+            <ConfirmDialog
+              title="Scan vulnerabilities"
+              description={`Are you sure you want to scan vulnerabilities for target ${target.value}?`}
+              onConfirm={() => scanVulnerabilities({
+                data: { targetId: target.id, }
+              }, {
+                onSuccess: () => {
+                  toast.success("Scan started successfully")
+                  navigate(`?tab=vulnerabilities`)
+                },
+                onError: () => {
+                  toast.error("Failed to start scan")
+                },
+              })}
+              trigger={
+                <Button
+                  disabled={target.status !== JobStatus.completed}
+                  variant="outline"
+                  className="hover:cursor-pointer"
+                  title={`Start scan vulnerabilities for target ${target.value}`}
+                >
+                  <Bug className="h-4 w-4" />
+                  Scan vulnerability
+                </Button>
+              }
+            />
+            <SettingTarget target={target} />
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <p className="text-muted-foreground">
-            {dayjs(target.lastDiscoveredAt).fromNow()}
-          </p>
-          <ConfirmDialog
-            title="Scan vulnerabilities"
-            description={`Are you sure you want to scan vulnerabilities for target ${target.value}?`}
-            onConfirm={() => scanVulnerabilities({
-              data: { targetId: target.id, }
-            }, {
-              onSuccess: () => {
-                toast.success("Scan started successfully")
-                navigate(`?tab=vulnerabilities`)
-
-              },
-              onError: () => {
-                toast.error("Failed to start scan")
-              },
-            })}
-            trigger={
-              <Button
-                disabled={target.status !== JobStatus.completed}
-                variant="outline"
-                className="hover:cursor-pointer"
-                title={`Start scan vulnerabilities for target ${target.value}`}
-              >
-                <Bug className="h-4 w-4" />
-                Scan vulnerability
-              </Button>
-            }
-          />
-          <SettingTarget target={target} />
-        </div>
-      </div>
+      }
+    >
       {animation &&
         (target.status === JobStatus.in_progress ||
           target.status === JobStatus.pending) && (
