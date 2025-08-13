@@ -66,11 +66,13 @@ export class JobsRegistryService {
   public async createJob(asset: Asset, category: ToolCategory): Promise<Job> {
     const jobHistory = this.jobHistoryRepo.create({});
     await this.jobHistoryRepo.save(jobHistory);
+    const tool = await this.toolsService.getBuiltInByCategory(category);
     return this.repo.save({
       asset,
       category,
       group: randomUUID(),
       jobHistory,
+      tool: { id: tool?.id },
     });
   }
 
@@ -96,6 +98,7 @@ export class JobsRegistryService {
         .setLock('pessimistic_write')
         .limit(1)
         .getOne();
+
       if (!job) {
         await queryRunner.rollbackTransaction();
         return null;
@@ -105,7 +108,9 @@ export class JobsRegistryService {
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
-      const workerStep = this.toolsService.getBuiltInByName(job.category);
+      const workerStep = this.toolsService.builtInTools.find(
+        (tool) => tool.category === job.category,
+      );
 
       if (!workerStep) {
         await queryRunner.rollbackTransaction();
@@ -219,7 +224,9 @@ export class JobsRegistryService {
       throw new NotFoundException('Job not found');
     }
 
-    const step = this.toolsService.getBuiltInByName(job.category);
+    const step = this.toolsService.builtInTools.find(
+      (tool) => tool.category === job.category,
+    );
 
     if (!step) {
       throw new Error(`Worker step not found for worker: ${job.category}`);

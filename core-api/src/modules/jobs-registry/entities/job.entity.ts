@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
+import { Tool } from 'src/modules/tools/entities/tools.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
 import { JobHistory } from './job-history.entity';
 
@@ -26,6 +27,11 @@ export class Job extends BaseEntity {
 
   @Column({ nullable: true })
   workerId?: string;
+
+  @ManyToOne(() => Tool, (tool) => tool.jobs, {
+    onDelete: 'CASCADE',
+  })
+  tool: Tool;
 
   @Column({ type: 'json', nullable: true })
   rawResult?: object;
