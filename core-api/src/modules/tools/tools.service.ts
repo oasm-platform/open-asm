@@ -145,7 +145,6 @@ export class ToolsService implements OnModuleInit {
               name: finding['info']['name'] as string,
               description: finding['info']['description'] as string,
               severity: finding['info']['severity'].toLowerCase() as Severity,
-              createdAt: new Date(),
               tags: finding['info']['tags'] || [],
               references: finding['info']['reference'] || [],
               authors: finding['info']['author'] || [],
