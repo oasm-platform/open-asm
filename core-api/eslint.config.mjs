@@ -30,7 +30,6 @@ export default tseslint.config(
       '@typescript-eslint/interface-username-prefix': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
-      'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
 );
