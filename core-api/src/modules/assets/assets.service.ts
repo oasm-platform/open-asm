@@ -36,7 +36,7 @@ export class AssetsService {
     query: GetAssetsQueryDto,
     assetID?: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
-    let { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
 
     let sortBy = query.sortBy;
     if (!(sortBy in Asset)) {
@@ -53,31 +53,32 @@ export class AssetsService {
       .where('assets.isErrorPage = false')
       .orderBy(`assets.${sortBy}`, sortOrder);
 
-    if (!!value)
+    if (value && value.length > 0)
       queryBuilder.andWhere('assets.value ILIKE :value', {
         value: `%${value}%`,
       });
 
-    if (!!targetIds)
+    if (targetIds && targetIds.length > 0)
       queryBuilder.andWhere('assets.targetId = ANY(:targetID)', {
         targetID: targetIds,
       });
 
-    if (!!workspaceId)
+    if (workspaceId && workspaceId.length > 0)
       queryBuilder.andWhere('workspaceTargets.workspaceId = :workspaceId', {
         workspaceId,
       });
 
-    if (!!assetID)
+    if (assetID && assetID.length > 0)
       queryBuilder.andWhere('assets.id = :assetID', {
         assetID,
       });
 
-    const total = await queryBuilder.getCount();
+    const [list, total] = await queryBuilder
+      .skip(offset)
+      .take(limit)
+      .getManyAndCount();
 
-    const assets = (
-      await queryBuilder.limit(limit).offset(offset).getMany()
-    ).map((item) => {
+    const assets = list.map((item) => {
       const asset = new GetAssetsResponseDto();
       asset.id = item.id;
       asset.value = item.value;
@@ -115,7 +116,7 @@ export class AssetsService {
       value,
       isPrimary: true,
     });
-    this.jobRegistryService.createJob(asset, ToolCategory.SUBDOMAINS);
+    await this.jobRegistryService.createJob(asset, ToolCategory.SUBDOMAINS);
     return asset;
   }
 
@@ -145,8 +146,8 @@ export class AssetsService {
       throw new NotFoundException('Target not found');
     }
     const reScanCount = target.reScanCount + 1;
-    this.jobRegistryService.createJob(asset, ToolCategory.SUBDOMAINS);
-    this.targetRepo.update(targetId, {
+    await this.jobRegistryService.createJob(asset, ToolCategory.SUBDOMAINS);
+    await this.targetRepo.update(targetId, {
       reScanCount,
       lastDiscoveredAt: new Date(),
     });
@@ -190,7 +191,7 @@ export class AssetsService {
   public async getAssetIp(
     query: GetAssetsQueryDto,
   ): Promise<GetManyBaseResponseDto<GetAssetsIpDTO>> {
-    let { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
 
     const offset = (page - 1) * limit;
 
@@ -218,12 +219,10 @@ export class AssetsService {
       .groupBy('"ip"')
       .orderBy('"assetCount"', sortOrder);
 
-    console.log(await queryBuilder.getRawOne());
-
     const total = (await queryBuilder.getRawMany()).length;
 
     const result = await queryBuilder.limit(limit).offset(offset).getRawMany();
-    const list = result.map((item) => {
+    const list = result.map((item: GetAssetsIpDTO) => {
       const obj = new GetAssetsIpDTO();
       obj.assetCount = item.assetCount;
       obj.ip = item.ip;
