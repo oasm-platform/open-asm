@@ -26,10 +26,12 @@ export class Tool {
     await this.connectToCore();
     this.alive();
     
-    // Log worker status every 5 seconds
+    // Log worker status every 5 seconds when there are jobs running
     setInterval(() => {
       const status = this.getStatus();
-      logger.info(`Worker ${Tool.workerId} status - Running: ${status.processingJobs}/${status.maxConcurrentJobs} jobs | Queue: ${status.queueLength}/${status.maxJobsQueue}`);
+      if (status.processingJobs > 0 || status.queueLength > 0) {
+        logger.info(`Worker ${Tool.workerId} status - Running: ${status.processingJobs}/${status.maxConcurrentJobs} jobs | Queue: ${status.queueLength}/${status.maxJobsQueue}`);
+      }
     }, 5000);
 
     // Handle graceful shutdown

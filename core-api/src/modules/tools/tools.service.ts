@@ -55,7 +55,7 @@ export class ToolsService implements OnModuleInit {
       logoUrl:
         'https://raw.githubusercontent.com/projectdiscovery/subfinder/refs/heads/main/static/subfinder-logo.png',
       command:
-        '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
+        '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp -json -silent',
       resultHandler: this.handleSubfinderResult.bind(this),
       version: '2.8.0',
     },
@@ -254,7 +254,6 @@ export class ToolsService implements OnModuleInit {
         total: Object.keys(parsed).length,
       },
     });
-
     const assets: Asset[] = Object.keys(parsed).map((i) => ({
       id: randomUUID(),
       value: i,
