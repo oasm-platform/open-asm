@@ -223,13 +223,12 @@ export class JobsRegistryService {
     if (!job) {
       throw new NotFoundException('Job not found');
     }
-
     const step = this.toolsService.builtInTools.find(
-      (tool) => tool.category === job.category,
+      (tool) => tool.name === job.tool.name,
     );
 
     if (!step) {
-      throw new Error(`Worker step not found for worker: ${job.category}`);
+      throw new Error(`Worker step not found for worker: ${job.tool.name}`);
     }
 
     const hasError = data?.error;
@@ -253,6 +252,7 @@ export class JobsRegistryService {
           target: true,
         },
         jobHistory: true,
+        tool: true,
       },
     });
   }
@@ -315,7 +315,9 @@ export class JobsRegistryService {
     }
 
     return Promise.all(
-      nextJob.map((nextWorkerHandleJob) =>
+      nextJob.map(async (nextWorkerHandleJob) => {
+        const tool =
+          await this.toolsService.getBuiltInByCategory(nextWorkerHandleJob);
         this.repo
           .createQueryBuilder()
           .insert()
@@ -324,11 +326,14 @@ export class JobsRegistryService {
               asset: i,
               category: nextWorkerHandleJob,
               jobHistory,
+              tool: {
+                id: tool?.id,
+              },
             })),
           )
           .orIgnore()
-          .execute(),
-      ),
+          .execute();
+      }),
     );
   }
 }
