@@ -10,11 +10,12 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory } from 'src/common/enums/enum';
+import { JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
+import { builtInTools } from '../tools/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import {
   GetManyJobsQueryParams,
@@ -229,6 +230,16 @@ export class JobsRegistryService {
 
     if (!step) {
       throw new Error(`Worker step not found for worker: ${job.tool.name}`);
+    }
+
+    if (
+      job.tool.type === WorkerType.BUILT_IN &&
+      job.tool.category === ToolCategory.SUBDOMAINS
+    ) {
+      const builtInStep = builtInTools.find(
+        (tool) => tool.name === job.tool.name,
+      );
+      console.log(builtInStep?.parser(data.raw));
     }
 
     const hasError = data?.error;
