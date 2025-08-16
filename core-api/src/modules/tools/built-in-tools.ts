@@ -12,7 +12,7 @@ export const builtInTools: any[] = [
     logoUrl:
       'https://raw.githubusercontent.com/projectdiscovery/subfinder/refs/heads/main/static/subfinder-logo.png',
     command:
-      '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp -json -silent',
+      '(echo {{value}} && subfinder -d {{value}}) | dnsx -a -aaaa -cname -mx -ns -soa -txt -resp',
     parser: (result: string) => {
       const parsed = {};
       result.split('\n').forEach((line) => {
