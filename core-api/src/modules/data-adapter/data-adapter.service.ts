@@ -4,10 +4,10 @@ import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
-import { DataNormalizationAssets } from './data-normalization.interface';
+import { DataAdapterAssets } from './data-adapter.interface';
 
 @Injectable()
-export class DataNormalizationService {
+export class DataAdapterService {
   constructor(private readonly dataSource: DataSource) {}
 
   /**
@@ -18,7 +18,7 @@ export class DataNormalizationService {
   public async subdomains({
     assets,
     targetId,
-  }: DataNormalizationAssets): Promise<InsertResult> {
+  }: DataAdapterAssets): Promise<InsertResult> {
     return this.dataSource
       .createQueryBuilder()
       .insert()

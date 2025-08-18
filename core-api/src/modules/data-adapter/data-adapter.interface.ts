@@ -1,6 +1,6 @@
 import { Asset } from '../assets/entities/assets.entity';
 
-export interface DataNormalizationAssets {
+export interface DataAdapterAssets {
   assets: Asset[];
   targetId: string;
 }

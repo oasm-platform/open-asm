@@ -10,7 +10,7 @@ import { UsersModule } from './users/users.module';
 import { VulnerabilitiesModule } from './vulnerabilities/vulnerabilities.module';
 import { WorkersModule } from './workers/workers.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
-import { DataNormalizationModule } from './data-normalization/data-normalization.module';
+import { DataAdapterModule } from './data-adapter/data-adapter.module';
 
 @Module({
   imports: [
@@ -27,7 +27,7 @@ import { DataNormalizationModule } from './data-normalization/data-normalization
     SearchModule,
     ToolsModule,
     VulnerabilitiesModule,
-    DataNormalizationModule,
+    DataAdapterModule,
   ],
 })
 export class CombineModule {}
