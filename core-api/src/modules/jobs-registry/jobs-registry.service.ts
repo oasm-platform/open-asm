@@ -224,6 +224,7 @@ export class JobsRegistryService {
     if (!job) {
       throw new NotFoundException('Job not found');
     }
+
     const step = this.toolsService.builtInTools.find(
       (tool) => tool.name === job.tool.name,
     );
@@ -232,14 +233,13 @@ export class JobsRegistryService {
       throw new Error(`Worker step not found for worker: ${job.tool.name}`);
     }
 
-    if (
-      job.tool.type === WorkerType.BUILT_IN &&
-      job.tool.category === ToolCategory.SUBDOMAINS
-    ) {
+    if (job.tool.type === WorkerType.BUILT_IN && job.tool.name !== 'httpx') {
       const builtInStep = builtInTools.find(
         (tool) => tool.name === job.tool.name,
       );
-      console.log(builtInStep?.parser(data.raw));
+
+      // Save data to database
+      const _data = builtInStep?.parser(data.raw);
     }
 
     const hasError = data?.error;

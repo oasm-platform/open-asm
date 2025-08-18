@@ -25,7 +25,12 @@ export const builtInTools: any[] = [
         if (!parsed[domain][type]) parsed[domain][type] = [];
         parsed[domain][type].push(value);
       });
-      return parsed;
+
+      return Object.keys(parsed).map((i) => ({
+        id: randomUUID(),
+        value: i,
+        dnsRecords: parsed[i],
+      }));
     },
     version: '2.8.0',
   },

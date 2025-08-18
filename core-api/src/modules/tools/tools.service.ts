@@ -245,7 +245,6 @@ export class ToolsService implements OnModuleInit {
 
     const primaryAsset = parsed[job.asset.value];
     delete parsed[job.asset.value];
-    console.log(parsed, 'parsed');
     this.workerService.updateResultToDatabase({
       dataSource,
       job,
