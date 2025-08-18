@@ -1,6 +1,12 @@
-import { Asset } from '../assets/entities/assets.entity';
+import { Job } from '../jobs-registry/entities/job.entity';
 
-export interface DataAdapterAssets {
-  assets: Asset[];
-  targetId: string;
+export interface DataAdapterInput {
+  data: any;
+  job: Job;
+}
+
+// Common interface for sync data requests
+export interface SyncDataRequest {
+  category: string;
+  data: DataAdapterInput;
 }
