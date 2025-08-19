@@ -231,7 +231,7 @@ export class WorkspacesService {
     workspace.apiKey = generateToken(32);
     await this.repo.save(workspace);
     return {
-      apiKey: workspace.apiKey!,
+      apiKey: workspace.apiKey,
     };
   }
 }

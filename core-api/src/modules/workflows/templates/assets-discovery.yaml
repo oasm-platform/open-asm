@@ -1,0 +1,7 @@
+name: Asset Discovery
+
+on:
+  target: create
+
+jobs:
+  subfinder: [httpx, naabu]

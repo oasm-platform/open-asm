@@ -9,6 +9,7 @@ import { ToolsModule } from './tools/tools.module';
 import { UsersModule } from './users/users.module';
 import { VulnerabilitiesModule } from './vulnerabilities/vulnerabilities.module';
 import { WorkersModule } from './workers/workers.module';
+import { WorkflowsModule } from './workflows/workflows.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { DataAdapterModule } from './data-adapter/data-adapter.module';
 
@@ -28,6 +29,7 @@ import { DataAdapterModule } from './data-adapter/data-adapter.module';
     ToolsModule,
     VulnerabilitiesModule,
     DataAdapterModule,
+    WorkflowsModule,
   ],
 })
 export class CombineModule {}
