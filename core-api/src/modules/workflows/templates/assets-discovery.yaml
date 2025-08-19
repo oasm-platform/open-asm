@@ -1,4 +1,4 @@
-name: Asset Discovery
+name: Asset Discovery Workflow
 
 on:
   target: create
