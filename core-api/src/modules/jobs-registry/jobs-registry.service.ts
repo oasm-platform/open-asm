@@ -10,11 +10,12 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
+import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
+import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { builtInTools } from '../tools/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import {
@@ -32,6 +33,7 @@ export class JobsRegistryService {
     @InjectRepository(JobHistory)
     public readonly jobHistoryRepo: Repository<JobHistory>,
     private dataSource: DataSource,
+    private dataAdapterService: DataAdapterService,
 
     @Inject(forwardRef(() => ToolsService))
     private toolsService: ToolsService,
@@ -232,21 +234,23 @@ export class JobsRegistryService {
     if (!step) {
       throw new Error(`Worker step not found for worker: ${job.tool.name}`);
     }
+    const builtInStep = builtInTools.find(
+      (tool) => tool.name === job.tool.name,
+    );
 
-    if (job.tool.type === WorkerType.BUILT_IN && job.tool.name !== 'httpx') {
-      const builtInStep = builtInTools.find(
-        (tool) => tool.name === job.tool.name,
-      );
+    // Save data to database
+    const _data = builtInStep?.parser(data.raw);
 
-      // Save data to database
-      const _data = builtInStep?.parser(data.raw);
-    }
+    await this.dataAdapterService.syncData({
+      data: _data,
+      job,
+    });
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
     await this.updateJobStatus(job.id, newStatus);
 
-    await this.processStepResult(step, job, dto.data);
+    // await this.processStepResult(step, job, dto.data);
 
     return { workerId, dto };
   }

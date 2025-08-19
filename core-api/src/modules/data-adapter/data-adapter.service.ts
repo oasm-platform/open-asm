@@ -1,35 +1,75 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, InsertResult } from 'typeorm';
-import { ToolCategory } from '../../common/enums/enum';
+import { JobStatus, ToolCategory } from '../../common/enums/enum';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
+import { Job } from '../jobs-registry/entities/job.entity';
 import { DataAdapterInput } from './data-adapter.interface';
 
 @Injectable()
 export class DataAdapterService {
   constructor(private readonly dataSource: DataSource) {}
 
-  /**
-   * Subdomains data normalization
-   * @param param0
-   * @returns
-   */
   public async subdomains({
     data,
     job,
-  }: DataAdapterInput): Promise<InsertResult> {
-    return this.dataSource
-      .createQueryBuilder()
-      .insert()
-      .into(Asset)
-      .values(
-        data.map((asset) => ({
-          ...asset,
-          target: { id: job.asset.id },
-        })),
-      )
-      .execute();
+  }: DataAdapterInput<Asset[]>): Promise<InsertResult | void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const primaryAssets = data.find(
+        (asset) => asset.value === job.asset.value,
+      );
+
+      // Update Asset
+      await queryRunner.manager
+        .createQueryBuilder()
+        .update(Asset)
+        .where({ id: job.asset.id })
+        .set({ isPrimary: true, dnsRecords: primaryAssets?.dnsRecords })
+        .execute();
+
+      // Update Job status -> COMPLETED
+      await queryRunner.manager
+        .createQueryBuilder()
+        .update(Job)
+        .set({ status: JobStatus.COMPLETED })
+        .where({ id: job.id })
+        .execute();
+
+      // Insert Assets
+      const insertResult = await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(Asset)
+        .values(
+          data.map((asset) => ({
+            ...asset,
+            target: { id: job.asset.target.id },
+          })),
+        )
+        .orIgnore()
+        .execute();
+
+      await queryRunner.commitTransaction();
+      return insertResult;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+
+      await this.dataSource
+        .createQueryBuilder()
+        .update(Job)
+        .set({ status: JobStatus.FAILED })
+        .where({ id: job.id })
+        .execute();
+
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**
@@ -40,7 +80,7 @@ export class DataAdapterService {
   public async httpResponses({
     data,
     job,
-  }: DataAdapterInput): Promise<InsertResult> {
+  }: DataAdapterInput<any>): Promise<InsertResult> {
     return this.dataSource
       .createQueryBuilder()
       .insert()
@@ -61,7 +101,7 @@ export class DataAdapterService {
   public async portsScanner({
     data,
     job,
-  }: DataAdapterInput): Promise<InsertResult> {
+  }: DataAdapterInput<any>): Promise<InsertResult> {
     return this.dataSource
       .createQueryBuilder()
       .insert()
@@ -81,18 +121,18 @@ export class DataAdapterService {
    * @param data Data to sync
    * @returns
    */
-  public async syncData(data: DataAdapterInput): Promise<any> {
+  public async syncData(data: DataAdapterInput<any>): Promise<any> {
     // Map of tool categories to their corresponding sync functions
     const syncFunctions = {
-      [ToolCategory.SUBDOMAINS]: (data: DataAdapterInput) =>
+      [ToolCategory.SUBDOMAINS]: (data: DataAdapterInput<any>) =>
         this.subdomains(data),
-      [ToolCategory.HTTP_PROBE]: (data: DataAdapterInput) =>
+      [ToolCategory.HTTP_PROBE]: (data: DataAdapterInput<any>) =>
         this.httpResponses(data),
-      [ToolCategory.HTTP_SCRAPER]: (data: DataAdapterInput) =>
+      [ToolCategory.HTTP_SCRAPER]: (data: DataAdapterInput<any>) =>
         this.httpResponses(data),
-      [ToolCategory.PORTS_SCANNER]: (data: DataAdapterInput) =>
+      [ToolCategory.PORTS_SCANNER]: (data: DataAdapterInput<any>) =>
         this.portsScanner(data),
-      [ToolCategory.VULNERABILITIES]: (data: DataAdapterInput) => {
+      [ToolCategory.VULNERABILITIES]: (data: DataAdapterInput<any>) => {
         throw new Error(`Vulnerabilities sync not implemented yet`);
       },
     };

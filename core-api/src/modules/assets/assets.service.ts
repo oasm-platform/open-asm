@@ -26,6 +26,19 @@ export class AssetsService {
   ) {}
 
   /**
+   * Retrieves all assets associated with a specified target.
+   *
+   * @param targetId - The ID of the target for which to retrieve assets.
+   * @returns A promise that resolves to an array of assets.
+   */
+  public getAllAssetsByTargetId(targetId: string): Promise<Asset[]> {
+    return this.assetRepo.find({
+      where: {
+        target: { id: targetId },
+      },
+    });
+  }
+  /**
    * Retrieves a paginated list of assets associated with a specified target.
    *
    * @param id - The ID of the target for which to retrieve assets.
