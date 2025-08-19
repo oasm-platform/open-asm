@@ -15,7 +15,7 @@ import {
 import { WorkspaceTool } from './workspace_tools.entity';
 
 @Entity('tools')
-@Unique(['name', 'category'])
+@Unique(['name'])
 export class Tool {
   @ApiProperty()
   @PrimaryColumn({ type: 'uuid' })

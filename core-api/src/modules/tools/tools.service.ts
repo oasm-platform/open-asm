@@ -115,7 +115,7 @@ export class ToolsService implements OnModuleInit {
         .createQueryBuilder()
         .insert()
         .orUpdate({
-          conflict_target: ['name', 'category'],
+          conflict_target: ['name'],
           overwrite: ['description', 'logoUrl', 'version'],
         })
         .values(toolsToInsert)
