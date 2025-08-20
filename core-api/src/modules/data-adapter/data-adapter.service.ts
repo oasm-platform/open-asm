@@ -106,13 +106,11 @@ export class DataAdapterService {
       .createQueryBuilder()
       .insert()
       .into(Port)
-      .values(
-        data.map((port) => ({
-          ...port,
-          assetId: job.asset.id,
-          jobHistoryId: job.jobHistory.id,
-        })),
-      )
+      .values({
+        ports: data,
+        assetId: job.asset.id,
+        jobHistoryId: job.jobHistory.id,
+      })
       .execute();
   }
 

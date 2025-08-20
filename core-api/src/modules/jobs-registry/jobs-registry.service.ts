@@ -72,7 +72,7 @@ export class JobsRegistryService {
   public async createJob(
     toolNames: string[],
     target: Target,
-    workflow: Workflow,
+    workflow?: Workflow,
   ): Promise<void> {
     const jobHistory = this.jobHistoryRepo.create({
       workflow,
@@ -273,6 +273,7 @@ export class JobsRegistryService {
       data: _data,
       job,
     });
+    this.getNextStepForJob(job);
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
@@ -281,6 +282,15 @@ export class JobsRegistryService {
     // await this.processStepResult(step, job, dto.data);
 
     return { workerId, dto };
+  }
+
+  private getNextStepForJob(job: Job) {
+    const workflow = job.jobHistory.workflow;
+    const currentTool = job.tool.name;
+    const nextTool = workflow?.content.jobs[currentTool];
+    if (nextTool) {
+      this.createJob(nextTool, job.asset.target, job.jobHistory.workflow);
+    }
   }
 
   private async findJobForUpdate(workerId: string, jobId: string) {
@@ -294,7 +304,9 @@ export class JobsRegistryService {
         asset: {
           target: true,
         },
-        jobHistory: true,
+        jobHistory: {
+          workflow: true,
+        },
         tool: true,
       },
     });
