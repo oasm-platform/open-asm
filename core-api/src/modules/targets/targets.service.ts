@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CronJob } from 'cron';
@@ -31,6 +32,7 @@ export class TargetsService {
     private readonly workspacesService: WorkspacesService,
     public assetService: AssetsService,
     private schedulerRegistry: SchedulerRegistry,
+    private eventEmitter: EventEmitter2,
   ) {
     this.handleUpdateScanSchedule();
   }
@@ -115,6 +117,8 @@ export class TargetsService {
         target,
         value,
       });
+
+      await this.eventEmitter.emit('target.create', target);
     }
     // If the target exists, check if it is already associated with the workspace
     else {

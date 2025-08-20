@@ -13,11 +13,14 @@ import {
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
+import { Target } from '../targets/entities/target.entity';
 import { builtInTools } from '../tools/built-in-tools';
+import { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
+import { Workflow } from '../workflows/entities/workflow.entity';
 import {
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
@@ -66,17 +69,42 @@ export class JobsRegistryService {
    * @param category the name of the worker to run on the asset
    * @returns the newly created job
    */
-  public async createJob(asset: Asset, category: ToolCategory): Promise<Job> {
-    const jobHistory = this.jobHistoryRepo.create({});
-    await this.jobHistoryRepo.save(jobHistory);
-    const tool = await this.toolsService.getBuiltInByCategory(category);
-    return this.repo.save({
-      asset,
-      category,
-      group: randomUUID(),
-      jobHistory,
-      tool: { id: tool?.id },
+  public async createJob(
+    toolNames: string[],
+    target: Target,
+    workflow: Workflow,
+  ): Promise<void> {
+    const jobHistory = this.jobHistoryRepo.create({
+      workflow,
     });
+    await this.jobHistoryRepo.save(jobHistory);
+    const assets = await this.dataSource.getRepository(Asset).find({
+      where: {
+        target: { id: target.id },
+      },
+    });
+    const jobHistoryId = jobHistory.id;
+    const toolsForFirstJob = await this.dataSource.getRepository(Tool).find({
+      where: {
+        name: In(toolNames),
+      },
+    });
+
+    await Promise.all(
+      toolsForFirstJob.map(async (tool) => {
+        await this.dataSource.getRepository(Job).save(
+          assets.map((asset) => ({
+            id: randomUUID(),
+            asset,
+            jobName: tool.name,
+            status: JobStatus.PENDING,
+            category: tool.category,
+            tool,
+            jobHistory: { id: jobHistoryId },
+          })),
+        );
+      }),
+    );
   }
 
   /**

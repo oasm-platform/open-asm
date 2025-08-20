@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
-import { TargetsService } from './targets.service';
-import { TargetsController } from './targets.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Asset } from '../assets/entities/assets.entity';
+import { TriggerWorkflowService } from '../workflows/templates/trigger-workflow.service';
+import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { Target } from './entities/target.entity';
 import { WorkspaceTarget } from './entities/workspace-target.entity';
-import { WorkspacesModule } from '../workspaces/workspaces.module';
-import { Asset } from '../assets/entities/assets.entity';
+import { TargetsController } from './targets.controller';
+import { TargetsService } from './targets.service';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { Asset } from '../assets/entities/assets.entity';
     WorkspacesModule,
   ],
   controllers: [TargetsController],
-  providers: [TargetsService],
+  providers: [TargetsService, TriggerWorkflowService],
   exports: [TargetsService],
 })
 export class TargetsModule {}

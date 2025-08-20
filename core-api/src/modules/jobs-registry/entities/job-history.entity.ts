@@ -2,7 +2,8 @@ import { BaseEntity } from 'src/common/entities/base.entity';
 import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
 import { Port } from 'src/modules/assets/entities/ports.entity';
 import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
-import { Entity, OneToMany } from 'typeorm';
+import { Workflow } from 'src/modules/workflows/entities/workflow.entity';
+import { Entity, ManyToOne, OneToMany } from 'typeorm';
 import { Job } from './job.entity';
 
 @Entity('job_histories')
@@ -26,4 +27,9 @@ export class JobHistory extends BaseEntity {
     onDelete: 'CASCADE',
   })
   httpResponses?: HttpResponse[];
+
+  @ManyToOne(() => Workflow, (workflow) => workflow.jobHistories, {
+    onDelete: 'CASCADE',
+  })
+  workflow?: Workflow;
 }

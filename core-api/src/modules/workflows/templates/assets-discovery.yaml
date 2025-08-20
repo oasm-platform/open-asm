@@ -1,7 +1,8 @@
-name: Asset Discovery Workflow
+name: assets_discovery
 
 on:
-  target: create
+  target: [create, re_scan]
+
 
 jobs:
   subfinder: [httpx, naabu]

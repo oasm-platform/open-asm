@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
-import { ToolCategory } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -21,6 +21,7 @@ export class AssetsService {
     @InjectRepository(Target)
     public readonly targetRepo: Repository<Target>,
     private jobRegistryService: JobsRegistryService,
+    private eventEmitter: EventEmitter2,
 
     private dataSource: DataSource,
   ) {}
@@ -121,16 +122,13 @@ export class AssetsService {
   }: {
     target: Target;
     value: string;
-    isPrimary?: boolean;
   }): Promise<Asset> {
-    const asset = await this.assetRepo.save({
+    return this.assetRepo.save({
       id: randomUUID(),
       target,
       value,
       isPrimary: true,
     });
-    await this.jobRegistryService.createJob(asset, ToolCategory.SUBDOMAINS);
-    return asset;
   }
 
   /**
@@ -159,11 +157,11 @@ export class AssetsService {
       throw new NotFoundException('Target not found');
     }
     const reScanCount = target.reScanCount + 1;
-    await this.jobRegistryService.createJob(asset, ToolCategory.SUBDOMAINS);
     await this.targetRepo.update(targetId, {
       reScanCount,
       lastDiscoveredAt: new Date(),
     });
+    await this.eventEmitter.emit('target.re_scan', target);
     return {
       message: 'Scan started',
     };
