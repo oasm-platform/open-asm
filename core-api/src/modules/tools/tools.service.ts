@@ -9,7 +9,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Severity, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { ResultHandler } from 'src/common/interfaces/app.interface';
-import { BuiltInTool } from 'src/common/types/app.types';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DeepPartial, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
@@ -46,7 +45,7 @@ export class ToolsService implements OnModuleInit {
     private storageService: StorageService,
   ) {}
 
-  public builtInTools: BuiltInTool[] = [
+  public builtInTools: Tool[] = [
     {
       name: 'subfinder',
       category: ToolCategory.SUBDOMAINS,
@@ -116,7 +115,7 @@ export class ToolsService implements OnModuleInit {
         .createQueryBuilder()
         .insert()
         .orUpdate({
-          conflict_target: ['name', 'category'],
+          conflict_target: ['name'],
           overwrite: ['description', 'logoUrl', 'version'],
         })
         .values(toolsToInsert)
@@ -246,7 +245,6 @@ export class ToolsService implements OnModuleInit {
 
     const primaryAsset = parsed[job.asset.value];
     delete parsed[job.asset.value];
-
     this.workerService.updateResultToDatabase({
       dataSource,
       job,
@@ -254,7 +252,6 @@ export class ToolsService implements OnModuleInit {
         total: Object.keys(parsed).length,
       },
     });
-
     const assets: Asset[] = Object.keys(parsed).map((i) => ({
       id: randomUUID(),
       value: i,
@@ -356,10 +353,15 @@ export class ToolsService implements OnModuleInit {
   /**
    * Get a built-in tool by category.
    * @param {ToolCategory} category - The category of the tool.
-   * @returns {BuiltInTool | undefined} The built-in tool if found, otherwise undefined.
+   * @returns {Tool | undefined} The built-in tool if found, otherwise undefined.
    */
-  public getBuiltInByName(category: ToolCategory): BuiltInTool | undefined {
-    return this.builtInTools.find((step) => step.category === category);
+  public async getBuiltInByCategory(
+    category: ToolCategory,
+  ): Promise<Tool | null> {
+    const tool = await this.toolsRepository.findOne({
+      where: { category, type: WorkerType.BUILT_IN },
+    });
+    return tool;
   }
 
   /**

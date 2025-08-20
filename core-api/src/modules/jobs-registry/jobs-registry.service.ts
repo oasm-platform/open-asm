@@ -13,9 +13,14 @@ import {
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
+import { DataAdapterService } from '../data-adapter/data-adapter.service';
+import { Target } from '../targets/entities/target.entity';
+import { builtInTools } from '../tools/built-in-tools';
+import { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
+import { Workflow } from '../workflows/entities/workflow.entity';
 import {
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
@@ -31,6 +36,7 @@ export class JobsRegistryService {
     @InjectRepository(JobHistory)
     public readonly jobHistoryRepo: Repository<JobHistory>,
     private dataSource: DataSource,
+    private dataAdapterService: DataAdapterService,
 
     @Inject(forwardRef(() => ToolsService))
     private toolsService: ToolsService,
@@ -63,15 +69,46 @@ export class JobsRegistryService {
    * @param category the name of the worker to run on the asset
    * @returns the newly created job
    */
-  public async createJob(asset: Asset, category: ToolCategory): Promise<Job> {
-    const jobHistory = this.jobHistoryRepo.create({});
-    await this.jobHistoryRepo.save(jobHistory);
-    return this.repo.save({
-      asset,
-      category,
-      group: randomUUID(),
-      jobHistory,
+  public async createJob({
+    toolNames,
+    target,
+    workflow,
+  }: {
+    toolNames: string[];
+    target: Target;
+    workflow?: Workflow;
+  }): Promise<void> {
+    const jobHistory = this.jobHistoryRepo.create({
+      workflow,
     });
+    await this.jobHistoryRepo.save(jobHistory);
+    const assets = await this.dataSource.getRepository(Asset).find({
+      where: {
+        target: { id: target.id },
+      },
+    });
+    const jobHistoryId = jobHistory.id;
+    const toolsForFirstJob = await this.dataSource.getRepository(Tool).find({
+      where: {
+        name: In(toolNames),
+      },
+    });
+
+    await Promise.all(
+      toolsForFirstJob.map(async (tool) => {
+        await this.dataSource.getRepository(Job).save(
+          assets.map((asset) => ({
+            id: randomUUID(),
+            asset,
+            jobName: tool.name,
+            status: JobStatus.PENDING,
+            category: tool.category,
+            tool,
+            jobHistory: { id: jobHistoryId },
+          })),
+        );
+      }),
+    );
   }
 
   /**
@@ -96,6 +133,7 @@ export class JobsRegistryService {
         .setLock('pessimistic_write')
         .limit(1)
         .getOne();
+
       if (!job) {
         await queryRunner.rollbackTransaction();
         return null;
@@ -105,7 +143,9 @@ export class JobsRegistryService {
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
-      const workerStep = this.toolsService.getBuiltInByName(job.category);
+      const workerStep = this.toolsService.builtInTools.find(
+        (tool) => tool.category === job.category,
+      );
 
       if (!workerStep) {
         await queryRunner.rollbackTransaction();
@@ -219,19 +259,46 @@ export class JobsRegistryService {
       throw new NotFoundException('Job not found');
     }
 
-    const step = this.toolsService.getBuiltInByName(job.category);
+    const step = this.toolsService.builtInTools.find(
+      (tool) => tool.name === job.tool.name,
+    );
 
     if (!step) {
-      throw new Error(`Worker step not found for worker: ${job.category}`);
+      throw new Error(`Worker step not found for worker: ${job.tool.name}`);
     }
+    const builtInStep = builtInTools.find(
+      (tool) => tool.name === job.tool.name,
+    );
+
+    // Save data to database
+    const _data = builtInStep?.parser(data.raw);
+
+    await this.dataAdapterService.syncData({
+      data: _data,
+      job,
+    });
+    this.getNextStepForJob(job);
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
     await this.updateJobStatus(job.id, newStatus);
 
-    await this.processStepResult(step, job, dto.data);
+    // await this.processStepResult(step, job, dto.data);
 
     return { workerId, dto };
+  }
+
+  private getNextStepForJob(job: Job) {
+    const workflow = job.jobHistory.workflow;
+    const currentTool = job.tool.name;
+    const nextTool = workflow?.content.jobs[currentTool];
+    if (nextTool) {
+      this.createJob({
+        toolNames: nextTool,
+        target: job.asset.target,
+        workflow: job.jobHistory.workflow,
+      });
+    }
   }
 
   private async findJobForUpdate(workerId: string, jobId: string) {
@@ -245,7 +312,10 @@ export class JobsRegistryService {
         asset: {
           target: true,
         },
-        jobHistory: true,
+        jobHistory: {
+          workflow: true,
+        },
+        tool: true,
       },
     });
   }
@@ -308,7 +378,9 @@ export class JobsRegistryService {
     }
 
     return Promise.all(
-      nextJob.map((nextWorkerHandleJob) =>
+      nextJob.map(async (nextWorkerHandleJob) => {
+        const tool =
+          await this.toolsService.getBuiltInByCategory(nextWorkerHandleJob);
         this.repo
           .createQueryBuilder()
           .insert()
@@ -317,11 +389,14 @@ export class JobsRegistryService {
               asset: i,
               category: nextWorkerHandleJob,
               jobHistory,
+              tool: {
+                id: tool?.id,
+              },
             })),
           )
           .orIgnore()
-          .execute(),
-      ),
+          .execute();
+      }),
     );
   }
 }

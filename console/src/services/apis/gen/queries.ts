@@ -364,6 +364,7 @@ export type Vulnerability = {
   cweId: string;
   extractorName: string;
   extractedResults: string[];
+  tool: Tool;
 };
 
 export type GetManyVulnerabilityDto = {
@@ -396,6 +397,17 @@ export type GetVulnerabilitiesStatisticsResponseDto = {
   data: VulnerabilityStatisticsDto[];
 };
 
+export type String = { [key: string]: unknown };
+
+export type GetManyStringDto = {
+  data: string[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   page?: number;
   limit?: number;
@@ -420,6 +432,19 @@ export type JobsRegistryControllerGetManyJobsParams = {
 };
 
 export type AssetsControllerGetAssetsInWorkspaceParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  value?: string;
+  workspaceId: string;
+  targetIds?: string[];
+  ports?: string[];
+  techs?: string[];
+  statusCodes?: string[];
+};
+
+export type AssetsControllerGetAssetIpParams = {
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -4490,6 +4515,362 @@ export function useAssetsControllerGetAssetsInWorkspace<
 }
 
 /**
+ * Retrieves a list of ip with number of assets.
+ * @summary Get IP asset
+ */
+export const assetsControllerGetAssetIp = (
+  params: AssetsControllerGetAssetIpParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetAssetsResponseDto>(
+    { url: `/api/assets/ip`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetAssetIpQueryKey = (
+  params: AssetsControllerGetAssetIpParams,
+) => {
+  return [`/api/assets/ip`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetAssetIpInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    AssetsControllerGetAssetIpParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetIpParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetAssetIpQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    QueryKey,
+    AssetsControllerGetAssetIpParams["page"]
+  > = ({ signal, pageParam }) =>
+    assetsControllerGetAssetIp(
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    TError,
+    TData,
+    QueryKey,
+    AssetsControllerGetAssetIpParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetAssetIpInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+>;
+export type AssetsControllerGetAssetIpInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetAssetIpInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    AssetsControllerGetAssetIpParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetIpParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetIpInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    AssetsControllerGetAssetIpParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetIpParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetIpInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    AssetsControllerGetAssetIpParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetIpParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get IP asset
+ */
+
+export function useAssetsControllerGetAssetIpInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    AssetsControllerGetAssetIpParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetAssetIpParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetAssetIpInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetsControllerGetAssetIpQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetAssetIpQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+  > = ({ signal }) =>
+    assetsControllerGetAssetIp(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetAssetIpQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+>;
+export type AssetsControllerGetAssetIpQueryError = unknown;
+
+export function useAssetsControllerGetAssetIp<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetIp<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetAssetIp<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get IP asset
+ */
+
+export function useAssetsControllerGetAssetIp<
+  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetAssetIpParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetAssetIpQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Retrieves a single asset by its ID.
  * @summary Get asset by ID
  */
@@ -8299,6 +8680,313 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
       params,
       options,
     );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves a list of all available workflow templates in YAML format.
+ * @summary Get all workflow templates
+ */
+export const workflowsControllerListTemplates = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyStringDto>(
+    { url: `/api/workflows/templates`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getWorkflowsControllerListTemplatesQueryKey = () => {
+  return [`/api/workflows/templates`] as const;
+};
+
+export const getWorkflowsControllerListTemplatesInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getWorkflowsControllerListTemplatesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+  > = ({ signal }) => workflowsControllerListTemplates(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerListTemplatesInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+>;
+export type WorkflowsControllerListTemplatesInfiniteQueryError = unknown;
+
+export function useWorkflowsControllerListTemplatesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerListTemplatesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerListTemplatesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all workflow templates
+ */
+
+export function useWorkflowsControllerListTemplatesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkflowsControllerListTemplatesInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkflowsControllerListTemplatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getWorkflowsControllerListTemplatesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+  > = ({ signal }) => workflowsControllerListTemplates(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerListTemplatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+>;
+export type WorkflowsControllerListTemplatesQueryError = unknown;
+
+export function useWorkflowsControllerListTemplates<
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerListTemplates<
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerListTemplates<
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all workflow templates
+ */
+
+export function useWorkflowsControllerListTemplates<
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkflowsControllerListTemplatesQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

@@ -1,0 +1,8 @@
+name: assets_discovery
+
+on:
+  target: [create, re_scan]
+
+
+jobs:
+  subfinder: [httpx, naabu]

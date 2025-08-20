@@ -1,0 +1,178 @@
+import { Injectable } from '@nestjs/common';
+import { DataSource, InsertResult } from 'typeorm';
+import { JobStatus, ToolCategory } from '../../common/enums/enum';
+import { Asset } from '../assets/entities/assets.entity';
+import { HttpResponse } from '../assets/entities/http-response.entity';
+import { Port } from '../assets/entities/ports.entity';
+import { Job } from '../jobs-registry/entities/job.entity';
+import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import { DataAdapterInput } from './data-adapter.interface';
+
+@Injectable()
+export class DataAdapterService {
+  constructor(private readonly dataSource: DataSource) {}
+
+  public async subdomains({
+    data,
+    job,
+  }: DataAdapterInput<Asset[]>): Promise<InsertResult | void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const primaryAssets = data.find(
+        (asset) => asset.value === job.asset.value,
+      );
+
+      // Update Asset
+      await queryRunner.manager
+        .createQueryBuilder()
+        .update(Asset)
+        .where({ id: job.asset.id })
+        .set({ isPrimary: true, dnsRecords: primaryAssets?.dnsRecords })
+        .execute();
+
+      // Update Job status -> COMPLETED
+      await queryRunner.manager
+        .createQueryBuilder()
+        .update(Job)
+        .set({ status: JobStatus.COMPLETED })
+        .where({ id: job.id })
+        .execute();
+
+      // Insert Assets
+      const insertResult = await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(Asset)
+        .values(
+          data.map((asset) => ({
+            ...asset,
+            target: { id: job.asset.target.id },
+          })),
+        )
+        .orIgnore()
+        .execute();
+
+      await queryRunner.commitTransaction();
+      return insertResult;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+
+      await this.dataSource
+        .createQueryBuilder()
+        .update(Job)
+        .set({ status: JobStatus.FAILED })
+        .where({ id: job.id })
+        .execute();
+
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * HTTP responses data normalization
+   * @param param0
+   * @returns
+   */
+  public async httpResponses({
+    data,
+    job,
+  }: DataAdapterInput<any>): Promise<InsertResult> {
+    return this.dataSource
+      .createQueryBuilder()
+      .insert()
+      .into(HttpResponse)
+      .values({
+        ...data,
+        assetId: job.asset.id,
+        jobHistoryId: job.jobHistory.id,
+      })
+      .execute();
+  }
+
+  /**
+   * Ports data normalization
+   * @param param0
+   * @returns
+   */
+  public async portsScanner({
+    data,
+    job,
+  }: DataAdapterInput<any>): Promise<InsertResult> {
+    return this.dataSource
+      .createQueryBuilder()
+      .insert()
+      .into(Port)
+      .values({
+        ports: data,
+        assetId: job.asset.id,
+        jobHistoryId: job.jobHistory.id,
+      })
+      .execute();
+  }
+
+  /**
+   * Vulnerabilities data normalization
+   * @param param0
+   * @returns
+   */
+  public async vulnerabilities({
+    data,
+    job,
+  }: DataAdapterInput<any>): Promise<InsertResult> {
+    return this.dataSource
+      .createQueryBuilder()
+      .insert()
+      .into(Vulnerability)
+      .values(
+        data.map((vuln) => ({
+          ...vuln,
+          asset: { id: job.asset.id },
+          jobHistory: { id: job.jobHistory.id },
+          tool: { id: job.tool.id },
+        })),
+      )
+      .execute();
+  }
+
+  /**
+   * Sync data based on tool category
+   * @param data Data to sync
+   * @returns
+   */
+  public async syncData(data: DataAdapterInput<any>): Promise<any> {
+    // Map of tool categories to their corresponding sync functions
+    const syncFunctions = {
+      [ToolCategory.SUBDOMAINS]: (data: DataAdapterInput<any>) =>
+        this.subdomains(data),
+      [ToolCategory.HTTP_PROBE]: (data: DataAdapterInput<any>) =>
+        this.httpResponses(data),
+      [ToolCategory.HTTP_SCRAPER]: (data: DataAdapterInput<any>) =>
+        this.httpResponses(data),
+      [ToolCategory.PORTS_SCANNER]: (data: DataAdapterInput<any>) =>
+        this.portsScanner(data),
+      [ToolCategory.VULNERABILITIES]: (data: DataAdapterInput<any>) => {
+        return this.vulnerabilities(data);
+      },
+    };
+
+    // Get the appropriate sync function based on category
+    if (!data.job.tool.category) {
+      throw new Error(`Unsupported tool category: ${data.job.tool.category}`);
+    }
+
+    const syncFunction = syncFunctions[data.job.tool.category];
+
+    // Check if we have a function for this category
+    if (!syncFunction) {
+      throw new Error(`Unsupported tool category: ${data.job.tool.category}`);
+    }
+
+    // Call the appropriate sync function
+    return syncFunction(data);
+  }
+}
