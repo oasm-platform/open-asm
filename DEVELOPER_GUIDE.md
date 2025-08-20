@@ -70,47 +70,6 @@ This command will:
 
 After running `task init`, you can start all services using `task dev` or run them individually as described below.
 
-## Running Services
-
-### Core API
-
-From the root directory, run:
-
-```bash
-task api:dev
-```
-
-This starts the NestJS API server in development mode with hot-reload.
-
-**Default API URLs:**
-
-- Main API: `http://localhost:6276`
-- API Docs: `http://localhost:6276/api/docs`
-- Auth Docs: `http://localhost:6276/api/auth/docs`
-- OpenAPI Spec: `http://localhost:6276/api/docs-json`
-
-### Console (Web Interface)
-
-From the root directory, run:
-
-```bash
-task console:dev
-```
-
-This starts the Vite development server for the React console.
-
-**Default Console URL:** `http://localhost:5173`
-
-### Workers
-
-Navigate to the `worker` directory and run:
-
-```bash
-bun run dev
-```
-
-This starts the Bun-based worker in development mode.
-
 ### All Services with Task
 
 To start all services (API, Console) simultaneously, use the task command from the root directory:
@@ -119,7 +78,13 @@ To start all services (API, Console) simultaneously, use the task command from t
 task dev
 ```
 
-Note: This command starts the API and Console. You might need to start workers manually depending on your testing needs.
+### Run workers locally
+
+To run workers locally, use the task command from the root directory:
+
+```bash
+task worker:dev
+```
 
 ## Database Setup
 
@@ -141,7 +106,7 @@ If you prefer to use your own PostgreSQL instance, update the `core-api/.env` fi
   - Run unit tests: `npm run test`
   - Run tests in watch mode: `npm run test:watch`
   - Run end-to-end tests: `npm run test:e2e`
-  Consider creating tasks to wrap these commands for convenience.
+    Consider creating tasks to wrap these commands for convenience.
 
 ## Using Docker Compose
 
