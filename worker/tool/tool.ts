@@ -25,14 +25,27 @@ export class Tool {
   public async run() {
     await this.connectToCore();
     this.alive();
-    
-    // Log worker status every 5 seconds when there are jobs running
+
+    // Track previous status for change detection
+    let prevStatus = this.getStatus();
+
+    // Log worker status when values change (check every second)
     setInterval(() => {
-      const status = this.getStatus();
-      if (status.processingJobs > 0 || status.queueLength > 0) {
-        logger.info(`Worker ${Tool.workerId} status - Running: ${status.processingJobs}/${status.maxConcurrentJobs} jobs | Queue: ${status.queueLength}/${status.maxJobsQueue}`);
+      const currentStatus = this.getStatus();
+      const statusChanged =
+        prevStatus.processingJobs !== currentStatus.processingJobs ||
+        prevStatus.queueLength !== currentStatus.queueLength;
+
+      if (
+        statusChanged &&
+        (currentStatus.processingJobs > 0 || currentStatus.queueLength > 0)
+      ) {
+        logger.info(
+          `Worker ${Tool.workerId} status - Running: ${currentStatus.processingJobs}/${currentStatus.maxConcurrentJobs} jobs | Queue: ${currentStatus.queueLength}/${currentStatus.maxJobsQueue}`
+        );
+        prevStatus = { ...currentStatus };
       }
-    }, 5000);
+    }, 1000);
 
     // Handle graceful shutdown
     this.setupGracefulShutdown();

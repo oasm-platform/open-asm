@@ -5,6 +5,7 @@ import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
+import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { DataAdapterInput } from './data-adapter.interface';
 
 @Injectable()
@@ -115,6 +116,30 @@ export class DataAdapterService {
   }
 
   /**
+   * Vulnerabilities data normalization
+   * @param param0
+   * @returns
+   */
+  public async vulnerabilities({
+    data,
+    job,
+  }: DataAdapterInput<any>): Promise<InsertResult> {
+    return this.dataSource
+      .createQueryBuilder()
+      .insert()
+      .into(Vulnerability)
+      .values(
+        data.map((vuln) => ({
+          ...vuln,
+          asset: { id: job.asset.id },
+          jobHistory: { id: job.jobHistory.id },
+          tool: { id: job.tool.id },
+        })),
+      )
+      .execute();
+  }
+
+  /**
    * Sync data based on tool category
    * @param data Data to sync
    * @returns
@@ -131,7 +156,7 @@ export class DataAdapterService {
       [ToolCategory.PORTS_SCANNER]: (data: DataAdapterInput<any>) =>
         this.portsScanner(data),
       [ToolCategory.VULNERABILITIES]: (data: DataAdapterInput<any>) => {
-        throw new Error(`Vulnerabilities sync not implemented yet`);
+        return this.vulnerabilities(data);
       },
     };
 

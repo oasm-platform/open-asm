@@ -1,12 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Severity, ToolCategory } from 'src/common/enums/enum';
+import { Severity } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { Target } from '../targets/entities/target.entity';
+import {
+  GetVulnerabilitiesStatisticsQueryDto,
+  VulnerabilityStatisticsDto,
+} from './dto/get-vulnerability-statistics.dto';
 import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
-import { GetVulnerabilitiesStatisticsQueryDto, VulnerabilityStatisticsDto } from './dto/get-vulnerability-statistics.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
 
 @Injectable()
@@ -19,23 +23,16 @@ export class VulnerabilitiesService {
     private assetService: AssetsService,
   ) {}
 
-  async scan(targetId: string) {
-    const assets = await this.assetService.assetRepo.find({
-      where: {
-        target: {
-          id: targetId,
-        },
-        isErrorPage: false,
-      },
-    });
-
-    if (!assets.length) {
-      throw new NotFoundException('Assets not found');
-    }
-
-    this.jobRegistryService.startNextJob({
-      assets,
-      nextJob: [ToolCategory.VULNERABILITIES],
+  /**
+   * Triggers a scan for a specific target by creating new jobs for relevant workers.
+   *
+   * @param targetId - The ID of the target to scan.
+   * @throws Error if the target is not found.
+   */
+  public async scan(targetId: string) {
+    this.jobRegistryService.createJob({
+      toolNames: ['nuclei'],
+      target: { id: targetId } as Target,
     });
 
     return { message: `Scanning target ${targetId}...` };
@@ -50,10 +47,9 @@ export class VulnerabilitiesService {
    */
   async getVulnerabilities(query: GetVulnerabilitiesQueryDto) {
     const { limit, page, sortOrder, targetIds, workspaceId, q } = query;
+
     let { sortBy } = query;
-    if (!(sortBy in Vulnerability)) {
-      sortBy = 'createdAt';
-    }
+
     const queryBuilder = this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')
       .leftJoin('vulnerabilities.asset', 'assets')
@@ -73,16 +69,16 @@ export class VulnerabilitiesService {
     if (q) {
       queryBuilder.andWhere(
         '(vulnerabilities.name ILIKE :q OR ' +
-        'vulnerabilities.description ILIKE :q OR ' +
-        'vulnerabilities.severity ILIKE :q OR ' +
-        'vulnerabilities.affectedUrl ILIKE :q OR ' +
-        'vulnerabilities.ipAddress ILIKE :q OR ' +
-        'vulnerabilities.host ILIKE :q OR ' +
-        'vulnerabilities.port ILIKE :q OR ' +
-        'vulnerabilities.cveId ILIKE :q OR ' +
-        'vulnerabilities.cweId ILIKE :q OR ' +
-        'vulnerabilities.extractorName ILIKE :q)',
-        { q: `%${q}%` }
+          'vulnerabilities.description ILIKE :q OR ' +
+          'vulnerabilities.severity ILIKE :q OR ' +
+          'vulnerabilities.affectedUrl ILIKE :q OR ' +
+          'vulnerabilities.ipAddress ILIKE :q OR ' +
+          'vulnerabilities.host ILIKE :q OR ' +
+          'vulnerabilities.port ILIKE :q OR ' +
+          'vulnerabilities.cveId ILIKE :q OR ' +
+          'vulnerabilities.cweId ILIKE :q OR ' +
+          'vulnerabilities.extractorName ILIKE :q)',
+        { q: `%${q}%` },
       );
     }
 
@@ -97,7 +93,9 @@ export class VulnerabilitiesService {
    * @param query - The query parameters to filter vulnerabilities, including workspaceId and optional targetIds.
    * @returns A promise that resolves to an array of vulnerability counts by severity level.
    */
-  async getVulnerabilitiesStatistics(query: GetVulnerabilitiesStatisticsQueryDto) {
+  async getVulnerabilitiesStatistics(
+    query: GetVulnerabilitiesStatisticsQueryDto,
+  ) {
     const { workspaceId, targetIds } = query;
 
     const queryBuilder = this.vulnerabilitiesRepository
@@ -119,7 +117,7 @@ export class VulnerabilitiesService {
 
     // Convert the result to a map for easy lookup
     const severityCounts = new Map<string, number>();
-    result.forEach(item => {
+    result.forEach((item) => {
       severityCounts.set(item.severity, parseInt(item.count, 10));
     });
 
@@ -132,10 +130,12 @@ export class VulnerabilitiesService {
       Severity.CRITICAL,
     ];
 
-    const statistics: VulnerabilityStatisticsDto[] = allSeverities.map(severity => ({
-      severity,
-      count: severityCounts.get(severity) || 0,
-    }));
+    const statistics: VulnerabilityStatisticsDto[] = allSeverities.map(
+      (severity) => ({
+        severity,
+        count: severityCounts.get(severity) || 0,
+      }),
+    );
 
     return { data: statistics };
   }

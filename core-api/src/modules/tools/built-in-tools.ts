@@ -142,10 +142,13 @@ export const builtInTools: any[] = [
         }
       }
 
-      return Array.from(
+      const data = Array.from(
         groupedVulnerabilities.values(),
       ) as DeepPartial<Vulnerability>[];
+      console.log(data);
+      return data;
     },
+
     version: '3.4.7',
   },
 ];

@@ -69,11 +69,15 @@ export class JobsRegistryService {
    * @param category the name of the worker to run on the asset
    * @returns the newly created job
    */
-  public async createJob(
-    toolNames: string[],
-    target: Target,
-    workflow?: Workflow,
-  ): Promise<void> {
+  public async createJob({
+    toolNames,
+    target,
+    workflow,
+  }: {
+    toolNames: string[];
+    target: Target;
+    workflow?: Workflow;
+  }): Promise<void> {
     const jobHistory = this.jobHistoryRepo.create({
       workflow,
     });
@@ -289,7 +293,11 @@ export class JobsRegistryService {
     const currentTool = job.tool.name;
     const nextTool = workflow?.content.jobs[currentTool];
     if (nextTool) {
-      this.createJob(nextTool, job.asset.target, job.jobHistory.workflow);
+      this.createJob({
+        toolNames: nextTool,
+        target: job.asset.target,
+        workflow: job.jobHistory.workflow,
+      });
     }
   }
 

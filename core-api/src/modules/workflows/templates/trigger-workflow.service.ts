@@ -20,7 +20,11 @@ export class TriggerWorkflowService implements OnModuleInit {
 
       if (workflow) {
         const firstJobs = Object.keys(workflow.content.jobs);
-        await this.jobRegistryService.createJob(firstJobs, payload, workflow);
+        await this.jobRegistryService.createJob({
+          toolNames: firstJobs,
+          target: payload,
+          workflow,
+        });
       }
     });
   }
