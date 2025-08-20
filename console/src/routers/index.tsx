@@ -66,8 +66,17 @@ export const router = createBrowserRouter([
             path: "workers",
           },
           {
-            element: <Tools />,
             path: "tools",
+            children: [
+              {
+                path: "",
+                element: <Tools />,
+              },
+              {
+                path: ":id",
+                element: <Tools />,
+              },
+            ],
           },
           {
             element: <Search />,

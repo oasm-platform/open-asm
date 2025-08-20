@@ -56,6 +56,7 @@ export class VulnerabilitiesService {
       .leftJoin('assets.target', 'targets')
       .leftJoin('targets.workspaceTargets', 'workspace_targets')
       .leftJoin('workspace_targets.workspace', 'workspaces')
+      .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .where('workspaces.id = :workspaceId', { workspaceId })
       .orderBy(`vulnerabilities.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
