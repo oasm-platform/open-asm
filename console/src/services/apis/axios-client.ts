@@ -3,7 +3,7 @@ import Axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import Qs from "qs";
 // Create a more descriptively named instance
 export const axiosInstance = Axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: "",
   paramsSerializer: (params) => Qs.stringify(params, { arrayFormat: "repeat" }),
   withCredentials: true,
 });
