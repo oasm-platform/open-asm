@@ -81,7 +81,7 @@ export class DataAdapterService {
   public async httpResponses({
     data,
     job,
-  }: DataAdapterInput<any>): Promise<InsertResult> {
+  }: DataAdapterInput<HttpResponse>): Promise<InsertResult> {
     return this.dataSource
       .createQueryBuilder()
       .insert()
@@ -102,7 +102,7 @@ export class DataAdapterService {
   public async portsScanner({
     data,
     job,
-  }: DataAdapterInput<any>): Promise<InsertResult> {
+  }: DataAdapterInput<number[]>): Promise<InsertResult> {
     return this.dataSource
       .createQueryBuilder()
       .insert()
@@ -123,7 +123,7 @@ export class DataAdapterService {
   public async vulnerabilities({
     data,
     job,
-  }: DataAdapterInput<any>): Promise<InsertResult> {
+  }: DataAdapterInput<Vulnerability[]>): Promise<InsertResult> {
     return this.dataSource
       .createQueryBuilder()
       .insert()
@@ -147,15 +147,17 @@ export class DataAdapterService {
   public async syncData(data: DataAdapterInput<any>): Promise<any> {
     // Map of tool categories to their corresponding sync functions
     const syncFunctions = {
-      [ToolCategory.SUBDOMAINS]: (data: DataAdapterInput<any>) =>
+      [ToolCategory.SUBDOMAINS]: (data: DataAdapterInput<Asset[]>) =>
         this.subdomains(data),
-      [ToolCategory.HTTP_PROBE]: (data: DataAdapterInput<any>) =>
+      [ToolCategory.HTTP_PROBE]: (data: DataAdapterInput<HttpResponse>) =>
         this.httpResponses(data),
-      [ToolCategory.HTTP_SCRAPER]: (data: DataAdapterInput<any>) =>
+      [ToolCategory.HTTP_SCRAPER]: (data: DataAdapterInput<HttpResponse>) =>
         this.httpResponses(data),
-      [ToolCategory.PORTS_SCANNER]: (data: DataAdapterInput<any>) =>
+      [ToolCategory.PORTS_SCANNER]: (data: DataAdapterInput<number[]>) =>
         this.portsScanner(data),
-      [ToolCategory.VULNERABILITIES]: (data: DataAdapterInput<any>) => {
+      [ToolCategory.VULNERABILITIES]: (
+        data: DataAdapterInput<Vulnerability[]>,
+      ) => {
         return this.vulnerabilities(data);
       },
     };
