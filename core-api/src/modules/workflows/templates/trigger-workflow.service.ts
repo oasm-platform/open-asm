@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JobsRegistryService } from 'src/modules/jobs-registry/jobs-registry.service';
 import { Target } from 'src/modules/targets/entities/target.entity';
@@ -30,7 +30,7 @@ export class TriggerWorkflowService implements OnModuleInit {
         })
         .catch((error) => {
           // Handle error, e.g., log it
-          console.error('Error in onModuleInit:', error);
+          Logger.error('Error in onModuleInit:', error);
         });
     });
   }
