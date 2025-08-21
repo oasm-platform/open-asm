@@ -30,12 +30,11 @@ export class VulnerabilitiesService {
    * @param targetId - The ID of the target to scan.
    * @returns A message indicating the scan has started.
    */
-  public scan(targetId: string) {
-    this.jobRegistryService.createJob({
+  public async scan(targetId: string) {
+    await this.jobRegistryService.createJob({
       toolNames: ['nuclei'],
       target: { id: targetId } as Target,
     });
-
     return { message: `Scanning target ${targetId}...` };
   }
 
@@ -139,8 +138,8 @@ export class VulnerabilitiesService {
     const result = await queryBuilder.getRawMany();
 
     // Convert the result to a map for easy lookup
-    const severityCounts = new Map<string, number>();
-    result.forEach((item) => {
+    const severityCounts = new Map<Severity, number>();
+    result.forEach((item: { severity: Severity; count: string }) => {
       severityCounts.set(item.severity, parseInt(item.count, 10));
     });
 

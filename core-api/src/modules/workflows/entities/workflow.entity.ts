@@ -9,7 +9,7 @@ export class Workflow extends BaseEntity {
   name: string;
 
   @Column({ type: 'jsonb' })
-  content: any;
+  content: Record<string, any>;
 
   @Column()
   filePath: string;
