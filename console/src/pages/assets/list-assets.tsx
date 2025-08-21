@@ -1,9 +1,13 @@
 import { DataTable } from "@/components/ui/data-table";
+import { Tabs } from "@/components/ui/tabs";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { useAssetsControllerGetAssetsInWorkspace } from "@/services/apis/gen/queries";
+import { TabsContent } from "@radix-ui/react-tabs";
 import { useState } from "react";
 import AssetDetailSheet from "./asset-detail-sheet";
+import TriggerList from "./components/tab-trigger-list";
+import FilterForm from "./components/filter-form";
 import { assetColumns } from "./data-column";
 
 interface ListAssetsProps {
@@ -17,7 +21,7 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
 
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder, setFilter },
+    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
   } = useServerDataTable({
     defaultSortBy: "value",
     defaultSortOrder: "ASC",
@@ -55,32 +59,48 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
 
   if (!data && !isLoading) return <div>Error loading targets.</div>;
 
+  const tabTriggerList = [
+    {
+      value: "asset",
+      text: "All services",
+    },
+    {
+      value: "ip",
+      text: "IP",
+    },
+  ];
+
   return (
-    <>
-      <DataTable
-        data={targets}
-        columns={assetColumns}
-        isLoading={isLoading}
-        page={page}
-        pageSize={pageSize}
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        onSortChange={(col, order) => {
-          setSortBy(col);
-          setSortOrder(order);
-        }}
-        filterColumnKey="value"
-        filterValue={filter}
-        onFilterChange={setFilter}
-        totalItems={total}
-        onRowClick={(row) => {
-          setRowID(row.id);
-          setIsOpen(!isOpen);
-        }}
-      />
+    <div className="w-full">
+      <FilterForm />
+      <Tabs defaultValue="asset" className="gap-0">
+        <TriggerList tabTriggerList={tabTriggerList} />
+        <TabsContent value="asset">
+          <DataTable
+            data={targets}
+            columns={assetColumns}
+            isLoading={isLoading}
+            isShowHeader={false}
+            page={page}
+            pageSize={pageSize}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            onSortChange={(col, order) => {
+              setSortBy(col);
+              setSortOrder(order);
+            }}
+            totalItems={total}
+            onRowClick={(row) => {
+              setRowID(row.id);
+              setIsOpen(!isOpen);
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="ip">No data</TabsContent>
+      </Tabs>
       <AssetDetailSheet open={isOpen} setOpen={setIsOpen} id={rowID} />
-    </>
+    </div>
   );
 }

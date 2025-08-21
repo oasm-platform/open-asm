@@ -59,6 +59,7 @@ interface DataTableProps<TData, TValue> {
   onSortChange?: (sortBy: string, sortOrder: "ASC" | "DESC") => void;
   emptyMessage?: string;
   filterComponents?: React.JSX.Element[];
+  isShowHeader?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -71,7 +72,6 @@ export function DataTable<TData, TValue>({
   onRowClick,
   rowClassName,
   filterPlaceholder = "Filter...",
-  showColumnVisibility = true,
   showPagination = true,
   page,
   pageSize,
@@ -83,6 +83,7 @@ export function DataTable<TData, TValue>({
   onSortChange,
   emptyMessage = "No data",
   filterComponents,
+  isShowHeader = true,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -141,7 +142,7 @@ export function DataTable<TData, TValue>({
   return (
     <div className="w-full">
       {/* Filter and column visibility controls */}
-      {(filterColumnKey || showColumnVisibility) && (
+      {filterColumnKey && (
         <div className="flex items-center gap-4 py-1">
           {filterColumnKey && (
             <Input
@@ -159,36 +160,45 @@ export function DataTable<TData, TValue>({
       {filterComponents}
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div
+        className={
+          isShowHeader
+            ? "rounded-md border"
+            : "rounded-b-md border border-t-0 bg-secondary"
+        }
+      >
         <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    onClick={() =>
-                      header.column.getCanSort() && handleSort(header.column.id)
-                    }
-                    className={`whitespace-nowrap ${header.column.getCanSort() ? "cursor-pointer" : ""}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                      {sortBy === header.column.id &&
-                        (sortOrder === "ASC" ? (
-                          <ArrowUpNarrowWide size={16} />
-                        ) : (
-                          <ArrowDownNarrowWide size={16} />
-                        ))}
-                    </div>
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
+          {isShowHeader && (
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      onClick={() =>
+                        header.column.getCanSort() &&
+                        handleSort(header.column.id)
+                      }
+                      className={`whitespace-nowrap ${header.column.getCanSort() ? "cursor-pointer" : ""}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                        {sortBy === header.column.id &&
+                          (sortOrder === "ASC" ? (
+                            <ArrowUpNarrowWide size={16} />
+                          ) : (
+                            <ArrowDownNarrowWide size={16} />
+                          ))}
+                      </div>
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+          )}
           <TableBody>
             {showSkeleton ? (
               [...Array(5)].map((_, rowIndex) => (
