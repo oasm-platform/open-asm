@@ -68,11 +68,11 @@ export class WorkspacesController {
     },
   })
   @Get(':id')
-  getWorkspaceById(
+  async getWorkspaceById(
     @Param() { id }: IdQueryParamDto,
     @UserContext() userContext: UserContextPayload,
   ) {
-    const workspace = this.workspacesService.getWorkspaceById(id, userContext);
+    const workspace = await this.workspacesService.getWorkspaceById(id, userContext);
 
     if (!workspace) {
       throw new NotFoundException('Workspace not found');

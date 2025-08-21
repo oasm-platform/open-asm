@@ -24,12 +24,13 @@ export class VulnerabilitiesService {
   ) {}
 
   /**
-   * Triggers a scan for a specific target by creating new jobs for relevant workers.
+   * Initiates a vulnerability scan for a given target.
+   * This method creates a job in the job registry to start the scanning process.
    *
    * @param targetId - The ID of the target to scan.
-   * @throws Error if the target is not found.
+   * @returns A message indicating the scan has started.
    */
-  public async scan(targetId: string) {
+  public scan(targetId: string) {
     this.jobRegistryService.createJob({
       toolNames: ['nuclei'],
       target: { id: targetId } as Target,
@@ -48,7 +49,7 @@ export class VulnerabilitiesService {
   async getVulnerabilities(query: GetVulnerabilitiesQueryDto) {
     const { limit, page, sortOrder, targetIds, workspaceId, q } = query;
 
-    let { sortBy } = query;
+    const { sortBy } = query;
 
     const queryBuilder = this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')

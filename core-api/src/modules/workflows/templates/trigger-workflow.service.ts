@@ -15,17 +15,22 @@ export class TriggerWorkflowService implements OnModuleInit {
 
   onModuleInit() {
     // Listen all events with wildcard
-    this.eventEmitter.onAny(async (event: string, payload: Target) => {
-      const workflow = await this.getWorkflowByEvent(event);
-
-      if (workflow) {
-        const firstJobs = Object.keys(workflow.content.jobs);
-        await this.jobRegistryService.createJob({
-          toolNames: firstJobs,
-          target: payload,
-          workflow,
+    this.eventEmitter.onAny((event: string, payload: Target) => {
+      this.getWorkflowByEvent(event)
+        .then(async (workflow) => {
+          if (workflow) {
+            const firstJobs = Object.keys(workflow.content.jobs);
+            await this.jobRegistryService.createJob({
+              toolNames: firstJobs,
+              target: payload,
+              workflow,
+            });
+          }
+        })
+        .catch((error) => {
+          // Handle error, e.g., log it
+          console.error('Error in onModuleInit:', error);
         });
-      }
     });
   }
 

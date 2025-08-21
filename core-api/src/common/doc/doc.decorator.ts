@@ -53,9 +53,8 @@ function DocDefault<T>({
   description,
   extraModels = [],
   httpStatus = HttpStatus.OK,
-  messageExample,
   serialization,
-}: IDocResponseOptions): MethodDecorator {
+}: Omit<IDocResponseOptions, 'messageExample'>): MethodDecorator {
   const decorators: MethodDecorator[] = [];
 
   const schema: Record<string, any> = {

@@ -291,7 +291,7 @@ export class ToolsService implements OnModuleInit {
    * Parses open ports and updates the job result in the database.
    * @param {ResultHandler} handlerData - The data object containing result, job, and dataSource.
    */
-  private async handleNaabuResult({ result, job, dataSource }: ResultHandler) {
+  private handleNaabuResult({ result, job, dataSource }: ResultHandler) {
     const parsed = result
       .trim()
       .split('\n')

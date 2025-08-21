@@ -14,7 +14,7 @@ export class VulnerabilitiesController {
   ) {}
 
   @Post('scan')
-  async scan(@Body() scanDto: ScanDto) {
+  scan(@Body() scanDto: ScanDto) {
     return this.vulnerabilitiesService.scan(scanDto.targetId);
   }
 

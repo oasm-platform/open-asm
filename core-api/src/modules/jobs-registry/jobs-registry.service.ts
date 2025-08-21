@@ -47,7 +47,6 @@ export class JobsRegistryService {
   ): Promise<GetManyBaseResponseDto<Job>> {
     const { limit, page, sortOrder } = query;
     let { sortBy } = query;
-    const { id } = userContextPayload;
 
     if (!(sortBy in Job)) {
       sortBy = 'createdAt';
