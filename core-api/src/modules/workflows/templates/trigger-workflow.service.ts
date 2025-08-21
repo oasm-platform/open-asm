@@ -46,7 +46,7 @@ export class TriggerWorkflowService implements OnModuleInit {
     return this.dataSource
       .getRepository(Workflow)
       .createQueryBuilder('workflow')
-      .where(`workflow.content -> 'on' -> :target @> :action`, {
+      .where('workflow.content -> \'on\' -> :target @> :action', {
         target,
         action: JSON.stringify([action]),
       })

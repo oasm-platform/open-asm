@@ -9,7 +9,7 @@ import { StorageModule } from './modules/storage/storage.module'; // assuming th
 @Module({
   imports: [
     ConfigModule.forRoot({
-      envFilePath: `.env`,
+      envFilePath: '.env',
       isGlobal: true,
     }),
     EventEmitterModule.forRoot({ wildcard: true }),

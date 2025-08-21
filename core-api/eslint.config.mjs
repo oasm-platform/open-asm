@@ -24,12 +24,35 @@ export default tseslint.config(
   },
   {
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'warn',
+      // Safety
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-      '@typescript-eslint/interface-username-prefix': 'off',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-    },
-  },
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/restrict-template-expressions': 'error',
+
+      // NestJS / OOP
+      'no-console': 'error',
+      '@typescript-eslint/member-ordering': 'warn',
+
+      // Clean code
+      'eqeqeq': ['error', 'always'],
+      'complexity': ['warn', 10],
+      'max-lines-per-function': ['warn', 500],
+      'max-params': ['warn', 4],
+      'no-magic-numbers': ['warn', { ignore: [-1, 0, 1, 200, 201, 400, 401, 500] }],
+
+
+      // Style
+      'semi': ['error', 'always'],
+      'quotes': ['error', 'single'],
+      'object-curly-spacing': ['error', 'always'],
+
+      // Security
+      'no-eval': 'error',
+      'no-new-func': 'error',
+    }
+  }
+
 );

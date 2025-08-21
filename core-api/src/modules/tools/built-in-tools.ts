@@ -1,7 +1,8 @@
-import { DeepPartial } from 'better-auth/*';
+import type { DeepPartial } from 'better-auth/*';
 import { randomUUID } from 'crypto';
-import { Severity, ToolCategory } from 'src/common/enums/enum';
-import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import type { Severity } from 'src/common/enums/enum';
+import { ToolCategory } from 'src/common/enums/enum';
+import type { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 
 export const builtInTools: any[] = [
   {

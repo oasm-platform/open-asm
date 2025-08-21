@@ -6,7 +6,7 @@ import {
   HOOK_KEY,
   ROLE_METADATA_KEY,
 } from '../constants/app.constants';
-import { Role } from '../enums/enum';
+import type { Role } from '../enums/enum';
 /**
  * Marks a route as public, allowing unauthenticated access.
  * When applied to a controller method, the AuthGuard will skip authentication checks.

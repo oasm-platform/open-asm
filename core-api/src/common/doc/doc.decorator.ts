@@ -10,7 +10,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 
-import { IDocOptions, IDocResponseOptions } from './doc.interface';
+import type { IDocOptions, IDocResponseOptions } from './doc.interface';
 import { AppResponseSerialization } from './response.serialization';
 
 export const RESPONSE_DOCS_METADATA = 'RESPONSE_DOCS_METADATA';

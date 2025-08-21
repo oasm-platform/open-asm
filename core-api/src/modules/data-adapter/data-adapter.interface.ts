@@ -1,4 +1,4 @@
-import { Job } from '../jobs-registry/entities/job.entity';
+import type { Job } from '../jobs-registry/entities/job.entity';
 
 export interface DataAdapterInput<T> {
   data: T;

@@ -1,7 +1,7 @@
-import { HttpStatus } from "@nestjs/common";
-import { ApiParamOptions, ApiQueryOptions } from "@nestjs/swagger";
-import { SchemaObject } from "@nestjs/swagger/dist/interfaces/open-api-spec.interface";
-import { ClassConstructor } from "class-transformer";
+import type { HttpStatus } from '@nestjs/common';
+import type { ApiParamOptions, ApiQueryOptions } from '@nestjs/swagger';
+import type { SchemaObject } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
+import type { ClassConstructor } from 'class-transformer';
 
 export interface IDocResponseOptions<T = any> {
   dataSchema?: SchemaObject;
@@ -22,5 +22,5 @@ export interface IDocOptions<T> {
 interface IDocRequestOptions {
   params?: ApiParamOptions[];
   queries?: ApiQueryOptions[];
-  bodyType?: "FORM_DATA" | "JSON";
+  bodyType?: 'FORM_DATA' | 'JSON';
 }

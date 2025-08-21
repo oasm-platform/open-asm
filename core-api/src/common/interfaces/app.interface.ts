@@ -1,6 +1,6 @@
-import { Job } from 'src/modules/jobs-registry/entities/job.entity';
-import { DataSource } from 'typeorm';
-import { Role } from '../enums/enum';
+import type { Job } from 'src/modules/jobs-registry/entities/job.entity';
+import type { DataSource } from 'typeorm';
+import type { Role } from '../enums/enum';
 
 export interface UserContextPayload {
   expiresAt: string;
