@@ -100,9 +100,13 @@ export const builtInTools: any[] = [
               cvssMetric: finding['info']['classification']?.[
                 'cvss-metrics'
               ] as string,
+              cvssScore: finding['info']['classification']?.[
+                'cvss-score'
+              ] as number,
               cveId: finding['info']['classification']?.[
                 'cve-id'
               ]?.[0] as string,
+              cweId: finding['info']['classification']?.['cwe-id'] as string[],
               extractorName: finding['extractor-name'] as string,
               extractedResults: finding['extracted-results'] || [],
               filePath,
@@ -145,7 +149,6 @@ export const builtInTools: any[] = [
       const data = Array.from(
         groupedVulnerabilities.values(),
       ) as DeepPartial<Vulnerability>[];
-      console.log(data);
       return data;
     },
 
