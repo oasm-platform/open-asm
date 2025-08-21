@@ -25,16 +25,16 @@ export default function AssetDetail({ id }: { id: string }) {
   if (!data) return "Loading";
 
   const { value, httpResponses, ports, dnsRecords } = data;
-  const ports_scanner = ports as unknown as number[];
+  const ports_scanner = ports?.ports as unknown as number[];
   const ipAddresses = dnsRecords?.["A"] as string[];
   const tls = httpResponses?.tls as any;
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after
     ? Math.round(
-        (new Date(tls.not_after).getTime() - new Date().getTime()) /
-          (1000 * 60 * 60 * 24),
-      )
+      (new Date(tls.not_after).getTime() - new Date().getTime()) /
+      (1000 * 60 * 60 * 24),
+    )
     : undefined;
 
   // Calculate certificate age start date and display
