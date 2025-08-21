@@ -95,11 +95,7 @@ export function DetailTarget() {
         </div>
       }
     >
-      {animation &&
-        (target.status === JobStatus.in_progress ||
-          target.status === JobStatus.pending) && (
-          <AssetsDiscovering targetId={target.id} />
-        )}
+
       <Tabs value={activeTab as any} onValueChange={handleTabChange} className="w-full my-6">
         <div className="flex justify-between items-center gap-5">
           <TabsList>
@@ -140,6 +136,11 @@ export function DetailTarget() {
           )}
         </div>
         <TabsContent value="assets">
+          {animation && tab === "assets" &&
+            (target.status === JobStatus.in_progress ||
+              target.status === JobStatus.pending) && (
+              <AssetsDiscovering targetId={target.id} />
+            )}
           <ListAssets
             targetId={target.id}
             refetchInterval={target.status === JobStatus.in_progress ? 1000 : 5000}
