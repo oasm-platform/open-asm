@@ -9,3 +9,4 @@ export const APP_NAME = 'Open Attack Surface Management';
 export const DEFAULT_ADMIN_ID = '00bd7b24-2f88-4e2f-84e0-835bf28e7905';
 export const WORKER_TIMEOUT = 10; // seconds
 export const LIMIT_WORKSPACE_CREATE = 5;
+export const API_KEY_LENGTH = 32;
