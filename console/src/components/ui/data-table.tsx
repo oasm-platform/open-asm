@@ -160,13 +160,7 @@ export function DataTable<TData, TValue>({
       {filterComponents}
 
       {/* Table */}
-      <div
-        className={
-          isShowHeader
-            ? "rounded-md border"
-            : "rounded-b-md border border-t-0 bg-secondary"
-        }
-      >
+      <div>
         <Table>
           {isShowHeader && (
             <TableHeader>
@@ -249,8 +243,8 @@ export function DataTable<TData, TValue>({
 
       {/* Pagination */}
       {showPagination && (
-        <div className="flex flex-row-reverse justify-end items-center">
-          <div className="flex items-center gap-2 my-5">
+        <div className="flex flex-row-reverse justify-end items-center bg-background">
+          <div className="flex items-center gap-2 my-5 mx-3">
             <Select
               value={pageSize.toString()}
               onValueChange={(value) => onPageSizeChange?.(parseInt(value))}

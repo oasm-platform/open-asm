@@ -77,7 +77,10 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
       <FilterForm />
       <Tabs defaultValue="asset" className="gap-0">
         <TriggerList tabTriggerList={tabTriggerList} />
-        <TabsContent value="asset">
+        <TabsContent
+          value="asset"
+          className="border border-t-0 rounded-b-md bg-secondary overflow-hidden"
+        >
           <DataTable
             data={targets}
             columns={assetColumns}
@@ -100,7 +103,12 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
             }}
           />
         </TabsContent>
-        <TabsContent value="ip">No data</TabsContent>
+        <TabsContent
+          value="ip"
+          className="border border-t-0 bg-secondary p-5 rounded-b-md"
+        >
+          No data
+        </TabsContent>
       </Tabs>
       <AssetDetailSheet open={isOpen} setOpen={setIsOpen} id={rowID} />
     </div>
