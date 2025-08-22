@@ -218,6 +218,20 @@ export type GetManyGetAssetsResponseDtoDto = {
   pageCount: number;
 };
 
+export type GetAssetsIpDTO = {
+  ip: string;
+  assetCount: number;
+};
+
+export type GetManyGetAssetsIpDTODto = {
+  data: GetAssetsIpDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type WorkerAliveDto = {
   token: string;
 };
@@ -4523,7 +4537,7 @@ export const assetsControllerGetAssetIp = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetAssetsResponseDto>(
+  return orvalClient<GetManyGetAssetsIpDTODto>(
     { url: `/api/assets/ip`, method: "GET", params, signal },
     options,
   );

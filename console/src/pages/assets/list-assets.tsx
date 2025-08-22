@@ -2,13 +2,24 @@ import { DataTable } from "@/components/ui/data-table";
 import { Tabs } from "@/components/ui/tabs";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useAssetsControllerGetAssetsInWorkspace } from "@/services/apis/gen/queries";
+import {
+  useAssetsControllerGetAssetIp,
+  useAssetsControllerGetAssetsInWorkspace,
+} from "@/services/apis/gen/queries";
 import { TabsContent } from "@radix-ui/react-tabs";
 import { useState } from "react";
 import AssetDetailSheet from "./asset-detail-sheet";
 import TriggerList from "./components/tab-trigger-list";
 import FilterForm from "./components/filter-form";
 import { assetColumns } from "./data-column";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Table, TableBody, TableRow } from "@/components/ui/table";
+import { ChevronDown, MapPinHouse } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface ListAssetsProps {
   targetId?: string;
@@ -54,6 +65,10 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
     },
   );
 
+  const { data: ipAssetData } = useAssetsControllerGetAssetIp({
+    workspaceId: selectedWorkspace ?? "",
+  });
+
   const targets = data?.data ?? [];
   const total = data?.total ?? 0;
 
@@ -62,11 +77,11 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
   const tabTriggerList = [
     {
       value: "asset",
-      text: "All services",
+      text: "All Services",
     },
     {
       value: "ip",
-      text: "IP",
+      text: "IPs",
     },
   ];
 
@@ -77,7 +92,7 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
         <TriggerList tabTriggerList={tabTriggerList} />
         <TabsContent
           value="asset"
-          className="border border-t-0 rounded-b-md bg-secondary overflow-hidden"
+          className="border rounded-b-md bg-secondary overflow-hidden"
         >
           <DataTable
             data={targets}
@@ -103,9 +118,27 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
         </TabsContent>
         <TabsContent
           value="ip"
-          className="border border-t-0 bg-secondary p-5 rounded-b-md"
+          className="border bg-secondary rounded-b-md overflow-hidden"
         >
-          No data
+          <Table>
+            <TableBody>
+              {ipAssetData &&
+                ipAssetData.data.map((e) => (
+                  <TableRow className="h-15 flex items-center hover:cursor-pointer p-5 hover:bg-neutral-900 justify-between">
+                    <div className="flex items-center gap-4">
+                      <MapPinHouse className="size-4" />
+                      <span>{e.ip}</span>
+                      <Badge className="text-foreground bg-neutral-950 rounded border-neutral-600">
+                        {e.assetCount} services
+                      </Badge>
+                    </div>
+                    <div>
+                      <ChevronDown className="size-4" />
+                    </div>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
         </TabsContent>
       </Tabs>
       <AssetDetailSheet open={isOpen} setOpen={setIsOpen} id={rowID} />
