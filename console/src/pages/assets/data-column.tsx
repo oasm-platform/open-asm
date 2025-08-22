@@ -50,14 +50,16 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
           <div className="w-full">
             <BadgeList list={ipAddresses as string[]} Icon={Network} />
           </div>
-          <div className="w-full">
-            <BadgeList
-              list={(ports_scanner as string[]).sort(
-                (a: string, b: string) => parseInt(a) - parseInt(b),
-              )}
-              Icon={EthernetPort}
-            />
-          </div>
+          {ports_scanner && (
+            <div className="w-full">
+              <BadgeList
+                list={(ports_scanner as string[]).sort(
+                  (a: string, b: string) => parseInt(a) - parseInt(b),
+                )}
+                Icon={EthernetPort}
+              />
+            </div>
+          )}
         </div>
       );
     },

@@ -9,13 +9,9 @@ type Prop = {
 
 export default function TriggerList({ tabTriggerList }: Prop) {
   return (
-    <TabsList className="p-0 rounded-none bg-transparent mt-2 flex gap-2">
+    <TabsList className="rounded-none bg-transparent my-2 flex gap-2">
       {tabTriggerList.map((e) => (
-        <TabsTrigger
-          key={e.value}
-          value={e.value}
-          className="border-border border border-b-0 rounded-none rounded-t-md p-4 dark:data-[state=active]:bg-secondary data-[state=active]:bg-secondary focus-visible:border-none focus-visible:outline-none focus-visible:ring-0"
-        >
+        <TabsTrigger key={e.value} value={e.value}>
           {e.text}
         </TabsTrigger>
       ))}
