@@ -276,6 +276,7 @@ export class JobsRegistryService {
       data: _data,
       job,
     });
+
     this.getNextStepForJob(job);
 
     const hasError = data?.error;
@@ -323,7 +324,7 @@ export class JobsRegistryService {
     jobId: string,
     status: JobStatus,
   ): Promise<void> {
-    await this.repo.update(jobId, { status });
+    await this.repo.update(jobId, { status, completedAt: new Date() });
   }
 
   private async processStepResult(

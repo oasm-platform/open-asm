@@ -55,6 +55,9 @@ export class Tool {
   @Column({ nullable: true })
   logoUrl?: string;
 
+  /**
+   * @deprecated Use parser: () => void instead
+   */
   resultHandler: ({ dataSource, result, job }: ResultHandler) => Promise<void>;
 
   @ApiProperty()

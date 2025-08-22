@@ -81,17 +81,41 @@ export class DataAdapterService {
   public async httpResponses({
     data,
     job,
-  }: DataAdapterInput<HttpResponse>): Promise<InsertResult> {
-    return this.dataSource
-      .createQueryBuilder()
-      .insert()
-      .into(HttpResponse)
-      .values({
-        ...data,
-        assetId: job.asset.id,
-        jobHistoryId: job.jobHistory.id,
-      })
-      .execute();
+  }: DataAdapterInput<any>): Promise<InsertResult> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      if (data.failed) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .update(Asset)
+          .set({ isErrorPage: true })
+          .where({ id: job.asset.id })
+          .execute();
+      }
+
+      const result = await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(HttpResponse)
+        .values({
+          ...data,
+          assetId: job.asset.id,
+          jobHistoryId: job.jobHistory.id,
+        })
+        .execute();
+
+      await queryRunner.commitTransaction();
+      return result;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**
