@@ -85,15 +85,11 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
       <FilterForm />
       <Tabs defaultValue="asset" className="gap-0">
         <TriggerList tabTriggerList={tabTriggerList} />
-        <TabsContent
-          value="asset"
-          className="border rounded-b-md bg-secondary overflow-hidden"
-        >
+        <TabsContent value="asset" className="overflow-hidden">
           <DataTable
             data={targets}
             columns={assetColumns}
             isLoading={isLoading}
-            isShowHeader={false}
             page={page}
             pageSize={pageSize}
             sortBy={sortBy}
@@ -111,11 +107,8 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
             }}
           />
         </TabsContent>
-        <TabsContent
-          value="ip"
-          className="border bg-secondary rounded-b-md overflow-hidden"
-        >
-          <Table>
+        <TabsContent value="ip" className="overflow-hidden">
+          <Table className="border rounded">
             <TableBody>
               {ipAssetData &&
                 ipAssetData.data.map((e) => (
