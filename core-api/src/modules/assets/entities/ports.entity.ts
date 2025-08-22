@@ -2,12 +2,15 @@ import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Asset } from './assets.entity';
 import { JobHistory } from 'src/modules/jobs-registry/entities/job-history.entity';
 import { BaseEntity } from 'src/common/entities/base.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('ports')
 export class Port extends BaseEntity {
+  @ApiProperty()
   @Column({ array: true, type: 'integer' })
   ports: number[];
 
+  @ApiProperty()
   @Column({ type: 'varchar', nullable: true })
   assetId: string;
 
@@ -17,6 +20,7 @@ export class Port extends BaseEntity {
   @JoinColumn({ name: 'assetId' })
   asset: Asset;
 
+  @ApiProperty()
   @Column({ type: 'varchar', nullable: true })
   jobHistoryId: string;
 

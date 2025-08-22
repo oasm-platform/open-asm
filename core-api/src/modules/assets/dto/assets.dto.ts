@@ -2,6 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
+import { HttpResponse } from '../entities/http-response.entity';
+import { Port } from '../entities/ports.entity';
 
 export class GetAssetsResponseDto {
   @ApiProperty()
@@ -21,10 +23,10 @@ export class GetAssetsResponseDto {
   dnsRecords?: object;
 
   @ApiProperty({ required: false })
-  httpResponses?: any;
+  httpResponses?: HttpResponse;
 
   @ApiProperty({ required: false })
-  ports?: any;
+  ports?: Port;
 
   @ApiProperty({ required: false })
   isErrorPage?: boolean;
@@ -46,9 +48,7 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsUUID(4, { each: true })
   @IsOptional()
-  @Transform(
-    ({ value }) => (Array.isArray(value) ? value : [value]) as string[],
-  )
+  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   targetIds?: string[];
 
   @ApiProperty({
@@ -56,9 +56,7 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(
-    ({ value }) => (Array.isArray(value) ? value : [value]) as string[],
-  )
+  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   ports?: string[];
 
   @ApiProperty({
@@ -66,9 +64,7 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(
-    ({ value }) => (Array.isArray(value) ? value : [value]) as string[],
-  )
+  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   techs?: string[];
 
   @ApiProperty({
@@ -76,8 +72,6 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(
-    ({ value }) => (Array.isArray(value) ? value : [value]) as string[],
-  )
+  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   statusCodes?: string[];
 }

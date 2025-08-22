@@ -67,6 +67,16 @@ export type CreateTargetDto = {
   workspaceId: string;
 };
 
+export type GetManyTargetResponseDtoScanSchedule =
+  (typeof GetManyTargetResponseDtoScanSchedule)[keyof typeof GetManyTargetResponseDtoScanSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const GetManyTargetResponseDtoScanSchedule = {
+  "0_0_*_*_0": "0 0 * * 0",
+  "0_0_*/14_*_*": "0 0 */14 * *",
+  "0_0_1_*_*": "0 0 1 * *",
+} as const;
+
 export type GetManyTargetResponseDtoStatus =
   (typeof GetManyTargetResponseDtoStatus)[keyof typeof GetManyTargetResponseDtoStatus];
 
@@ -77,8 +87,14 @@ export const GetManyTargetResponseDtoStatus = {
 } as const;
 
 export type GetManyTargetResponseDto = {
+  id: string;
+  value: string;
+  reScanCount: number;
+  scanSchedule: GetManyTargetResponseDtoScanSchedule;
   status: GetManyTargetResponseDtoStatus;
   totalAssets: number;
+  duration: number;
+  lastDiscoveredAt: string;
 };
 
 export type GetManyGetManyTargetResponseDtoDto = {
@@ -204,11 +220,83 @@ export type UpdateResultDto = {
   data: UpdateResultDtoData;
 };
 
+export type TlsInfoFingerprintHash = { [key: string]: unknown };
+
+export type TlsInfo = {
+  host: string;
+  port: string;
+  probe_status: boolean;
+  tls_version: string;
+  cipher: string;
+  not_before: string;
+  not_after: string;
+  subject_dn: string;
+  subject_cn: string;
+  subject_an: string[];
+  serial: string;
+  issuer_dn: string;
+  issuer_cn: string;
+  issuer_org: string[];
+  fingerprint_hash: TlsInfoFingerprintHash;
+  wildcard_certificate: boolean;
+  tls_connection: string;
+  sni: string;
+};
+
+export type KnowledgebaseInfo = {
+  PageType: string;
+  pHash: number;
+};
+
+export type HttpResponseHeader = { [key: string]: unknown };
+
+export type HttpResponse = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  timestamp: string;
+  tls: TlsInfo;
+  port: string;
+  url: string;
+  input: string;
+  title: string;
+  scheme: string;
+  webserver: string;
+  body: string;
+  content_type: string;
+  method: string;
+  host: string;
+  path: string;
+  favicon: string;
+  favicon_md5: string;
+  favicon_url: string;
+  header: HttpResponseHeader;
+  raw_header: string;
+  request: string;
+  time: string;
+  a: string[];
+  tech: string[];
+  words: number;
+  lines: number;
+  status_code: number;
+  content_length: number;
+  failed: boolean;
+  knowledgebase: KnowledgebaseInfo;
+  resolvers: string[];
+  assetId: string;
+  jobHistoryId: string;
+};
+
+export type Port = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  ports: string[];
+  assetId: string;
+  jobHistoryId: string;
+};
+
 export type GetAssetsResponseDtoDnsRecords = { [key: string]: unknown };
-
-export type GetAssetsResponseDtoHttpResponses = { [key: string]: unknown };
-
-export type GetAssetsResponseDtoPorts = { [key: string]: unknown };
 
 export type GetAssetsResponseDto = {
   id: string;
@@ -218,8 +306,8 @@ export type GetAssetsResponseDto = {
   createdAt: string;
   updatedAt: string;
   dnsRecords?: GetAssetsResponseDtoDnsRecords;
-  httpResponses?: GetAssetsResponseDtoHttpResponses;
-  ports?: GetAssetsResponseDtoPorts;
+  httpResponses?: HttpResponse;
+  ports?: Port;
   isErrorPage?: boolean;
 };
 

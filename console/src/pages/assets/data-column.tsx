@@ -13,8 +13,9 @@ import {
 import AssetValue from "./components/asset-value";
 import BadgeList from "./components/badge-list";
 import HTTPXStatusCode from "./components/status-code";
+import type { GetAssetsResponseDto } from "@/services/apis/gen/queries";
 
-export const assetColumns: ColumnDef<any, any>[] = [
+export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
     accessorKey: "value",
     header: "Value",
@@ -23,33 +24,37 @@ export const assetColumns: ColumnDef<any, any>[] = [
     cell: ({ row }) => {
       const data = row.original;
       const ports_scanner = data.ports?.ports;
-      const http_probe = data.httpResponses;
+      const httpResponse = data.httpResponses;
       const ipAddresses = data.dnsRecords?.["A"];
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
           <div className="flex items-center gap-2 w-full">
-            <AssetValue http_probe={http_probe} value={data.value} />
-            <HTTPXStatusCode http_probe={http_probe} />
+            <AssetValue httpResponse={httpResponse} value={data.value} />
+            <HTTPXStatusCode httpResponse={httpResponse} />
           </div>
-          {http_probe?.title && (
-            <p className="truncate w-full text-sm" title={http_probe?.title}>
-              {http_probe?.title}
+          {httpResponse?.title && (
+            <p className="truncate w-full text-sm" title={httpResponse?.title}>
+              {httpResponse?.title}
             </p>
           )}
-          {http_probe?.error && (
-            <p
-              className="text-red-500 truncate w-full text-sm"
-              title={http_probe?.error}
-            >
-              {http_probe?.error}
-            </p>
-          )}
+
+          {/* {http_response?.failed && ( */}
+          {/*   <p */}
+          {/*     className="text-red-500 truncate w-full text-sm" */}
+          {/*     title={http_response?.error} */}
+          {/*   > */}
+          {/*     {http_response?.error} */}
+          {/*   </p> */}
+          {/* )} */}
+
           <div className="w-full">
-            <BadgeList list={ipAddresses} Icon={Network} />
+            <BadgeList list={ipAddresses as string[]} Icon={Network} />
           </div>
           <div className="w-full">
             <BadgeList
-              list={ports_scanner?.sort((a: number, b: number) => a - b)}
+              list={(ports_scanner as string[]).sort(
+                (a: string, b: string) => parseInt(a) - parseInt(b),
+              )}
               Icon={EthernetPort}
             />
           </div>
@@ -89,7 +94,8 @@ export const assetColumns: ColumnDef<any, any>[] = [
 
       const daysLeft = Math.round(
         Math.abs(
-          (new Date(tls.not_after).getTime() - new Date().getTime()) /
+          (new Date(tls.not_after as unknown as Date).getTime() -
+            new Date().getTime()) /
             (1000 * 60 * 60 * 24),
         ),
       );
@@ -111,11 +117,14 @@ export const assetColumns: ColumnDef<any, any>[] = [
             <Lock size={14} color={color} className="mr-1" />
             SSL {daysLeft}d
           </Badge>
-          {tls?.issuer_org && (
-            <BadgeList list={[tls.issuer_org]} Icon={Globe} />
+          {(tls?.issuer_org as string[]) && (
+            <BadgeList list={tls.issuer_org as string[]} Icon={Globe} />
           )}
-          {tls?.subject_org && (
-            <BadgeList list={[tls.subject_org]} Icon={BriefcaseBusiness} />
+          {(tls?.subject_an as string[]) && (
+            <BadgeList
+              list={tls.subject_an as string[]}
+              Icon={BriefcaseBusiness}
+            />
           )}
         </div>
       );

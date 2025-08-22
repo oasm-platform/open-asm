@@ -243,8 +243,8 @@ export function DataTable<TData, TValue>({
 
       {/* Pagination */}
       {showPagination && (
-        <div className="flex flex-row-reverse justify-end items-center bg-background">
-          <div className="flex items-center gap-2 my-5 mx-3">
+        <div className="flex flex-row-reverse justify-end items-center bg-background px-2">
+          <div className="flex items-center gap-2 my-5">
             <Select
               value={pageSize.toString()}
               onValueChange={(value) => onPageSizeChange?.(parseInt(value))}
