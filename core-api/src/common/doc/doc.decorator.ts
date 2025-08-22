@@ -15,12 +15,28 @@ import { AppResponseSerialization } from './response.serialization';
 
 export const RESPONSE_DOCS_METADATA = 'RESPONSE_DOCS_METADATA';
 
-export function Doc<T>(options?: IDocOptions<T>): MethodDecorator {
+/**
+ * Apply common decorators for API documentation
+ * @param options Documentation options
+ * @returns Array of method decorators
+ */
+function applyCommonDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
   const decorators: MethodDecorator[] = [];
 
   decorators.push(ApiConsumes(getContentType(options?.request?.bodyType)));
   decorators.push(ApiProduces('application/json'));
   decorators.push(DocDefault(options?.response || {}));
+
+  return decorators;
+}
+
+/**
+ * Apply parameter decorators for API documentation
+ * @param options Documentation options
+ * @returns Array of method decorators
+ */
+function applyParamDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
+  const decorators: MethodDecorator[] = [];
 
   if (options?.request?.params?.length) {
     decorators.push(...options.request.params.map(ApiParam));
@@ -29,6 +45,17 @@ export function Doc<T>(options?: IDocOptions<T>): MethodDecorator {
   if (options?.request?.queries?.length) {
     decorators.push(...options.request.queries.map(ApiQuery));
   }
+
+  return decorators;
+}
+
+/**
+ * Apply operation decorators for API documentation
+ * @param options Documentation options
+ * @returns Array of method decorators
+ */
+function applyOperationDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
+  const decorators: MethodDecorator[] = [];
 
   if (options?.description || options?.summary) {
     decorators.push(
@@ -39,25 +66,56 @@ export function Doc<T>(options?: IDocOptions<T>): MethodDecorator {
     );
   }
 
+  return decorators;
+}
+
+/**
+ * Decorator for documenting API endpoints with Swagger
+ * @param options Documentation options
+ * @returns Method decorator
+ */
+export function Doc<T>(options?: IDocOptions<T>): MethodDecorator {
+  const decorators: MethodDecorator[] = [];
+
+  // Apply common decorators
+  decorators.push(...applyCommonDecorators(options));
+
+  // Apply parameter decorators
+  decorators.push(...applyParamDecorators(options));
+
+  // Apply operation decorators
+  decorators.push(...applyOperationDecorators(options));
+
+  // Add metadata
   decorators.push(SetMetadata(RESPONSE_DOCS_METADATA, true));
 
   return applyDecorators(...decorators);
 }
 
+/**
+ * Get content type based on body type
+ * @param bodyType Body type
+ * @returns Content type string
+ */
 function getContentType(bodyType?: 'FORM_DATA' | 'JSON'): string {
   return bodyType === 'FORM_DATA' ? 'multipart/form-data' : 'application/json';
 }
 
+/**
+ * Create default documentation response
+ * @param options Response options
+ * @returns Method decorator
+ */
 function DocDefault<T>({
   dataSchema,
   description,
   extraModels = [],
   httpStatus = HttpStatus.OK,
   serialization,
-}: Omit<IDocResponseOptions, 'messageExample'>): MethodDecorator {
+}: Omit<IDocResponseOptions<T>, 'messageExample'>): MethodDecorator {
   const decorators: MethodDecorator[] = [];
 
-  const schema: Record<string, any> = {
+  const schema: Record<string, unknown> = {
     allOf: [{ $ref: getSchemaPath(AppResponseSerialization<T>) }],
   };
 
@@ -72,7 +130,11 @@ function DocDefault<T>({
 
   // Always include AppResponseSerialization and extra models
   decorators.push(ApiExtraModels(AppResponseSerialization<T>));
-  extraModels.forEach((model) => decorators.push(ApiExtraModels(model)));
+  extraModels.forEach((model) => {
+    if (model) {
+      decorators.push(ApiExtraModels(model));
+    }
+  });
 
   decorators.push(
     ApiResponse({
