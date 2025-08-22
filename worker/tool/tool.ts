@@ -128,11 +128,15 @@ export class Tool {
         // Wait until Tool.workerId is set (by SSE handler)
         await this.waitUntil(() => !!Tool.workerId, 1000);
         return; // success, exit the method
-      } catch (e) {
+      } catch (e: any) {
+        // If we get a 401 error, don't retry - just throw an API key invalid error
+        if (e?.response?.status === 401) {
+          logger.error("API key is invalid. Cannot connect to core.");
+        }
+
         attempt++;
         logger.error(
-          `Cannot connect to core ${process.env.API} (attempt ${attempt}):`,
-          e
+          `Cannot connect to core ${process.env.API} (attempt ${attempt}):`
         );
         await this.sleep(1000 * attempt); // exponential backoff delay
       }

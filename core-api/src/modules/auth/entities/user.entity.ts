@@ -1,11 +1,11 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { Role } from 'src/common/enums/enum';
+import { SearchHistory } from 'src/modules/search/entities/search-history.entity';
 import { WorkspaceMembers } from 'src/modules/workspaces/entities/workspace-members.entity';
 import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { Account } from './account.entity';
 import { Session } from './session.entity';
-import { SearchHistory } from 'src/modules/search/entities/search-history.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -47,9 +47,6 @@ export class User extends BaseEntity {
 
   @Column('text', { nullable: true })
   banReason?: string;
-
-  @Column('text', { nullable: true })
-  apiKey?: string;
 
   @OneToMany(() => SearchHistory, (searchHistory) => searchHistory.user)
   searchHistory: SearchHistory[];
