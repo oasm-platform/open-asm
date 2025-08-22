@@ -103,8 +103,10 @@ export class AssetsService {
       asset.updatedAt = item.updatedAt;
       asset.dnsRecords = item.dnsRecords;
       asset.isErrorPage = item.isErrorPage;
-      asset.httpResponses = item.httpResponses ? item.httpResponses[0] : null;
-      asset.ports = item.ports ? item.ports[0] : null;
+      asset.httpResponses = item.httpResponses
+        ? item.httpResponses[0]
+        : undefined;
+      asset.ports = item.ports ? item.ports[0] : undefined;
       return asset;
     });
 

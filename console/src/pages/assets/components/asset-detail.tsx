@@ -25,21 +25,22 @@ export default function AssetDetail({ id }: { id: string }) {
   if (!data) return "Loading";
 
   const { value, httpResponses, ports, dnsRecords } = data;
-  const ports_scanner = ports?.ports as unknown as number[];
+  const ports_scanner = ports;
   const ipAddresses = dnsRecords?.["A"] as string[];
-  const tls = httpResponses?.tls as any;
+  const tls = httpResponses?.tls;
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after
     ? Math.round(
-      (new Date(tls.not_after).getTime() - new Date().getTime()) /
-      (1000 * 60 * 60 * 24),
-    )
+        (new Date(tls.not_after as unknown as Date).getTime() -
+          new Date().getTime()) /
+          (1000 * 60 * 60 * 24),
+      )
     : undefined;
 
   // Calculate certificate age start date and display
   const certAgeStartDate = tls?.not_before
-    ? new Date(tls.not_before)
+    ? new Date(tls.not_before as unknown as Date)
     : undefined;
   const certAgeDisplay = certAgeStartDate
     ? dayjs(certAgeStartDate).fromNow()
@@ -61,7 +62,7 @@ export default function AssetDetail({ id }: { id: string }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
             <div>
               <span className="block mb-1">Domain</span>
-              <AssetValue http_probe={httpResponses} value={value} />
+              <AssetValue httpResponse={httpResponses} value={value} />
             </div>
 
             {/* IP Addresses */}
@@ -80,7 +81,7 @@ export default function AssetDetail({ id }: { id: string }) {
             {httpResponses?.status_code && (
               <div>
                 <span className="block mb-1">HTTP Status</span>
-                <HTTPXStatusCode http_probe={httpResponses} />
+                <HTTPXStatusCode httpResponse={httpResponses} />
               </div>
             )}
 
@@ -115,14 +116,14 @@ export default function AssetDetail({ id }: { id: string }) {
               </div>
             )}
 
-            {httpResponses?.error && (
-              <div className="md:col-span-2">
-                <span className="block mb-1">Error</span>
-                <p className="text-red-600 dark:text-red-400 ">
-                  {httpResponses.error}
-                </p>
-              </div>
-            )}
+            {/* {httpResponses?.error && ( */}
+            {/*   <div className="md:col-span-2"> */}
+            {/*     <span className="block mb-1">Error</span> */}
+            {/*     <p className="text-red-600 dark:text-red-400 "> */}
+            {/*       {httpResponses.error} */}
+            {/*     </p> */}
+            {/*   </div> */}
+            {/* )} */}
           </div>
         </section>
 
@@ -146,11 +147,13 @@ export default function AssetDetail({ id }: { id: string }) {
                 <span className="">{tls.port}</span>
               </div>
             )}
-            {ports_scanner && ports_scanner.length > 0 ? (
+            {ports_scanner && ports_scanner.ports.length > 0 ? (
               <div>
                 <span className="block mb-1">Open Ports</span>
                 <BadgeList
-                  list={ports_scanner.sort((a: number, b: number) => a - b)}
+                  list={ports_scanner.ports.sort(
+                    (a: string, b: string) => parseInt(a) - parseInt(b),
+                  )}
                   Icon={EthernetPort}
                 />
               </div>

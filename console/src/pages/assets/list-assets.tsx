@@ -1,4 +1,6 @@
+import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { Table, TableBody, TableRow } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
@@ -7,19 +9,12 @@ import {
   useAssetsControllerGetAssetsInWorkspace,
 } from "@/services/apis/gen/queries";
 import { TabsContent } from "@radix-ui/react-tabs";
+import { ChevronDown, MapPinHouse } from "lucide-react";
 import { useState } from "react";
 import AssetDetailSheet from "./asset-detail-sheet";
-import TriggerList from "./components/tab-trigger-list";
 import FilterForm from "./components/filter-form";
+import TriggerList from "./components/tab-trigger-list";
 import { assetColumns } from "./data-column";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Table, TableBody, TableRow } from "@/components/ui/table";
-import { ChevronDown, MapPinHouse } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 interface ListAssetsProps {
   targetId?: string;

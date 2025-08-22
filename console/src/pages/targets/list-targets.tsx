@@ -9,10 +9,13 @@ import { useTargetsControllerGetTargetsInWorkspace } from "@/services/apis/gen/q
 
 import TargetStatus from "@/components/ui/target-status";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
-import type { JobStatus, Target } from "@/services/apis/gen/queries";
+import type {
+  GetManyTargetResponseDto,
+  JobStatus,
+} from "@/services/apis/gen/queries";
 import { useNavigate } from "react-router-dom";
 
-export const targetColumns: ColumnDef<Target, any>[] = [
+const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   {
     accessorKey: "value",
     header: "Target",
@@ -37,21 +40,23 @@ export const targetColumns: ColumnDef<Target, any>[] = [
     header: "Duration",
     cell: ({ row }) => {
       const status = row.getValue("status");
-      if (status === 'in_progress') {
+      if (status === "in_progress") {
         return null;
       }
-      
+
       const value: number = parseInt(row.getValue("duration"));
-      const duration = dayjs.duration(value, 'seconds');
+      const duration = dayjs.duration(value, "seconds");
       const hours = duration.hours();
       const minutes = duration.minutes();
       const seconds = duration.seconds();
 
-      return <div className="text-gray-400 font-semibold">
-        {hours > 0 && `${hours}h`}
-        {minutes > 0 && `${minutes}m`}
-        {seconds > 0 && `${seconds}s`}
-      </div>;
+      return (
+        <div className="text-gray-400 font-semibold">
+          {hours > 0 && `${hours}h`}
+          {minutes > 0 && `${minutes}m`}
+          {seconds > 0 && `${seconds}s`}
+        </div>
+      );
     },
   },
   {
@@ -59,7 +64,11 @@ export const targetColumns: ColumnDef<Target, any>[] = [
     header: "Last Discovered At",
     cell: ({ row }) => {
       const value: string = row.getValue("lastDiscoveredAt");
-      return <div className="text-gray-400 font-semibold">{new Date(value).toLocaleString()}</div>;
+      return (
+        <div className="text-gray-400 font-semibold">
+          {new Date(value).toLocaleString()}
+        </div>
+      );
     },
   },
   {
@@ -111,13 +120,13 @@ export function ListTargets() {
 
   if (!data && !isLoading) return <div>Error loading targets.</div>;
 
-  const handleRowClick = (target: Target) => {
+  const handleRowClick = (target: GetManyTargetResponseDto) => {
     navigate(`/targets/${target.id}`);
   };
 
   return (
     <DataTable
-      data={targets as any}
+      data={targets}
       columns={targetColumns}
       isLoading={isLoading}
       page={page}

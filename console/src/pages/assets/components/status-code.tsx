@@ -1,18 +1,24 @@
 import StatusCode from "@/components/ui/status-code";
-import { MoveRight } from "lucide-react";
+import type { HttpResponse } from "@/services/apis/gen/queries";
 
-export default function HTTPXStatusCode({ http_probe }: { http_probe: any }) {
-  return http_probe?.chain_status_codes ? (
-    <div className="flex items-center gap-1">
-      <StatusCode code={http_probe?.chain_status_codes[0].toString()} />
-      <MoveRight size={15} />
-      <StatusCode
-        code={http_probe?.chain_status_codes[
-          http_probe.chain_status_codes.length - 1
-        ].toString()}
-      />
-    </div>
-  ) : (
-    <StatusCode code={http_probe?.status_code} />
-  );
+export default function HTTPXStatusCode({
+  httpResponse,
+}: {
+  httpResponse: HttpResponse | undefined;
+}) {
+  // return httpResponse?.chain_status_codes ? (
+  //   <div className="flex items-center gap-1">
+  //     <StatusCode code={httpResponse?.chain_status_codes[0].toString()} />
+  //     <MoveRight size={15} />
+  //     <StatusCode
+  //       code={httpResponse?.chain_status_codes[
+  //         httpResponse.chain_status_codes.length - 1
+  //       ].toString()}
+  //     />
+  //   </div>
+  // ) : (
+  //   <StatusCode code={httpResponse?.status_code.toString()} />
+  // );
+  // TODO: chain_status_codes
+  return <StatusCode code={httpResponse?.status_code.toString()} />;
 }
