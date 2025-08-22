@@ -3,7 +3,7 @@ import type { ApiParamOptions, ApiQueryOptions } from '@nestjs/swagger';
 import type { SchemaObject } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
 import type { ClassConstructor } from 'class-transformer';
 
-export interface IDocResponseOptions<T = any> {
+export interface IDocResponseOptions<T> {
   dataSchema?: SchemaObject;
   description?: string;
   extraModels?: ClassConstructor<T>[];

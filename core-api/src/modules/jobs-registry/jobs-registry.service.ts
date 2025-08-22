@@ -277,7 +277,7 @@ export class JobsRegistryService {
     }
 
     await this.dataAdapterService.syncData({
-      data: builtInStep?.parser?.(data.raw),
+      data: builtInStep?.parser?.(data.raw) as any,
       job,
     });
 
