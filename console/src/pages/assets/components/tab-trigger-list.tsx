@@ -14,7 +14,7 @@ export default function TriggerList({ tabTriggerList }: Prop) {
         <TabsTrigger
           key={e.value}
           value={e.value}
-          className="border-border border border-b-0 rounded-none rounded-t p-4 dark:data-[state=active]:bg-secondary data-[state=active]:bg-secondary focus-visible:border-none focus-visible:outline-none focus-visible:ring-0"
+          className="border-border border border-b-0 rounded-none rounded-t-md p-4 dark:data-[state=active]:bg-secondary data-[state=active]:bg-secondary focus-visible:border-none focus-visible:outline-none focus-visible:ring-0"
         >
           {e.text}
         </TabsTrigger>

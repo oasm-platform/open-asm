@@ -11,6 +11,7 @@ import { Target } from '../targets/entities/target.entity';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetAssetsIpDTO } from './dto/get-asset-ip.dto';
 import { Asset } from './entities/assets.entity';
+import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 
 @Injectable()
 export class AssetsService {
@@ -202,7 +203,7 @@ export class AssetsService {
   public async getAssetIp(
     query: GetAssetsQueryDto,
   ): Promise<GetManyBaseResponseDto<GetAssetsIpDTO>> {
-    const { limit, page, sortOrder } = query;
+    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
 
     const offset = (page - 1) * limit;
 
@@ -211,6 +212,7 @@ export class AssetsService {
       .addCommonTableExpression(
         `SELECT
         a.id AS asset_id,
+        a."targetId",
         jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'A') AS ip
     FROM assets a
     WHERE a."targetId" IS NOT NULL
@@ -219,6 +221,7 @@ export class AssetsService {
 
     SELECT
         a.id AS asset_id,
+        a."targetId",
         jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'AAAA') AS ip
     FROM assets a
     WHERE a."targetId" IS NOT NULL`,
@@ -227,12 +230,15 @@ export class AssetsService {
       .select('t.ip', 'ip')
       .addSelect('COUNT(DISTINCT t.asset_id)', 'assetCount')
       .from('cte', 't')
+      .leftJoin(WorkspaceTarget, 'wt', 'wt."targetId" = t."targetId"')
+      .where('wt.workspaceId = :workspaceId', { workspaceId })
       .groupBy('"ip"')
       .orderBy('"assetCount"', sortOrder);
 
     const total = (await queryBuilder.getRawMany()).length;
 
-    const result = await queryBuilder.limit(limit).offset(offset).getRawMany();
+    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+
     const list = result.map((item: GetAssetsIpDTO) => {
       const obj = new GetAssetsIpDTO();
       obj.assetCount = item.assetCount;

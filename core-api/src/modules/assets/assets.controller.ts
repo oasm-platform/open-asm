@@ -4,6 +4,7 @@ import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
+import { GetAssetsIpDTO } from './dto/get-asset-ip.dto';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -26,7 +27,7 @@ export class AssetsController {
     summary: 'Get IP asset',
     description: 'Retrieves a list of ip with number of assets.',
     response: {
-      serialization: GetAssetsResponseDto,
+      serialization: GetManyResponseDto(GetAssetsIpDTO),
     },
   })
   @Get('/ip')
