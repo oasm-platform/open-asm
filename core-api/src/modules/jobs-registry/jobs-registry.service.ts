@@ -253,6 +253,7 @@ export class JobsRegistryService {
     const { jobId, data } = dto;
 
     const job = await this.findJobForUpdate(workerId, jobId);
+
     if (!job) {
       throw new NotFoundException('Job not found');
     }

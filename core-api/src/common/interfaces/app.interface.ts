@@ -17,7 +17,7 @@ export interface UserContextPayload {
   name: string;
   email: string;
   emailVerified: boolean;
-  image: any;
+  image: string;
   createdAt: Date;
   updatedAt: Date;
   role: Role;

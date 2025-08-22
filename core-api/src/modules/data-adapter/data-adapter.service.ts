@@ -81,7 +81,7 @@ export class DataAdapterService {
   public async httpResponses({
     data,
     job,
-  }: DataAdapterInput<any>): Promise<InsertResult> {
+  }: DataAdapterInput<HttpResponse>): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
 
     await queryRunner.connect();
@@ -97,7 +97,7 @@ export class DataAdapterService {
           .execute();
       }
 
-      const result = await queryRunner.manager
+      await queryRunner.manager
         .createQueryBuilder()
         .insert()
         .into(HttpResponse)
@@ -109,7 +109,8 @@ export class DataAdapterService {
         .execute();
 
       await queryRunner.commitTransaction();
-      return result;
+
+      return;
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
@@ -126,8 +127,8 @@ export class DataAdapterService {
   public async portsScanner({
     data,
     job,
-  }: DataAdapterInput<number[]>): Promise<InsertResult> {
-    return this.dataSource
+  }: DataAdapterInput<number[]>): Promise<void> {
+    await this.dataSource
       .createQueryBuilder()
       .insert()
       .into(Port)
@@ -137,6 +138,8 @@ export class DataAdapterService {
         jobHistoryId: job.jobHistory.id,
       })
       .execute();
+
+    return;
   }
 
   /**
@@ -168,17 +171,19 @@ export class DataAdapterService {
    * @param data Data to sync
    * @returns
    */
-  public async syncData(data: DataAdapterInput<any>): Promise<any> {
+  public async syncData(
+    data: DataAdapterInput<Asset[] | HttpResponse | number[] | Vulnerability[]>,
+  ): Promise<void> {
     // Map of tool categories to their corresponding sync functions
     const syncFunctions = {
+      [ToolCategory.PORTS_SCANNER]: (data: DataAdapterInput<number[]>) =>
+        this.portsScanner(data),
       [ToolCategory.SUBDOMAINS]: (data: DataAdapterInput<Asset[]>) =>
         this.subdomains(data),
       [ToolCategory.HTTP_PROBE]: (data: DataAdapterInput<HttpResponse>) =>
         this.httpResponses(data),
       [ToolCategory.HTTP_SCRAPER]: (data: DataAdapterInput<HttpResponse>) =>
         this.httpResponses(data),
-      [ToolCategory.PORTS_SCANNER]: (data: DataAdapterInput<number[]>) =>
-        this.portsScanner(data),
       [ToolCategory.VULNERABILITIES]: (
         data: DataAdapterInput<Vulnerability[]>,
       ) => {
@@ -199,6 +204,8 @@ export class DataAdapterService {
     }
 
     // Call the appropriate sync function
-    return syncFunction(data);
+    await syncFunction(data as DataAdapterInput<any>);
+
+    return;
   }
 }
