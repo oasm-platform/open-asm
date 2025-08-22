@@ -142,7 +142,7 @@ export class JobsRegistryService {
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
-      const workerStep = this.toolsService.builtInTools.find(
+      const workerStep = builtInTools.find(
         (tool) => tool.category === job.category,
       );
 
@@ -258,9 +258,7 @@ export class JobsRegistryService {
       throw new NotFoundException('Job not found');
     }
 
-    const step = this.toolsService.builtInTools.find(
-      (tool) => tool.name === job.tool.name,
-    );
+    const step = builtInTools.find((tool) => tool.name === job.tool.name);
 
     if (!step) {
       throw new Error(`Worker step not found for worker: ${job.tool.name}`);

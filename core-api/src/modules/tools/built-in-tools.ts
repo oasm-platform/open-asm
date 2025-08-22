@@ -1,10 +1,13 @@
+/* eslint-disable */
+
 import type { DeepPartial } from 'better-auth/*';
 import { randomUUID } from 'crypto';
 import type { Severity } from 'src/common/enums/enum';
 import { ToolCategory } from 'src/common/enums/enum';
 import type { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import { Tool } from './entities/tools.entity';
 
-export const builtInTools: any[] = [
+export const builtInTools: Tool[] = [
   {
     name: 'subfinder',
     category: ToolCategory.SUBDOMAINS,
