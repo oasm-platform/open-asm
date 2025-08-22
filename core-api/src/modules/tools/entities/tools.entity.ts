@@ -54,7 +54,8 @@ export class Tool {
   @Column({ nullable: true })
   logoUrl?: string;
 
-  parser: (result: string) => any;
+  // @ApiProperty()
+  parser?: (result: string | undefined) => unknown;
 
   @ApiProperty()
   isInstalled?: boolean;

@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   forwardRef,
   Inject,
   Injectable,
@@ -10,8 +11,7 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory } from 'src/common/enums/enum';
-import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { JobStatus } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
@@ -43,7 +43,6 @@ export class JobsRegistryService {
   ) {}
   public async getManyJobs(
     query: GetManyBaseQueryParams,
-    userContextPayload: UserContextPayload,
   ): Promise<GetManyBaseResponseDto<Job>> {
     const { limit, page, sortOrder } = query;
     let { sortBy } = query;
@@ -263,19 +262,25 @@ export class JobsRegistryService {
     if (!step) {
       throw new Error(`Worker step not found for worker: ${job.tool.name}`);
     }
+
     const builtInStep = builtInTools.find(
       (tool) => tool.name === job.tool.name,
     );
 
-    // Save data to database
-    const _data = builtInStep?.parser(data.raw);
+    if (!builtInStep) {
+      throw new Error(`Worker step not found for worker: ${job.tool.name}`);
+    }
+
+    if (!data.raw && !builtInStep) {
+      throw new BadGatewayException('Raw data is required');
+    }
 
     await this.dataAdapterService.syncData({
-      data: _data,
+      data: builtInStep?.parser?.(data.raw),
       job,
     });
 
-    this.getNextStepForJob(job);
+    await this.getNextStepForJob(job);
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
@@ -286,12 +291,12 @@ export class JobsRegistryService {
     return { workerId, dto };
   }
 
-  private getNextStepForJob(job: Job) {
+  private async getNextStepForJob(job: Job) {
     const workflow = job.jobHistory.workflow;
     const currentTool = job.tool.name;
     const nextTool = workflow?.content.jobs[currentTool];
     if (nextTool) {
-      this.createJob({
+      await this.createJob({
         toolNames: nextTool,
         target: job.asset.target,
         workflow: job.jobHistory.workflow,
@@ -323,78 +328,5 @@ export class JobsRegistryService {
     status: JobStatus,
   ): Promise<void> {
     await this.repo.update(jobId, { status, completedAt: new Date() });
-  }
-
-  private async processStepResult(
-    step: any,
-    job: any,
-    data: any,
-  ): Promise<void> {
-    try {
-      await step.resultHandler({
-        dataSource: this.dataSource,
-        result: data?.raw,
-        job,
-      });
-    } catch (error) {
-      // Log error and potentially update job status to failed
-      console.error('Error processing step result:', error);
-
-      // If the job wasn't already marked as failed, mark it as failed now
-      if (job.status !== JobStatus.FAILED) {
-        await this.updateJobStatus(job.id, JobStatus.FAILED);
-      }
-
-      throw error;
-    }
-  }
-
-  /**
-   * Starts the next job in the queue by inserting it into the database.
-   *
-   * Starts the next job in the queue by inserting it into the database.
-   * Ignores any errors that might occur if the job already exists in the database.
-   * @param assets the assets to start the next job for
-   * @param currentWorkerName the name of the current worker
-   */
-  public async startNextJob({
-    assets,
-    jobHistory,
-    nextJob,
-  }: {
-    assets: Asset[];
-    jobHistory?: JobHistory;
-    nextJob: ToolCategory[];
-  }) {
-    if (!nextJob.length) {
-      return null;
-    }
-
-    if (!jobHistory) {
-      jobHistory = this.jobHistoryRepo.create({});
-      await this.jobHistoryRepo.save(jobHistory);
-    }
-
-    return Promise.all(
-      nextJob.map(async (nextWorkerHandleJob) => {
-        const tool =
-          await this.toolsService.getBuiltInByCategory(nextWorkerHandleJob);
-        this.repo
-          .createQueryBuilder()
-          .insert()
-          .values(
-            assets.map((i) => ({
-              asset: i,
-              category: nextWorkerHandleJob,
-              jobHistory,
-              tool: {
-                id: tool?.id,
-              },
-            })),
-          )
-          .orIgnore()
-          .execute();
-      }),
-    );
   }
 }
