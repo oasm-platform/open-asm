@@ -1,8 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { Public, UserContext } from 'src/common/decorators/app.decorator';
+import { Public } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
-import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   GetNextJobResponseDto,
@@ -24,11 +23,8 @@ export class JobsRegistryController {
     },
   })
   @Get('')
-  getManyJobs(
-    @Query() query: GetManyBaseQueryParams,
-    @UserContext() userContextPayload: UserContextPayload,
-  ) {
-    return this.jobsRegistryService.getManyJobs(query, userContextPayload);
+  getManyJobs(@Query() query: GetManyBaseQueryParams) {
+    return this.jobsRegistryService.getManyJobs(query);
   }
 
   @Doc({

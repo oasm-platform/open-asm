@@ -24,17 +24,17 @@ export class VulnerabilitiesService {
   ) {}
 
   /**
-   * Triggers a scan for a specific target by creating new jobs for relevant workers.
+   * Initiates a vulnerability scan for a given target.
+   * This method creates a job in the job registry to start the scanning process.
    *
    * @param targetId - The ID of the target to scan.
-   * @throws Error if the target is not found.
+   * @returns A message indicating the scan has started.
    */
   public async scan(targetId: string) {
-    this.jobRegistryService.createJob({
+    await this.jobRegistryService.createJob({
       toolNames: ['nuclei'],
       target: { id: targetId } as Target,
     });
-
     return { message: `Scanning target ${targetId}...` };
   }
 
@@ -48,7 +48,7 @@ export class VulnerabilitiesService {
   async getVulnerabilities(query: GetVulnerabilitiesQueryDto) {
     const { limit, page, sortOrder, targetIds, workspaceId, q } = query;
 
-    let { sortBy } = query;
+    const { sortBy } = query;
 
     const queryBuilder = this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')
@@ -138,8 +138,8 @@ export class VulnerabilitiesService {
     const result = await queryBuilder.getRawMany();
 
     // Convert the result to a map for easy lookup
-    const severityCounts = new Map<string, number>();
-    result.forEach((item) => {
+    const severityCounts = new Map<Severity, number>();
+    result.forEach((item: { severity: Severity; count: string }) => {
       severityCounts.set(item.severity, parseInt(item.count, 10));
     });
 

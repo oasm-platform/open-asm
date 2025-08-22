@@ -1,6 +1,6 @@
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
-import { Workspace } from './entities/workspace.entity';
+import type { Workspace } from './entities/workspace.entity';
 
 export function GetManyWorkspaceDoc() {
   Doc({

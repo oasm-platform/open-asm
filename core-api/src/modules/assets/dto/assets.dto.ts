@@ -46,7 +46,9 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsUUID(4, { each: true })
   @IsOptional()
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @Transform(
+    ({ value }) => (Array.isArray(value) ? value : [value]) as string[],
+  )
   targetIds?: string[];
 
   @ApiProperty({
@@ -54,7 +56,9 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @Transform(
+    ({ value }) => (Array.isArray(value) ? value : [value]) as string[],
+  )
   ports?: string[];
 
   @ApiProperty({
@@ -62,7 +66,9 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @Transform(
+    ({ value }) => (Array.isArray(value) ? value : [value]) as string[],
+  )
   techs?: string[];
 
   @ApiProperty({
@@ -70,6 +76,8 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @Transform(
+    ({ value }) => (Array.isArray(value) ? value : [value]) as string[],
+  )
   statusCodes?: string[];
 }

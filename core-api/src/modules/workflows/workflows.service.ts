@@ -55,7 +55,8 @@ export class WorkflowsService implements OnModuleInit {
    * @param obj Workflow object
    * @returns Normalized workflow object
    */
-  private normalizeOn(obj: any): any {
+
+  private normalizeOn(obj: Record<string, any>): Record<string, any> {
     if (!obj.on) return obj;
 
     for (const key of Object.keys(obj.on)) {
@@ -81,7 +82,7 @@ export class WorkflowsService implements OnModuleInit {
         try {
           const filePath = path.join(this.templatesPath, fileName);
           const fileContent = fs.readFileSync(filePath, 'utf8');
-          const parsed = yaml.load(fileContent);
+          const parsed = yaml.load(fileContent) as Record<string, any>;
 
           const normalized = this.normalizeOn(parsed);
 

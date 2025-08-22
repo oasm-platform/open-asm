@@ -161,7 +161,7 @@ export class AssetsService {
       reScanCount,
       lastDiscoveredAt: new Date(),
     });
-    await this.eventEmitter.emit('target.re_scan', target);
+    this.eventEmitter.emit('target.re_scan', target);
     return {
       message: 'Scan started',
     };
@@ -202,7 +202,7 @@ export class AssetsService {
   public async getAssetIp(
     query: GetAssetsQueryDto,
   ): Promise<GetManyBaseResponseDto<GetAssetsIpDTO>> {
-    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+    const { limit, page, sortOrder } = query;
 
     const offset = (page - 1) * limit;
 

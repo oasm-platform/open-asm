@@ -42,8 +42,6 @@ const HOOKS = [
   { metadataKey: AFTER_HOOK_KEY, hookType: 'after' as const },
 ];
 
-const isProd = process.env.NODE_ENV === 'production';
-
 /**
  * NestJS module that integrates the Auth library with NestJS applications.
  * Provides authentication middleware, hooks, and exception handling.

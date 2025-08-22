@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from '../assets/entities/assets.entity';
-import { TriggerWorkflowService } from '../workflows/templates/trigger-workflow.service';
+import { TriggerWorkflowService } from '../workflows/trigger-workflow.service';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { Target } from './entities/target.entity';
 import { WorkspaceTarget } from './entities/workspace-target.entity';

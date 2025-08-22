@@ -4,7 +4,6 @@ import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
-import { Asset } from './entities/assets.entity';
 
 @ApiTags('Assets')
 @Controller('assets')

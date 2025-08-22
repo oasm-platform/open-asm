@@ -23,7 +23,7 @@ export class Target extends BaseEntity {
       const hasProtocol = /^https?:\/\//.test(value);
       const url = new URL(hasProtocol ? value : `http://${value}`);
       return url.hostname;
-    } catch (err) {
+    } catch (_err) {
       return value;
     }
   })

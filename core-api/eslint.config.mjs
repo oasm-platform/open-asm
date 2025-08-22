@@ -24,12 +24,36 @@ export default tseslint.config(
   },
   {
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'warn',
+      // Safety
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-      '@typescript-eslint/interface-username-prefix': 'off',
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-    },
-  },
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/restrict-template-expressions': 'error',
+
+      // NestJS / OOP
+      'no-console': 'error',
+      '@typescript-eslint/member-ordering': 'off',
+
+      // Clean code
+      'eqeqeq': ['error', 'always'],
+      'complexity': ['warn', 10],
+      'max-lines-per-function': ['warn', 500],
+      'max-params': ['warn', 20],
+      'max-statements': ['warn', 20],
+      'no-magic-numbers': ['warn', { ignore: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100, 200, 201, 400, 401, 500] }],
+
+
+      // Style
+      'semi': ['error', 'always'],
+      'quotes': ['error', 'single', 'avoid-escape'],
+      'object-curly-spacing': ['error', 'always'],
+
+      // Security
+      'no-eval': 'error',
+      'no-new-func': 'error',
+    }
+  }
+
 );

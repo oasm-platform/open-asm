@@ -5,7 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LIMIT_WORKSPACE_CREATE } from 'src/common/constants/app.constants';
+import {
+  API_KEY_LENGTH,
+  LIMIT_WORKSPACE_CREATE,
+} from 'src/common/constants/app.constants';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
@@ -58,7 +61,7 @@ export class WorkspacesService {
       name: dto.name,
       description: dto?.description,
       owner: { id },
-      apiKey: generateToken(32),
+      apiKey: generateToken(API_KEY_LENGTH),
     });
 
     await this.workspaceMembersRepository.save({
@@ -98,6 +101,70 @@ export class WorkspacesService {
     });
 
     return getManyResponse(query, data, total);
+  }
+
+  /**
+   * Updates a workspace's details, but only if the requesting user is the owner of the workspace.
+   *
+   * @param id - The ID of the workspace to be updated.
+   * @param dto - The data transfer object containing the updated details of the workspace.
+   * @param userContext - The user's context data, which includes the user's ID.
+   * @throws BadRequestException if the workspace is not found or the user is not the owner.
+   * @returns A response indicating the workspace was successfully updated.
+   */
+  public async updateWorkspace(
+    id: string,
+    dto: UpdateWorkspaceDto,
+    userContext: UserContextPayload,
+  ) {
+    await this.getWorkspaceByIdAndOwner(id, userContext);
+
+    await this.repo.update({ id: id }, { ...dto });
+
+    return { message: 'Workspace updated successfully' };
+  }
+
+  /**
+   * Deletes a workspace by its ID, but only if the requesting user is the owner.
+   * The workspace is soft deleted, meaning it is not actually removed from the
+   * database, but its `deletedAt` field is set to the current timestamp.
+   *
+   * @param id - The ID of the workspace to be deleted.
+   * @param userContext - The user's context data, which includes the user's ID.
+   * @throws ForbiddenException if the workspace is not found or the user is not the owner.
+   * @returns A response indicating the workspace was successfully deleted.
+   */
+  public async deleteWorkspace(
+    id: string,
+    userContext: UserContextPayload,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.getWorkspaceByIdAndOwner(id, userContext);
+
+    await this.repo.softDelete({ id });
+
+    return {
+      message: 'Workspace deleted successfully',
+    };
+  }
+
+  /**
+   * Regenerates the API key for a user.
+   * @param userId The ID of the user to regenerate the API key for.
+   * @returns The new API key for the user.
+   */
+  public async rotateApiKey(
+    workspaceId: string,
+    userContext: UserContextPayload,
+  ): Promise<GetApiKeyResponseDto> {
+    const workspace = await this.getWorkspaceByIdAndOwner(
+      workspaceId,
+      userContext,
+    );
+    workspace.apiKey = generateToken(API_KEY_LENGTH);
+    await this.repo.save(workspace);
+    return {
+      apiKey: workspace.apiKey,
+    };
   }
 
   /**
@@ -169,69 +236,5 @@ export class WorkspacesService {
     }
 
     return workspaceMember;
-  }
-
-  /**
-   * Updates a workspace's details, but only if the requesting user is the owner of the workspace.
-   *
-   * @param id - The ID of the workspace to be updated.
-   * @param dto - The data transfer object containing the updated details of the workspace.
-   * @param userContext - The user's context data, which includes the user's ID.
-   * @throws BadRequestException if the workspace is not found or the user is not the owner.
-   * @returns A response indicating the workspace was successfully updated.
-   */
-  public async updateWorkspace(
-    id: string,
-    dto: UpdateWorkspaceDto,
-    userContext: UserContextPayload,
-  ) {
-    await this.getWorkspaceByIdAndOwner(id, userContext);
-
-    await this.repo.update({ id: id }, { ...dto });
-
-    return { message: 'Workspace updated successfully' };
-  }
-
-  /**
-   * Deletes a workspace by its ID, but only if the requesting user is the owner.
-   * The workspace is soft deleted, meaning it is not actually removed from the
-   * database, but its `deletedAt` field is set to the current timestamp.
-   *
-   * @param id - The ID of the workspace to be deleted.
-   * @param userContext - The user's context data, which includes the user's ID.
-   * @throws ForbiddenException if the workspace is not found or the user is not the owner.
-   * @returns A response indicating the workspace was successfully deleted.
-   */
-  public async deleteWorkspace(
-    id: string,
-    userContext: UserContextPayload,
-  ): Promise<DefaultMessageResponseDto> {
-    await this.getWorkspaceByIdAndOwner(id, userContext);
-
-    await this.repo.softDelete({ id });
-
-    return {
-      message: 'Workspace deleted successfully',
-    };
-  }
-
-  /**
-   * Regenerates the API key for a user.
-   * @param userId The ID of the user to regenerate the API key for.
-   * @returns The new API key for the user.
-   */
-  public async rotateApiKey(
-    workspaceId: string,
-    userContext: UserContextPayload,
-  ): Promise<GetApiKeyResponseDto> {
-    const workspace = await this.getWorkspaceByIdAndOwner(
-      workspaceId,
-      userContext,
-    );
-    workspace.apiKey = generateToken(32);
-    await this.repo.save(workspace);
-    return {
-      apiKey: workspace.apiKey,
-    };
   }
 }

@@ -118,7 +118,7 @@ export class TargetsService {
         value,
       });
 
-      await this.eventEmitter.emit('target.create', target);
+      this.eventEmitter.emit('target.create', target);
     }
     // If the target exists, check if it is already associated with the workspace
     else {

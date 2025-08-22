@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
-import { ResultHandler } from 'src/common/interfaces/app.interface';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
 import {
@@ -55,10 +54,8 @@ export class Tool {
   @Column({ nullable: true })
   logoUrl?: string;
 
-  /**
-   * @deprecated Use parser: () => void instead
-   */
-  resultHandler: ({ dataSource, result, job }: ResultHandler) => Promise<void>;
+  // @ApiProperty()
+  parser?: (result: string | undefined) => unknown;
 
   @ApiProperty()
   isInstalled?: boolean;

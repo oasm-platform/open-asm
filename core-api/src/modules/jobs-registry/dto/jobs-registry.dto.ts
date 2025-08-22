@@ -30,7 +30,7 @@ export class UpdateResultDto {
   @IsObject()
   data: {
     error?: boolean;
-    raw?: any;
+    raw?: string;
   };
 }
 
