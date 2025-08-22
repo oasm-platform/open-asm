@@ -46,7 +46,7 @@ export default tseslint.config(
 
       // Style
       'semi': ['error', 'always'],
-      'quotes': ['error', 'single'],
+      'quotes': ['error', 'single', 'avoid-escape'],
       'object-curly-spacing': ['error', 'always'],
 
       // Security

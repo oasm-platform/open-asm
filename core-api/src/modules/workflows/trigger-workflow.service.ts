@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JobsRegistryService } from 'src/modules/jobs-registry/jobs-registry.service';
 import { Target } from 'src/modules/targets/entities/target.entity';
 import { DataSource } from 'typeorm';
-import { Workflow } from '../entities/workflow.entity';
+import { Workflow } from './entities/workflow.entity';
 
 @Injectable()
 export class TriggerWorkflowService implements OnModuleInit {
@@ -24,7 +24,7 @@ export class TriggerWorkflowService implements OnModuleInit {
             await this.jobRegistryService.createJob({
               toolNames: firstJobs,
               target: payload,
-              workflow,
+              workflow: workflow,
             });
           }
         })
@@ -46,7 +46,7 @@ export class TriggerWorkflowService implements OnModuleInit {
     return this.dataSource
       .getRepository(Workflow)
       .createQueryBuilder('workflow')
-      .where('workflow.content -> \'on\' -> :target @> :action', {
+      .where("workflow.content -> 'on' -> :target @> :action", {
         target,
         action: JSON.stringify([action]),
       })

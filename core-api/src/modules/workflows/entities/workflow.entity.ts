@@ -2,6 +2,16 @@ import { BaseEntity } from 'src/common/entities/base.entity';
 import { JobHistory } from 'src/modules/jobs-registry/entities/job-history.entity';
 import { Column, Entity, Index, OneToMany } from 'typeorm';
 
+export interface WorkflowContent {
+  on: On;
+  jobs: Record<string, string[]>;
+  name: string;
+}
+
+export interface On {
+  target: string[];
+}
+
 @Entity('workflows')
 @Index(['filePath'], { unique: true })
 export class Workflow extends BaseEntity {
@@ -9,7 +19,7 @@ export class Workflow extends BaseEntity {
   name: string;
 
   @Column({ type: 'jsonb' })
-  content: Record<string, any>;
+  content: WorkflowContent;
 
   @Column()
   filePath: string;
