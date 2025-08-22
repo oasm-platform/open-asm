@@ -138,7 +138,7 @@ export class ToolsService implements OnModuleInit {
         name: 'ASC',
       },
     });
-    return getManyResponse(query, data, total);
+    return getManyResponse({ query, data, total });
   }
 
   async getInstalledTools(dto: GetInstalledToolsDto) {

@@ -51,7 +51,7 @@ const ListWorkers = () => {
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                     <Loader2Icon className="h-6 w-6 text-muted-foreground animate-spin" />
                 </div>
-                <h3 className="mt-4 text-lg font-medium text-muted-foreground">Pending connect workers...</h3>
+                <h3 className="m-4 text-lg font-medium text-muted-foreground">Pending connect workers...</h3>
                 <ConnectWorker />
             </div>
         )

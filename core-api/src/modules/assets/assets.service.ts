@@ -107,7 +107,7 @@ export class AssetsService {
       return asset;
     });
 
-    return getManyResponse(query, assets, total);
+    return getManyResponse({ query, data: assets, total });
   }
 
   /**
@@ -240,6 +240,6 @@ export class AssetsService {
       return obj;
     });
 
-    return getManyResponse(query, list, total);
+    return getManyResponse({ query, data: list, total });
   }
 }

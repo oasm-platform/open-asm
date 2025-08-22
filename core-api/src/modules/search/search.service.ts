@@ -142,7 +142,7 @@ export class SearchService {
 
     const [searchHistory, total] = await queryBuilder.getManyAndCount();
 
-    return getManyResponse(query, searchHistory, total);
+    return getManyResponse({ query, data: searchHistory, total });
   }
 
   /**

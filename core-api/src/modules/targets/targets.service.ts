@@ -214,7 +214,7 @@ export class TargetsService {
 
     const targets = await queryBuilder.limit(limit).offset(offset).getRawMany();
 
-    return getManyResponse(query, targets, total);
+    return getManyResponse({ query, data: targets, total });
   }
 
   /**

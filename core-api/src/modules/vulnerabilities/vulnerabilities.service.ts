@@ -96,7 +96,7 @@ export class VulnerabilitiesService {
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
 
-    return getManyResponse(query, vulnerabilities, total);
+    return getManyResponse({ query, data: vulnerabilities, total });
   }
 
   /**

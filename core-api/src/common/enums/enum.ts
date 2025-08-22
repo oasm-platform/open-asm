@@ -29,6 +29,11 @@ export enum WorkerType {
   PLUGIN = 'plugin',
 }
 
+export enum WorkerScope {
+  CLOUD = 'cloud',
+  WORKSPACE = 'workspace',
+}
+
 export enum CronSchedule {
   WEEKLY = '0 0 * * 0',
   BI_WEEKLY = '0 0 */14 * *',

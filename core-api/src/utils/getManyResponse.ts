@@ -12,12 +12,27 @@ import {
  * @param data - The array of entities that were fetched.
  * @param total - The total number of entities that match the query.
  */
-export function getManyResponse<T>(
-  query: GetManyBaseQueryParams,
-  data: T[],
-  total: number,
-): GetManyBaseResponseDto<T> {
+export function getManyResponse<T>({
+  query,
+  data,
+  total,
+  ignoreFields,
+}: {
+  query: GetManyBaseQueryParams;
+  data: T[];
+  total: number;
+  ignoreFields?: (keyof T)[];
+}): GetManyBaseResponseDto<T> {
   const { limit, page } = query;
+  if (ignoreFields && ignoreFields?.length > 0) {
+    data = data.map((item) => {
+      const newItem = { ...item };
+      ignoreFields.forEach((field) => {
+        delete newItem[field];
+      });
+      return newItem;
+    });
+  }
   return {
     data,
     total: +total,

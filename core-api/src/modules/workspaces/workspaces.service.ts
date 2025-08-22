@@ -100,7 +100,7 @@ export class WorkspacesService {
       },
     });
 
-    return getManyResponse(query, data, total);
+    return getManyResponse({ query, data, total });
   }
 
   /**

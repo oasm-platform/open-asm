@@ -58,7 +58,7 @@ export class JobsRegistryService {
       },
     });
 
-    return getManyResponse<Job>(query, data, total);
+    return getManyResponse<Job>({ query, data, total });
   }
 
   /**
@@ -198,7 +198,7 @@ export class JobsRegistryService {
       .skip((page - 1) * limit)
       .take(limit);
     const [data, total] = await qb.getManyAndCount();
-    return getManyResponse(query, data, total);
+    return getManyResponse({ query, data, total });
   }
   /**
    * Retrieves a paginated list of jobs associated with a specified target ID.
@@ -237,7 +237,7 @@ export class JobsRegistryService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    return getManyResponse(query, data, total);
+    return getManyResponse({ query, data, total });
   }
 
   /**

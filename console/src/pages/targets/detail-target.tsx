@@ -136,7 +136,7 @@ export function DetailTarget() {
           )}
         </div>
         <TabsContent value="assets">
-          {animation && tab === "assets" &&
+          {animation &&
             (target.status === JobStatus.in_progress ||
               target.status === JobStatus.pending) && (
               <AssetsDiscovering targetId={target.id} />
