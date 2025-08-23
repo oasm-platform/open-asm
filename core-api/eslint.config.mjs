@@ -46,13 +46,16 @@ export default tseslint.config(
 
       // Style
       'semi': ['error', 'always'],
-      'quotes': ['error', 'single', 'avoid-escape'],
+      'quotes': [
+        'error',
+        'single',
+        { avoidEscape: true, allowTemplateLiterals: true },
+      ],
       'object-curly-spacing': ['error', 'always'],
 
       // Security
       'no-eval': 'error',
       'no-new-func': 'error',
-    }
-  }
-
+    },
+  },
 );

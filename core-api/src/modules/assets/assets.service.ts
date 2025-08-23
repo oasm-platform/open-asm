@@ -8,10 +8,11 @@ import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';
-import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
-import { GetAssetsIpDTO } from './dto/get-asset-ip.dto';
-import { Asset } from './entities/assets.entity';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
+import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
+import { GetIpAssetsDTO } from './dto/getIpAssets.dto';
+import { Asset } from './entities/assets.entity';
+import { GetPortAssetsDTO } from './dto/getPortAssets.dto';
 
 @Injectable()
 export class AssetsService {
@@ -202,9 +203,9 @@ export class AssetsService {
    * @returns A promise that resolves to the list of ip.
    *
    */
-  public async getAssetIp(
+  public async getIpAssets(
     query: GetAssetsQueryDto,
-  ): Promise<GetManyBaseResponseDto<GetAssetsIpDTO>> {
+  ): Promise<GetManyBaseResponseDto<GetIpAssetsDTO>> {
     const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
 
     const offset = (page - 1) * limit;
@@ -237,17 +238,77 @@ export class AssetsService {
       .groupBy('"ip"')
       .orderBy('"assetCount"', sortOrder);
 
+    if (value && value.length > 0)
+      queryBuilder.andWhere('t.ip ILIKE :value', {
+        value: `%${value}%`,
+      });
+
+    if (targetIds && targetIds.length > 0)
+      queryBuilder.andWhere('t."targetId" = ANY(:targetId)', {
+        targetId: targetIds,
+      });
+
     const total = (await queryBuilder.getRawMany()).length;
 
     const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
 
-    const list = result.map((item: GetAssetsIpDTO) => {
-      const obj = new GetAssetsIpDTO();
+    const list = result.map((item: GetIpAssetsDTO) => {
+      const obj = new GetIpAssetsDTO();
       obj.assetCount = item.assetCount;
       obj.ip = item.ip;
       return obj;
     });
 
     return getManyResponse({ query, data: list, total });
+  }
+
+  /**
+   * Retrieves a list of Port with number of asset
+   *
+   * @returns A promise that resolves to the list of port.
+   *
+   */
+  public async getPortAssets(
+    query: GetAssetsQueryDto,
+  ): Promise<GetManyBaseResponseDto<GetPortAssetsDTO>> {
+    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+
+    const offset = (page - 1) * limit;
+
+    const queryBuilder = this.assetRepo
+      .createQueryBuilder('assets')
+      .leftJoin('assets.httpResponses', 'httpResponses')
+      .leftJoin('assets.target', 'targets')
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .select(`"httpResponses"."tls"::jsonb -> 'port'`, 'port')
+      .addSelect('COUNT(assets.id)', 'assetCount')
+      .distinct(true)
+      .where(`"httpResponses"."tls"::jsonb -> 'port' is not null`)
+      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .groupBy(`"httpResponses"."tls"::jsonb -> 'port'`)
+      .orderBy('"assetCount"', sortOrder);
+
+    if (value && value.length > 0)
+      queryBuilder.andWhere('t.ip ILIKE :value', {
+        value: `%${value}%`,
+      });
+
+    if (targetIds && targetIds.length > 0)
+      queryBuilder.andWhere('t."targetId" = ANY(:targetId)', {
+        targetId: targetIds,
+      });
+
+    const total = (await queryBuilder.getRawMany()).length;
+
+    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+
+    const list = result.map((item: GetPortAssetsDTO) => {
+      const obj = new GetPortAssetsDTO();
+      obj.assetCount = item.assetCount;
+      obj.port = item.port;
+      return obj;
+    });
+
+    return getManyResponse(query, list, total);
   }
 }
