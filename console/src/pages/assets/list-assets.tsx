@@ -5,11 +5,11 @@ import { Tabs } from "@/components/ui/tabs";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import {
-  useAssetsControllerGetAssetIp,
   useAssetsControllerGetAssetsInWorkspace,
+  useAssetsControllerGetIpAssets,
 } from "@/services/apis/gen/queries";
 import { TabsContent } from "@radix-ui/react-tabs";
-import { ChevronDown, MapPinHouse } from "lucide-react";
+import { MapPinHouse } from "lucide-react";
 import { useState } from "react";
 import AssetDetailSheet from "./asset-detail-sheet";
 import FilterForm from "./components/filter-form";
@@ -60,8 +60,14 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
     },
   );
 
-  const { data: ipAssetData } = useAssetsControllerGetAssetIp({
+  const { data: ipAssetData } = useAssetsControllerGetIpAssets({
     workspaceId: selectedWorkspace ?? "",
+    targetIds: targetId ? [targetId] : undefined,
+    value: filter,
+    limit: pageSize,
+    page,
+    sortBy,
+    sortOrder,
   });
 
   const targets = data?.data ?? [];
@@ -75,8 +81,16 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
       text: "All Services",
     },
     {
+      value: "tech",
+      text: "Technologies",
+    },
+    {
       value: "ip",
       text: "IPs",
+    },
+    {
+      value: "port",
+      text: "Ports",
     },
   ];
 
@@ -112,17 +126,19 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
             <TableBody>
               {ipAssetData &&
                 ipAssetData.data.map((e) => (
-                  <TableRow className="h-15 flex items-center hover:cursor-pointer p-5 hover:bg-neutral-900 justify-between">
-                    <div className="flex items-center gap-4">
-                      <MapPinHouse className="size-4" />
-                      <span>{e.ip}</span>
-                      <Badge className="text-foreground bg-neutral-950 rounded border-neutral-600">
-                        {e.assetCount} services
-                      </Badge>
-                    </div>
-                    <div>
-                      <ChevronDown className="size-4" />
-                    </div>
+                  <TableRow
+                    className="h-15 flex items-center hover:cursor-pointer p-5 hover:bg-neutral-900 justify-between"
+                    key={e.ip}
+                  >
+                    <>
+                      <div className="flex items-center gap-4">
+                        <MapPinHouse className="size-4" />
+                        <span>{e.ip}</span>
+                        <Badge className="text-foreground bg-neutral-950 rounded border-neutral-600">
+                          {e.assetCount} services
+                        </Badge>
+                      </div>
+                    </>
                   </TableRow>
                 ))}
             </TableBody>

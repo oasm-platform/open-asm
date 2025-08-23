@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class GetAssetsIpDTO {
+export class GetPortAssetsDTO {
   @ApiProperty()
-  ip: string;
+  port: string;
   @ApiProperty()
   assetCount: number;
 }
