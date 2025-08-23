@@ -9,10 +9,7 @@ import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { WORKER_TIMEOUT } from 'src/common/constants/app.constants';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from 'src/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus } from 'src/common/enums/enum';
 import { generateToken } from 'src/utils/genToken';
 import { getManyResponse } from 'src/utils/getManyResponse';
@@ -20,7 +17,11 @@ import { DataSource, LessThan, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
-import { WorkerAliveDto, WorkerJoinDto } from './dto/workers.dto';
+import {
+  GetManyWorkersDto,
+  WorkerAliveDto,
+  WorkerJoinDto,
+} from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 
 @Injectable()
@@ -132,36 +133,53 @@ export class WorkersService {
    *          along with total count and pagination information.
    */
   public async getWorkers(
-    query: GetManyBaseQueryParams,
+    query: GetManyWorkersDto,
   ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
-    const { page, limit, sortOrder } = query;
+    const { page, limit, sortOrder, workspaceId } = query;
     let { sortBy } = query;
     if (!sortBy) {
       sortBy = '"createdAt"';
     }
 
-    const result = await this.repo
+    const queryBuilder = this.repo
       .createQueryBuilder('w')
       .select('w')
       .addSelect(
         `(SELECT COUNT(j.id) FROM jobs j WHERE j."workerId"::uuid = w.id::uuid and j.status = '${JobStatus.IN_PROGRESS}')`,
         'currentJobsCount',
       )
+      .where('1=1');
+
+    // Add workspace filter if workspaceId is provided
+    if (workspaceId) {
+      queryBuilder.andWhere('w."workspaceId" = :workspaceId', { workspaceId });
+    }
+
+    const [workers, total] = await queryBuilder
       .orderBy(`w.${sortBy.replace(/[^a-zA-Z0-9_]/g, '')}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit)
-      .getRawAndEntities();
+      .getManyAndCount();
 
-    const workers = result.entities.map((entity, index) => ({
-      ...entity,
-      currentJobsCount: result.raw[index]?.currentJobsCount,
-    }));
-
-    const total = workers.length;
+    // Get current jobs count for each worker
+    const workersWithJobCount = await Promise.all(
+      workers.map(async (worker) => {
+        const count = await this.jobsRegistryService['repo'].count({
+          where: {
+            workerId: worker.id,
+            status: JobStatus.IN_PROGRESS,
+          },
+        });
+        return {
+          ...worker,
+          currentJobsCount: count,
+        };
+      }),
+    );
 
     return getManyResponse<WorkerInstance>({
       query,
-      data: workers,
+      data: workersWithJobCount,
       total,
       ignoreFields: ['token'],
     });

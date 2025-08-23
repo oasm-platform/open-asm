@@ -95,7 +95,7 @@ export class Tool {
           token: Tool.token!,
         });
         if (this.isAliveError) {
-          logger.success(`RECONNECTED ✅ WorkerId: ${Tool.workerId}`);
+          logger.success(`RECONNECTED ✅ WorkerId: ${Tool.workerId?.split('-')[0]}`);
           this.isAliveError = false;
         }
       } catch (error: any) {
@@ -123,7 +123,7 @@ export class Tool {
         });
         Tool.workerId = worker.id;
         Tool.token = worker.token;
-        logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId}`);
+        logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId?.split('-')[0]}`);
 
         // Wait until Tool.workerId is set (by SSE handler)
         await this.waitUntil(() => !!Tool.workerId, 1000);
@@ -247,7 +247,7 @@ export class Tool {
       logger
         .color("green")
         .log(
-          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId} - Time: ${executionTime}ms`
+          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split('-')[0]} - Time: ${executionTime}ms`
         );
     } catch (e) {
       logger.error(`Failed to handle job ${job.jobId}:`, e);

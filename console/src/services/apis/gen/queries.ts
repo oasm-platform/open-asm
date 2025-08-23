@@ -230,6 +230,7 @@ export type WorkerInstance = {
   token: string;
   currentJobsCount: number;
   type: string;
+  scope: string;
 };
 
 export type WorkerJoinDto = {
@@ -360,8 +361,9 @@ export type Vulnerability = {
   host: string;
   port: string;
   cvssMetric: string;
+  cvssScore: number;
   cveId: string;
-  cweId: string;
+  cweId: string[];
   extractorName: string;
   extractedResults: string[];
   tool: Tool;
@@ -462,6 +464,7 @@ export type WorkersControllerGetWorkersParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  workspaceId?: string;
 };
 
 export type SearchControllerSearchAssetsTargetsParams = {
