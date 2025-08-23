@@ -1,19 +1,33 @@
 version: "3"
 
+vars:
+  replicas: "{{.replicas | default 1}}"
+  apiKey: "{{.apiKey | default .API_KEY}}"
+  maxJobs: "{{.maxJobs | default .MAX_JOBS}}"
+
 tasks:
   dev:
+    env:
+      API_KEY: "{{.apiKey}}"
+      MAX_JOBS: "{{.maxJobs}}"
     cmds:
       - |
-        for i in $(seq 1 5); do
+        echo "API = $API"
+        echo "API_KEY = $API_KEY"
+        echo "MAX_JOBS = $MAX_JOBS"
+        echo "Replicas = {{.replicas}}"
+
+        for i in $(seq 1 {{.replicas}}); do
           echo "Starting worker $i"
           bun --watch index.ts &
         done
         wait
     silent: false
-  
+
   install:
     cmds:
       - bun install
+
   tools:
     cmds:
       - go install github.com/projectdiscovery/httpx/cmd/httpx@v1.7.1

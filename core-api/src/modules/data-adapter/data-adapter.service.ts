@@ -172,7 +172,9 @@ export class DataAdapterService {
    * @returns
    */
   public async syncData(
-    data: DataAdapterInput<Asset[] | HttpResponse | number[] | Vulnerability[]>,
+    data: DataAdapterInput<
+      Asset[] | HttpResponse | number[] | Vulnerability[] | undefined
+    >,
   ): Promise<void> {
     // Map of tool categories to their corresponding sync functions
     const syncFunctions = {

@@ -1,5 +1,5 @@
 version: "3"
-dotenv: ["core-api/.env"]
+dotenv: ["core-api/.env", "worker/.env", "console/.env"]
 includes:
   api:
     taskfile: ./core-api/taskfile.yml

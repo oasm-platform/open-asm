@@ -1,6 +1,5 @@
 // src/components/AppBar.tsx
 
-import { ConnectWorker } from "@/components/ui/connect-worker";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import ThemeModeSwitcher from "@/components/ui/theme-mode-switcher";
 import { Separator } from "@radix-ui/react-separator";
@@ -21,7 +20,6 @@ export default function AppBar({ children }: { children: JSX.Element }) {
             className="mr-2 data-[orientation=vertical]:h-4"
           />
         </div>
-        <ConnectWorker />
         <div className="w-full flex justify-center">
           <SearchForm className="w-1/2" />
         </div>

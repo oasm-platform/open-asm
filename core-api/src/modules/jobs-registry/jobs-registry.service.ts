@@ -3,6 +3,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,6 +21,7 @@ import { Target } from '../targets/entities/target.entity';
 import { builtInTools } from '../tools/built-in-tools';
 import { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
+import { WorkerInstance } from '../workers/entities/worker.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import {
   GetManyJobsQueryParams,
@@ -58,7 +60,7 @@ export class JobsRegistryService {
       },
     });
 
-    return getManyResponse<Job>(query, data, total);
+    return getManyResponse<Job>({ query, data, total });
   }
 
   /**
@@ -123,10 +125,29 @@ export class JobsRegistryService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      const worker = await queryRunner.manager
+        .getRepository(WorkerInstance)
+        .findOne({
+          where: {
+            id: workerId,
+          },
+          relations: ['workspace'],
+        });
+
+      if (!worker) {
+        throw new NotFoundException('Worker not found');
+      }
+
       const job = await queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
+        .innerJoin('asset.target', 'target')
+        .leftJoin('target.workspaceTargets', 'workspace_targets')
+        .leftJoin('workspace_targets.workspace', 'workspaces')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
+        .andWhere('workspaces.id = :workspaceId', {
+          workspaceId: worker.workspace.id,
+        })
         .orderBy('jobs.createdAt', 'ASC')
         .setLock('pessimistic_write')
         .limit(1)
@@ -158,9 +179,10 @@ export class JobsRegistryService {
         category: job.category,
         command: workerStep.command,
       };
-    } catch (err) {
+    } catch (error) {
+      Logger.error('Error in getNextJob', error);
       await queryRunner.rollbackTransaction();
-      throw err;
+      return null;
     } finally {
       await queryRunner.release();
     }
@@ -198,7 +220,7 @@ export class JobsRegistryService {
       .skip((page - 1) * limit)
       .take(limit);
     const [data, total] = await qb.getManyAndCount();
-    return getManyResponse(query, data, total);
+    return getManyResponse({ query, data, total });
   }
   /**
    * Retrieves a paginated list of jobs associated with a specified target ID.
@@ -237,7 +259,7 @@ export class JobsRegistryService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    return getManyResponse(query, data, total);
+    return getManyResponse({ query, data, total });
   }
 
   /**
@@ -277,7 +299,7 @@ export class JobsRegistryService {
     }
 
     await this.dataAdapterService.syncData({
-      data: builtInStep?.parser?.(data.raw) as any,
+      data: builtInStep?.parser?.(data.raw),
       job,
     });
 

@@ -1,13 +1,16 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
-import { WorkerAliveDto, WorkerJoinDto } from './dto/workers.dto';
+import {
+  GetManyWorkersDto,
+  WorkerAliveDto,
+  WorkerJoinDto,
+} from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Workers')
 @Controller('workers')
@@ -47,7 +50,7 @@ export class WorkersController {
     },
   })
   @Get()
-  getWorkers(@Query() query: GetManyBaseQueryParams) {
+  getWorkers(@Query() query: GetManyWorkersDto) {
     return this.workersService.getWorkers(query);
   }
 }

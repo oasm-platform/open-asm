@@ -95,7 +95,7 @@ export class Tool {
           token: Tool.token!,
         });
         if (this.isAliveError) {
-          logger.success(`RECONNECTED ✅ WorkerId: ${Tool.workerId}`);
+          logger.success(`RECONNECTED ✅ WorkerId: ${Tool.workerId?.split('-')[0]}`);
           this.isAliveError = false;
         }
       } catch (error: any) {
@@ -123,16 +123,20 @@ export class Tool {
         });
         Tool.workerId = worker.id;
         Tool.token = worker.token;
-        logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId}`);
+        logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId?.split('-')[0]}`);
 
         // Wait until Tool.workerId is set (by SSE handler)
         await this.waitUntil(() => !!Tool.workerId, 1000);
         return; // success, exit the method
-      } catch (e) {
+      } catch (e: any) {
+        // If we get a 401 error, don't retry - just throw an API key invalid error
+        if (e?.response?.status === 401) {
+          logger.error("API key is invalid. Cannot connect to core.");
+        }
+
         attempt++;
         logger.error(
-          `Cannot connect to core ${process.env.API} (attempt ${attempt}):`,
-          e
+          `Cannot connect to core ${process.env.API} (attempt ${attempt}):`
         );
         await this.sleep(1000 * attempt); // exponential backoff delay
       }
@@ -243,7 +247,7 @@ export class Tool {
       logger
         .color("green")
         .log(
-          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId} - Time: ${executionTime}ms`
+          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split('-')[0]} - Time: ${executionTime}ms`
         );
     } catch (e) {
       logger.error(`Failed to handle job ${job.jobId}:`, e);

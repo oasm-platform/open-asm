@@ -4,6 +4,7 @@ import { BaseEntity } from 'src/common/entities/base.entity';
 import { User } from 'src/modules/auth/entities/user.entity';
 import { WorkspaceTarget } from 'src/modules/targets/entities/workspace-target.entity';
 import { WorkspaceTool } from 'src/modules/tools/entities/workspace_tools.entity';
+import { WorkerInstance } from 'src/modules/workers/entities/worker.entity';
 import {
   Column,
   DeleteDateColumn,
@@ -58,4 +59,7 @@ export class Workspace extends BaseEntity {
   })
   @Column('text', { nullable: true })
   apiKey?: string;
+
+  @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.workspace)
+  workers: WorkerInstance[];
 }

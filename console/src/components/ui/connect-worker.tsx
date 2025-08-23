@@ -21,7 +21,9 @@ export function ConnectWorker() {
     const apiKey = workspaces[workspaces.findIndex((workspace) => workspace.id === selectedWorkspace)]?.apiKey;
     const [open, setOpen] = useState(false);
 
-    const rawCommand = `docker run -d --name open-asm-worker -e API_KEY=${apiKey} -e API=${import.meta.env.VITE_API_URL} -e MAX_JOBS=10 open-asm-worker:latest`;
+    const rawCommand = import.meta.env.PROD
+        ? `docker run -d --name open-asm-worker -e API_KEY=${apiKey} -e API=${window.location.origin} -e MAX_JOBS=10 open-asm-worker:latest`
+        : `task worker:dev replicas=1 maxJobs=10 apiKey=${apiKey}`;
 
     const { mutate } = useWorkspacesControllerRotateApiKey({
         mutation: {
@@ -34,17 +36,17 @@ export function ConnectWorker() {
             }
         }
     })
-    if (import.meta.env.DEV) return null;
+    // if (import.meta.env.DEV) return null;
 
     const handleCopyCommand = async () => {
         await navigator.clipboard.writeText(rawCommand);
         toast.success("Command copied to clipboard");
     };
 
-    const handleCopyApiKey = async () => {
-        await navigator.clipboard.writeText(apiKey || "");
-        toast.success("API key copied to clipboard");
-    };
+    // const handleCopyApiKey = async () => {
+    //     await navigator.clipboard.writeText(apiKey || "");
+    //     toast.success("API key copied to clipboard");
+    // };
 
     if (!selectedWorkspace) return null;
     return (
@@ -63,7 +65,7 @@ export function ConnectWorker() {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                    <p>API Key:</p>
+                    {/* <p>API Key:</p>
                     <div className="relative bg-black text-white font-mono rounded-md p-4 text-sm">
                         <pre className="whitespace-pre-wrap">{apiKey}</pre>
                         <Button
@@ -74,8 +76,7 @@ export function ConnectWorker() {
                         >
                             <Copy size={16} />
                         </Button>
-                    </div>
-                    <p>Command:</p>
+                    </div> */}
                     <div className="relative bg-black text-white font-mono rounded-md p-4 text-sm">
                         <pre className="whitespace-pre-wrap">{rawCommand}</pre>
                         <Button

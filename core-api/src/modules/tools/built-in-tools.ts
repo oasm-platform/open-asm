@@ -1,9 +1,9 @@
 /* eslint-disable */
 
-import type { DeepPartial } from 'better-auth/*';
 import { randomUUID } from 'crypto';
 import type { Severity } from 'src/common/enums/enum';
 import { ToolCategory } from 'src/common/enums/enum';
+import { Asset } from '../assets/entities/assets.entity';
 import type { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { Tool } from './entities/tools.entity';
 
@@ -34,7 +34,7 @@ export const builtInTools: Tool[] = [
         id: randomUUID(),
         value: i,
         dnsRecords: parsed[i],
-      }));
+      })) as Asset[];
     },
     version: '2.8.0',
   },
@@ -150,10 +150,7 @@ export const builtInTools: Tool[] = [
         }
       }
 
-      const data = Array.from(
-        groupedVulnerabilities.values(),
-      ) as DeepPartial<Vulnerability>[];
-      return data;
+      return Array.from(groupedVulnerabilities.values()) as Vulnerability[];
     },
 
     version: '3.4.7',
