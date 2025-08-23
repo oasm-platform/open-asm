@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
+import { Asset } from 'src/modules/assets/entities/assets.entity';
+import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
 import {
@@ -55,7 +57,9 @@ export class Tool {
   logoUrl?: string;
 
   // @ApiProperty()
-  parser?: (result: string | undefined) => unknown;
+  parser?: (
+    result: string | undefined,
+  ) => Asset[] | HttpResponse | number[] | Vulnerability[] | undefined;
 
   @ApiProperty()
   isInstalled?: boolean;
