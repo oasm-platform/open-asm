@@ -12,11 +12,6 @@ tasks:
       MAX_JOBS: "{{.maxJobs}}"
     cmds:
       - |
-        echo "API = $API"
-        echo "API_KEY = $API_KEY"
-        echo "MAX_JOBS = $MAX_JOBS"
-        echo "Replicas = {{.replicas}}"
-
         for i in $(seq 1 {{.replicas}}); do
           echo "Starting worker $i"
           bun --watch index.ts &

@@ -150,7 +150,10 @@ export const builtInTools: Tool[] = [
         }
       }
 
-      return Array.from(groupedVulnerabilities.values()) as Vulnerability[];
+      const data = Array.from(
+        groupedVulnerabilities.values(),
+      ) as Vulnerability[];
+      return data;
     },
 
     version: '3.4.7',
