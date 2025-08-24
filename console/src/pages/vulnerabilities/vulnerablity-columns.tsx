@@ -28,8 +28,7 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
         cell: ({ row }) => {
             const data = row.original;
             const value: string = row.getValue("name");
-            const cveId: string = row.getValue("cveId") || "";
-
+            const cveId: string = row.original.cveId;
             return (
                 <div className="flex flex-col gap-2 py-2 justify-center min-h-[60px]">
                     <div className="flex items-center gap-2">

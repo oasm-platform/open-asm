@@ -59,16 +59,6 @@ export class VulnerabilitiesService {
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
       .where('workspaces.id = :workspaceId', { workspaceId })
-      // Filter to only include vulnerabilities from the latest jobHistory for each target
-      .andWhere(
-        `(
-          SELECT MAX(jh."createdAt") 
-          FROM job_histories jh 
-          INNER JOIN vulnerabilities v2 ON v2."jobHistoryId" = jh.id
-          INNER JOIN assets a2 ON v2."assetId" = a2.id
-          WHERE a2."targetId" = targets.id
-        ) = "jobHistory"."createdAt"`,
-      )
       .orderBy(`vulnerabilities.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit);

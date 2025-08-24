@@ -142,28 +142,36 @@ export class DataAdapterService {
     return;
   }
 
-  /**
-   * Vulnerabilities data normalization
-   * @param param0
-   * @returns
-   */
   public async vulnerabilities({
     data,
     job,
-  }: DataAdapterInput<Vulnerability[]>): Promise<InsertResult> {
-    return this.dataSource
-      .createQueryBuilder()
-      .insert()
-      .into(Vulnerability)
-      .values(
-        data.map((vuln) => ({
-          ...vuln,
-          asset: { id: job.asset.id },
-          jobHistory: { id: job.jobHistory.id },
-          tool: { id: job.tool.id },
-        })),
-      )
-      .execute();
+  }: DataAdapterInput<Vulnerability[]>): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      // Step 1: Delete old vulnerabilities of this asset
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from(Vulnerability)
+        .where('assetId = :assetId', { assetId: job.asset.id })
+        .execute();
+
+      // Step 2: Insert new vulnerabilities
+      if (data.length > 0) {
+        await manager
+          .createQueryBuilder()
+          .insert()
+          .into(Vulnerability)
+          .values(
+            data.map((vuln) => ({
+              ...vuln,
+              asset: { id: job.asset.id },
+              jobHistory: { id: job.jobHistory.id },
+              tool: { id: job.tool.id },
+            })),
+          )
+          .execute();
+      }
+    });
   }
 
   /**
