@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, SchedulerRegistry } from '@nestjs/schedule';
@@ -23,7 +24,7 @@ import { Target } from './entities/target.entity';
 import { WorkspaceTarget } from './entities/workspace-target.entity';
 
 @Injectable()
-export class TargetsService {
+export class TargetsService implements OnModuleInit {
   constructor(
     @InjectRepository(Target)
     private readonly repo: Repository<Target>,
@@ -33,18 +34,19 @@ export class TargetsService {
     public assetService: AssetsService,
     private schedulerRegistry: SchedulerRegistry,
     private eventEmitter: EventEmitter2,
-  ) {
-    this.handleUpdateScanSchedule();
-  }
+  ) {}
 
+  async onModuleInit() {
+    await this.handleUpdateScanSchedule();
+  }
   /**
    * Retrieves a target entity by its ID.
    *
    * @param id - The ID of the target to retrieve.
    * @returns A promise that resolves to the target entity if found, otherwise null.
    */
-  public async getTargetById(id: string): Promise<any> {
-    const result = await this.repo
+  public async getTargetById(id: string): Promise<Target> {
+    const result = (await this.repo
       .createQueryBuilder('targets')
       .leftJoin('targets.workspaceTargets', 'workspaceTarget')
       .leftJoin('workspaceTarget.workspace', 'workspace')
@@ -68,7 +70,7 @@ export class TargetsService {
       .groupBy(
         'targets.id, targets.value, targets.lastDiscoveredAt, targets.scanSchedule',
       )
-      .getRawOne();
+      .getRawOne()) as Target;
 
     return result;
   }
@@ -300,10 +302,10 @@ export class TargetsService {
 
     if (targetSchedules.length === 0) return;
 
-    Promise.all(
+    await Promise.all(
       targetSchedules.map(({ id, scanSchedule }) => {
-        const newCron = new CronJob(scanSchedule, () => {
-          this.assetService.reScan(id);
+        const newCron = new CronJob(scanSchedule, async () => {
+          await this.assetService.reScan(id);
         });
         this.schedulerRegistry.addCronJob(id, newCron);
         return newCron.start();

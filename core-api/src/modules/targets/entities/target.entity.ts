@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsString, Matches } from 'class-validator';
@@ -18,12 +19,13 @@ export class Target extends BaseEntity {
   @Matches(/^(?!\d+\.\d+\.\d+\.\d+)(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/, {
     message: 'Target must be a valid domain (IP is not allowed)',
   })
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: string }) => {
     try {
       const hasProtocol = /^https?:\/\//.test(value);
       const url = new URL(hasProtocol ? value : `http://${value}`);
       return url.hostname;
-    } catch (_err) {
+    } catch (error) {
+      Logger.error(error);
       return value;
     }
   })
