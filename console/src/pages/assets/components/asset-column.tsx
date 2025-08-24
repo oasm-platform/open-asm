@@ -10,10 +10,10 @@ import {
   Lock,
   Network,
 } from "lucide-react";
-import AssetValue from "./components/asset-value";
-import BadgeList from "./components/badge-list";
-import HTTPXStatusCode from "./components/status-code";
 import type { GetAssetsResponseDto } from "@/services/apis/gen/queries";
+import AssetValue from "./asset-value";
+import BadgeList from "./badge-list";
+import HTTPXStatusCode from "./status-code";
 
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
