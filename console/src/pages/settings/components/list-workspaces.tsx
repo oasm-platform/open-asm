@@ -40,10 +40,6 @@ const ListWorkspaces = () => {
                     setSortBy(newSortBy);
                     setSortOrder(newSortOrder);
                 }}
-                onRowClick={(row) => {
-                    // Handle row click if needed
-                    console.log('Row clicked:', row);
-                }}
             />
         </div>
     );
