@@ -95,7 +95,9 @@ export class Tool {
           token: Tool.token!,
         });
         if (this.isAliveError) {
-          logger.success(`RECONNECTED ✅ WorkerId: ${Tool.workerId?.split('-')[0]}`);
+          logger.success(
+            `RECONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`
+          );
           this.isAliveError = false;
         }
       } catch (error: any) {
@@ -123,7 +125,9 @@ export class Tool {
         });
         Tool.workerId = worker.id;
         Tool.token = worker.token;
-        logger.success(`CONNECTED ✅ WorkerId: ${Tool.workerId?.split('-')[0]}`);
+        logger.success(
+          `CONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`
+        );
 
         // Wait until Tool.workerId is set (by SSE handler)
         await this.waitUntil(() => !!Tool.workerId, 1000);
@@ -145,33 +149,37 @@ export class Tool {
 
   /**
    * Periodically pulls jobs from core if the queue isn't full.
+   * Only pulls one job at a time to reduce API load.
    */
   private async pullJobsContinuously() {
-    logger.info(`Start pulling jobs...`);
+    logger.info(`Start pulling jobs with ${this.pullInterval}ms interval...`);
+    let lastPullTime = 0;
 
     while (!this.isShuttingDown) {
-      try {
-        // Pull multiple jobs at once if queue has space
-        const availableSlots = this.maxJobsQueue - this.queue.length;
-        if (availableSlots > 0) {
-          const jobPromises = Array.from(
-            { length: Math.min(availableSlots, this.maxJobsQueue) },
-            () => this.pullSingleJob()
-          );
+      const now = Date.now();
+      
+      // Ensure we don't pull more often than pullInterval
+      if (now - lastPullTime < this.pullInterval) {
+        await this.sleep(100); // Small delay to prevent busy waiting
+        continue;
+      }
 
-          const jobs = await Promise.allSettled(jobPromises);
-          jobs.forEach((result) => {
-            if (result.status === "fulfilled" && result.value) {
-              this.queue.push(result.value);
+      try {
+        // Only pull one job at a time
+        if (this.queue.length < this.maxJobsQueue) {
+          const job = await this.pullSingleJob();
+          if (job) {
+            this.queue.push(job);
+            if (this.queue.length % 5 === 0) { // Log every 5 jobs to reduce noise
+              logger.info(`Queue size: ${this.queue.length}/${this.maxJobsQueue}`);
             }
-          });
+          }
         }
+        lastPullTime = Date.now();
       } catch (err) {
         logger.error("Cannot get next job:", err);
         await this.reconnectWithBackoff();
       }
-
-      await this.sleep(this.pullInterval);
     }
   }
 
@@ -247,7 +255,7 @@ export class Tool {
       logger
         .color("green")
         .log(
-          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split('-')[0]} - Time: ${executionTime}ms`
+          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split("-")[0]} - Time: ${executionTime}ms`
         );
     } catch (e) {
       logger.error(`Failed to handle job ${job.jobId}:`, e);

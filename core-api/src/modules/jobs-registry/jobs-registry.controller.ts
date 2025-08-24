@@ -40,34 +40,6 @@ export class JobsRegistryController {
     return this.jobsRegistryService.getNextJob(workerId);
   }
 
-  // @Doc({
-  //   summary: 'Gets jobs by asset ID, filtered by status and worker name.',
-  //   response: {
-  //     serialization: GetManyResponseDto(Job),
-  //   },
-  // })
-  // @Get('/asset/:assetId')
-  // getJobsByAssetId(
-  //   @Param('assetId', new ParseUUIDPipe()) assetId: string,
-  //   @Query() query: GetManyJobsQueryParams,
-  // ) {
-  //   return this.jobsRegistryService.getJobsByAssetId(assetId, query);
-  // }
-
-  // @Doc({
-  //   summary: 'Gets jobs by target ID, filtered by status and worker name.',
-  //   response: {
-  //     serialization: GetManyResponseDto(Job),
-  //   },
-  // })
-  // @Get('/target/:targetId')
-  // getJobsByTargetId(
-  //   @Param('targetId', new ParseUUIDPipe()) targetId: string,
-  //   @Query() query: GetManyJobsQueryParams,
-  // ) {
-  //   return this.jobsRegistryService.getJobsByTargetId(targetId, query);
-  // }
-
   @Doc({ summary: 'Updates the result of a job with the given worker ID.' })
   @Public()
   @Post('/:workerId/result')

@@ -149,6 +149,7 @@ export class JobsRegistryService {
           workspaceId: worker.workspace.id,
         })
         .orderBy('jobs.createdAt', 'ASC')
+        .orderBy('jobs.priority', 'ASC')
         .setLock('pessimistic_write')
         .limit(1)
         .getOne();

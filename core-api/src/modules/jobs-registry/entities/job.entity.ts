@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from 'src/common/entities/base.entity';
-import { JobStatus, ToolCategory } from 'src/common/enums/enum';
+import { JobPriority, JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { Tool } from 'src/modules/tools/entities/tools.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
@@ -24,6 +24,9 @@ export class Job extends BaseEntity {
   @ApiProperty()
   @Column({ nullable: true })
   pickJobAt?: Date;
+
+  @Column({ type: 'enum', enum: JobPriority, default: JobPriority.BACKGROUND })
+  priority: JobPriority;
 
   @Column({ nullable: true })
   workerId?: string;

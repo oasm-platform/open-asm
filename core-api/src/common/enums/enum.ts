@@ -47,3 +47,11 @@ export enum Severity {
   HIGH = 'high',
   CRITICAL = 'critical',
 }
+
+export enum JobPriority {
+  CRITICAL = 0,
+  HIGH = 1,
+  MEDIUM = 2,
+  LOW = 3,
+  BACKGROUND = 4,
+}
