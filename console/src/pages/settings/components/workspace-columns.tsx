@@ -3,6 +3,7 @@ import type { Workspace } from "@/services/apis/gen/queries";
 import { type ColumnDef } from "@tanstack/react-table";
 import ArchivedWorkspace from "./archived-workspace";
 import { EditWorkspaceDialog } from "./edit-workspace-dialog";
+import ShowNameWorkspace from "./show-name-workspace";
 
 
 export const workspaceColumns: ColumnDef<Workspace, unknown>[] = [
@@ -10,7 +11,7 @@ export const workspaceColumns: ColumnDef<Workspace, unknown>[] = [
         accessorKey: "name",
         header: "Workspace Name",
         cell: ({ row }) => (
-            <div className="font-medium">{row.getValue("name")}</div>
+            <ShowNameWorkspace workspace={row.original as Workspace} />
         ),
     },
     {
