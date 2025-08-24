@@ -13,13 +13,14 @@ import { ApiTags } from '@nestjs/swagger';
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
+  ArchiveWorkspaceDto,
   CreateWorkspaceDto,
   GetApiKeyResponseDto,
+  GetManyWorkspacesDto,
   UpdateWorkspaceDto,
 } from './dto/workspaces.dto';
 import { Workspace } from './entities/workspace.entity';
@@ -54,7 +55,7 @@ export class WorkspacesController {
   })
   @Get()
   getWorkspaces(
-    @Query() query: GetManyBaseQueryParams,
+    @Query() query: GetManyWorkspacesDto,
     @UserContext() userContextPayload: UserContextPayload,
   ) {
     return this.workspacesService.getWorkspaces(query, userContextPayload);
@@ -72,7 +73,10 @@ export class WorkspacesController {
     @Param() { id }: IdQueryParamDto,
     @UserContext() userContext: UserContextPayload,
   ) {
-    const workspace = await this.workspacesService.getWorkspaceById(id, userContext);
+    const workspace = await this.workspacesService.getWorkspaceById(
+      id,
+      userContext,
+    );
 
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
@@ -125,5 +129,21 @@ export class WorkspacesController {
     @UserContext() userContext: UserContextPayload,
   ) {
     return this.workspacesService.rotateApiKey(id, userContext);
+  }
+
+  @Doc({
+    summary: 'Archive/Unarchive Workspace',
+    description: 'Sets the archived status of a workspace.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  @Patch(':id/archived')
+  makeArchived(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: ArchiveWorkspaceDto,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.workspacesService.makeArchived(id, dto.isArchived, userContext);
   }
 }

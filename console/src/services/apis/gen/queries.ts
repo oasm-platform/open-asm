@@ -108,6 +108,8 @@ export type UpdateTargetDto = {
   scanSchedule: UpdateTargetDtoScanSchedule;
 };
 
+export type WorkspaceArchivedAt = { [key: string]: unknown };
+
 export type Workspace = {
   id: string;
   createdAt: string;
@@ -118,13 +120,17 @@ export type Workspace = {
   description: string;
   /** The API key of the workspace */
   apiKey: string;
+  archivedAt?: WorkspaceArchivedAt;
 };
+
+export type CreateWorkspaceDtoArchivedAt = { [key: string]: unknown };
 
 export type CreateWorkspaceDto = {
   /** The name of the workspace */
   name: string;
   /** The description of the workspace */
   description: string;
+  archivedAt?: CreateWorkspaceDtoArchivedAt;
 };
 
 export type GetManyWorkspaceDto = {
@@ -136,15 +142,23 @@ export type GetManyWorkspaceDto = {
   pageCount: number;
 };
 
+export type UpdateWorkspaceDtoArchivedAt = { [key: string]: unknown };
+
 export type UpdateWorkspaceDto = {
   /** The name of the workspace */
   name?: string;
   /** The description of the workspace */
   description?: string;
+  archivedAt?: UpdateWorkspaceDtoArchivedAt;
 };
 
 export type GetApiKeyResponseDto = {
   apiKey: string;
+};
+
+export type ArchiveWorkspaceDto = {
+  /** Whether to archive (true) or unarchive (false) the workspace */
+  isArchived: boolean;
 };
 
 export type CreateFirstAdminDto = {
@@ -424,6 +438,10 @@ export type WorkspacesControllerGetWorkspacesParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  /**
+   * Whether to archive (true) or unarchive (false) the workspace
+   */
+  isArchived?: boolean;
 };
 
 export type JobsRegistryControllerGetManyJobsParams = {
@@ -2684,6 +2702,99 @@ export const useWorkspacesControllerRotateApiKey = <
 > => {
   const mutationOptions =
     getWorkspacesControllerRotateApiKeyMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Sets the archived status of a workspace.
+ * @summary Archive/Unarchive Workspace
+ */
+export const workspacesControllerMakeArchived = (
+  id: string,
+  archiveWorkspaceDto: ArchiveWorkspaceDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/workspaces/${id}/archived`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: archiveWorkspaceDto,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerMakeArchivedMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+    TError,
+    { id: string; data: ArchiveWorkspaceDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+  TError,
+  { id: string; data: ArchiveWorkspaceDto },
+  TContext
+> => {
+  const mutationKey = ["workspacesControllerMakeArchived"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+    { id: string; data: ArchiveWorkspaceDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return workspacesControllerMakeArchived(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerMakeArchivedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerMakeArchived>>
+>;
+export type WorkspacesControllerMakeArchivedMutationBody = ArchiveWorkspaceDto;
+export type WorkspacesControllerMakeArchivedMutationError = unknown;
+
+/**
+ * @summary Archive/Unarchive Workspace
+ */
+export const useWorkspacesControllerMakeArchived = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+      TError,
+      { id: string; data: ArchiveWorkspaceDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerMakeArchived>>,
+  TError,
+  { id: string; data: ArchiveWorkspaceDto },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkspacesControllerMakeArchivedMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

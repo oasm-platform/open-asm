@@ -3,6 +3,7 @@ import { useServerDataTable } from "@/hooks/useServerDataTable";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { useAssetsControllerGetAssetsInWorkspace } from "@/services/apis/gen/queries";
 import { useState } from "react";
+import CreateWorkspace from "../workspaces/create-workspace";
 import AssetDetailSheet from "./asset-detail-sheet";
 import { assetColumns } from "./data-column";
 
@@ -11,7 +12,7 @@ interface ListAssetsProps {
   refetchInterval?: number;
 }
 export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const { selectedWorkspace, workspaces } = useWorkspaceSelector();
   const [isOpen, setIsOpen] = useState(false);
   const [rowID, setRowID] = useState("");
 
@@ -50,6 +51,7 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
     },
   );
 
+  if (workspaces.length === 0) return <CreateWorkspace />;
   const targets = data?.data ?? [];
   const total = data?.total ?? 0;
 

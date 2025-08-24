@@ -10,10 +10,7 @@ import {
   LIMIT_WORKSPACE_CREATE,
 } from 'src/common/constants/app.constants';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from 'src/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { generateToken } from 'src/utils/genToken';
 import { getManyResponse } from 'src/utils/getManyResponse';
@@ -21,6 +18,7 @@ import { Repository } from 'typeorm';
 import {
   CreateWorkspaceDto,
   GetApiKeyResponseDto,
+  GetManyWorkspacesDto,
   UpdateWorkspaceDto,
 } from './dto/workspaces.dto';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
@@ -79,26 +77,33 @@ export class WorkspacesService {
    * @returns A paginated list of workspaces, along with the total count and page information.
    */
   public async getWorkspaces(
-    query: GetManyBaseQueryParams,
+    query: GetManyWorkspacesDto,
     userContextPayload: UserContextPayload,
   ): Promise<GetManyBaseResponseDto<Workspace>> {
-    const { limit, page, sortOrder } = query;
+    const { limit, page, sortOrder, isArchived } = query;
     let { sortBy } = query;
     const { id } = userContextPayload;
 
     if (!(sortBy in Workspace)) {
       sortBy = 'createdAt';
     }
-    const [data, total] = await this.repo.findAndCount({
-      where: {
-        owner: { id },
-      },
-      take: query.limit,
-      skip: (page - 1) * limit,
-      order: {
-        [sortBy]: sortOrder,
-      },
-    });
+
+    const queryBuilder = this.repo
+      .createQueryBuilder('workspace')
+      .where('workspace.ownerId = :id', { id });
+    if (isArchived !== undefined) {
+      if (isArchived) {
+        queryBuilder.andWhere('workspace.archivedAt IS NOT NULL');
+      } else {
+        queryBuilder.andWhere('workspace.archivedAt IS NULL');
+      }
+    }
+
+    const [data, total] = await queryBuilder
+      .orderBy(`workspace.${sortBy}`, sortOrder)
+      .take(limit)
+      .skip((page - 1) * limit)
+      .getManyAndCount();
 
     return getManyResponse({ query, data, total });
   }
@@ -119,7 +124,7 @@ export class WorkspacesService {
   ) {
     await this.getWorkspaceByIdAndOwner(id, userContext);
 
-    await this.repo.update({ id: id }, { ...dto });
+    await this.repo.update({ id }, { ...dto });
 
     return { message: 'Workspace updated successfully' };
   }
@@ -210,6 +215,34 @@ export class WorkspacesService {
     }
 
     return workspace;
+  }
+
+  /**
+   * Sets the archived status of a workspace.
+   * @param id - The ID of the workspace to archive/unarchive.
+   * @param archived - Whether to archive (true) or unarchive (false) the workspace.
+   * @param userContext - The user's context data, which includes the user's ID.
+   * @returns A response indicating the workspace was successfully updated.
+   */
+  public async makeArchived(
+    id: string,
+    archived: boolean,
+    userContext: UserContextPayload,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.getWorkspaceByIdAndOwner(id, userContext);
+
+    await this.repo.update(
+      { id },
+      {
+        archivedAt: archived ? new Date() : null,
+      },
+    );
+
+    return {
+      message: archived
+        ? 'Workspace archived successfully'
+        : 'Workspace unarchived successfully',
+    };
   }
 
   /**

@@ -13,6 +13,8 @@ import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import CreateWorkspace from "@/pages/workspaces/create-workspace-dialog";
 import { DropdownMenuItem } from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { toast } from "sonner";
+import { Separator } from "./separator";
 
 export function WorkspaceSwitcher() {
     const {
@@ -64,16 +66,17 @@ export function WorkspaceSwitcher() {
                                 {workspaces.map((workspace) => (
                                     <DropdownMenuItem
                                         key={workspace.id}
-                                        onSelect={() => handleSelectWorkspace(workspace.id)}
+                                        onSelect={() => {
+                                            handleSelectWorkspace(workspace.id)
+                                            toast(`Switched to ${workspace.name}`)
+                                        }}
                                         className="cursor-pointer px-2 py-1.5 rounded hover:bg-muted flex items-center justify-between"
                                     >
                                         {workspace.name}
                                         {workspace.id === selectedWorkspace && <Check size={16} />}
                                     </DropdownMenuItem>
                                 ))}
-
-                                {/* Separator */}
-                                <div className="my-2 h-px bg-gray-200 dark:bg-gray-700" />
+                                <Separator className="my-1" />
                             </>
                         ) : (
                             <div className="text-center text-sm text-muted-foreground px-2 py-4">

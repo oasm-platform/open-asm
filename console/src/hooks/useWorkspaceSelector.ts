@@ -23,7 +23,7 @@ const useWorkspaceState = createState<WorkspaceState>(
       ...state,
       selectedWorkspaceId: null,
     }),
-  },
+  }
 );
 
 export function useWorkspaceSelector() {
@@ -31,10 +31,18 @@ export function useWorkspaceSelector() {
     data: response,
     isLoading,
     refetch,
-  } = useWorkspacesControllerGetWorkspaces({
-    limit: 100,
-    page: 1,
-  });
+  } = useWorkspacesControllerGetWorkspaces(
+    {
+      limit: 100,
+      page: 1,
+      isArchived: false,
+    },
+    {
+      query: {
+        queryKey: ["workspaces"],
+      },
+    }
+  );
 
   const { state, setSelectedWorkspace, clearSelectedWorkspace } =
     useWorkspaceState();
@@ -44,7 +52,7 @@ export function useWorkspaceSelector() {
       setSelectedWorkspace(id);
       // Remove window.location.reload() since we're using global state
     },
-    [setSelectedWorkspace],
+    [setSelectedWorkspace]
   );
 
   // Auto-select workspace logic
