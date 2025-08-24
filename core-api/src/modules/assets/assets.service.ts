@@ -289,12 +289,15 @@ export class AssetsService {
       .orderBy('"assetCount"', sortOrder);
 
     if (value && value.length > 0)
-      queryBuilder.andWhere('t.ip ILIKE :value', {
-        value: `%${value}%`,
-      });
+      queryBuilder.andWhere(
+        `"httpResponses"."tls"::jsonb -> 'port' ILIKE :value`,
+        {
+          value: `%${value}%`,
+        },
+      );
 
     if (targetIds && targetIds.length > 0)
-      queryBuilder.andWhere('t."targetId" = ANY(:targetId)', {
+      queryBuilder.andWhere('"assets"."targetId" = ANY(:targetId)', {
         targetId: targetIds,
       });
 
