@@ -20,11 +20,14 @@ import {
 } from "@/components/ui/sidebar"
 import { authClient } from "@/utils/authClient"
 import { useQueryClient } from "@tanstack/react-query"
+import { LogOut, Settings } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 export function NavUser() {
     const queryClient = useQueryClient();
     const { isMobile } = useSidebar()
     const { useSession, signOut } = authClient
+    const navigate = useNavigate()
     const { data: session } = useSession()
     const user = session?.user
     if (!user) {
@@ -79,18 +82,14 @@ export function NavUser() {
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem>
-                                {/* <IconUserCircle /> */}
-                                Account
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                {/* <IconNotification /> */}
-                                Notifications
+                            <DropdownMenuItem onClick={() => navigate("/settings")}>
+                                <Settings />
+                                Settings
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout}>
-                            {/* <IconLogout /> */}
+                            <LogOut />
                             Log out
                         </DropdownMenuItem>
                     </DropdownMenuContent>

@@ -11,8 +11,9 @@ import TargetStatus from "@/components/ui/target-status";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
 import type { JobStatus, Target } from "@/services/apis/gen/queries";
 import { useNavigate } from "react-router-dom";
+import CreateWorkspace from "../workspaces/create-workspace";
 
-export const targetColumns: ColumnDef<Target, any>[] = [
+export const targetColumns: ColumnDef<Target, unknown>[] = [
   {
     accessorKey: "value",
     header: "Target",
@@ -40,7 +41,7 @@ export const targetColumns: ColumnDef<Target, any>[] = [
       if (status === 'in_progress') {
         return null;
       }
-      
+
       const value: number = parseInt(row.getValue("duration"));
       const duration = dayjs.duration(value, 'seconds');
       const hours = duration.hours();
@@ -73,7 +74,7 @@ export const targetColumns: ColumnDef<Target, any>[] = [
 ];
 
 export function ListTargets() {
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const { selectedWorkspace, workspaces } = useWorkspaceSelector();
   const navigate = useNavigate();
 
   const {
@@ -109,6 +110,7 @@ export function ListTargets() {
   const targets = data?.data ?? [];
   const total = data?.total ?? 0;
 
+  if (workspaces.length === 0) return <CreateWorkspace />;
   if (!data && !isLoading) return <div>Error loading targets.</div>;
 
   const handleRowClick = (target: Target) => {
@@ -116,8 +118,8 @@ export function ListTargets() {
   };
 
   return (
-    <DataTable
-      data={targets as any}
+    <DataTable<Target, unknown>
+      data={targets as unknown as Target[]}
       columns={targetColumns}
       isLoading={isLoading}
       page={page}

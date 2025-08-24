@@ -36,6 +36,7 @@ const CreateWorkspaceDialog = () => {
             data: {
                 name: data.name,
                 description: data.description,
+
             },
         }, {
             onSuccess: (data) => {

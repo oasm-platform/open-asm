@@ -6,6 +6,7 @@ import Login from "@/pages/login/login";
 import Tools from "@/pages/marketplaces/marketplaces";
 import Register from "@/pages/register/register";
 import Search from "@/pages/search/search";
+import Settings from "@/pages/settings/settings";
 import DetailTarget from "@/pages/targets/detail-target";
 import Targets from "@/pages/targets/targets";
 import Vulnerabilities from "@/pages/vulnerabilities/vulnerabilities";
@@ -43,6 +44,19 @@ export const router = createBrowserRouter([
           {
             path: "",
             element: <Dashboard />,
+          },
+          {
+            path: "settings",
+            children: [
+              {
+                path: "",
+                element: <Settings defaultTab="account" />,
+              },
+              {
+                path: ":tab",
+                element: <Settings />,
+              },
+            ],
           },
           {
             path: "targets",

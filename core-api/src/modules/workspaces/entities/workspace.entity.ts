@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { User } from 'src/modules/auth/entities/user.entity';
 import { WorkspaceTarget } from 'src/modules/targets/entities/workspace-target.entity';
@@ -62,4 +62,9 @@ export class Workspace extends BaseEntity {
 
   @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.workspace)
   workers: WorkerInstance[];
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Column({ type: 'timestamp', nullable: true })
+  archivedAt?: Date | null;
 }
