@@ -1,7 +1,5 @@
 import {
   BadGatewayException,
-  forwardRef,
-  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -20,7 +18,6 @@ import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { Target } from '../targets/entities/target.entity';
 import { builtInTools } from '../tools/built-in-tools';
 import { Tool } from '../tools/entities/tools.entity';
-import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import {
@@ -39,9 +36,6 @@ export class JobsRegistryService {
     public readonly jobHistoryRepo: Repository<JobHistory>,
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
-
-    @Inject(forwardRef(() => ToolsService))
-    private toolsService: ToolsService,
   ) {}
   public async getManyJobs(
     query: GetManyBaseQueryParams,
