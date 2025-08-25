@@ -4,6 +4,7 @@ import FilterForm from "./components/filter-form";
 import IpAssetsTab from "./components/ip-assets-tab";
 import TriggerList from "./components/tab-trigger-list";
 import PortAssetsTab from "./components/port-assets-tab";
+import TechnologyAssetsTab from "./components/technology-assets-tab";
 
 interface ListAssetsProps {
   targetId?: string;
@@ -42,6 +43,10 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
           />
           <IpAssetsTab targetId={targetId} refetchInterval={refetchInterval} />
           <PortAssetsTab
+            targetId={targetId}
+            refetchInterval={refetchInterval}
+          />
+          <TechnologyAssetsTab
             targetId={targetId}
             refetchInterval={refetchInterval}
           />
