@@ -4,8 +4,9 @@ import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
-import { GetIpAssetsDTO } from './dto/getIpAssets.dto';
-import { GetPortAssetsDTO } from './dto/getPortAssets.dto';
+import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
+import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
+import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -46,6 +47,18 @@ export class AssetsController {
   @Get('/port')
   getPortAssets(@Query() query: GetAssetsQueryDto) {
     return this.assetsService.getPortAssets(query);
+  }
+
+  @Doc({
+    summary: 'Get technologies along with number of assets',
+    description: 'Retrieves a list of technologies with number of assets.',
+    response: {
+      serialization: GetManyResponseDto(GetTechnologyAssetsDTO),
+    },
+  })
+  @Get('/tech')
+  getTechnologyAssets(@Query() query: GetAssetsQueryDto) {
+    return this.assetsService.getTechnologyAssets(query);
   }
 
   @Doc({
