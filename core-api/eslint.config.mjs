@@ -41,6 +41,7 @@ export default tseslint.config(
       'complexity': ['warn', 10],
       'max-lines-per-function': ['warn', 500],
       'max-params': ['warn', 20],
+      'max-statements': ['warn', 20],
       'no-magic-numbers': ['warn', { ignore: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100, 200, 201, 400, 401, 500] }],
 
 

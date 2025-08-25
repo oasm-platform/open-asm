@@ -374,4 +374,115 @@ export class AssetsService {
 
     return getManyResponse({ query, data: list, total });
   }
+
+  /**
+   * Retrieves a list of Port with number of asset
+   *
+   * @returns A promise that resolves to the list of port.
+   *
+   */
+  public async getPortAssets(
+    query: GetAssetsQueryDto,
+  ): Promise<GetManyBaseResponseDto<GetPortAssetsDTO>> {
+    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+
+    const offset = (page - 1) * limit;
+
+    const queryBuilder = this.assetRepo
+      .createQueryBuilder('assets')
+      .leftJoin('assets.httpResponses', 'httpResponses')
+      .leftJoin('assets.target', 'targets')
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .select(`"httpResponses"."tls"::jsonb -> 'port'`, 'port')
+      .addSelect('COUNT(assets.id)', 'assetCount')
+      .distinct(true)
+      .where(`"httpResponses"."tls"::jsonb -> 'port' is not null`)
+      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .groupBy(`"httpResponses"."tls"::jsonb -> 'port'`)
+      .orderBy('"assetCount"', sortOrder);
+
+    if (value && value.length > 0)
+      queryBuilder.andWhere(
+        `"httpResponses"."tls"::jsonb -> 'port' ILIKE :value`,
+        {
+          value: `%${value}%`,
+        },
+      );
+
+    if (targetIds && targetIds.length > 0)
+      queryBuilder.andWhere('"assets"."targetId" = ANY(:targetId)', {
+        targetId: targetIds,
+      });
+
+    const total = (await queryBuilder.getRawMany()).length;
+
+    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+
+    const list = result.map((item: GetPortAssetsDTO) => {
+      const obj = new GetPortAssetsDTO();
+      obj.assetCount = item.assetCount;
+      obj.port = item.port;
+      return obj;
+    });
+
+    return getManyResponse(query, list, total);
+  }
+
+  /**
+   * Retrieves a list of Port with number of asset
+   *
+   * @returns A promise that resolves to the list of port.
+   *
+   */
+  public async getTechnologyAssets(
+    query: GetAssetsQueryDto,
+  ): Promise<GetManyBaseResponseDto<GetTechnologyAssetsDTO>> {
+    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+
+    const offset = (page - 1) * limit;
+
+    const queryBuilder = this.assetRepo
+      .createQueryBuilder('assets')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .select('httpResponses.assetId', 'assetId')
+            .addSelect('unnest(httpResponses.tech)', 'tech')
+            .from(HttpResponse, 'httpResponses'),
+        'techUnnested',
+        '"techUnnested"."assetId" = "assets"."id"',
+      )
+      .leftJoin('assets.target', 'targets')
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .select(`"techUnnested"."tech"`, 'technology')
+      .addSelect('COUNT(assets.id)', 'assetCount')
+      .distinct(true)
+      .where(`"techUnnested"."tech" is not null`)
+      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .groupBy(`"techUnnested"."tech"`)
+      .orderBy('"assetCount"', sortOrder);
+
+    if (value && value.length > 0)
+      queryBuilder.andWhere(`"techUnnested"."tech" ILIKE :value`, {
+        value: `%${value}%`,
+      });
+
+    if (targetIds && targetIds.length > 0)
+      queryBuilder.andWhere('"assets"."targetId" = ANY(:targetId)', {
+        targetId: targetIds,
+      });
+
+    const total = (await queryBuilder.getRawMany()).length;
+
+    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+
+    const list = result.map((item: GetTechnologyAssetsDTO) => {
+      const obj = new GetTechnologyAssetsDTO();
+      obj.assetCount = item.assetCount;
+      obj.technology = item.technology;
+      return obj;
+    });
+
+    return getManyResponse(query, list, total);
+  }
 }
