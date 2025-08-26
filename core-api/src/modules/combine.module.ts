@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { JobsRegistryModule } from './jobs-registry/jobs-registry.module';
 import { RootModule } from './root/root.module';
 import { SearchModule } from './search/search.module';
+import { StatisticModule } from './statistic/statistic.module';
 import { TargetsModule } from './targets/targets.module';
 import { ToolsModule } from './tools/tools.module';
 import { UsersModule } from './users/users.module';
@@ -30,6 +31,7 @@ import { DataAdapterModule } from './data-adapter/data-adapter.module';
     VulnerabilitiesModule,
     DataAdapterModule,
     WorkflowsModule,
+    StatisticModule,
   ],
 })
 export class CombineModule {}
