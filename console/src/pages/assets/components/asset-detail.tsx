@@ -192,7 +192,7 @@ export default function AssetDetail({ id }: { id: string }) {
                 </div>
 
                 {/* Adjusted Alternate Names display logic */}
-                {tls.subject_an && tls.subject_an.length > 0 && (
+                {tls.subject_an && tls.subject_an.length > 1 && (
                   <div>
                     <span className="block mb-1">Alternate Names</span>
                     <div className="flex items-center gap-2">

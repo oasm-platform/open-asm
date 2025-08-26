@@ -15,6 +15,7 @@ import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
+import { Port } from './entities/ports.entity';
 
 @Injectable()
 export class AssetsService {
@@ -279,24 +280,29 @@ export class AssetsService {
 
     const queryBuilder = this.assetRepo
       .createQueryBuilder('assets')
-      .leftJoin('assets.httpResponses', 'httpResponses')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .select('ports.assetId', 'assetId')
+            .addSelect('unnest(ports.ports)', 'port')
+            .from(Port, 'ports'),
+        'portUnnested',
+        '"portUnnested"."assetId" = "assets"."id"',
+      )
       .leftJoin('assets.target', 'targets')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .select(`"httpResponses"."tls"::jsonb -> 'port'`, 'port')
+      .select(`"portUnnested"."port"`, 'port')
       .addSelect('COUNT(assets.id)', 'assetCount')
       .distinct(true)
-      .where(`"httpResponses"."tls"::jsonb -> 'port' is not null`)
+      .where(`"portUnnested"."port" is not null`)
       .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
-      .groupBy(`"httpResponses"."tls"::jsonb -> 'port'`)
+      .groupBy(`"portUnnested"."port"`)
       .orderBy('"assetCount"', sortOrder);
 
     if (value && value.length > 0)
-      queryBuilder.andWhere(
-        `"httpResponses"."tls"::jsonb -> 'port' ILIKE :value`,
-        {
-          value: `%${value}%`,
-        },
-      );
+      queryBuilder.andWhere(`"portUnnested"."port" ILIKE :value`, {
+        value: `%${value}%`,
+      });
 
     if (targetIds && targetIds.length > 0)
       queryBuilder.andWhere('"assets"."targetId" = ANY(:targetId)', {
