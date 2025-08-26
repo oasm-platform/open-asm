@@ -1,7 +1,6 @@
 import { DataTable } from '@/components/ui/data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useAssetsControllerGetPortAssets,
   type GetPortAssetsDTO,
@@ -11,6 +10,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 interface Props {
   targetId?: string;
   refetchInterval?: number;
+  selectedWorkspace: string;
 }
 
 const portAssetsColumn: ColumnDef<GetPortAssetsDTO>[] = [
@@ -44,9 +44,11 @@ const portAssetsColumn: ColumnDef<GetPortAssetsDTO>[] = [
   },
 ];
 
-export default function PortAssetsTab({ targetId, refetchInterval }: Props) {
-  const { selectedWorkspace } = useWorkspaceSelector();
-
+export default function PortAssetsTab({
+  targetId,
+  refetchInterval,
+  selectedWorkspace,
+}: Props) {
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },

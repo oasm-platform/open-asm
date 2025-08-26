@@ -1,7 +1,6 @@
 import { DataTable } from '@/components/ui/data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
 import { useState } from 'react';
 import { assetColumns } from './asset-column';
@@ -10,10 +9,14 @@ import AssetDetailSheet from './asset-detail-sheet';
 interface Props {
   targetId?: string;
   refetchInterval?: number;
+  selectedWorkspace: string;
 }
 
-export default function AssetTab({ targetId, refetchInterval }: Props) {
-  const { selectedWorkspace } = useWorkspaceSelector();
+export default function AssetTab({
+  selectedWorkspace,
+  targetId,
+  refetchInterval,
+}: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [rowID, setRowID] = useState('');
 

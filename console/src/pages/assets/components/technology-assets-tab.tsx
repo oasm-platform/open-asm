@@ -1,7 +1,6 @@
 import { DataTable } from '@/components/ui/data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useAssetsControllerGetTechnologyAssets,
   type GetTechnologyAssetsDTO,
@@ -11,6 +10,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 interface Props {
   targetId?: string;
   refetchInterval?: number;
+  selectedWorkspace: string;
 }
 
 const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
@@ -49,9 +49,8 @@ const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
 export default function TechnologyAssetsTab({
   targetId,
   refetchInterval,
+  selectedWorkspace,
 }: Props) {
-  const { selectedWorkspace } = useWorkspaceSelector();
-
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
