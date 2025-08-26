@@ -1,12 +1,12 @@
-import { DataTable } from "@/components/ui/data-table";
-import { TabsContent } from "@/components/ui/tabs";
-import { useServerDataTable } from "@/hooks/useServerDataTable";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
+import { DataTable } from '@/components/ui/data-table';
+import { TabsContent } from '@/components/ui/tabs';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useAssetsControllerGetPortAssets,
   type GetPortAssetsDTO,
-} from "@/services/apis/gen/queries";
-import type { ColumnDef } from "@tanstack/react-table";
+} from '@/services/apis/gen/queries';
+import type { ColumnDef } from '@tanstack/react-table';
 
 interface Props {
   targetId?: string;
@@ -15,8 +15,8 @@ interface Props {
 
 const portAssetsColumn: ColumnDef<GetPortAssetsDTO>[] = [
   {
-    accessorKey: "port",
-    header: "Port",
+    accessorKey: 'port',
+    header: 'Port',
     enableHiding: false,
     size: 500,
     cell: ({ row }) => {
@@ -29,8 +29,8 @@ const portAssetsColumn: ColumnDef<GetPortAssetsDTO>[] = [
     },
   },
   {
-    accessorKey: "assetCount",
-    header: "Number of assets",
+    accessorKey: 'assetCount',
+    header: 'Number of assets',
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
@@ -51,12 +51,12 @@ export default function PortAssetsTab({ targetId, refetchInterval }: Props) {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
   } = useServerDataTable({
-    defaultSortBy: "value",
-    defaultSortOrder: "ASC",
+    defaultSortBy: 'value',
+    defaultSortOrder: 'ASC',
   });
 
   const queryParams = {
-    workspaceId: selectedWorkspace ?? "",
+    workspaceId: selectedWorkspace ?? '',
     targetIds: targetId ? [targetId] : undefined,
     value: filter,
     limit: pageSize,
@@ -67,9 +67,9 @@ export default function PortAssetsTab({ targetId, refetchInterval }: Props) {
 
   const queryOpts = {
     query: {
-      refetchInterval: refetchInterval ?? (false as const),
+      refetchInterval: refetchInterval ?? 30 * 1000,
       queryKey: [
-        "portAssets",
+        'portAssets',
         targetId,
         selectedWorkspace,
         page,

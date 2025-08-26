@@ -1,11 +1,11 @@
-import { DataTable } from "@/components/ui/data-table";
-import { TabsContent } from "@/components/ui/tabs";
-import { useServerDataTable } from "@/hooks/useServerDataTable";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useAssetsControllerGetAssetsInWorkspace } from "@/services/apis/gen/queries";
-import { useState } from "react";
-import { assetColumns } from "./asset-column";
-import AssetDetailSheet from "./asset-detail-sheet";
+import { DataTable } from '@/components/ui/data-table';
+import { TabsContent } from '@/components/ui/tabs';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
+import { useState } from 'react';
+import { assetColumns } from './asset-column';
+import AssetDetailSheet from './asset-detail-sheet';
 
 interface Props {
   targetId?: string;
@@ -15,18 +15,18 @@ interface Props {
 export default function AssetTab({ targetId, refetchInterval }: Props) {
   const { selectedWorkspace } = useWorkspaceSelector();
   const [isOpen, setIsOpen] = useState(false);
-  const [rowID, setRowID] = useState("");
+  const [rowID, setRowID] = useState('');
 
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
   } = useServerDataTable({
-    defaultSortBy: "value",
-    defaultSortOrder: "ASC",
+    defaultSortBy: 'value',
+    defaultSortOrder: 'ASC',
   });
 
   const queryParams = {
-    workspaceId: selectedWorkspace ?? "",
+    workspaceId: selectedWorkspace ?? '',
     targetIds: targetId ? [targetId] : undefined,
     value: filter,
     limit: pageSize,
@@ -37,9 +37,9 @@ export default function AssetTab({ targetId, refetchInterval }: Props) {
 
   const queryOpts = {
     query: {
-      refetchInterval: refetchInterval ?? 5000,
+      refetchInterval: refetchInterval ?? 30 * 1000,
       queryKey: [
-        "assets",
+        'assets',
         targetId,
         selectedWorkspace,
         page,

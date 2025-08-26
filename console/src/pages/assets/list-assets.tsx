@@ -14,7 +14,6 @@ interface ListAssetsProps {
 
 export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
   //TODO: rework on refetchInterval because not necessary after complete discovering
-  //FIX: fix api call only when selecting tab
 
   const tabList = useMemo(
     () => [
@@ -70,7 +69,7 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
         className="gap-0"
       >
         <TriggerList tabTriggerList={tabList} />
-        {tabList.find((a) => a.value == selectedTab)?.tab}
+        {tabList.find((t) => t.value == selectedTab)?.tab}
       </Tabs>
     </div>
   );

@@ -1,12 +1,12 @@
-import { DataTable } from "@/components/ui/data-table";
-import { TabsContent } from "@/components/ui/tabs";
-import { useServerDataTable } from "@/hooks/useServerDataTable";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
+import { DataTable } from '@/components/ui/data-table';
+import { TabsContent } from '@/components/ui/tabs';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useAssetsControllerGetTechnologyAssets,
   type GetTechnologyAssetsDTO,
-} from "@/services/apis/gen/queries";
-import type { ColumnDef } from "@tanstack/react-table";
+} from '@/services/apis/gen/queries';
+import type { ColumnDef } from '@tanstack/react-table';
 
 interface Props {
   targetId?: string;
@@ -15,8 +15,8 @@ interface Props {
 
 const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
   {
-    accessorKey: "technology",
-    header: "Technology",
+    accessorKey: 'technology',
+    header: 'Technology',
     enableHiding: false,
     size: 500,
     enableSorting: false,
@@ -30,8 +30,8 @@ const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
     },
   },
   {
-    accessorKey: "assetCount",
-    header: "Number of assets",
+    accessorKey: 'assetCount',
+    header: 'Number of assets',
     enableSorting: true,
     size: 250,
     cell: ({ row }) => {
@@ -56,12 +56,12 @@ export default function TechnologyAssetsTab({
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
   } = useServerDataTable({
-    defaultSortBy: "value",
-    defaultSortOrder: "ASC",
+    defaultSortBy: 'value',
+    defaultSortOrder: 'ASC',
   });
 
   const queryParams = {
-    workspaceId: selectedWorkspace ?? "",
+    workspaceId: selectedWorkspace ?? '',
     targetIds: targetId ? [targetId] : undefined,
     value: filter,
     limit: pageSize,
@@ -72,9 +72,9 @@ export default function TechnologyAssetsTab({
 
   const queryOpts = {
     query: {
-      refetchInterval: refetchInterval ?? (false as const),
+      refetchInterval: refetchInterval ?? 30 * 1000,
       queryKey: [
-        "technologyAssets",
+        'technologyAssets',
         targetId,
         selectedWorkspace,
         page,

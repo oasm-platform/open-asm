@@ -1,27 +1,27 @@
-import Page from "@/components/common/page";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import TargetStatus from "@/components/ui/target-status";
+import Page from '@/components/common/page';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import TargetStatus from '@/components/ui/target-status';
 import {
   JobStatus,
   useTargetsControllerGetTargetById,
   useVulnerabilitiesControllerScan,
-} from "@/services/apis/gen/queries";
-import dayjs from "dayjs";
-import { Bug, Loader2 } from "lucide-react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
-import { ListAssets } from "../assets/list-assets";
-import { ListVulnerabilities } from "../vulnerabilities/list-vulnerabilitys";
-import VulnerabilitiesStatistic from "../vulnerabilities/vulnerabilites-statistic";
-import AssetsDiscovering from "./assets-discovering";
-import SettingTarget from "./setting-target";
+} from '@/services/apis/gen/queries';
+import dayjs from 'dayjs';
+import { Bug, Loader2 } from 'lucide-react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import { ListAssets } from '../assets/list-assets';
+import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
+import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
+import AssetsDiscovering from './assets-discovering';
+import SettingTarget from './setting-target';
 
 // Define tabs configuration
 const TABS = [
-  { value: "assets", label: "Assets" },
-  { value: "vulnerabilities", label: "Vulnerabilities" },
+  { value: 'assets', label: 'Assets' },
+  { value: 'vulnerabilities', label: 'Vulnerabilities' },
 ];
 
 export function DetailTarget() {
@@ -29,27 +29,27 @@ export function DetailTarget() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const animation = searchParams.get("animation") === "true";
-  const tab = searchParams.get("tab");
+  const animation = searchParams.get('animation') === 'true';
+  const tab = searchParams.get('tab');
 
   const {
     data: target,
     isLoading,
     error,
-  } = useTargetsControllerGetTargetById(id || "", {
+  } = useTargetsControllerGetTargetById(id || '', {
     query: { enabled: !!id, refetchInterval: 5000 },
   });
 
   const { mutate: scanVulnerabilities } = useVulnerabilitiesControllerScan();
 
   // Determine active tab, default to "assets" if not specified
-  const activeTab = TABS.some((t) => t.value === tab) ? tab : "assets";
+  const activeTab = TABS.some((t) => t.value === tab) ? tab : 'assets';
 
   // Handle tab change
   const handleTabChange = (value: string) => {
     // Create new search params with the selected tab
     const newSearchParams = new URLSearchParams(searchParams);
-    newSearchParams.set("tab", value);
+    newSearchParams.set('tab', value);
     navigate(`?${newSearchParams.toString()}`);
   };
 
@@ -95,7 +95,6 @@ export function DetailTarget() {
         </div>
       }
     >
-
       <Tabs
         value={activeTab!}
         onValueChange={handleTabChange}
@@ -113,7 +112,7 @@ export function DetailTarget() {
               </TabsTrigger>
             ))}
           </TabsList>
-          {tab === "vulnerabilities" && (
+          {tab === 'vulnerabilities' && (
             <ConfirmDialog
               title="Scan vulnerabilities"
               description={`Are you sure you want to scan vulnerabilities for target ${target.value}?`}
@@ -124,11 +123,11 @@ export function DetailTarget() {
                   },
                   {
                     onSuccess: () => {
-                      toast.success("Scan started successfully");
+                      toast.success('Scan started successfully');
                       navigate(`?tab=vulnerabilities`);
                     },
                     onError: () => {
-                      toast.error("Failed to start scan");
+                      toast.error('Failed to start scan');
                     },
                   },
                 )
@@ -138,7 +137,7 @@ export function DetailTarget() {
                   disabled={target.status !== JobStatus.completed}
                   variant="secondary"
                   className="hover:cursor-pointer text-sm"
-                  size={"sm"}
+                  size={'sm'}
                   title={`Start scan vulnerabilities for target ${target.value}`}
                 >
                   <Bug className="h-4 w-4" />
@@ -157,7 +156,7 @@ export function DetailTarget() {
           <ListAssets
             targetId={target.id}
             refetchInterval={
-              target.status === JobStatus.in_progress ? 1000 : 5000
+              target.status === JobStatus.in_progress ? 1000 : 30 * 1000
             }
           />
         </TabsContent>
