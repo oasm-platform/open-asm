@@ -67,6 +67,16 @@ export type CreateTargetDto = {
   workspaceId: string;
 };
 
+export type GetManyTargetResponseDtoScanSchedule =
+  (typeof GetManyTargetResponseDtoScanSchedule)[keyof typeof GetManyTargetResponseDtoScanSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const GetManyTargetResponseDtoScanSchedule = {
+  "0_0_*_*_0": "0 0 * * 0",
+  "0_0_*/14_*_*": "0 0 */14 * *",
+  "0_0_1_*_*": "0 0 1 * *",
+} as const;
+
 export type GetManyTargetResponseDtoStatus =
   (typeof GetManyTargetResponseDtoStatus)[keyof typeof GetManyTargetResponseDtoStatus];
 
@@ -77,8 +87,14 @@ export const GetManyTargetResponseDtoStatus = {
 } as const;
 
 export type GetManyTargetResponseDto = {
+  id: string;
+  value: string;
+  reScanCount: number;
+  scanSchedule: GetManyTargetResponseDtoScanSchedule;
   status: GetManyTargetResponseDtoStatus;
   totalAssets: number;
+  duration: number;
+  lastDiscoveredAt: string;
 };
 
 export type GetManyGetManyTargetResponseDtoDto = {
@@ -204,11 +220,83 @@ export type UpdateResultDto = {
   data: UpdateResultDtoData;
 };
 
+export type TlsInfoFingerprintHash = { [key: string]: unknown };
+
+export type TlsInfo = {
+  host: string;
+  port: string;
+  probe_status: boolean;
+  tls_version: string;
+  cipher: string;
+  not_before: string;
+  not_after: string;
+  subject_dn: string;
+  subject_cn: string;
+  subject_an: string[];
+  serial: string;
+  issuer_dn: string;
+  issuer_cn: string;
+  issuer_org: string[];
+  fingerprint_hash: TlsInfoFingerprintHash;
+  wildcard_certificate: boolean;
+  tls_connection: string;
+  sni: string;
+};
+
+export type KnowledgebaseInfo = {
+  PageType: string;
+  pHash: number;
+};
+
+export type HttpResponseHeader = { [key: string]: unknown };
+
+export type HttpResponse = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  timestamp: string;
+  tls: TlsInfo;
+  port: string;
+  url: string;
+  input: string;
+  title: string;
+  scheme: string;
+  webserver: string;
+  body: string;
+  content_type: string;
+  method: string;
+  host: string;
+  path: string;
+  favicon: string;
+  favicon_md5: string;
+  favicon_url: string;
+  header: HttpResponseHeader;
+  raw_header: string;
+  request: string;
+  time: string;
+  a: string[];
+  tech: string[];
+  words: number;
+  lines: number;
+  status_code: number;
+  content_length: number;
+  failed: boolean;
+  knowledgebase: KnowledgebaseInfo;
+  resolvers: string[];
+  assetId: string;
+  jobHistoryId: string;
+};
+
+export type Port = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  ports: string[];
+  assetId: string;
+  jobHistoryId: string;
+};
+
 export type GetAssetsResponseDtoDnsRecords = { [key: string]: unknown };
-
-export type GetAssetsResponseDtoHttpResponses = { [key: string]: unknown };
-
-export type GetAssetsResponseDtoPorts = { [key: string]: unknown };
 
 export type GetAssetsResponseDto = {
   id: string;
@@ -218,13 +306,55 @@ export type GetAssetsResponseDto = {
   createdAt: string;
   updatedAt: string;
   dnsRecords?: GetAssetsResponseDtoDnsRecords;
-  httpResponses?: GetAssetsResponseDtoHttpResponses;
-  ports?: GetAssetsResponseDtoPorts;
+  httpResponses?: HttpResponse;
+  ports?: Port;
   isErrorPage?: boolean;
 };
 
 export type GetManyGetAssetsResponseDtoDto = {
   data: GetAssetsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type GetIpAssetsDTO = {
+  ip: string;
+  assetCount: number;
+};
+
+export type GetManyGetIpAssetsDTODto = {
+  data: GetIpAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type GetPortAssetsDTO = {
+  port: string;
+  assetCount: number;
+};
+
+export type GetManyGetPortAssetsDTODto = {
+  data: GetPortAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type GetTechnologyAssetsDTO = {
+  technology: string;
+  assetCount: number;
+};
+
+export type GetManyGetTechnologyAssetsDTODto = {
+  data: GetTechnologyAssetsDTO[];
   total: number;
   page: number;
   limit: number;
@@ -464,7 +594,33 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
   statusCodes?: string[];
 };
 
-export type AssetsControllerGetAssetIpParams = {
+export type AssetsControllerGetIpAssetsParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  value?: string;
+  workspaceId: string;
+  targetIds?: string[];
+  ports?: string[];
+  techs?: string[];
+  statusCodes?: string[];
+};
+
+export type AssetsControllerGetPortAssetsParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  value?: string;
+  workspaceId: string;
+  targetIds?: string[];
+  ports?: string[];
+  techs?: string[];
+  statusCodes?: string[];
+};
+
+export type AssetsControllerGetTechnologyAssetsParams = {
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -4632,39 +4788,39 @@ export function useAssetsControllerGetAssetsInWorkspace<
  * Retrieves a list of ip with number of assets.
  * @summary Get IP asset
  */
-export const assetsControllerGetAssetIp = (
-  params: AssetsControllerGetAssetIpParams,
+export const assetsControllerGetIpAssets = (
+  params: AssetsControllerGetIpAssetsParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetAssetsResponseDto>(
+  return orvalClient<GetManyGetIpAssetsDTODto>(
     { url: `/api/assets/ip`, method: "GET", params, signal },
     options,
   );
 };
 
-export const getAssetsControllerGetAssetIpQueryKey = (
-  params: AssetsControllerGetAssetIpParams,
+export const getAssetsControllerGetIpAssetsQueryKey = (
+  params: AssetsControllerGetIpAssetsParams,
 ) => {
   return [`/api/assets/ip`, ...(params ? [params] : [])] as const;
 };
 
-export const getAssetsControllerGetAssetIpInfiniteQueryOptions = <
+export const getAssetsControllerGetIpAssetsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
-    AssetsControllerGetAssetIpParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+    AssetsControllerGetIpAssetsParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetIpParams["page"]
+        AssetsControllerGetIpAssetsParams["page"]
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -4673,56 +4829,56 @@ export const getAssetsControllerGetAssetIpInfiniteQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAssetsControllerGetAssetIpQueryKey(params);
+    queryOptions?.queryKey ?? getAssetsControllerGetIpAssetsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
     QueryKey,
-    AssetsControllerGetAssetIpParams["page"]
+    AssetsControllerGetIpAssetsParams["page"]
   > = ({ signal, pageParam }) =>
-    assetsControllerGetAssetIp(
+    assetsControllerGetIpAssets(
       { ...params, page: pageParam || params?.["page"] },
       requestOptions,
       signal,
     );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
     TError,
     TData,
     QueryKey,
-    AssetsControllerGetAssetIpParams["page"]
+    AssetsControllerGetIpAssetsParams["page"]
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AssetsControllerGetAssetIpInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+export type AssetsControllerGetIpAssetsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
 >;
-export type AssetsControllerGetAssetIpInfiniteQueryError = unknown;
+export type AssetsControllerGetIpAssetsInfiniteQueryError = unknown;
 
-export function useAssetsControllerGetAssetIpInfinite<
+export function useAssetsControllerGetIpAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
-    AssetsControllerGetAssetIpParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+    AssetsControllerGetIpAssetsParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetIpParams["page"]
+        AssetsControllerGetIpAssetsParams["page"]
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
           QueryKey
         >,
         "initialData"
@@ -4733,29 +4889,29 @@ export function useAssetsControllerGetAssetIpInfinite<
 ): DefinedUseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetsControllerGetAssetIpInfinite<
+export function useAssetsControllerGetIpAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
-    AssetsControllerGetAssetIpParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+    AssetsControllerGetIpAssetsParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetIpParams["page"]
+        AssetsControllerGetIpAssetsParams["page"]
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
           QueryKey
         >,
         "initialData"
@@ -4766,22 +4922,22 @@ export function useAssetsControllerGetAssetIpInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetsControllerGetAssetIpInfinite<
+export function useAssetsControllerGetIpAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
-    AssetsControllerGetAssetIpParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+    AssetsControllerGetIpAssetsParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetIpParams["page"]
+        AssetsControllerGetIpAssetsParams["page"]
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -4794,22 +4950,22 @@ export function useAssetsControllerGetAssetIpInfinite<
  * @summary Get IP asset
  */
 
-export function useAssetsControllerGetAssetIpInfinite<
+export function useAssetsControllerGetIpAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
-    AssetsControllerGetAssetIpParams["page"]
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+    AssetsControllerGetIpAssetsParams["page"]
   >,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData,
         QueryKey,
-        AssetsControllerGetAssetIpParams["page"]
+        AssetsControllerGetIpAssetsParams["page"]
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -4818,7 +4974,7 @@ export function useAssetsControllerGetAssetIpInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAssetsControllerGetAssetIpInfiniteQueryOptions(
+  const queryOptions = getAssetsControllerGetIpAssetsInfiniteQueryOptions(
     params,
     options,
   );
@@ -4835,15 +4991,15 @@ export function useAssetsControllerGetAssetIpInfinite<
   return query;
 }
 
-export const getAssetsControllerGetAssetIpQueryOptions = <
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+export const getAssetsControllerGetIpAssetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData
       >
@@ -4854,43 +5010,43 @@ export const getAssetsControllerGetAssetIpQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAssetsControllerGetAssetIpQueryKey(params);
+    queryOptions?.queryKey ?? getAssetsControllerGetIpAssetsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
   > = ({ signal }) =>
-    assetsControllerGetAssetIp(params, requestOptions, signal);
+    assetsControllerGetIpAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AssetsControllerGetAssetIpQueryResult = NonNullable<
-  Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+export type AssetsControllerGetIpAssetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
 >;
-export type AssetsControllerGetAssetIpQueryError = unknown;
+export type AssetsControllerGetIpAssetsQueryError = unknown;
 
-export function useAssetsControllerGetAssetIp<
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+export function useAssetsControllerGetIpAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
         >,
         "initialData"
       >;
@@ -4900,24 +5056,24 @@ export function useAssetsControllerGetAssetIp<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetsControllerGetAssetIp<
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+export function useAssetsControllerGetIpAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetIp>>
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
         >,
         "initialData"
       >;
@@ -4927,15 +5083,15 @@ export function useAssetsControllerGetAssetIp<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetsControllerGetAssetIp<
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+export function useAssetsControllerGetIpAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData
       >
@@ -4950,15 +5106,15 @@ export function useAssetsControllerGetAssetIp<
  * @summary Get IP asset
  */
 
-export function useAssetsControllerGetAssetIp<
-  TData = Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+export function useAssetsControllerGetIpAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
   TError = unknown,
 >(
-  params: AssetsControllerGetAssetIpParams,
+  params: AssetsControllerGetIpAssetsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetsControllerGetAssetIp>>,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
         TData
       >
@@ -4969,7 +5125,718 @@ export function useAssetsControllerGetAssetIp<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAssetsControllerGetAssetIpQueryOptions(
+  const queryOptions = getAssetsControllerGetIpAssetsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves a list of port with number of assets.
+ * @summary Get ports and number of assets
+ */
+export const assetsControllerGetPortAssets = (
+  params: AssetsControllerGetPortAssetsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetPortAssetsDTODto>(
+    { url: `/api/assets/port`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetPortAssetsQueryKey = (
+  params: AssetsControllerGetPortAssetsParams,
+) => {
+  return [`/api/assets/port`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetPortAssetsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+    AssetsControllerGetPortAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetPortAssetsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetPortAssetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+    QueryKey,
+    AssetsControllerGetPortAssetsParams["page"]
+  > = ({ signal, pageParam }) =>
+    assetsControllerGetPortAssets(
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+    TError,
+    TData,
+    QueryKey,
+    AssetsControllerGetPortAssetsParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetPortAssetsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
+>;
+export type AssetsControllerGetPortAssetsInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetPortAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+    AssetsControllerGetPortAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetPortAssetsParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetPortAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+    AssetsControllerGetPortAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetPortAssetsParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetPortAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+    AssetsControllerGetPortAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetPortAssetsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get ports and number of assets
+ */
+
+export function useAssetsControllerGetPortAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+    AssetsControllerGetPortAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetPortAssetsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetPortAssetsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetsControllerGetPortAssetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetPortAssetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
+  > = ({ signal }) =>
+    assetsControllerGetPortAssets(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetPortAssetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
+>;
+export type AssetsControllerGetPortAssetsQueryError = unknown;
+
+export function useAssetsControllerGetPortAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetPortAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetPortAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get ports and number of assets
+ */
+
+export function useAssetsControllerGetPortAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetPortAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetPortAssetsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves a list of technologies with number of assets.
+ * @summary Get technologies along with number of assets
+ */
+export const assetsControllerGetTechnologyAssets = (
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetTechnologyAssetsDTODto>(
+    { url: `/api/assets/tech`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetTechnologyAssetsQueryKey = (
+  params: AssetsControllerGetTechnologyAssetsParams,
+) => {
+  return [`/api/assets/tech`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetTechnologyAssetsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+    AssetsControllerGetTechnologyAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTechnologyAssetsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetTechnologyAssetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+    QueryKey,
+    AssetsControllerGetTechnologyAssetsParams["page"]
+  > = ({ signal, pageParam }) =>
+    assetsControllerGetTechnologyAssets(
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+    TError,
+    TData,
+    QueryKey,
+    AssetsControllerGetTechnologyAssetsParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetTechnologyAssetsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>>;
+export type AssetsControllerGetTechnologyAssetsInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetTechnologyAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+    AssetsControllerGetTechnologyAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTechnologyAssetsParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTechnologyAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+    AssetsControllerGetTechnologyAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTechnologyAssetsParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTechnologyAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+    AssetsControllerGetTechnologyAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTechnologyAssetsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get technologies along with number of assets
+ */
+
+export function useAssetsControllerGetTechnologyAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+    AssetsControllerGetTechnologyAssetsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTechnologyAssetsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetsControllerGetTechnologyAssetsInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetsControllerGetTechnologyAssetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetTechnologyAssetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
+  > = ({ signal }) =>
+    assetsControllerGetTechnologyAssets(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetTechnologyAssetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
+>;
+export type AssetsControllerGetTechnologyAssetsQueryError = unknown;
+
+export function useAssetsControllerGetTechnologyAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTechnologyAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTechnologyAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get technologies along with number of assets
+ */
+
+export function useAssetsControllerGetTechnologyAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetTechnologyAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetTechnologyAssetsQueryOptions(
     params,
     options,
   );

@@ -2,7 +2,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import AssetDetail from "./components/asset-detail";
+import AssetDetail from "./asset-detail";
 
 dayjs.extend(relativeTime);
 

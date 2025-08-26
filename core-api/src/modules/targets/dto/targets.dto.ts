@@ -14,11 +14,30 @@ export class CreateTargetDto extends PickType(Target, ['value'] as const) {
 }
 
 export class GetManyTargetResponseDto {
+  @ApiProperty()
+  @IsUUID('4')
+  id: string;
+
+  @ApiProperty()
+  value: string;
+
+  @ApiProperty()
+  reScanCount: number;
+
+  @ApiProperty({ enum: CronSchedule, example: CronSchedule.BI_WEEKLY })
+  scanSchedule: CronSchedule;
+
   @ApiProperty({ enum: ScanStatus, example: ScanStatus.DONE })
   status?: ScanStatus;
 
   @ApiProperty({ example: 100 })
   totalAssets: number;
+
+  @ApiProperty()
+  duration: number;
+
+  @ApiProperty()
+  lastDiscoveredAt: Date;
 }
 
 export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {

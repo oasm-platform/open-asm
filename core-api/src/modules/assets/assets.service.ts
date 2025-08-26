@@ -8,9 +8,13 @@ import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';
+import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
-import { GetAssetsIpDTO } from './dto/get-asset-ip.dto';
+import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
+import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
+import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { Asset } from './entities/assets.entity';
+import { HttpResponse } from './entities/http-response.entity';
 
 @Injectable()
 export class AssetsService {
@@ -102,8 +106,10 @@ export class AssetsService {
       asset.updatedAt = item.updatedAt;
       asset.dnsRecords = item.dnsRecords;
       asset.isErrorPage = item.isErrorPage;
-      asset.httpResponses = item.httpResponses ? item.httpResponses[0] : null;
-      asset.ports = item.ports ? item.ports[0] : null;
+      asset.httpResponses = item.httpResponses
+        ? item.httpResponses[0]
+        : undefined;
+      asset.ports = item.ports ? item.ports[0] : undefined;
       return asset;
     });
 
@@ -199,10 +205,10 @@ export class AssetsService {
    * @returns A promise that resolves to the list of ip.
    *
    */
-  public async getAssetIp(
+  public async getIpAssets(
     query: GetAssetsQueryDto,
-  ): Promise<GetManyBaseResponseDto<GetAssetsIpDTO>> {
-    const { limit, page, sortOrder } = query;
+  ): Promise<GetManyBaseResponseDto<GetIpAssetsDTO>> {
+    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
 
     const offset = (page - 1) * limit;
 
@@ -211,6 +217,7 @@ export class AssetsService {
       .addCommonTableExpression(
         `SELECT
         a.id AS asset_id,
+        a."targetId",
         jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'A') AS ip
     FROM assets a
     WHERE a."targetId" IS NOT NULL
@@ -219,6 +226,7 @@ export class AssetsService {
 
     SELECT
         a.id AS asset_id,
+        a."targetId",
         jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'AAAA') AS ip
     FROM assets a
     WHERE a."targetId" IS NOT NULL`,
@@ -227,16 +235,140 @@ export class AssetsService {
       .select('t.ip', 'ip')
       .addSelect('COUNT(DISTINCT t.asset_id)', 'assetCount')
       .from('cte', 't')
+      .leftJoin(WorkspaceTarget, 'wt', 'wt."targetId" = t."targetId"')
+      .where('wt.workspaceId = :workspaceId', { workspaceId })
       .groupBy('"ip"')
       .orderBy('"assetCount"', sortOrder);
 
+    if (value && value.length > 0)
+      queryBuilder.andWhere('t.ip ILIKE :value', {
+        value: `%${value}%`,
+      });
+
+    if (targetIds && targetIds.length > 0)
+      queryBuilder.andWhere('t."targetId" = ANY(:targetId)', {
+        targetId: targetIds,
+      });
+
     const total = (await queryBuilder.getRawMany()).length;
 
-    const result = await queryBuilder.limit(limit).offset(offset).getRawMany();
-    const list = result.map((item: GetAssetsIpDTO) => {
-      const obj = new GetAssetsIpDTO();
+    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+
+    const list = result.map((item: GetIpAssetsDTO) => {
+      const obj = new GetIpAssetsDTO();
       obj.assetCount = item.assetCount;
       obj.ip = item.ip;
+      return obj;
+    });
+
+    return getManyResponse({ query, data: list, total });
+  }
+
+  /**
+   * Retrieves a list of Port with number of asset
+   *
+   * @returns A promise that resolves to the list of port.
+   *
+   */
+  public async getPortAssets(
+    query: GetAssetsQueryDto,
+  ): Promise<GetManyBaseResponseDto<GetPortAssetsDTO>> {
+    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+
+    const offset = (page - 1) * limit;
+
+    const queryBuilder = this.assetRepo
+      .createQueryBuilder('assets')
+      .leftJoin('assets.httpResponses', 'httpResponses')
+      .leftJoin('assets.target', 'targets')
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .select(`"httpResponses"."tls"::jsonb -> 'port'`, 'port')
+      .addSelect('COUNT(assets.id)', 'assetCount')
+      .distinct(true)
+      .where(`"httpResponses"."tls"::jsonb -> 'port' is not null`)
+      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .groupBy(`"httpResponses"."tls"::jsonb -> 'port'`)
+      .orderBy('"assetCount"', sortOrder);
+
+    if (value && value.length > 0)
+      queryBuilder.andWhere(
+        `"httpResponses"."tls"::jsonb -> 'port' ILIKE :value`,
+        {
+          value: `%${value}%`,
+        },
+      );
+
+    if (targetIds && targetIds.length > 0)
+      queryBuilder.andWhere('"assets"."targetId" = ANY(:targetId)', {
+        targetId: targetIds,
+      });
+
+    const total = (await queryBuilder.getRawMany()).length;
+
+    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+
+    const list = result.map((item: GetPortAssetsDTO) => {
+      const obj = new GetPortAssetsDTO();
+      obj.assetCount = item.assetCount;
+      obj.port = item.port;
+      return obj;
+    });
+
+    return getManyResponse({ query, data: list, total });
+  }
+
+  /**
+   * Retrieves a list of Port with number of asset
+   *
+   * @returns A promise that resolves to the list of port.
+   *
+   */
+  public async getTechnologyAssets(
+    query: GetAssetsQueryDto,
+  ): Promise<GetManyBaseResponseDto<GetTechnologyAssetsDTO>> {
+    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+
+    const offset = (page - 1) * limit;
+
+    const queryBuilder = this.assetRepo
+      .createQueryBuilder('assets')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .select('httpResponses.assetId', 'assetId')
+            .addSelect('unnest(httpResponses.tech)', 'tech')
+            .from(HttpResponse, 'httpResponses'),
+        'techUnnested',
+        '"techUnnested"."assetId" = "assets"."id"',
+      )
+      .leftJoin('assets.target', 'targets')
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .select(`"techUnnested"."tech"`, 'technology')
+      .addSelect('COUNT(assets.id)', 'assetCount')
+      .distinct(true)
+      .where(`"techUnnested"."tech" is not null`)
+      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .groupBy(`"techUnnested"."tech"`)
+      .orderBy('"assetCount"', sortOrder);
+
+    if (value && value.length > 0)
+      queryBuilder.andWhere(`"techUnnested"."tech" ILIKE :value`, {
+        value: `%${value}%`,
+      });
+
+    if (targetIds && targetIds.length > 0)
+      queryBuilder.andWhere('"assets"."targetId" = ANY(:targetId)', {
+        targetId: targetIds,
+      });
+
+    const total = (await queryBuilder.getRawMany()).length;
+
+    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+
+    const list = result.map((item: GetTechnologyAssetsDTO) => {
+      const obj = new GetTechnologyAssetsDTO();
+      obj.assetCount = item.assetCount;
+      obj.technology = item.technology;
       return obj;
     });
 

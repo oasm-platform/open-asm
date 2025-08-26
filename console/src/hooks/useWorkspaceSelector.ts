@@ -13,11 +13,13 @@ const useWorkspaceState = createState<WorkspaceState>(
   "workspace",
   { selectedWorkspaceId: null },
   {
-    setSelectedWorkspace: (state, id: string | null) => {
-      return {
-        ...state,
-        selectedWorkspaceId: id,
-      };
+    setSelectedWorkspace: (state, id) => {
+      return typeof id === "string"
+        ? {
+            ...state,
+            selectedWorkspaceId: id,
+          }
+        : state;
     },
     clearSelectedWorkspace: (state) => ({
       ...state,

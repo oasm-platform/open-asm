@@ -40,10 +40,10 @@ export function DetailTarget() {
     query: { enabled: !!id, refetchInterval: 5000 },
   });
 
-  const { mutate: scanVulnerabilities } = useVulnerabilitiesControllerScan()
+  const { mutate: scanVulnerabilities } = useVulnerabilitiesControllerScan();
 
   // Determine active tab, default to "assets" if not specified
-  const activeTab = TABS.some(t => t.value === tab) ? tab : "assets";
+  const activeTab = TABS.some((t) => t.value === tab) ? tab : "assets";
 
   // Handle tab change
   const handleTabChange = (value: string) => {
@@ -96,11 +96,19 @@ export function DetailTarget() {
       }
     >
 
-      <Tabs value={activeTab as any} onValueChange={handleTabChange} className="w-full my-6">
+      <Tabs
+        value={activeTab!}
+        onValueChange={handleTabChange}
+        className="w-full my-6"
+      >
         <div className="flex justify-between items-center gap-5">
           <TabsList>
             {TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value} className="hover:cursor-pointer">
+              <TabsTrigger
+                key={t.value}
+                value={t.value}
+                className="hover:cursor-pointer"
+              >
                 {t.label}
               </TabsTrigger>
             ))}
@@ -109,17 +117,22 @@ export function DetailTarget() {
             <ConfirmDialog
               title="Scan vulnerabilities"
               description={`Are you sure you want to scan vulnerabilities for target ${target.value}?`}
-              onConfirm={() => scanVulnerabilities({
-                data: { targetId: target.id, }
-              }, {
-                onSuccess: () => {
-                  toast.success("Scan started successfully")
-                  navigate(`?tab=vulnerabilities`)
-                },
-                onError: () => {
-                  toast.error("Failed to start scan")
-                },
-              })}
+              onConfirm={() =>
+                scanVulnerabilities(
+                  {
+                    data: { targetId: target.id },
+                  },
+                  {
+                    onSuccess: () => {
+                      toast.success("Scan started successfully");
+                      navigate(`?tab=vulnerabilities`);
+                    },
+                    onError: () => {
+                      toast.error("Failed to start scan");
+                    },
+                  },
+                )
+              }
               trigger={
                 <Button
                   disabled={target.status !== JobStatus.completed}
@@ -143,10 +156,15 @@ export function DetailTarget() {
             )}
           <ListAssets
             targetId={target.id}
-            refetchInterval={target.status === JobStatus.in_progress ? 1000 : 5000}
+            refetchInterval={
+              target.status === JobStatus.in_progress ? 1000 : 5000
+            }
           />
         </TabsContent>
-        <TabsContent value="vulnerabilities" className="flex flex-col gap-5 py-3">
+        <TabsContent
+          value="vulnerabilities"
+          className="flex flex-col gap-5 py-3"
+        >
           <VulnerabilitiesStatistic targetId={target.id} />
           <ListVulnerabilities targetId={target.id} />
         </TabsContent>
@@ -156,4 +174,3 @@ export function DetailTarget() {
 }
 
 export default DetailTarget;
-
