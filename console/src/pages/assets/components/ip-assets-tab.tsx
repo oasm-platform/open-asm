@@ -29,6 +29,7 @@ const ipAssetsColumn: ColumnDef<GetIpAssetsDTO>[] = [
     },
   },
   {
+    accessorKey: "assetCount",
     header: "Number of assets",
     size: 250,
     cell: ({ row }) => {

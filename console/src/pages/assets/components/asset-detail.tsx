@@ -52,7 +52,7 @@ export default function AssetDetail({ id }: { id: string }) {
   };
 
   return (
-    <ScrollArea className="flex-grow min-h-0 pr-2 sm:pr-4 mt-4">
+    <ScrollArea className="flex-grow min-h-0 pr-2 sm:pr-4 mt-4 [&>div>div]:!block">
       <div className="flex flex-col">
         <section>
           <h3 className="font-bold text-blue-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">

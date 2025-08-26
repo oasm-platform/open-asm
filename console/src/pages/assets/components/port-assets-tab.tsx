@@ -29,6 +29,7 @@ const portAssetsColumn: ColumnDef<GetPortAssetsDTO>[] = [
     },
   },
   {
+    accessorKey: "assetCount",
     header: "Number of assets",
     size: 250,
     cell: ({ row }) => {

@@ -22,7 +22,7 @@ const tabList = [
   },
   {
     value: "ip",
-    text: "IPs",
+    text: "IP Adresses",
   },
   {
     value: "port",
@@ -31,6 +31,7 @@ const tabList = [
 ];
 
 export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
+  //TODO: rework on refetchInterval because not necessary after complete discovering
   return (
     <div className="w-full">
       <FilterForm />
