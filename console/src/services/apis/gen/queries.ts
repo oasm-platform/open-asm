@@ -554,6 +554,17 @@ export type GetManyStringDto = {
   pageCount: number;
 };
 
+export type StatisticResponseDto = {
+  /** Total number of targets in the workspace */
+  totalTargets: number;
+  /** Total number of assets in the workspace */
+  totalAssets: number;
+  /** Total number of vulnerabilities in the workspace */
+  totalVulnerabilities: number;
+  /** Total number of unique technologies in the workspace */
+  totalUniqueTechnologies: number;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   page?: number;
   limit?: number;
@@ -723,6 +734,13 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
 export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
   workspaceId: string;
   targetIds?: string[];
+};
+
+export type StatisticControllerGetStatisticsParams = {
+  /**
+   * The ID of the workspace to get statistics for
+   */
+  workspaceId: string;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -9968,6 +9986,364 @@ export function useWorkflowsControllerListTemplates<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getWorkflowsControllerListTemplatesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
+ * @summary Get workspace statistics
+ */
+export const statisticControllerGetStatistics = (
+  params: StatisticControllerGetStatisticsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<StatisticResponseDto>(
+    { url: `/api/statistic`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetStatisticsQueryKey = (
+  params: StatisticControllerGetStatisticsParams,
+) => {
+  return [`/api/statistic`, ...(params ? [params] : [])] as const;
+};
+
+export const getStatisticControllerGetStatisticsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+    StatisticControllerGetStatisticsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData,
+        QueryKey,
+        StatisticControllerGetStatisticsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getStatisticControllerGetStatisticsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+    QueryKey,
+    StatisticControllerGetStatisticsParams["page"]
+  > = ({ signal, pageParam }) =>
+    statisticControllerGetStatistics(
+      { ...params, page: pageParam || params?.["page"] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+    TError,
+    TData,
+    QueryKey,
+    StatisticControllerGetStatisticsParams["page"]
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetStatisticsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+>;
+export type StatisticControllerGetStatisticsInfiniteQueryError = unknown;
+
+export function useStatisticControllerGetStatisticsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+    StatisticControllerGetStatisticsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData,
+        QueryKey,
+        StatisticControllerGetStatisticsParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetStatisticsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+    StatisticControllerGetStatisticsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData,
+        QueryKey,
+        StatisticControllerGetStatisticsParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetStatisticsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+    StatisticControllerGetStatisticsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData,
+        QueryKey,
+        StatisticControllerGetStatisticsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace statistics
+ */
+
+export function useStatisticControllerGetStatisticsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+    StatisticControllerGetStatisticsParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData,
+        QueryKey,
+        StatisticControllerGetStatisticsParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStatisticControllerGetStatisticsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStatisticControllerGetStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getStatisticControllerGetStatisticsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+  > = ({ signal }) =>
+    statisticControllerGetStatistics(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+>;
+export type StatisticControllerGetStatisticsQueryError = unknown;
+
+export function useStatisticControllerGetStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace statistics
+ */
+
+export function useStatisticControllerGetStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(
+  params: StatisticControllerGetStatisticsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStatisticControllerGetStatisticsQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
