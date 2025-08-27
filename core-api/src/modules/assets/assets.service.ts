@@ -342,8 +342,7 @@ export class AssetsService {
       )
       .leftJoin(Port, 'ports', 'ports."assetId" = t."asset_id"')
       .where('wt.workspaceId = :workspaceId', { workspaceId })
-      .groupBy('"ip"')
-      .orderBy(`"${sortBy}"`, sortOrder);
+      .groupBy('"ip"');
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -359,7 +358,11 @@ export class AssetsService {
 
     const total = (await queryBuilder.getRawMany()).length;
 
-    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+    const result = await queryBuilder
+      .orderBy(`"${sortBy}"`, sortOrder)
+      .offset(offset)
+      .limit(limit)
+      .getRawMany();
 
     const list = result.map((item: GetIpAssetsDTO) => {
       const obj = new GetIpAssetsDTO();
@@ -470,8 +473,7 @@ export class AssetsService {
       .addSelect('COUNT(assets.id)', 'assetCount')
       .distinct(true)
       .where(`"portUnnested"."port" is not null`)
-      .groupBy(`"portUnnested"."port"`)
-      .orderBy(`"${sortBy}"`, sortOrder);
+      .groupBy(`"portUnnested"."port"`);
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -487,7 +489,11 @@ export class AssetsService {
 
     const total = (await queryBuilder.getRawMany()).length;
 
-    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+    const result = await queryBuilder
+      .orderBy(`"${sortBy}"`, sortOrder)
+      .offset(offset)
+      .limit(limit)
+      .getRawMany();
 
     const list = result.map((item: GetPortAssetsDTO) => {
       const obj = new GetPortAssetsDTO();
@@ -597,8 +603,7 @@ export class AssetsService {
       .addSelect('COUNT(assets.id)', 'assetCount')
       .distinct(true)
       .where(`"techUnnested"."tech" is not null`)
-      .groupBy(`"techUnnested"."tech"`)
-      .orderBy(`"${sortBy}"`, sortOrder);
+      .groupBy(`"techUnnested"."tech"`);
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -614,7 +619,11 @@ export class AssetsService {
 
     const total = (await queryBuilder.getRawMany()).length;
 
-    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+    const result = await queryBuilder
+      .orderBy(`"${sortBy}"`, sortOrder)
+      .offset(offset)
+      .limit(limit)
+      .getRawMany();
 
     const list = result.map((item: GetTechnologyAssetsDTO) => {
       const obj = new GetTechnologyAssetsDTO();
@@ -716,13 +725,15 @@ export class AssetsService {
 
     return result;
   }
-   /**
+  /**
    * Counts the number of unique technologies in a workspace.
    *
    * @param workspaceId - The ID of the workspace.
    * @returns The count of unique technologies in the workspace.
    */
-  public async countUniqueTechnologiesInWorkspace(workspaceId: string): Promise<number> {
+  public async countUniqueTechnologiesInWorkspace(
+    workspaceId: string,
+  ): Promise<number> {
     const result = await this.assetRepo
       .createQueryBuilder('assets')
       .leftJoin(
