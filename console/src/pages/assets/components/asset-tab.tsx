@@ -5,6 +5,7 @@ import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/que
 import { useState } from 'react';
 import { assetColumns } from './asset-column';
 import AssetDetailSheet from './asset-detail-sheet';
+import { useSearchParams } from 'react-router-dom';
 
 interface Props {
   targetId?: string;
@@ -19,6 +20,7 @@ export default function AssetTab({
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [rowID, setRowID] = useState('');
+  const [params] = useSearchParams();
 
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
@@ -27,12 +29,16 @@ export default function AssetTab({
     defaultSortBy: 'value',
     defaultSortOrder: 'ASC',
   });
+  const ipAddresses = params.getAll('ipAddresses');
 
   const queryParams = {
     workspaceId: selectedWorkspace ?? '',
     targetIds: targetId ? [targetId] : undefined,
     value: filter,
     limit: pageSize,
+    ipAddresses: ipAddresses,
+    ports: params.getAll('ports'),
+    techs: params.getAll('techs'),
     page,
     sortBy,
     sortOrder,
@@ -50,6 +56,7 @@ export default function AssetTab({
         pageSize,
         sortBy,
         sortOrder,
+        ipAddresses,
       ],
     },
   };

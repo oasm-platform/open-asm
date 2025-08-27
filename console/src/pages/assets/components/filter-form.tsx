@@ -185,7 +185,9 @@ function FacetedFilter({ title, filterKey, options }: FacetedFilterProps) {
                   </Badge>
                 ) : (
                   options
-                    .filter((option) => selectedValues.has(option.value))
+                    .filter((option) =>
+                      selectedValues.has(option.value.toString()),
+                    )
                     .map((option) => (
                       <Badge
                         variant="secondary"
@@ -208,7 +210,7 @@ function FacetedFilter({ title, filterKey, options }: FacetedFilterProps) {
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
-                const isSelected = selectedValues.has(option.value);
+                const isSelected = selectedValues.has(option.value.toString());
                 return (
                   <CommandItem
                     key={option.value}
@@ -233,12 +235,6 @@ function FacetedFilter({ title, filterKey, options }: FacetedFilterProps) {
                       <Check className={cn('text-background h-4 w-4')} />
                     </div>
                     <span>{option.label}</span>
-                    {/* TODO: display unique value for each option */}
-                    {/* {facets?.get(option.value) && ( */}
-                    {/*   <span className="ms-auto flex h-4 w-4 items-center justify-center font-mono text-xs"> */}
-                    {/*     {facets.get(option.value)} */}
-                    {/*   </span> */}
-                    {/* )} */}
                   </CommandItem>
                 );
               })}

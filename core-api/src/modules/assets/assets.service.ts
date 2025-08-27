@@ -53,15 +53,82 @@ export class AssetsService {
    */
   public async getAssetsInWorkspace(
     query: GetAssetsQueryDto,
-    assetID?: string,
+    assetId?: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
-    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+    const {
+      limit,
+      page,
+      sortOrder,
+      targetIds,
+      workspaceId,
+      value,
+      ipAddresses,
+      ports,
+      techs,
+    } = query;
 
     let sortBy = query.sortBy;
     if (!(sortBy in Asset)) {
       sortBy = 'createdAt';
     }
     const offset = (page - 1) * limit;
+
+    const ipQb = this.dataSource
+      .createQueryBuilder()
+      .addCommonTableExpression(
+        `SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'A') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL
+
+    UNION ALL
+
+    SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'AAAA') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL`,
+        'cte',
+      )
+      .select('t.asset_id', 'asset_id')
+      .where('t.ip = ANY(:ipAddresses)', {
+        ipAddresses,
+      })
+      .from('cte', 't');
+
+    const whereBuilder = {
+      value: {
+        value: value,
+        whereClause: `"assets"."value" ILIKE :param`,
+      },
+      targetIds: {
+        value: targetIds,
+        whereClause: `"assets"."targetIds" = ANY(:param)`,
+      },
+      workspaceId: {
+        value: workspaceId,
+        whereClause: `workspaceTargets.workspaceId = :param`,
+      },
+      assetId: {
+        value: assetId,
+        whereClause: `"assets"."assetId" = :param`,
+      },
+      techs: {
+        value: techs,
+        whereClause: `"httpResponses"."tech" && :param`,
+      },
+      ipAddresses: {
+        value: ipAddresses,
+        whereClause: '"assets"."id" IN (' + ipQb.getQuery() + ')',
+      },
+      ports: {
+        value: ports,
+        whereClause: `"ports"."ports" && :param`,
+      },
+    };
 
     const queryBuilder = this.assetRepo
       .createQueryBuilder('assets')
@@ -72,25 +139,17 @@ export class AssetsService {
       .where('assets.isErrorPage = false')
       .orderBy(`assets.${sortBy}`, sortOrder);
 
-    if (value && value.length > 0)
-      queryBuilder.andWhere('assets.value ILIKE :value', {
-        value: `%${value}%`,
-      });
-
-    if (targetIds && targetIds.length > 0)
-      queryBuilder.andWhere('assets.targetId = ANY(:targetID)', {
-        targetID: targetIds,
-      });
-
-    if (workspaceId && workspaceId.length > 0)
-      queryBuilder.andWhere('workspaceTargets.workspaceId = :workspaceId', {
-        workspaceId,
-      });
-
-    if (assetID && assetID.length > 0)
-      queryBuilder.andWhere('assets.id = :assetID', {
-        assetID,
-      });
+    for (const [key, value] of Object.entries(whereBuilder)) {
+      if (query[key]) {
+        const newWhereClause = value.whereClause.replaceAll(
+          ':param',
+          `:${key}`,
+        );
+        queryBuilder.andWhere(newWhereClause, {
+          [key]: value.value,
+        });
+      }
+    }
 
     const [list, total] = await queryBuilder
       .skip(offset)
