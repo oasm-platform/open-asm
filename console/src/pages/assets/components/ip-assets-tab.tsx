@@ -1,89 +1,23 @@
-import { DataTable } from "@/components/ui/data-table";
-import { TabsContent } from "@/components/ui/tabs";
-import { useServerDataTable } from "@/hooks/useServerDataTable";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import {
-  useAssetsControllerGetIpAssets,
-  type GetIpAssetsDTO,
-} from "@/services/apis/gen/queries";
-import type { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from '@/components/ui/data-table';
+import { TabsContent } from '@/components/ui/tabs';
+import { useAssetsControllerGetIpAssets } from '@/services/apis/gen/queries';
+import { useAsset } from '../context/asset-context';
+import { ipAssetsColumn } from './ip-assets-column';
 
-interface Props {
-  targetId?: string;
-  refetchInterval?: number;
-}
-
-const ipAssetsColumn: ColumnDef<GetIpAssetsDTO>[] = [
-  {
-    accessorKey: "ip",
-    header: "IP",
-    enableHiding: false,
-    size: 500,
-    cell: ({ row }) => {
-      const data = row.original;
-      return (
-        <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
-          {data.ip}
-        </div>
-      );
-    },
-  },
-  {
-    header: "Number of assets",
-    size: 250,
-    cell: ({ row }) => {
-      const data = row.original;
-
-      return (
-        <div className="flex flex-wrap gap-1 items-center">
-          {data.assetCount}
-        </div>
-      );
-    },
-  },
-];
-
-export default function IpAssetsTab({ targetId, refetchInterval }: Props) {
-  const { selectedWorkspace } = useWorkspaceSelector();
-
+export default function IpAssetsTab() {
   const {
-    tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
-  } = useServerDataTable({
-    defaultSortBy: "value",
-    defaultSortOrder: "ASC",
-  });
-
-  const queryParams = {
-    workspaceId: selectedWorkspace ?? "",
-    targetIds: targetId ? [targetId] : undefined,
-    value: filter,
-    limit: pageSize,
-    page,
-    sortBy,
-    sortOrder,
-  };
-
-  const queryOpts = {
-    query: {
-      refetchInterval: refetchInterval ?? (false as const),
-      queryKey: [
-        "ipAssets",
-        targetId,
-        selectedWorkspace,
-        page,
-        filter,
-        pageSize,
-        sortBy,
-        sortOrder,
-      ],
-    },
-  };
-
-  const { data, isLoading } = useAssetsControllerGetIpAssets(
+    tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
-    queryOpts,
-  );
+    queryOptions,
+  } = useAsset();
+
+  const { data, isLoading } = useAssetsControllerGetIpAssets(queryParams, {
+    query: {
+      ...queryOptions.query,
+      queryKey: ['assets', ...queryOptions.query.queryKey],
+    },
+  });
 
   const ipAssets = data?.data ?? [];
   const total = data?.total ?? 0;

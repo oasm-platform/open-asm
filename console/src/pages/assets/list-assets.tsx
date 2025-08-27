@@ -1,56 +1,51 @@
-import { Tabs } from "@/components/ui/tabs";
-import AssetTabContent from "./components/asset-tab";
-import FilterForm from "./components/filter-form";
-import IpAssetsTab from "./components/ip-assets-tab";
-import TriggerList from "./components/tab-trigger-list";
-import PortAssetsTab from "./components/port-assets-tab";
-import TechnologyAssetsTab from "./components/technology-assets-tab";
+import { Tabs } from '@/components/ui/tabs';
+import { useMemo, useState } from 'react';
+import AssetTabContent from './components/asset-tab';
+import FilterForm from './components/filter-form';
+import IpAssetsTab from './components/ip-assets-tab';
+import PortAssetsTab from './components/port-assets-tab';
+import TriggerList from './components/tab-trigger-list';
+import TechnologyAssetsTab from './components/technology-assets-tab';
 
-interface ListAssetsProps {
-  targetId?: string;
-  refetchInterval?: number;
-}
+export function ListAssets() {
+  const tabList = useMemo(
+    () => [
+      {
+        value: 'asset',
+        text: 'All Services',
+        tab: <AssetTabContent />,
+      },
+      {
+        value: 'tech',
+        text: 'Technologies',
+        tab: <TechnologyAssetsTab />,
+      },
+      {
+        value: 'ip',
+        text: 'IP Adresses',
+        tab: <IpAssetsTab />,
+      },
+      {
+        value: 'port',
+        text: 'Ports',
+        tab: <PortAssetsTab />,
+      },
+    ],
+    [],
+  );
 
-const tabList = [
-  {
-    value: "asset",
-    text: "All Services",
-  },
-  {
-    value: "tech",
-    text: "Technologies",
-  },
-  {
-    value: "ip",
-    text: "IPs",
-  },
-  {
-    value: "port",
-    text: "Ports",
-  },
-];
+  const [selectedTab, setSelectedTab] = useState('asset');
 
-export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
   return (
     <div className="w-full">
       <FilterForm />
-      <Tabs defaultValue="asset" className="gap-0">
+      <Tabs
+        value={selectedTab}
+        onValueChange={setSelectedTab}
+        className="gap-0"
+      >
         <TriggerList tabTriggerList={tabList} />
-        <div>
-          <AssetTabContent
-            targetId={targetId}
-            refetchInterval={refetchInterval}
-          />
-          <IpAssetsTab targetId={targetId} refetchInterval={refetchInterval} />
-          <PortAssetsTab
-            targetId={targetId}
-            refetchInterval={refetchInterval}
-          />
-          <TechnologyAssetsTab
-            targetId={targetId}
-            refetchInterval={refetchInterval}
-          />
-        </div>
+        {tabList.find((t) => t.value == selectedTab)?.tab}
       </Tabs>
     </div>
   );

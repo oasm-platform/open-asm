@@ -57,6 +57,14 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   @IsString({ each: true })
   @IsOptional()
   @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
+  ipAddresses?: string[];
+
+  @ApiProperty({
+    required: false,
+  })
+  @IsString({ each: true })
+  @IsOptional()
+  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   ports?: string[];
 
   @ApiProperty({

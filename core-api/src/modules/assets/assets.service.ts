@@ -15,6 +15,8 @@ import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
+import { Port } from './entities/ports.entity';
+import { GetFacetedDataDTO } from './dto/get-faceted-data.dto';
 
 @Injectable()
 export class AssetsService {
@@ -52,9 +54,19 @@ export class AssetsService {
    */
   public async getAssetsInWorkspace(
     query: GetAssetsQueryDto,
-    assetID?: string,
+    assetId?: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
-    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+    const {
+      limit,
+      page,
+      sortOrder,
+      targetIds,
+      workspaceId,
+      value,
+      ipAddresses,
+      ports,
+      techs,
+    } = query;
 
     let sortBy = query.sortBy;
     if (!(sortBy in Asset)) {
@@ -62,36 +74,85 @@ export class AssetsService {
     }
     const offset = (page - 1) * limit;
 
+    const ipQb = this.dataSource
+      .createQueryBuilder()
+      .addCommonTableExpression(
+        `SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'A') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL
+
+    UNION ALL
+
+    SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'AAAA') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL`,
+        'cte',
+      )
+      .select('t.asset_id', 'asset_id')
+      .where('t.ip = ANY(:ipAddresses)', {
+        ipAddresses,
+      })
+      .from('cte', 't');
+
+    const whereBuilder = {
+      value: {
+        value: `%${value}%`,
+        whereClause: `"assets"."value" ILIKE :param`,
+      },
+      targetIds: {
+        value: targetIds,
+        whereClause: `"assets"."targetId" = ANY(:param)`,
+      },
+      workspaceId: {
+        value: workspaceId,
+        whereClause: `workspaceTargets.workspaceId = :param`,
+      },
+      assetId: {
+        value: assetId,
+        whereClause: `"assets"."assetId" = :param`,
+      },
+      techs: {
+        value: techs,
+        whereClause: `"httpResponses"."tech" && :param`,
+      },
+      ipAddresses: {
+        value: ipAddresses,
+        whereClause: '"assets"."id" IN (' + ipQb.getQuery() + ')',
+      },
+      ports: {
+        value: ports,
+        whereClause: `"ports"."ports" && :param`,
+      },
+    };
+
     const queryBuilder = this.assetRepo
       .createQueryBuilder('assets')
       .leftJoinAndSelect('assets.httpResponses', 'httpResponses')
       .leftJoinAndSelect('assets.ports', 'ports')
       .leftJoinAndSelect('assets.target', 'targets')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .where('assets.isErrorPage = false')
-      .orderBy(`assets.${sortBy}`, sortOrder);
+      .where('assets.isErrorPage = false');
 
-    if (value && value.length > 0)
-      queryBuilder.andWhere('assets.value ILIKE :value', {
-        value: `%${value}%`,
-      });
-
-    if (targetIds && targetIds.length > 0)
-      queryBuilder.andWhere('assets.targetId = ANY(:targetID)', {
-        targetID: targetIds,
-      });
-
-    if (workspaceId && workspaceId.length > 0)
-      queryBuilder.andWhere('workspaceTargets.workspaceId = :workspaceId', {
-        workspaceId,
-      });
-
-    if (assetID && assetID.length > 0)
-      queryBuilder.andWhere('assets.id = :assetID', {
-        assetID,
-      });
+    for (const [key, value] of Object.entries(whereBuilder)) {
+      if (query[key]) {
+        const newWhereClause = value.whereClause.replaceAll(
+          ':param',
+          `:${key}`,
+        );
+        queryBuilder.andWhere(newWhereClause, {
+          [key]: value.value,
+        });
+      }
+    }
 
     const [list, total] = await queryBuilder
+      .orderBy(`assets.${sortBy}`, sortOrder)
       .skip(offset)
       .take(limit)
       .getManyAndCount();
@@ -208,9 +269,47 @@ export class AssetsService {
   public async getIpAssets(
     query: GetAssetsQueryDto,
   ): Promise<GetManyBaseResponseDto<GetIpAssetsDTO>> {
-    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+    const {
+      limit,
+      page,
+      sortOrder,
+      targetIds,
+      workspaceId,
+      value,
+      ipAddresses,
+      ports,
+      techs,
+    } = query;
+
+    let sortBy = query.sortBy;
+    if (!(sortBy in GetIpAssetsDTO)) {
+      sortBy = 'assetCount';
+    }
 
     const offset = (page - 1) * limit;
+
+    const whereBuilder = {
+      value: {
+        value: `%${value}%`,
+        whereClause: `"t"."ip" ILIKE :param`,
+      },
+      targetIds: {
+        value: targetIds,
+        whereClause: `"t"."targetId" = ANY(:param)`,
+      },
+      techs: {
+        value: techs,
+        whereClause: `"httpResponses"."tech" && :param`,
+      },
+      ipAddresses: {
+        value: ipAddresses,
+        whereClause: `"t"."ip" = ANY(:param)`,
+      },
+      ports: {
+        value: ports,
+        whereClause: `"ports"."ports" && :param`,
+      },
+    };
 
     const queryBuilder = this.dataSource
       .createQueryBuilder()
@@ -236,23 +335,34 @@ export class AssetsService {
       .addSelect('COUNT(DISTINCT t.asset_id)', 'assetCount')
       .from('cte', 't')
       .leftJoin(WorkspaceTarget, 'wt', 'wt."targetId" = t."targetId"')
+      .leftJoin(
+        HttpResponse,
+        'httpResponses',
+        '"httpResponses"."assetId" = t."asset_id"',
+      )
+      .leftJoin(Port, 'ports', 'ports."assetId" = t."asset_id"')
       .where('wt.workspaceId = :workspaceId', { workspaceId })
-      .groupBy('"ip"')
-      .orderBy('"assetCount"', sortOrder);
+      .groupBy('"ip"');
 
-    if (value && value.length > 0)
-      queryBuilder.andWhere('t.ip ILIKE :value', {
-        value: `%${value}%`,
-      });
-
-    if (targetIds && targetIds.length > 0)
-      queryBuilder.andWhere('t."targetId" = ANY(:targetId)', {
-        targetId: targetIds,
-      });
+    for (const [key, value] of Object.entries(whereBuilder)) {
+      if (query[key]) {
+        const newWhereClause = value.whereClause.replaceAll(
+          ':param',
+          `:${key}`,
+        );
+        queryBuilder.andWhere(newWhereClause, {
+          [key]: value.value,
+        });
+      }
+    }
 
     const total = (await queryBuilder.getRawMany()).length;
 
-    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+    const result = await queryBuilder
+      .orderBy(`"${sortBy}"`, sortOrder)
+      .offset(offset)
+      .limit(limit)
+      .getRawMany();
 
     const list = result.map((item: GetIpAssetsDTO) => {
       const obj = new GetIpAssetsDTO();
@@ -273,39 +383,117 @@ export class AssetsService {
   public async getPortAssets(
     query: GetAssetsQueryDto,
   ): Promise<GetManyBaseResponseDto<GetPortAssetsDTO>> {
-    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+    const {
+      limit,
+      page,
+      sortOrder,
+      targetIds,
+      workspaceId,
+      value,
+      ipAddresses,
+      ports,
+      techs,
+    } = query;
 
     const offset = (page - 1) * limit;
 
+    let sortBy = query.sortBy;
+    if (!(sortBy in GetPortAssetsDTO)) {
+      sortBy = 'assetCount';
+    }
+
+    const ipQb = this.dataSource
+      .createQueryBuilder()
+      .addCommonTableExpression(
+        `SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'A') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL
+
+    UNION ALL
+
+    SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'AAAA') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL`,
+        'cte',
+      )
+      .select('t.asset_id', 'asset_id')
+      .where('t.ip = ANY(:ipAddresses)', {
+        ipAddresses,
+      })
+      .from('cte', 't');
+
+    const whereBuilder = {
+      value: {
+        value: `%${value}%`,
+        whereClause: `"portUnnested"."port" ILIKE :param`,
+      },
+      targetIds: {
+        value: targetIds,
+        whereClause: `"assets"."targetId" = ANY(:param)`,
+      },
+      workspaceId: {
+        value: workspaceId,
+        whereClause: `workspaceTargets.workspaceId = :param`,
+      },
+      techs: {
+        value: techs,
+        whereClause: `"httpResponses"."tech" && :param`,
+      },
+      ipAddresses: {
+        value: ipAddresses,
+        whereClause: '"assets"."id" IN (' + ipQb.getQuery() + ')',
+      },
+      ports: {
+        value: ports,
+        whereClause: `"portUnnested"."port" = ANY(:param)`,
+      },
+    };
+
     const queryBuilder = this.assetRepo
       .createQueryBuilder('assets')
-      .leftJoin('assets.httpResponses', 'httpResponses')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .select('ports.assetId', 'assetId')
+            .addSelect('unnest(ports.ports)', 'port')
+            .from(Port, 'ports'),
+        'portUnnested',
+        '"portUnnested"."assetId" = "assets"."id"',
+      )
       .leftJoin('assets.target', 'targets')
+      .leftJoin('assets.httpResponses', 'httpResponses')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .select(`"httpResponses"."tls"::jsonb -> 'port'`, 'port')
+      .select(`"portUnnested"."port"`, 'port')
       .addSelect('COUNT(assets.id)', 'assetCount')
       .distinct(true)
-      .where(`"httpResponses"."tls"::jsonb -> 'port' is not null`)
-      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
-      .groupBy(`"httpResponses"."tls"::jsonb -> 'port'`)
-      .orderBy('"assetCount"', sortOrder);
+      .where(`"portUnnested"."port" is not null`)
+      .groupBy(`"portUnnested"."port"`);
 
-    if (value && value.length > 0)
-      queryBuilder.andWhere(
-        `"httpResponses"."tls"::jsonb -> 'port' ILIKE :value`,
-        {
-          value: `%${value}%`,
-        },
-      );
-
-    if (targetIds && targetIds.length > 0)
-      queryBuilder.andWhere('"assets"."targetId" = ANY(:targetId)', {
-        targetId: targetIds,
-      });
+    for (const [key, value] of Object.entries(whereBuilder)) {
+      if (query[key]) {
+        const newWhereClause = value.whereClause.replaceAll(
+          ':param',
+          `:${key}`,
+        );
+        queryBuilder.andWhere(newWhereClause, {
+          [key]: value.value,
+        });
+      }
+    }
 
     const total = (await queryBuilder.getRawMany()).length;
 
-    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+    const result = await queryBuilder
+      .orderBy(`"${sortBy}"`, sortOrder)
+      .offset(offset)
+      .limit(limit)
+      .getRawMany();
 
     const list = result.map((item: GetPortAssetsDTO) => {
       const obj = new GetPortAssetsDTO();
@@ -326,10 +514,77 @@ export class AssetsService {
   public async getTechnologyAssets(
     query: GetAssetsQueryDto,
   ): Promise<GetManyBaseResponseDto<GetTechnologyAssetsDTO>> {
-    const { limit, page, sortOrder, targetIds, workspaceId, value } = query;
+    const {
+      limit,
+      page,
+      sortOrder,
+      targetIds,
+      workspaceId,
+      value,
+      ipAddresses,
+      ports,
+      techs,
+    } = query;
 
     const offset = (page - 1) * limit;
 
+    let sortBy = query.sortBy;
+    if (!(sortBy in GetTechnologyAssetsDTO)) {
+      sortBy = 'assetCount';
+    }
+
+    const ipQb = this.dataSource
+      .createQueryBuilder()
+      .addCommonTableExpression(
+        `SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'A') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL
+
+    UNION ALL
+
+    SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'AAAA') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL`,
+        'cte',
+      )
+      .select('t.asset_id', 'asset_id')
+      .where('t.ip = ANY(:ipAddresses)', {
+        ipAddresses,
+      })
+      .from('cte', 't');
+
+    const whereBuilder = {
+      value: {
+        value: `%${value}%`,
+        whereClause: `"techUnnested"."tech" ILIKE :param`,
+      },
+      targetIds: {
+        value: targetIds,
+        whereClause: `"assets"."targetId" = ANY(:param)`,
+      },
+      workspaceId: {
+        value: workspaceId,
+        whereClause: `workspaceTargets.workspaceId = :param`,
+      },
+      techs: {
+        value: techs,
+        whereClause: `"techUnnested"."tech" = ANY(:param)`,
+      },
+      ipAddresses: {
+        value: ipAddresses,
+        whereClause: '"assets"."id" IN (' + ipQb.getQuery() + ')',
+      },
+      ports: {
+        value: ports,
+        whereClause: `"ports"."ports" && :param`,
+      },
+    };
     const queryBuilder = this.assetRepo
       .createQueryBuilder('assets')
       .leftJoin(
@@ -343,27 +598,32 @@ export class AssetsService {
       )
       .leftJoin('assets.target', 'targets')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .leftJoin('assets.ports', 'ports')
       .select(`"techUnnested"."tech"`, 'technology')
       .addSelect('COUNT(assets.id)', 'assetCount')
       .distinct(true)
       .where(`"techUnnested"."tech" is not null`)
-      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
-      .groupBy(`"techUnnested"."tech"`)
-      .orderBy('"assetCount"', sortOrder);
+      .groupBy(`"techUnnested"."tech"`);
 
-    if (value && value.length > 0)
-      queryBuilder.andWhere(`"techUnnested"."tech" ILIKE :value`, {
-        value: `%${value}%`,
-      });
-
-    if (targetIds && targetIds.length > 0)
-      queryBuilder.andWhere('"assets"."targetId" = ANY(:targetId)', {
-        targetId: targetIds,
-      });
+    for (const [key, value] of Object.entries(whereBuilder)) {
+      if (query[key]) {
+        const newWhereClause = value.whereClause.replaceAll(
+          ':param',
+          `:${key}`,
+        );
+        queryBuilder.andWhere(newWhereClause, {
+          [key]: value.value,
+        });
+      }
+    }
 
     const total = (await queryBuilder.getRawMany()).length;
 
-    const result = await queryBuilder.offset(offset).limit(limit).getRawMany();
+    const result = await queryBuilder
+      .orderBy(`"${sortBy}"`, sortOrder)
+      .offset(offset)
+      .limit(limit)
+      .getRawMany();
 
     const list = result.map((item: GetTechnologyAssetsDTO) => {
       const obj = new GetTechnologyAssetsDTO();
@@ -376,12 +636,104 @@ export class AssetsService {
   }
 
   /**
+   * Retrieves faceted data to display for faceted filter
+   *
+   * @returns A promise that resolves to faceted data.
+   *
+   */
+  public async getFacetedData(
+    query: GetAssetsQueryDto,
+  ): Promise<GetFacetedDataDTO> {
+    const { workspaceId, targetIds } = query;
+
+    const ipAddressesQb = this.dataSource
+      .createQueryBuilder()
+      .addCommonTableExpression(
+        `SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'A') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL
+
+    UNION ALL
+
+    SELECT
+        a.id AS asset_id,
+        a."targetId",
+        jsonb_array_elements_text(a."dnsRecords"::jsonb -> 'AAAA') AS ip
+    FROM assets a
+    WHERE a."targetId" IS NOT NULL`,
+        'cte',
+      )
+      .select('t.ip', 'ip')
+      .from('cte', 't')
+      .distinct(true)
+      .leftJoin(WorkspaceTarget, 'wt', 'wt."targetId" = t."targetId"')
+      .where('wt.workspaceId = :workspaceId', { workspaceId });
+
+    const portsQb = this.assetRepo
+      .createQueryBuilder('assets')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .select('ports."assetId"', 'assetId')
+            .addSelect('unnest(ports.ports)', 'port')
+            .from(Port, 'ports'),
+        'portUnnested',
+        '"portUnnested"."assetId" = "assets"."id"',
+      )
+      .leftJoin(WorkspaceTarget, 'wt', 'wt."targetId" = "assets"."targetId"')
+      .select(`"portUnnested"."port"`, 'port')
+      .distinct(true)
+      .where(`"portUnnested"."port" is not null`)
+      .andWhere('wt.workspaceId = :workspaceId', { workspaceId });
+
+    const techsQb = this.assetRepo
+      .createQueryBuilder('assets')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .select('"httpResponses"."assetId"', 'assetId')
+            .addSelect('unnest(httpResponses.tech)', 'tech')
+            .from(HttpResponse, 'httpResponses'),
+        'techUnnested',
+        '"techUnnested"."assetId" = "assets"."id"',
+      )
+      .leftJoin(WorkspaceTarget, 'wt', 'wt."targetId" = "assets"."targetId"')
+      .select(`"techUnnested"."tech"`, 'technology')
+      .distinct(true)
+      .where(`"techUnnested"."tech" is not null`)
+      .andWhere('wt.workspaceId = :workspaceId', { workspaceId });
+
+    if (targetIds && targetIds.length > 0) {
+      ipAddressesQb.andWhere('"t"."targetId" = ANY(:targetIds)', {
+        targetIds,
+      });
+      portsQb.andWhere('"assets"."targetId" = ANY(:targetIds)', { targetIds });
+      techsQb.andWhere('"assets"."targetId" = ANY(:targetIds)', { targetIds });
+    }
+
+    const ipAddresses = await ipAddressesQb.getRawMany();
+    const ports = await portsQb.getRawMany();
+    const techs = await techsQb.getRawMany();
+
+    const result = new GetFacetedDataDTO();
+    result.techs = techs.map((e: { technology: string }) => e.technology);
+    result.ipAddresses = ipAddresses.map((e: { ip: string }) => e.ip);
+    result.ports = ports.map((e: { port: string }) => e.port);
+
+    return result;
+  }
+  /**
    * Counts the number of unique technologies in a workspace.
    *
    * @param workspaceId - The ID of the workspace.
    * @returns The count of unique technologies in the workspace.
    */
-  public async countUniqueTechnologiesInWorkspace(workspaceId: string): Promise<number> {
+  public async countUniqueTechnologiesInWorkspace(
+    workspaceId: string,
+  ): Promise<number> {
     const result = await this.assetRepo
       .createQueryBuilder('assets')
       .leftJoin(
