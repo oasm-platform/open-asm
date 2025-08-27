@@ -1,26 +1,23 @@
 import { DataTable } from '@/components/ui/data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetIpAssets } from '@/services/apis/gen/queries';
+import { useAsset } from '../context/asset-context';
 import { ipAssetsColumn } from './ip-assets-column';
-import { useAssetTable } from './useAssetTable';
 
-interface Props {
-  targetId?: string;
-  refetchInterval?: number;
-}
-
-export default function IpAssetsTab({ targetId, refetchInterval }: Props) {
+export default function IpAssetsTab() {
   const {
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
     tableParams: { page, pageSize, sortBy, sortOrder },
-    queryOpts,
     queryParams,
-  } = useAssetTable({ refetchInterval, targetId });
+    queryOptions,
+  } = useAsset();
 
-  const { data, isLoading } = useAssetsControllerGetIpAssets(
-    queryParams,
-    queryOpts,
-  );
+  const { data, isLoading } = useAssetsControllerGetIpAssets(queryParams, {
+    query: {
+      ...queryOptions.query,
+      queryKey: ['assets', ...queryOptions.query.queryKey],
+    },
+  });
 
   const ipAssets = data?.data ?? [];
   const total = data?.total ?? 0;

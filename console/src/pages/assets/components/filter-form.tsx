@@ -22,19 +22,16 @@ import { useAssetsControllerGetFacetedData } from '@/services/apis/gen/queries';
 import { Check, CirclePlus, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useAssetTable } from './useAssetTable';
+import { useAsset } from '../context/asset-context';
 
-interface FilterFormProps {
-  targetId?: string;
-}
-
-export default function FilterForm({ targetId }: FilterFormProps) {
+export default function FilterForm() {
   const [params, setParams] = useSearchParams();
   const {
     tableParams: { filter },
     tableHandlers: { setFilter },
-    selectedWorkspace,
-  } = useAssetTable({ targetId });
+    queryParams,
+    filterParams: { ipAddresses, ports, techs },
+  } = useAsset();
 
   const [searchValue, setSearchValue] = useState(filter ?? '');
   const debouncedValue = useDebounce(searchValue, 500);
@@ -43,10 +40,7 @@ export default function FilterForm({ targetId }: FilterFormProps) {
     setFilter(debouncedValue);
   }, [debouncedValue, setFilter]);
 
-  const { data } = useAssetsControllerGetFacetedData({
-    workspaceId: selectedWorkspace ?? '',
-    targetIds: targetId ? [targetId] : undefined,
-  });
+  const { data } = useAssetsControllerGetFacetedData(queryParams);
 
   const filters = useMemo(
     () => [
@@ -59,6 +53,7 @@ export default function FilterForm({ targetId }: FilterFormProps) {
             label: e,
           };
         }),
+        selectedValues: ipAddresses,
       },
       {
         filterKey: 'ports',
@@ -69,6 +64,7 @@ export default function FilterForm({ targetId }: FilterFormProps) {
             label: e,
           };
         }),
+        selectedValues: ports,
       },
       {
         filterKey: 'techs',
@@ -79,9 +75,10 @@ export default function FilterForm({ targetId }: FilterFormProps) {
             label: e,
           };
         }),
+        selectedValues: techs,
       },
     ],
-    [data?.ipAddresses, data?.ports, data?.techs],
+    [data?.ipAddresses, data?.ports, data?.techs, ipAddresses, ports, techs],
   );
 
   const facets = filters.map((filter) => filter.filterKey);
@@ -103,6 +100,7 @@ export default function FilterForm({ targetId }: FilterFormProps) {
               title={filter.title}
               filterKey={filter.filterKey}
               options={filter.options ?? []}
+              selectedValue={filter.selectedValues}
             />
           ))}
         </div>
@@ -133,12 +131,17 @@ interface FacetedFilterProps {
     value: string;
     label: string;
   }[];
+  selectedValue?: string[];
 }
 
-function FacetedFilter({ title, filterKey, options }: FacetedFilterProps) {
-  const [params, setParams] = useSearchParams();
-
-  const selectedValues = new Set(params.getAll(filterKey));
+function FacetedFilter({
+  title,
+  filterKey,
+  options,
+  selectedValue,
+}: FacetedFilterProps) {
+  const { filterHandlers } = useAsset();
+  const selectedValues = new Set(selectedValue);
 
   return (
     <Popover>
@@ -200,11 +203,7 @@ function FacetedFilter({ title, filterKey, options }: FacetedFilterProps) {
                       } else {
                         selectedValues.add(option.value.toString());
                       }
-                      params.delete(filterKey);
-                      for (const value of selectedValues) {
-                        params.append(filterKey, value);
-                      }
-                      setParams(params, { replace: true });
+                      filterHandlers(filterKey, Array.from(selectedValues));
                     }}
                   >
                     <div
@@ -228,8 +227,7 @@ function FacetedFilter({ title, filterKey, options }: FacetedFilterProps) {
                 <CommandGroup>
                   <CommandItem
                     onSelect={() => {
-                      params.delete(filterKey);
-                      setParams(params);
+                      filterHandlers(filterKey, []);
                     }}
                     className="justify-center text-center"
                   >

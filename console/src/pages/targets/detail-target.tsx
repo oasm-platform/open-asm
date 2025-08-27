@@ -17,6 +17,7 @@ import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
 import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
 import AssetsDiscovering from './assets-discovering';
 import SettingTarget from './setting-target';
+import AssetProvider from '../assets/context/asset-context';
 
 // Define tabs configuration
 const TABS = [
@@ -153,12 +154,14 @@ export function DetailTarget() {
               target.status === JobStatus.pending) && (
               <AssetsDiscovering targetId={target.id} />
             )}
-          <ListAssets
+          <AssetProvider
             targetId={target.id}
             refetchInterval={
               target.status === JobStatus.in_progress ? 1000 : 30 * 1000
             }
-          />
+          >
+            <ListAssets />
+          </AssetProvider>
         </TabsContent>
         <TabsContent
           value="vulnerabilities"

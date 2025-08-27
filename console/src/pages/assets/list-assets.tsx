@@ -7,60 +7,38 @@ import PortAssetsTab from './components/port-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
 
-interface ListAssetsProps {
-  targetId?: string;
-  refetchInterval?: number;
-}
-
-export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
+export function ListAssets() {
   const tabList = useMemo(
     () => [
       {
         value: 'asset',
         text: 'All Services',
-        tab: (
-          <AssetTabContent
-            refetchInterval={refetchInterval}
-            targetId={targetId}
-          />
-        ),
+        tab: <AssetTabContent />,
       },
       {
         value: 'tech',
         text: 'Technologies',
-        tab: (
-          <TechnologyAssetsTab
-            refetchInterval={refetchInterval}
-            targetId={targetId}
-          />
-        ),
+        tab: <TechnologyAssetsTab />,
       },
       {
         value: 'ip',
         text: 'IP Adresses',
-        tab: (
-          <IpAssetsTab refetchInterval={refetchInterval} targetId={targetId} />
-        ),
+        tab: <IpAssetsTab />,
       },
       {
         value: 'port',
         text: 'Ports',
-        tab: (
-          <PortAssetsTab
-            refetchInterval={refetchInterval}
-            targetId={targetId}
-          />
-        ),
+        tab: <PortAssetsTab />,
       },
     ],
-    [refetchInterval, targetId],
+    [],
   );
 
   const [selectedTab, setSelectedTab] = useState('asset');
 
   return (
     <div className="w-full">
-      <FilterForm targetId={targetId} />
+      <FilterForm />
       <Tabs
         value={selectedTab}
         onValueChange={setSelectedTab}

@@ -2,29 +2,29 @@ import { DataTable } from '@/components/ui/data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
 import { useState } from 'react';
+import { useAsset } from '../context/asset-context';
 import { assetColumns } from './asset-column';
 import AssetDetailSheet from './asset-detail-sheet';
-import { useAssetTable } from './useAssetTable';
 
-interface Props {
-  targetId?: string;
-  refetchInterval?: number;
-}
-
-export default function AssetTab({ refetchInterval, targetId }: Props) {
+export default function AssetTab() {
   const [isOpen, setIsOpen] = useState(false);
   const [rowID, setRowID] = useState('');
 
   const {
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
     tableParams: { page, pageSize, sortBy, sortOrder },
-    queryOpts,
     queryParams,
-  } = useAssetTable({ refetchInterval, targetId });
+    queryOptions,
+  } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetAssetsInWorkspace(
     queryParams,
-    queryOpts,
+    {
+      query: {
+        ...queryOptions.query,
+        queryKey: ['assets', ...queryOptions.query.queryKey],
+      },
+    },
   );
 
   const assets = data?.data ?? [];
