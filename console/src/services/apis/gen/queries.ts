@@ -283,6 +283,7 @@ export type HttpResponse = {
   failed: boolean;
   knowledgebase: KnowledgebaseInfo;
   resolvers: string[];
+  chain_status_codes: string[];
   assetId: string;
   jobHistoryId: string;
 };
