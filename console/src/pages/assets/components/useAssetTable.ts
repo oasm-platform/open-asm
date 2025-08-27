@@ -1,5 +1,6 @@
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 export function useAssetTable({
@@ -56,11 +57,19 @@ export function useAssetTable({
     },
   };
 
+  const setArrayParam = useCallback(
+    (key: string, value: string[]) => {
+      params.delete(key);
+      params.append(key, value.toString());
+      setParams(params, { replace: true });
+    },
+    [params, setParams],
+  );
+
   return {
     tableHandlers: {
       ...tableHandlers,
-      setArrayParams: (key: string, value: string[]) =>
-        setParams({ [key]: value }),
+      setArrayParam,
     },
     tableParams: { page, filter, pageSize, sortBy, sortOrder },
     queryParams,

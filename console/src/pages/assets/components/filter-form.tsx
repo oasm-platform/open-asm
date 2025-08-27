@@ -85,7 +85,6 @@ export default function FilterForm({ targetId }: FilterFormProps) {
   );
 
   const facets = filters.map((filter) => filter.filterKey);
-
   const isFiltered = facets.some((e) => params.has(e));
 
   return (
@@ -135,6 +134,7 @@ interface FacetedFilterProps {
     label: string;
   }[];
 }
+
 function FacetedFilter({ title, filterKey, options }: FacetedFilterProps) {
   const [params, setParams] = useSearchParams();
 
@@ -200,8 +200,11 @@ function FacetedFilter({ title, filterKey, options }: FacetedFilterProps) {
                       } else {
                         selectedValues.add(option.value.toString());
                       }
-                      const filterValues = Array.from(selectedValues);
-                      setParams({ [filterKey]: filterValues });
+                      params.delete(filterKey);
+                      for (const value of selectedValues) {
+                        params.append(filterKey, value);
+                      }
+                      setParams(params, { replace: true });
                     }}
                   >
                     <div
