@@ -1,8 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { JobHistory } from 'src/modules/jobs-registry/entities/job-history.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Asset } from './assets.entity';
-import { ApiProperty } from '@nestjs/swagger';
 
 class TlsInfo {
   @ApiProperty()
@@ -176,6 +176,10 @@ export class HttpResponse extends BaseEntity {
   @ApiProperty()
   @Column({ array: true, type: 'varchar', nullable: true })
   resolvers: string[];
+
+  @ApiProperty()
+  @Column({ array: true, type: 'varchar', nullable: true })
+  chain_status_codes: string[];
 
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })
