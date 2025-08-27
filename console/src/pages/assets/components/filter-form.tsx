@@ -18,54 +18,34 @@ import {
 import { Separator } from '@/components/ui/separator';
 import useDebounce from '@/hooks/use-debounce';
 import { cn } from '@/lib/utils';
-import {
-  useAssetsControllerGetIpAssets,
-  useAssetsControllerGetPortAssets,
-  useAssetsControllerGetTechnologyAssets,
-} from '@/services/apis/gen/queries';
+import { useAssetsControllerGetFacetedData } from '@/services/apis/gen/queries';
 import { Check, CirclePlus, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAssetTable } from './useAssetTable';
 
 interface FilterFormProps {
-  selectedWorkspace: string;
   targetId?: string;
 }
 
-export default function FilterForm({
-  selectedWorkspace,
-  targetId,
-}: FilterFormProps) {
+export default function FilterForm({ targetId }: FilterFormProps) {
   const [params, setParams] = useSearchParams();
+  const {
+    tableParams: { filter },
+    tableHandlers: { setFilter },
+    selectedWorkspace,
+  } = useAssetTable({ targetId });
 
-  const [searchValue, setSearchValue] = useState(params.get('filter') ?? '');
+  const [searchValue, setSearchValue] = useState(filter ?? '');
   const debouncedValue = useDebounce(searchValue, 500);
 
   useEffect(() => {
-    if (debouncedValue) {
-      params.set('filter', debouncedValue);
-    } else {
-      params.delete('filter');
-    }
-    setParams(params);
-  }, [debouncedValue, params, setParams]);
+    setFilter(debouncedValue);
+  }, [debouncedValue, setFilter]);
 
-  const { data: ipAssetsData } = useAssetsControllerGetIpAssets({
+  const { data } = useAssetsControllerGetFacetedData({
     workspaceId: selectedWorkspace ?? '',
     targetIds: targetId ? [targetId] : undefined,
-    limit: 100,
-  });
-
-  const { data: portAssetsData } = useAssetsControllerGetPortAssets({
-    workspaceId: selectedWorkspace ?? '',
-    targetIds: targetId ? [targetId] : undefined,
-    limit: 100,
-  });
-
-  const { data: techAssetsData } = useAssetsControllerGetTechnologyAssets({
-    workspaceId: selectedWorkspace ?? '',
-    targetIds: targetId ? [targetId] : undefined,
-    limit: 100,
   });
 
   const filters = useMemo(
@@ -73,35 +53,35 @@ export default function FilterForm({
       {
         filterKey: 'ipAddresses',
         title: 'IP',
-        options: ipAssetsData?.data.map((e) => {
+        options: data?.ipAddresses.map((e) => {
           return {
-            value: e.ip,
-            label: e.ip,
+            value: e,
+            label: e,
           };
         }),
       },
       {
         filterKey: 'ports',
         title: 'Port',
-        options: portAssetsData?.data.map((e) => {
+        options: data?.ports.map((e) => {
           return {
-            value: e.port,
-            label: e.port,
+            value: e,
+            label: e,
           };
         }),
       },
       {
         filterKey: 'techs',
         title: 'Technology',
-        options: techAssetsData?.data.map((e) => {
+        options: data?.techs.map((e) => {
           return {
-            value: e.technology,
-            label: e.technology,
+            value: e,
+            label: e,
           };
         }),
       },
     ],
-    [ipAssetsData?.data, portAssetsData?.data, techAssetsData?.data],
+    [data?.ipAddresses, data?.ports, data?.techs],
   );
 
   const facets = filters.map((filter) => filter.filterKey);
@@ -216,9 +196,9 @@ function FacetedFilter({ title, filterKey, options }: FacetedFilterProps) {
                     key={option.value}
                     onSelect={() => {
                       if (isSelected) {
-                        selectedValues.delete(option.value);
+                        selectedValues.delete(option.value.toString());
                       } else {
-                        selectedValues.add(option.value);
+                        selectedValues.add(option.value.toString());
                       }
                       const filterValues = Array.from(selectedValues);
                       setParams({ [filterKey]: filterValues });

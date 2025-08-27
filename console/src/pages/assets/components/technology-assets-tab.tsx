@@ -1,16 +1,15 @@
 import { DataTable } from '@/components/ui/data-table';
 import { TabsContent } from '@/components/ui/tabs';
-import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   useAssetsControllerGetTechnologyAssets,
   type GetTechnologyAssetsDTO,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useAssetTable } from './useAssetTable';
 
 interface Props {
   targetId?: string;
   refetchInterval?: number;
-  selectedWorkspace: string;
 }
 
 const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
@@ -49,41 +48,13 @@ const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
 export default function TechnologyAssetsTab({
   targetId,
   refetchInterval,
-  selectedWorkspace,
 }: Props) {
   const {
-    tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
-  } = useServerDataTable({
-    defaultSortBy: 'value',
-    defaultSortOrder: 'ASC',
-  });
-
-  const queryParams = {
-    workspaceId: selectedWorkspace ?? '',
-    targetIds: targetId ? [targetId] : undefined,
-    value: filter,
-    limit: pageSize,
-    page,
-    sortBy,
-    sortOrder,
-  };
-
-  const queryOpts = {
-    query: {
-      refetchInterval: refetchInterval ?? 30 * 1000,
-      queryKey: [
-        'technologyAssets',
-        targetId,
-        selectedWorkspace,
-        page,
-        filter,
-        pageSize,
-        sortBy,
-        sortOrder,
-      ],
-    },
-  };
+    tableParams: { page, pageSize, sortBy, sortOrder },
+    queryOpts,
+    queryParams,
+  } = useAssetTable({ refetchInterval, targetId });
 
   const { data, isLoading } = useAssetsControllerGetTechnologyAssets(
     queryParams,

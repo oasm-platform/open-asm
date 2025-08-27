@@ -1,16 +1,15 @@
 import { DataTable } from '@/components/ui/data-table';
 import { TabsContent } from '@/components/ui/tabs';
-import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   useAssetsControllerGetPortAssets,
   type GetPortAssetsDTO,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useAssetTable } from './useAssetTable';
 
 interface Props {
   targetId?: string;
   refetchInterval?: number;
-  selectedWorkspace: string;
 }
 
 const portAssetsColumn: ColumnDef<GetPortAssetsDTO>[] = [
@@ -44,44 +43,13 @@ const portAssetsColumn: ColumnDef<GetPortAssetsDTO>[] = [
   },
 ];
 
-export default function PortAssetsTab({
-  targetId,
-  refetchInterval,
-  selectedWorkspace,
-}: Props) {
+export default function PortAssetsTab({ targetId, refetchInterval }: Props) {
   const {
-    tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
-  } = useServerDataTable({
-    defaultSortBy: 'value',
-    defaultSortOrder: 'ASC',
-  });
-
-  const queryParams = {
-    workspaceId: selectedWorkspace ?? '',
-    targetIds: targetId ? [targetId] : undefined,
-    value: filter,
-    limit: pageSize,
-    page,
-    sortBy,
-    sortOrder,
-  };
-
-  const queryOpts = {
-    query: {
-      refetchInterval: refetchInterval ?? 30 * 1000,
-      queryKey: [
-        'portAssets',
-        targetId,
-        selectedWorkspace,
-        page,
-        filter,
-        pageSize,
-        sortBy,
-        sortOrder,
-      ],
-    },
-  };
+    tableParams: { page, pageSize, sortBy, sortOrder },
+    queryOpts,
+    queryParams,
+  } = useAssetTable({ refetchInterval, targetId });
 
   const { data, isLoading } = useAssetsControllerGetPortAssets(
     queryParams,

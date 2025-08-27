@@ -1,65 +1,26 @@
 import { DataTable } from '@/components/ui/data-table';
 import { TabsContent } from '@/components/ui/tabs';
-import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
 import { useState } from 'react';
 import { assetColumns } from './asset-column';
 import AssetDetailSheet from './asset-detail-sheet';
-import { useSearchParams } from 'react-router-dom';
+import { useAssetTable } from './useAssetTable';
 
 interface Props {
   targetId?: string;
   refetchInterval?: number;
-  selectedWorkspace: string;
 }
 
-export default function AssetTab({
-  selectedWorkspace,
-  targetId,
-  refetchInterval,
-}: Props) {
+export default function AssetTab({ refetchInterval, targetId }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [rowID, setRowID] = useState('');
-  const [params] = useSearchParams();
 
   const {
-    tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
-  } = useServerDataTable({
-    defaultSortBy: 'value',
-    defaultSortOrder: 'ASC',
-  });
-  const ipAddresses = params.getAll('ipAddresses');
-
-  const queryParams = {
-    workspaceId: selectedWorkspace ?? '',
-    targetIds: targetId ? [targetId] : undefined,
-    value: filter,
-    limit: pageSize,
-    ipAddresses: ipAddresses,
-    ports: params.getAll('ports'),
-    techs: params.getAll('techs'),
-    page,
-    sortBy,
-    sortOrder,
-  };
-
-  const queryOpts = {
-    query: {
-      refetchInterval: refetchInterval ?? 30 * 1000,
-      queryKey: [
-        'assets',
-        targetId,
-        selectedWorkspace,
-        page,
-        filter,
-        pageSize,
-        sortBy,
-        sortOrder,
-        ipAddresses,
-      ],
-    },
-  };
+    tableParams: { page, pageSize, sortBy, sortOrder },
+    queryOpts,
+    queryParams,
+  } = useAssetTable({ refetchInterval, targetId });
 
   const { data, isLoading } = useAssetsControllerGetAssetsInWorkspace(
     queryParams,

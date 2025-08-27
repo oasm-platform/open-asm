@@ -1,12 +1,11 @@
 import { Tabs } from '@/components/ui/tabs';
+import { useMemo, useState } from 'react';
 import AssetTabContent from './components/asset-tab';
 import FilterForm from './components/filter-form';
 import IpAssetsTab from './components/ip-assets-tab';
-import TriggerList from './components/tab-trigger-list';
 import PortAssetsTab from './components/port-assets-tab';
+import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
-import { useMemo, useState } from 'react';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 
 interface ListAssetsProps {
   targetId?: string;
@@ -14,8 +13,6 @@ interface ListAssetsProps {
 }
 
 export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
-  const { selectedWorkspace } = useWorkspaceSelector();
-
   const tabList = useMemo(
     () => [
       {
@@ -25,7 +22,6 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
           <AssetTabContent
             refetchInterval={refetchInterval}
             targetId={targetId}
-            selectedWorkspace={selectedWorkspace ?? ''}
           />
         ),
       },
@@ -36,7 +32,6 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
           <TechnologyAssetsTab
             refetchInterval={refetchInterval}
             targetId={targetId}
-            selectedWorkspace={selectedWorkspace ?? ''}
           />
         ),
       },
@@ -44,11 +39,7 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
         value: 'ip',
         text: 'IP Adresses',
         tab: (
-          <IpAssetsTab
-            refetchInterval={refetchInterval}
-            targetId={targetId}
-            selectedWorkspace={selectedWorkspace ?? ''}
-          />
+          <IpAssetsTab refetchInterval={refetchInterval} targetId={targetId} />
         ),
       },
       {
@@ -58,22 +49,18 @@ export function ListAssets({ targetId, refetchInterval }: ListAssetsProps) {
           <PortAssetsTab
             refetchInterval={refetchInterval}
             targetId={targetId}
-            selectedWorkspace={selectedWorkspace ?? ''}
           />
         ),
       },
     ],
-    [refetchInterval, selectedWorkspace, targetId],
+    [refetchInterval, targetId],
   );
 
   const [selectedTab, setSelectedTab] = useState('asset');
 
   return (
     <div className="w-full">
-      <FilterForm
-        selectedWorkspace={selectedWorkspace ?? ''}
-        targetId={targetId}
-      />
+      <FilterForm targetId={targetId} />
       <Tabs
         value={selectedTab}
         onValueChange={setSelectedTab}

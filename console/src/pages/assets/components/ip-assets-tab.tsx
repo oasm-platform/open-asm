@@ -1,54 +1,21 @@
 import { DataTable } from '@/components/ui/data-table';
 import { TabsContent } from '@/components/ui/tabs';
-import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useAssetsControllerGetIpAssets } from '@/services/apis/gen/queries';
 import { ipAssetsColumn } from './ip-assets-column';
+import { useAssetTable } from './useAssetTable';
 
 interface Props {
   targetId?: string;
   refetchInterval?: number;
-  selectedWorkspace?: string;
 }
 
-export default function IpAssetsTab({
-  targetId,
-  refetchInterval,
-  selectedWorkspace,
-}: Props) {
+export default function IpAssetsTab({ targetId, refetchInterval }: Props) {
   const {
-    tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
-  } = useServerDataTable({
-    defaultSortBy: 'value',
-    defaultSortOrder: 'ASC',
-  });
-
-  const queryParams = {
-    workspaceId: selectedWorkspace ?? '',
-    targetIds: targetId ? [targetId] : undefined,
-    value: filter,
-    limit: pageSize,
-    page,
-    sortBy,
-    sortOrder,
-  };
-
-  const queryOpts = {
-    query: {
-      refetchInterval: refetchInterval ?? 30 * 1000,
-      queryKey: [
-        'ipAssets',
-        targetId,
-        selectedWorkspace,
-        page,
-        filter,
-        pageSize,
-        sortBy,
-        sortOrder,
-      ],
-    },
-  };
+    tableParams: { page, pageSize, sortBy, sortOrder },
+    queryOpts,
+    queryParams,
+  } = useAssetTable({ refetchInterval, targetId });
 
   const { data, isLoading } = useAssetsControllerGetIpAssets(
     queryParams,

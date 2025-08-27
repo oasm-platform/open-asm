@@ -7,6 +7,7 @@ import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
+import { GetFacetedDataDTO } from './dto/get-faceted-data.dto';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -59,6 +60,18 @@ export class AssetsController {
   @Get('/tech')
   getTechnologyAssets(@Query() query: GetAssetsQueryDto) {
     return this.assetsService.getTechnologyAssets(query);
+  }
+
+  @Doc({
+    summary: 'Get faceted data',
+    description: 'Retrieves faceted data for faceted filter.',
+    response: {
+      serialization: GetFacetedDataDTO,
+    },
+  })
+  @Get('/faceted-data')
+  getFacetedData(@Query() query: GetAssetsQueryDto) {
+    return this.assetsService.getFacetedData(query);
   }
 
   @Doc({
