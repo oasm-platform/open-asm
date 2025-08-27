@@ -70,10 +70,10 @@ export default function AssetProvider({
 
   const queryParams = {
     workspaceId: selectedWorkspace ?? '',
-    targetids: targetId ? [targetId] : undefined,
+    targetIds: targetId ? [targetId] : undefined,
     value: tableParams.filter,
     limit: tableParams.pageSize,
-    ipaddresses: ipAddresses,
+    ipAddresses: ipAddresses,
     ports: ports,
     techs: techs,
     page: tableParams.page,

@@ -115,7 +115,7 @@ export class AssetsService {
       },
       assetId: {
         value: assetId,
-        whereClause: `"assets"."assetId" = :param`,
+        whereClause: `"assets"."id" = :param`,
       },
       techs: {
         value: techs,
@@ -140,7 +140,7 @@ export class AssetsService {
       .where('assets.isErrorPage = false');
 
     for (const [key, value] of Object.entries(whereBuilder)) {
-      if (query[key]) {
+      if (query[key] || (assetId && key === 'assetId')) {
         const newWhereClause = value.whereClause.replaceAll(
           ':param',
           `:${key}`,
