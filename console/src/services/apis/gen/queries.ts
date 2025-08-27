@@ -28,7 +28,7 @@ import type {
 import { orvalClient } from "../axios-client";
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const JobStatus = {
   pending: "pending",
   in_progress: "in_progress",
@@ -39,7 +39,7 @@ export const JobStatus = {
 
 export type CronSchedule = (typeof CronSchedule)[keyof typeof CronSchedule];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const CronSchedule = {
   "0_0_*_*_0": "0 0 * * 0",
   "0_0_*/14_*_*": "0 0 */14 * *",
@@ -70,7 +70,7 @@ export type CreateTargetDto = {
 export type GetManyTargetResponseDtoScanSchedule =
   (typeof GetManyTargetResponseDtoScanSchedule)[keyof typeof GetManyTargetResponseDtoScanSchedule];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const GetManyTargetResponseDtoScanSchedule = {
   "0_0_*_*_0": "0 0 * * 0",
   "0_0_*/14_*_*": "0 0 */14 * *",
@@ -80,7 +80,7 @@ export const GetManyTargetResponseDtoScanSchedule = {
 export type GetManyTargetResponseDtoStatus =
   (typeof GetManyTargetResponseDtoStatus)[keyof typeof GetManyTargetResponseDtoStatus];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const GetManyTargetResponseDtoStatus = {
   RUNNING: "RUNNING",
   DONE: "DONE",
@@ -113,7 +113,7 @@ export type DefaultMessageResponseDto = {
 export type UpdateTargetDtoScanSchedule =
   (typeof UpdateTargetDtoScanSchedule)[keyof typeof UpdateTargetDtoScanSchedule];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const UpdateTargetDtoScanSchedule = {
   "0_0_*_*_0": "0 0 * * 0",
   "0_0_*/14_*_*": "0 0 */14 * *",
@@ -453,7 +453,7 @@ export type AddToolToWorkspaceDto = {
 
 export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const ToolCategory = {
   subdomains: "subdomains",
   http_probe: "http_probe",
@@ -525,7 +525,7 @@ export type GetManyVulnerabilityDto = {
 export type VulnerabilityStatisticsDtoSeverity =
   (typeof VulnerabilityStatisticsDtoSeverity)[keyof typeof VulnerabilityStatisticsDtoSeverity];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const VulnerabilityStatisticsDtoSeverity = {
   info: "info",
   low: "low",
@@ -541,6 +541,27 @@ export type VulnerabilityStatisticsDto = {
 
 export type GetVulnerabilitiesStatisticsResponseDto = {
   data: VulnerabilityStatisticsDto[];
+};
+
+export type VulnerabilitySeverityDtoSeverity =
+  (typeof VulnerabilitySeverityDtoSeverity)[keyof typeof VulnerabilitySeverityDtoSeverity];
+
+ 
+export const VulnerabilitySeverityDtoSeverity = {
+  info: "info",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+export type VulnerabilitySeverityDto = {
+  severity: VulnerabilitySeverityDtoSeverity;
+  count: number;
+};
+
+export type GetVulnerabilitiesSeverityResponseDto = {
+  data: VulnerabilitySeverityDto[];
 };
 
 export type String = { [key: string]: unknown };
@@ -683,7 +704,7 @@ export type ToolsControllerGetManyToolsParams = {
 export type ToolsControllerGetManyToolsType =
   (typeof ToolsControllerGetManyToolsType)[keyof typeof ToolsControllerGetManyToolsType];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const ToolsControllerGetManyToolsType = {
   built_in: "built_in",
   plugin: "plugin",
@@ -692,7 +713,7 @@ export const ToolsControllerGetManyToolsType = {
 export type ToolsControllerGetManyToolsCategory =
   (typeof ToolsControllerGetManyToolsCategory)[keyof typeof ToolsControllerGetManyToolsCategory];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const ToolsControllerGetManyToolsCategory = {
   subdomains: "subdomains",
   http_probe: "http_probe",
@@ -712,7 +733,7 @@ export type ToolsControllerGetInstalledToolsParams = {
 export type ToolsControllerGetInstalledToolsCategory =
   (typeof ToolsControllerGetInstalledToolsCategory)[keyof typeof ToolsControllerGetInstalledToolsCategory];
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+ 
 export const ToolsControllerGetInstalledToolsCategory = {
   subdomains: "subdomains",
   http_probe: "http_probe",
@@ -734,6 +755,10 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
 export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
   workspaceId: string;
   targetIds?: string[];
+};
+
+export type VulnerabilitiesControllerGetVulnerabilitiesSeverityParams = {
+  workspaceId: string;
 };
 
 export type StatisticControllerGetStatisticsParams = {
@@ -9676,6 +9701,467 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
 } {
   const queryOptions =
     getVulnerabilitiesControllerGetVulnerabilitiesStatisticsQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get count of vulnerabilities by severity level based on workspaceId -> target -> assets -> vuls relation path
+ * @summary Get vulnerabilities severity counts
+ */
+export const vulnerabilitiesControllerGetVulnerabilitiesSeverity = (
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetVulnerabilitiesSeverityResponseDto>(
+    { url: `/api/vulnerabilities/severity`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerGetVulnerabilitiesSeverityQueryKey = (
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+) => {
+  return [
+    `/api/vulnerabilities/severity`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getVulnerabilitiesControllerGetVulnerabilitiesSeverityInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+      >,
+      VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+    >,
+    TError = unknown,
+  >(
+    params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >,
+          TError,
+          TData,
+          QueryKey,
+          VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getVulnerabilitiesControllerGetVulnerabilitiesSeverityQueryKey(params);
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+      >,
+      QueryKey,
+      VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+    > = ({ signal, pageParam }) =>
+      vulnerabilitiesControllerGetVulnerabilitiesSeverity(
+        { ...params, page: pageParam || params?.["page"] },
+        requestOptions,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+      >,
+      TError,
+      TData,
+      QueryKey,
+      VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type VulnerabilitiesControllerGetVulnerabilitiesSeverityInfiniteQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+    >
+  >;
+export type VulnerabilitiesControllerGetVulnerabilitiesSeverityInfiniteQueryError =
+  unknown;
+
+export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+    >,
+    VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+    >,
+    VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >,
+          QueryKey
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+    >,
+    VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get vulnerabilities severity counts
+ */
+
+export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+    >,
+    VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetVulnerabilitiesSeverityParams["page"]
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getVulnerabilitiesControllerGetVulnerabilitiesSeverityInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getVulnerabilitiesControllerGetVulnerabilitiesSeverityQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+    >,
+    TError = unknown,
+  >(
+    params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getVulnerabilitiesControllerGetVulnerabilitiesSeverityQueryKey(params);
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+      >
+    > = ({ signal }) =>
+      vulnerabilitiesControllerGetVulnerabilitiesSeverity(
+        params,
+        requestOptions,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type VulnerabilitiesControllerGetVulnerabilitiesSeverityQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+    >
+  >;
+export type VulnerabilitiesControllerGetVulnerabilitiesSeverityQueryError =
+  unknown;
+
+export function useVulnerabilitiesControllerGetVulnerabilitiesSeverity<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilitiesSeverity<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+            >
+          >
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilitiesSeverity<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get vulnerabilities severity counts
+ */
+
+export function useVulnerabilitiesControllerGetVulnerabilitiesSeverity<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+  >,
+  TError = unknown,
+>(
+  params: VulnerabilitiesControllerGetVulnerabilitiesSeverityParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getVulnerabilitiesControllerGetVulnerabilitiesSeverityQueryOptions(
       params,
       options,
     );
