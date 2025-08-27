@@ -1,11 +1,18 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
+import {
+  GetVulnerabilitiesSeverityQueryDto,
+  GetVulnerabilitiesSeverityResponseDto,
+} from './dto/get-vulnerability-severity.dto';
+import {
+  GetVulnerabilitiesStatisticsQueryDto,
+  GetVulnerabilitiesStatisticsResponseDto,
+} from './dto/get-vulnerability-statistics.dto';
 import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilitiesService } from './vulnerabilities.service';
-import { GetVulnerabilitiesStatisticsQueryDto, GetVulnerabilitiesStatisticsResponseDto } from './dto/get-vulnerability-statistics.dto';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
@@ -38,7 +45,24 @@ export class VulnerabilitiesController {
     },
   })
   @Get('statistics')
-  async getVulnerabilitiesStatistics(@Query() query: GetVulnerabilitiesStatisticsQueryDto) {
+  async getVulnerabilitiesStatistics(
+    @Query() query: GetVulnerabilitiesStatisticsQueryDto,
+  ) {
     return this.vulnerabilitiesService.getVulnerabilitiesStatistics(query);
+  }
+
+  @Doc({
+    summary: 'Get vulnerabilities severity counts',
+    description:
+      'Get count of vulnerabilities by severity level based on workspaceId -> target -> assets -> vuls relation path',
+    response: {
+      serialization: GetVulnerabilitiesSeverityResponseDto,
+    },
+  })
+  @Get('severity')
+  getVulnerabilitiesSeverity(
+    @Query() query: GetVulnerabilitiesSeverityQueryDto,
+  ) {
+    return this.vulnerabilitiesService.getVulnerabilitiesSeverity(query);
   }
 }
