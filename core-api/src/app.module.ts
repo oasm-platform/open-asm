@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseModule } from './database/database.module';
 import { CombineModule } from './modules/combine.module';
 import { StorageModule } from './modules/storage/storage.module'; // assuming this is the correct import path
+import { ServicesModule } from './services/services.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { StorageModule } from './modules/storage/storage.module'; // assuming th
     DatabaseModule,
     CombineModule,
     StorageModule,
+    ServicesModule,
   ],
 })
 export class AppModule {}

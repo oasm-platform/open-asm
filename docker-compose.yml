@@ -66,9 +66,30 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    container_name: cache
+    image: redis:alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - oasm
+    volumes:
+      - redis-data:/data
+    command: "redis-server --requirepass password"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1500M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
 volumes:
   pgdata:
   nuclei-templates:
+  redis-data:
 
 networks:
   oasm:

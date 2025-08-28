@@ -11,6 +11,7 @@ import { CronJob } from 'cron';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { RedisService } from 'src/services/redis/redis.service';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
@@ -34,6 +35,7 @@ export class TargetsService implements OnModuleInit {
     public assetService: AssetsService,
     private schedulerRegistry: SchedulerRegistry,
     private eventEmitter: EventEmitter2,
+    private redisService: RedisService,
   ) {}
 
   async onModuleInit() {
