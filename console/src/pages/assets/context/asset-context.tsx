@@ -78,6 +78,7 @@ export default function AssetProvider({
     ipAddresses: ipAddresses,
     ports: ports,
     techs: techs,
+    statusCodes: statusCodes,
     page: tableParams.page,
     sortBy: tableParams.sortBy,
     sortOrder: tableParams.sortOrder,
@@ -97,6 +98,7 @@ export default function AssetProvider({
         ipAddresses,
         ports,
         techs,
+        statusCodes,
       ],
     },
   };

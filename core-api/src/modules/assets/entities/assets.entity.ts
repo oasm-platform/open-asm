@@ -15,7 +15,7 @@ export class Asset extends BaseEntity {
   value: string;
 
   // Relationships
-  @ManyToOne(() => Target, (target) => target.workspaceTargets, {
+  @ManyToOne(() => Target, (target) => target.assets, {
     onDelete: 'CASCADE',
   })
   target: Target;
