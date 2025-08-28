@@ -6,6 +6,7 @@ import IpAssetsTab from './components/ip-assets-tab';
 import PortAssetsTab from './components/port-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
+import StatusCodeAssetsTab from './components/status-code-assets-tab';
 
 export function ListAssets() {
   const tabList = useMemo(
@@ -29,6 +30,11 @@ export function ListAssets() {
         value: 'port',
         text: 'Ports',
         tab: <PortAssetsTab />,
+      },
+      {
+        value: 'statusCode',
+        text: 'Status Code',
+        tab: <StatusCodeAssetsTab />,
       },
     ],
     [],

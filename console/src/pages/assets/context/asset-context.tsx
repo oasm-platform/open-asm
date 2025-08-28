@@ -29,6 +29,7 @@ type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ipAddresses?: string[];
     techs?: string[];
     ports?: string[];
+    statusCodes?: string[];
   };
   filterHandlers: (key: string, value: string[]) => void;
 };
@@ -56,6 +57,7 @@ export default function AssetProvider({
   const ipAddresses = params.getAll('ipAddresses');
   const ports = params.getAll('ports');
   const techs = params.getAll('techs');
+  const statusCodes = params.getAll('statusCodes');
 
   const filterHandlers = useCallback(
     (key: string, value: string[]) => {
@@ -111,6 +113,7 @@ export default function AssetProvider({
           ipAddresses,
           ports,
           techs,
+          statusCodes,
         },
         filterHandlers,
         targetId,

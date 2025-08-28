@@ -8,6 +8,7 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { GetFacetedDataDTO } from './dto/get-faceted-data.dto';
+import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -60,6 +61,18 @@ export class AssetsController {
   @Get('/tech')
   getTechnologyAssets(@Query() query: GetAssetsQueryDto) {
     return this.assetsService.getTechnologyAssets(query);
+  }
+
+  @Doc({
+    summary: 'Get technologies along with number of assets',
+    description: 'Retrieves a list of technologies with number of assets.',
+    response: {
+      serialization: GetManyResponseDto(GetStatusCodeAssetsDTO),
+    },
+  })
+  @Get('/status-code')
+  getStatusCodeAssets(@Query() query: GetAssetsQueryDto) {
+    return this.assetsService.getStatusCodeAssets(query);
   }
 
   @Doc({

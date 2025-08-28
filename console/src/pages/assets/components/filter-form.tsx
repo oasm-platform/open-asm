@@ -30,7 +30,7 @@ export default function FilterForm() {
     tableParams: { filter },
     tableHandlers: { setFilter },
     queryParams,
-    filterParams: { ipAddresses, ports, techs },
+    filterParams: { ipAddresses, ports, techs, statusCodes },
   } = useAsset();
 
   const [searchValue, setSearchValue] = useState(filter ?? '');
@@ -77,8 +77,28 @@ export default function FilterForm() {
         }),
         selectedValues: techs,
       },
+      {
+        filterKey: 'statusCodes',
+        title: 'Status Code',
+        options: data?.statusCodes.map((e) => {
+          return {
+            value: e,
+            label: e,
+          };
+        }),
+        selectedValues: statusCodes,
+      },
     ],
-    [data?.ipAddresses, data?.ports, data?.techs, ipAddresses, ports, techs],
+    [
+      data?.ipAddresses,
+      data?.ports,
+      data?.statusCodes,
+      data?.techs,
+      ipAddresses,
+      ports,
+      statusCodes,
+      techs,
+    ],
   );
 
   const facets = filters.map((filter) => filter.filterKey);
