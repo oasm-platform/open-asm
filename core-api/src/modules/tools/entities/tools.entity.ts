@@ -8,11 +8,13 @@ import {
   Column,
   Entity,
   Generated,
+  ManyToOne,
   OneToMany,
   PrimaryColumn,
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
+import { ToolProvider } from './provider.entity';
 import { WorkspaceTool } from './workspace_tools.entity';
 
 @Entity('tools')
@@ -81,4 +83,7 @@ export class Tool {
     onDelete: 'CASCADE',
   })
   vulnerabilities?: Vulnerability[];
+
+  @ManyToOne(() => ToolProvider, (toolProvider) => toolProvider.tools)
+  provider?: ToolProvider;
 }

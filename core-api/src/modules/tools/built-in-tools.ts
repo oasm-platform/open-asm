@@ -7,6 +7,17 @@ import { Asset } from '../assets/entities/assets.entity';
 import type { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { Tool } from './entities/tools.entity';
 
+export const projectDiscovery = {
+  id: randomUUID(),
+  name: 'Project Discovery',
+  url: 'https://projectdiscovery.io',
+  logoUrl:
+    'https://raw.githubusercontent.com/projectdiscovery/projectdiscovery/refs/heads/main/static/projectdiscovery-logo.png',
+  description:
+    'Project Discovery is a collection of tools for reconnaissance and penetration testing.',
+  isVerified: true,
+};
+
 export const builtInTools: Tool[] = [
   {
     name: 'subfinder',
@@ -37,6 +48,7 @@ export const builtInTools: Tool[] = [
       })) as Asset[];
     },
     version: '2.8.0',
+    provider: projectDiscovery,
   },
   {
     name: 'httpx',
@@ -52,6 +64,7 @@ export const builtInTools: Tool[] = [
       return parsed;
     },
     version: '1.7.1',
+    provider: projectDiscovery,
   },
   {
     name: 'naabu',
@@ -71,6 +84,7 @@ export const builtInTools: Tool[] = [
       return parsed;
     },
     version: '2.3.5',
+    provider: projectDiscovery,
   },
   {
     name: 'nuclei',
@@ -155,7 +169,7 @@ export const builtInTools: Tool[] = [
       ) as Vulnerability[];
       return data;
     },
-
+    provider: projectDiscovery,
     version: '3.4.7',
   },
 ];

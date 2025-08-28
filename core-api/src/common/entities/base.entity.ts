@@ -5,13 +5,13 @@ export class BaseEntity {
   @ApiProperty()
   @PrimaryColumn({ type: 'uuid' })
   @Generated('uuid')
-  id: string;
+  id?: string;
 
   @ApiProperty()
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
+  createdAt?: Date;
 
   @ApiProperty()
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt?: Date;
 }
