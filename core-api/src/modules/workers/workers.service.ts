@@ -198,12 +198,12 @@ export class WorkersService {
    * @returns A promise that resolves to the assigned worker index.
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance | null> {
-    const { token } = dto;
+    const { apiKey } = dto;
 
     // Find the workspace by API key
     const workspace = await this.dataSource.getRepository(Workspace).findOne({
       where: {
-        apiKey: token,
+        apiKey,
       },
     });
 

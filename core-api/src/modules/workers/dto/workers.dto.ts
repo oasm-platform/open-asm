@@ -5,7 +5,7 @@ import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 export class WorkerJoinDto {
   @ApiProperty()
   @IsString()
-  token: string;
+  apiKey: string;
 }
 
 export class WorkerAliveDto {

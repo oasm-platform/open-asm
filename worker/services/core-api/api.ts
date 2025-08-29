@@ -10,6 +10,20 @@
  * ---------------------------------------------------------------
  */
 
+export enum CronSchedule {
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum JobStatus {
+  Pending = "pending",
+  InProgress = "in_progress",
+  Completed = "completed",
+  Failed = "failed",
+  Cancelled = "cancelled",
+}
+
 export interface Target {
   id: string;
   /** @format date-time */
@@ -23,6 +37,9 @@ export interface Target {
   value: string;
   /** @format date-time */
   lastDiscoveredAt: string;
+  totalAssets: number;
+  status: JobStatus;
+  scanSchedule: CronSchedule;
 }
 
 export type AppResponseSerialization = object;
@@ -42,21 +59,16 @@ export interface CreateTargetDto {
 
 export interface GetManyTargetResponseDto {
   id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  /**
-   * The target domain (with optional URL path, will be parsed to extract domain)
-   * @example "example.com"
-   */
   value: string;
-  /** @format date-time */
-  lastDiscoveredAt: string;
+  reScanCount: number;
+  scanSchedule: GetManyTargetResponseDtoScanScheduleEnum;
   /** @example "DONE" */
   status: GetManyTargetResponseDtoStatusEnum;
   /** @example 100 */
   totalAssets: number;
+  duration: number;
+  /** @format date-time */
+  lastDiscoveredAt: string;
 }
 
 export interface GetManyGetManyTargetResponseDtoDto {
@@ -71,6 +83,10 @@ export interface GetManyGetManyTargetResponseDtoDto {
 export interface DefaultMessageResponseDto {
   /** @example "Success" */
   message: string;
+}
+
+export interface UpdateTargetDto {
+  scanSchedule: UpdateTargetDtoScanScheduleEnum;
 }
 
 export interface Workspace {
@@ -89,6 +105,12 @@ export interface Workspace {
    * @example "This is my workspace"
    */
   description: string;
+  /**
+   * The API key of the workspace
+   * @example "1234567890"
+   */
+  apiKey: string;
+  archivedAt?: object;
 }
 
 export interface CreateWorkspaceDto {
@@ -102,6 +124,7 @@ export interface CreateWorkspaceDto {
    * @example "This is my workspace"
    */
   description: string;
+  archivedAt?: object;
 }
 
 export interface GetManyWorkspaceDto {
@@ -112,8 +135,6 @@ export interface GetManyWorkspaceDto {
   hasNextPage: boolean;
   pageCount: number;
 }
-
-export type WorkspaceStatisticsResponseDto = object;
 
 export interface UpdateWorkspaceDto {
   /**
@@ -126,11 +147,28 @@ export interface UpdateWorkspaceDto {
    * @example "This is my workspace"
    */
   description?: string;
+  archivedAt?: object;
+}
+
+export interface GetApiKeyResponseDto {
+  apiKey: string;
+}
+
+export interface ArchiveWorkspaceDto {
+  /**
+   * Whether to archive (true) or unarchive (false) the workspace
+   * @example true
+   */
+  isArchived: boolean;
 }
 
 export interface CreateFirstAdminDto {
   email: string;
   password: string;
+}
+
+export interface GetMetadataDto {
+  isInit: boolean;
 }
 
 export interface Job {
@@ -139,7 +177,7 @@ export interface Job {
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
-  workerName: string;
+  category: string;
   status: string;
   /** @format date-time */
   pickJobAt: string;
@@ -159,7 +197,7 @@ export interface GetManyJobDto {
 export interface GetNextJobResponseDto {
   jobId: string;
   value: string;
-  workerName: string;
+  category: string;
   /** Command to run */
   command: string;
 }
@@ -169,13 +207,169 @@ export interface UpdateResultDto {
   data: object;
 }
 
-export interface GetManyBaseResponseDto {
-  data: object[];
+export interface TlsInfo {
+  host: string;
+  port: string;
+  probe_status: boolean;
+  tls_version: string;
+  cipher: string;
+  not_before: string;
+  not_after: string;
+  subject_dn: string;
+  subject_cn: string;
+  subject_an: string[];
+  serial: string;
+  issuer_dn: string;
+  issuer_cn: string;
+  issuer_org: string[];
+  fingerprint_hash: object;
+  wildcard_certificate: boolean;
+  tls_connection: string;
+  sni: string;
+}
+
+export interface KnowledgebaseInfo {
+  PageType: string;
+  pHash: number;
+}
+
+export interface HttpResponse {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  /** @format date-time */
+  timestamp: string;
+  tls: TlsInfo;
+  port: string;
+  url: string;
+  input: string;
+  title: string;
+  scheme: string;
+  webserver: string;
+  body: string;
+  content_type: string;
+  method: string;
+  host: string;
+  path: string;
+  favicon: string;
+  favicon_md5: string;
+  favicon_url: string;
+  header: object;
+  raw_header: string;
+  request: string;
+  time: string;
+  a: string[];
+  tech: string[];
+  words: number;
+  lines: number;
+  status_code: number;
+  content_length: number;
+  failed: boolean;
+  knowledgebase: KnowledgebaseInfo;
+  resolvers: string[];
+  chain_status_codes: string[];
+  assetId: string;
+  jobHistoryId: string;
+}
+
+export interface Port {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  ports: string[];
+  assetId: string;
+  jobHistoryId: string;
+}
+
+export interface GetAssetsResponseDto {
+  id: string;
+  value: string;
+  targetId: string;
+  isPrimary?: boolean;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  dnsRecords?: object;
+  httpResponses?: HttpResponse;
+  ports?: Port;
+  isErrorPage?: boolean;
+}
+
+export interface GetManyGetAssetsResponseDtoDto {
+  data: GetAssetsResponseDto[];
   total: number;
   page: number;
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+}
+
+export interface GetIpAssetsDTO {
+  ip: string;
+  assetCount: number;
+}
+
+export interface GetManyGetIpAssetsDTODto {
+  data: GetIpAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface GetPortAssetsDTO {
+  port: string;
+  assetCount: number;
+}
+
+export interface GetManyGetPortAssetsDTODto {
+  data: GetPortAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface GetTechnologyAssetsDTO {
+  technology: string;
+  assetCount: number;
+}
+
+export interface GetManyGetTechnologyAssetsDTODto {
+  data: GetTechnologyAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface GetStatusCodeAssetsDTO {
+  statusCode: string;
+  assetCount: number;
+}
+
+export interface GetManyGetStatusCodeAssetsDTODto {
+  data: GetStatusCodeAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface GetFacetedDataDTO {
+  techs: string[];
+  ipAddresses: string[];
+  ports: string[];
+  statusCodes: string[];
 }
 
 export interface WorkerAliveDto {
@@ -188,10 +382,215 @@ export interface WorkerInstance {
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
+  /** @format date-time */
+  lastSeenAt: string;
+  token: string;
+  currentJobsCount: number;
+  type: string;
+  scope: string;
 }
 
 export interface WorkerJoinDto {
-  token: string;
+  apiKey: string;
+}
+
+export interface GetManyWorkerInstanceDto {
+  data: WorkerInstance[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface Asset {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  value: string;
+  isPrimary: boolean;
+  dnsRecords: object;
+  isErrorPage: boolean;
+}
+
+export interface SearchData {
+  assets: Asset[];
+  targets: Target[];
+}
+
+export interface SearchResponseDto {
+  data: SearchData;
+  total: number;
+  page: number;
+  limit: number;
+  pageCount: number;
+  hasNextPage: boolean;
+}
+
+export interface GetSearchHistoryResponseDto {
+  id: string;
+  query: string;
+  workspaceId: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface GetManyGetSearchHistoryResponseDtoDto {
+  data: GetSearchHistoryResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface DeleteResponseDto {
+  /**
+   * Trạng thái xóa thành công
+   * @example true
+   */
+  success: boolean;
+}
+
+export interface WorkspaceTool {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface AddToolToWorkspaceDto {
+  /** The ID of the workspace */
+  workspaceId: string;
+  /** The ID of the tool */
+  toolId: string;
+}
+
+export interface Tool {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  description: string;
+  category: ToolCategoryEnum;
+  version: string;
+  logoUrl: string;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: string;
+}
+
+export interface GetManyToolDto {
+  data: Tool[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface ScanDto {
+  /** Target ID */
+  targetId: string;
+}
+
+export interface Vulnerability {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  description: string;
+  severity: string;
+  tags: string[];
+  references: string[];
+  authors: string[];
+  affectedUrl: string;
+  ipAddress: string;
+  host: string;
+  port: string;
+  cvssMetric: string;
+  cvssScore: number;
+  cveId: string;
+  cweId: string[];
+  extractorName: string;
+  extractedResults: string[];
+  tool: Tool;
+}
+
+export interface GetManyVulnerabilityDto {
+  data: Vulnerability[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface VulnerabilityStatisticsDto {
+  severity: VulnerabilityStatisticsDtoSeverityEnum;
+  count: number;
+}
+
+export interface GetVulnerabilitiesStatisticsResponseDto {
+  data: VulnerabilityStatisticsDto[];
+}
+
+export interface VulnerabilitySeverityDto {
+  severity: VulnerabilitySeverityDtoSeverityEnum;
+  count: number;
+}
+
+export interface GetVulnerabilitiesSeverityResponseDto {
+  data: VulnerabilitySeverityDto[];
+}
+
+export type String = object;
+
+export interface GetManyStringDto {
+  data: string[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface StatisticResponseDto {
+  /**
+   * Total number of targets in the workspace
+   * @example 10
+   */
+  totalTargets: number;
+  /**
+   * Total number of assets in the workspace
+   * @example 42
+   */
+  totalAssets: number;
+  /**
+   * Total number of vulnerabilities in the workspace
+   * @example 5
+   */
+  totalVulnerabilities: number;
+  /**
+   * Total number of unique technologies in the workspace
+   * @example 15
+   */
+  totalUniqueTechnologies: number;
+}
+
+export enum GetManyTargetResponseDtoScanScheduleEnum {
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
 }
 
 /** @example "DONE" */
@@ -200,52 +599,55 @@ export enum GetManyTargetResponseDtoStatusEnum {
   DONE = "DONE",
 }
 
-/**
- * Filter jobs by status
- * @default "all"
- */
-export enum JobsRegistryControllerGetJobsByAssetIdParamsJobStatusEnum {
-  Pending = "pending",
-  InProgress = "in_progress",
-  Completed = "completed",
-  Failed = "failed",
-  Cancelled = "cancelled",
-  All = "all",
+export enum UpdateTargetDtoScanScheduleEnum {
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
 }
 
-/**
- * Filter jobs by worker name
- * @default "all"
- */
-export enum JobsRegistryControllerGetJobsByAssetIdParamsWorkerNameEnum {
+export enum ToolCategoryEnum {
   Subdomains = "subdomains",
-  Httpx = "http_scraper",
-  Ports = "ports",
-  All = "all",
+  HttpProbe = "http_probe",
+  HttpScraper = "http_scraper",
+  PortsScanner = "ports_scanner",
+  Vulnerabilities = "vulnerabilities",
 }
 
-/**
- * Filter jobs by status
- * @default "all"
- */
-export enum JobsRegistryControllerGetJobsByTargetIdParamsJobStatusEnum {
-  Pending = "pending",
-  InProgress = "in_progress",
-  Completed = "completed",
-  Failed = "failed",
-  Cancelled = "cancelled",
-  All = "all",
+export enum VulnerabilityStatisticsDtoSeverityEnum {
+  Info = "info",
+  Low = "low",
+  Medium = "medium",
+  High = "high",
+  Critical = "critical",
 }
 
-/**
- * Filter jobs by worker name
- * @default "all"
- */
-export enum JobsRegistryControllerGetJobsByTargetIdParamsWorkerNameEnum {
+export enum VulnerabilitySeverityDtoSeverityEnum {
+  Info = "info",
+  Low = "low",
+  Medium = "medium",
+  High = "high",
+  Critical = "critical",
+}
+
+export enum ToolsControllerGetManyToolsParamsTypeEnum {
+  BuiltIn = "built_in",
+  Plugin = "plugin",
+}
+
+export enum ToolsControllerGetManyToolsParamsCategoryEnum {
   Subdomains = "subdomains",
-  Httpx = "http_scraperscraper",
-  Ports = "ports",
-  All = "all",
+  HttpProbe = "http_probe",
+  HttpScraper = "http_scraper",
+  PortsScanner = "ports_scanner",
+  Vulnerabilities = "vulnerabilities",
+}
+
+export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
+  Subdomains = "subdomains",
+  HttpProbe = "http_probe",
+  HttpScraper = "http_scraper",
+  PortsScanner = "ports_scanner",
+  Vulnerabilities = "vulnerabilities",
 }
 
 import type {
@@ -282,7 +684,7 @@ export type RequestParams = Omit<
 export interface ApiConfig<SecurityDataType = unknown>
   extends Omit<AxiosRequestConfig, "data" | "cancelToken"> {
   securityWorker?: (
-    securityData: SecurityDataType | null
+    securityData: SecurityDataType | null,
   ) => Promise<AxiosRequestConfig | void> | AxiosRequestConfig | void;
   secure?: boolean;
   format?: ResponseType;
@@ -324,7 +726,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected mergeRequestParams(
     params1: AxiosRequestConfig,
-    params2?: AxiosRequestConfig
+    params2?: AxiosRequestConfig,
   ): AxiosRequestConfig {
     const method = params1.method || (params2 && params2.method);
 
@@ -365,7 +767,7 @@ export class HttpClient<SecurityDataType = unknown> {
         const isFileType = formItem instanceof Blob || formItem instanceof File;
         formData.append(
           key,
-          isFileType ? formItem : this.stringifyFormItem(formItem)
+          isFileType ? formItem : this.stringifyFormItem(formItem),
         );
       }
 
@@ -445,7 +847,7 @@ export class Api<
    */
   targetsControllerCreateTarget = (
     data: CreateTargetDto,
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets`,
@@ -457,32 +859,15 @@ export class Api<
     });
 
   /**
-   * @description Retrieves a target by its ID.
-   *
-   * @tags Targets
-   * @name TargetsControllerGetTarget
-   * @summary Get a target by ID
-   * @request GET:/api/targets/{id}
-   */
-  targetsControllerGetTarget = (id: string, params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/targets/${id}`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
    * @description Retrieves all targets in a workspace.
    *
    * @tags Targets
    * @name TargetsControllerGetTargetsInWorkspace
    * @summary Get all targets in a workspace
-   * @request GET:/api/targets/workspace/{id}
+   * @request GET:/api/targets
    */
   targetsControllerGetTargetsInWorkspace = (
-    id: string,
-    query?: {
+    query: {
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -491,13 +876,53 @@ export class Api<
       sortBy?: string;
       /** @example "DESC" */
       sortOrder?: string;
+      workspaceId: string;
+      value?: string;
     },
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/targets/workspace/${id}`,
+      path: `/api/targets`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a target by its ID.
+   *
+   * @tags Targets
+   * @name TargetsControllerGetTargetById
+   * @summary Get a target by ID
+   * @request GET:/api/targets/{id}
+   */
+  targetsControllerGetTargetById = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/targets/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates a target.
+   *
+   * @tags Targets
+   * @name TargetsControllerUpdateTarget
+   * @summary Update a target
+   * @request PATCH:/api/targets/{id}
+   */
+  targetsControllerUpdateTarget = (
+    id: string,
+    data: UpdateTargetDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/targets/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });
@@ -513,7 +938,7 @@ export class Api<
   targetsControllerDeleteTargetFromWorkspace = (
     id: string,
     workspaceId: string,
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets/${id}/workspace/${workspaceId}`,
@@ -548,7 +973,7 @@ export class Api<
    */
   workspacesControllerCreateWorkspace = (
     data: CreateWorkspaceDto,
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces`,
@@ -577,32 +1002,18 @@ export class Api<
       sortBy?: string;
       /** @example "DESC" */
       sortOrder?: string;
+      /**
+       * Whether to archive (true) or unarchive (false) the workspace
+       * @example true
+       */
+      isArchived?: boolean;
     },
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces`,
       method: "GET",
       query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves statistics for a specific workspace.
-   *
-   * @tags Workspaces
-   * @name WorkspacesControllerGetWorkspaceStatistics
-   * @summary Get Workspace Statistics
-   * @request GET:/api/workspaces/{id}/statistics
-   */
-  workspacesControllerGetWorkspaceStatistics = (
-    id: string,
-    params: RequestParams = {}
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/workspaces/${id}/statistics`,
-      method: "GET",
       format: "json",
       ...params,
     });
@@ -617,7 +1028,7 @@ export class Api<
    */
   workspacesControllerGetWorkspaceById = (
     id: string,
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}`,
@@ -637,7 +1048,7 @@ export class Api<
   workspacesControllerUpdateWorkspace = (
     id: string,
     data: UpdateWorkspaceDto,
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}`,
@@ -658,7 +1069,7 @@ export class Api<
    */
   workspacesControllerDeleteWorkspace = (
     id: string,
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}`,
@@ -668,15 +1079,53 @@ export class Api<
     });
 
   /**
+   * @description Regenerates the API key for a workspace.
+   *
+   * @tags Workspaces
+   * @name WorkspacesControllerRotateApiKey
+   * @summary Rotate API key
+   * @request POST:/api/workspaces/{id}/api-key/rotate
+   */
+  workspacesControllerRotateApiKey = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workspaces/${id}/api-key/rotate`,
+      method: "POST",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Sets the archived status of a workspace.
+   *
+   * @tags Workspaces
+   * @name WorkspacesControllerMakeArchived
+   * @summary Archive/Unarchive Workspace
+   * @request PATCH:/api/workspaces/{id}/archived
+   */
+  workspacesControllerMakeArchived = (
+    id: string,
+    data: ArchiveWorkspaceDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workspaces/${id}/archived`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
    * No description
    *
    * @tags Root
    * @name RootControllerGetHealth
-   * @request GET:/
+   * @request GET:/api/health
    */
   rootControllerGetHealth = (params: RequestParams = {}) =>
     this.request<any, any>({
-      path: `/`,
+      path: `/api/health`,
       method: "GET",
       ...params,
     });
@@ -691,13 +1140,29 @@ export class Api<
    */
   rootControllerCreateFirstAdmin = (
     data: CreateFirstAdminDto,
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/init-admin`,
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Returns metadata about the system state, like whether it has been initialized.
+   *
+   * @tags Root
+   * @name RootControllerGetMetadata
+   * @summary Get system metadata.
+   * @request GET:/api/metadata
+   */
+  rootControllerGetMetadata = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/metadata`,
+      method: "GET",
       format: "json",
       ...params,
     });
@@ -721,7 +1186,7 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry`,
@@ -741,91 +1206,11 @@ export class Api<
    */
   jobsRegistryControllerGetNextJob = (
     workerId: string,
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/${workerId}/next`,
       method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * No description
-   *
-   * @tags JobsRegistry
-   * @name JobsRegistryControllerGetJobsByAssetId
-   * @summary Gets jobs by asset ID, filtered by status and worker name.
-   * @request GET:/api/jobs-registry/asset/{assetId}
-   */
-  jobsRegistryControllerGetJobsByAssetId = (
-    assetId: string,
-    query: {
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-      /**
-       * Filter jobs by status
-       * @default "all"
-       */
-      jobStatus: JobsRegistryControllerGetJobsByAssetIdParamsJobStatusEnum;
-      /**
-       * Filter jobs by worker name
-       * @default "all"
-       */
-      workerName: JobsRegistryControllerGetJobsByAssetIdParamsWorkerNameEnum;
-    },
-    params: RequestParams = {}
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/jobs-registry/asset/${assetId}`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * No description
-   *
-   * @tags JobsRegistry
-   * @name JobsRegistryControllerGetJobsByTargetId
-   * @summary Gets jobs by target ID, filtered by status and worker name.
-   * @request GET:/api/jobs-registry/target/{targetId}
-   */
-  jobsRegistryControllerGetJobsByTargetId = (
-    targetId: string,
-    query: {
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-      /**
-       * Filter jobs by status
-       * @default "all"
-       */
-      jobStatus: JobsRegistryControllerGetJobsByTargetIdParamsJobStatusEnum;
-      /**
-       * Filter jobs by worker name
-       * @default "all"
-       */
-      workerName: JobsRegistryControllerGetJobsByTargetIdParamsWorkerNameEnum;
-    },
-    params: RequestParams = {}
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/jobs-registry/target/${targetId}`,
-      method: "GET",
-      query: query,
       format: "json",
       ...params,
     });
@@ -841,7 +1226,7 @@ export class Api<
   jobsRegistryControllerUpdateResult = (
     workerId: string,
     data: UpdateResultDto,
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/${workerId}/result`,
@@ -856,13 +1241,12 @@ export class Api<
    * @description Retrieves a list of assets associated with the given target.
    *
    * @tags Assets
-   * @name AssetsControllerGetAllAssetsInTarget
+   * @name AssetsControllerGetAssetsInWorkspace
    * @summary Get assets in target
-   * @request GET:/api/assets/target/{id}
+   * @request GET:/api/assets
    */
-  assetsControllerGetAllAssetsInTarget = (
-    id: string,
-    query?: {
+  assetsControllerGetAssetsInWorkspace = (
+    query: {
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -871,11 +1255,18 @@ export class Api<
       sortBy?: string;
       /** @example "DESC" */
       sortOrder?: string;
+      value?: string;
+      workspaceId: string;
+      targetIds?: string[];
+      ipAddresses?: string[];
+      ports?: string[];
+      techs?: string[];
+      statusCodes?: string[];
     },
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/assets/target/${id}`,
+      path: `/api/assets`,
       method: "GET",
       query: query,
       format: "json",
@@ -883,18 +1274,216 @@ export class Api<
     });
 
   /**
-   * No description
+   * @description Retrieves a list of ip with number of assets.
+   *
+   * @tags Assets
+   * @name AssetsControllerGetIpAssets
+   * @summary Get IP asset
+   * @request GET:/api/assets/ip
+   */
+  assetsControllerGetIpAssets = (
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      value?: string;
+      workspaceId: string;
+      targetIds?: string[];
+      ipAddresses?: string[];
+      ports?: string[];
+      techs?: string[];
+      statusCodes?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/ip`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of port with number of assets.
+   *
+   * @tags Assets
+   * @name AssetsControllerGetPortAssets
+   * @summary Get ports and number of assets
+   * @request GET:/api/assets/port
+   */
+  assetsControllerGetPortAssets = (
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      value?: string;
+      workspaceId: string;
+      targetIds?: string[];
+      ipAddresses?: string[];
+      ports?: string[];
+      techs?: string[];
+      statusCodes?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/port`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of technologies with number of assets.
+   *
+   * @tags Assets
+   * @name AssetsControllerGetTechnologyAssets
+   * @summary Get technologies along with number of assets
+   * @request GET:/api/assets/tech
+   */
+  assetsControllerGetTechnologyAssets = (
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      value?: string;
+      workspaceId: string;
+      targetIds?: string[];
+      ipAddresses?: string[];
+      ports?: string[];
+      techs?: string[];
+      statusCodes?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/tech`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of technologies with number of assets.
+   *
+   * @tags Assets
+   * @name AssetsControllerGetStatusCodeAssets
+   * @summary Get technologies along with number of assets
+   * @request GET:/api/assets/status-code
+   */
+  assetsControllerGetStatusCodeAssets = (
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      value?: string;
+      workspaceId: string;
+      targetIds?: string[];
+      ipAddresses?: string[];
+      ports?: string[];
+      techs?: string[];
+      statusCodes?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/status-code`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves faceted data for faceted filter.
+   *
+   * @tags Assets
+   * @name AssetsControllerGetFacetedData
+   * @summary Get faceted data
+   * @request GET:/api/assets/faceted-data
+   */
+  assetsControllerGetFacetedData = (
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      value?: string;
+      workspaceId: string;
+      targetIds?: string[];
+      ipAddresses?: string[];
+      ports?: string[];
+      techs?: string[];
+      statusCodes?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/faceted-data`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a single asset by its ID.
+   *
+   * @tags Assets
+   * @name AssetsControllerGetAssetById
+   * @summary Get asset by ID
+   * @request GET:/api/assets/{id}
+   */
+  assetsControllerGetAssetById = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Worker alive
    *
    * @tags Workers
    * @name WorkersControllerAlive
+   * @summary Worker alive
    * @request POST:/api/workers/alive
    */
   workersControllerAlive = (data: WorkerAliveDto, params: RequestParams = {}) =>
-    this.request<any, any>({
+    this.request<AppResponseSerialization, any>({
       path: `/api/workers/alive`,
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
       ...params,
     });
 
@@ -934,13 +1523,369 @@ export class Api<
       sortBy?: string;
       /** @example "DESC" */
       sortOrder?: string;
+      workspaceId?: string;
     },
-    params: RequestParams = {}
+    params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workers`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Search assets and targets
+   *
+   * @tags Search
+   * @name SearchControllerSearchAssetsTargets
+   * @summary Search assets and targets
+   * @request GET:/api/search
+   */
+  searchControllerSearchAssetsTargets = (
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      value: string;
+      workspaceId: string;
+      isSaveHistory?: boolean;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/search`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get search history
+   *
+   * @tags Search
+   * @name SearchControllerGetSearchHistory
+   * @summary Get search history
+   * @request GET:/api/search/histories
+   */
+  searchControllerGetSearchHistory = (
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      workspaceId: string;
+      query?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/search/histories`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete all search history entries for the user
+   *
+   * @tags Search
+   * @name SearchControllerDeleteAllSearchHistories
+   * @summary Delete all search history
+   * @request DELETE:/api/search/histories
+   */
+  searchControllerDeleteAllSearchHistories = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/search/histories`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete a specific search history entry by its ID
+   *
+   * @tags Search
+   * @name SearchControllerDeleteSearchHistory
+   * @summary Delete search history by ID
+   * @request DELETE:/api/search/histories/{id}
+   */
+  searchControllerDeleteSearchHistory = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/search/histories/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Adds a tool to a specific workspace.
+   *
+   * @tags Tools
+   * @name ToolsControllerAddToolToWorkspace
+   * @summary Add tool to workspace
+   * @request POST:/api/tools/add-to-workspace
+   */
+  toolsControllerAddToolToWorkspace = (
+    data: AddToolToWorkspaceDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/add-to-workspace`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Tools
+   * @name ToolsControllerGetBuiltInTools
+   * @summary Get built-in tools
+   * @request GET:/api/tools/built-in-tools
+   */
+  toolsControllerGetBuiltInTools = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/built-in-tools`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of tools with pagination.
+   *
+   * @tags Tools
+   * @name ToolsControllerGetManyTools
+   * @summary Get tools
+   * @request GET:/api/tools
+   */
+  toolsControllerGetManyTools = (
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      type?: ToolsControllerGetManyToolsParamsTypeEnum;
+      category?: ToolsControllerGetManyToolsParamsCategoryEnum;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of installed tools for a specific workspace, including built-in tools.
+   *
+   * @tags Tools
+   * @name ToolsControllerGetInstalledTools
+   * @summary Get installed tools for a workspace
+   * @request GET:/api/tools/installed
+   */
+  toolsControllerGetInstalledTools = (
+    query: {
+      /** The ID of the workspace */
+      workspaceId: string;
+      category?: ToolsControllerGetInstalledToolsParamsCategoryEnum;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/installed`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerScan
+   * @request POST:/api/vulnerabilities/scan
+   */
+  vulnerabilitiesControllerScan = (data: ScanDto, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/api/vulnerabilities/scan`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      ...params,
+    });
+
+  /**
+   * @description Get vulnerabilities
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerGetVulnerabilities
+   * @summary Get vulnerabilities
+   * @request GET:/api/vulnerabilities
+   */
+  vulnerabilitiesControllerGetVulnerabilities = (
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      workspaceId: string;
+      targetIds?: string[];
+      q?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get count of vulnerabilities by severity level
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerGetVulnerabilitiesStatistics
+   * @summary Get vulnerabilities statistics
+   * @request GET:/api/vulnerabilities/statistics
+   */
+  vulnerabilitiesControllerGetVulnerabilitiesStatistics = (
+    query: {
+      workspaceId: string;
+      targetIds?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities/statistics`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get count of vulnerabilities by severity level based on workspaceId -> target -> assets -> vuls relation path
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerGetVulnerabilitiesSeverity
+   * @summary Get vulnerabilities severity counts
+   * @request GET:/api/vulnerabilities/severity
+   */
+  vulnerabilitiesControllerGetVulnerabilitiesSeverity = (
+    query: {
+      workspaceId: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities/severity`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of all available workflow templates in YAML format.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerListTemplates
+   * @summary Get all workflow templates
+   * @request GET:/api/workflows/templates
+   */
+  workflowsControllerListTemplates = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/templates`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
+   *
+   * @tags Statistic
+   * @name StatisticControllerGetStatistics
+   * @summary Get workspace statistics
+   * @request GET:/api/statistic
+   */
+  statisticControllerGetStatistics = (
+    query: {
+      /**
+       * The ID of the workspace to get statistics for
+       * @example "123e4567-e89b-12d3-a456-426614174000"
+       */
+      workspaceId: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/statistic`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Storage
+   * @name StorageControllerUploadFile
+   * @summary Upload a file to storage
+   * @request POST:/api/storage/upload
+   */
+  storageControllerUploadFile = (
+    data: {
+      /** @format binary */
+      file?: File;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<
+      {
+        /** @example "/storage/9bea7ee3-ddc3-4215-a9e6-74fa7b5be92f.png" */
+        path?: string;
+      },
+      any
+    >({
+      path: `/api/storage/upload`,
+      method: "POST",
+      body: data,
+      type: ContentType.FormData,
       format: "json",
       ...params,
     });
