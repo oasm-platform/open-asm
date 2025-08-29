@@ -4,6 +4,7 @@ import { useEffect, type JSX } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import CreateWorkspaceDialog from "../workspaces/create-workspace-dialog";
 import ListWorkspaces from "./components/list-workspaces";
+import { ThemeSwitcher } from "./components/theme-switcher";
 
 interface TabContentProps {
     title: string;
@@ -52,6 +53,21 @@ const Settings = ({ defaultTab = "account" }: SettingsProps) => {
             ),
         },
         {
+            id: "appearance",
+            label: "Appearance",
+            content: {
+                title: "Appearance",
+                description: "Customize the look and feel of the application",
+            },
+            component: (
+                <div className="space-y-4">
+                    <div className="rounded-lg border p-4">
+                        <ThemeSwitcher />
+                    </div>
+                </div>
+            ),
+        },
+        {
             id: "workspaces",
             label: "Workspaces",
             content: {
@@ -73,7 +89,7 @@ const Settings = ({ defaultTab = "account" }: SettingsProps) => {
                     onValueChange={handleTabChange}
                     className="w-full"
                 >
-                    <TabsList className="grid w-full grid-cols-2 max-w-md mb-4">
+                    <TabsList className="grid w-full grid-cols-3 max-w-lg mb-4">
                         {settingsTabs.map((tab) => (
                             <TabsTrigger key={tab.id} value={tab.id}>
                                 {tab.label}

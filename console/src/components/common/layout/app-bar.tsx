@@ -1,13 +1,12 @@
 // src/components/AppBar.tsx
 
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import ThemeModeSwitcher from "@/components/ui/theme-mode-switcher";
 import { Separator } from "@radix-ui/react-separator";
 import type { JSX } from "react";
 import { CreateTarget } from "../../ui/create-target";
+import { GithubBadge } from "../../ui/github-badge";
 import { SearchForm } from "../../ui/search-form";
 import { WorkspaceSwitcher } from "../../ui/workspace-switcher";
-import { GithubBadge } from "../../ui/github-badge";
 
 export default function AppBar({ children }: { children: JSX.Element }) {
   return (
@@ -27,7 +26,6 @@ export default function AppBar({ children }: { children: JSX.Element }) {
         <div className="ml-auto flex gap-3">
           <CreateTarget />
           <GithubBadge />
-          <ThemeModeSwitcher />
         </div>
       </header>
       <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
