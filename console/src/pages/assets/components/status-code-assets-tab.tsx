@@ -10,6 +10,8 @@ export default function StatusCodeAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    filterParams,
+    filterHandlers,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetStatusCodeAssets(
@@ -45,6 +47,13 @@ export default function StatusCodeAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
+          onRowClick={(row) => {
+            const selectedValue = [
+              ...(filterParams.statusCodes || []),
+              row.statusCode,
+            ];
+            filterHandlers('statusCodes', selectedValue);
+          }}
         />
       </TabsContent>
     </>

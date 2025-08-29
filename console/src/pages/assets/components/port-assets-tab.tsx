@@ -10,6 +10,8 @@ export default function PortAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    filterParams,
+    filterHandlers,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetPortAssets(queryParams, {
@@ -42,6 +44,10 @@ export default function PortAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
+          onRowClick={(row) => {
+            const selectedValue = [...(filterParams.ports || []), row.port];
+            filterHandlers('ports', selectedValue);
+          }}
         />
       </TabsContent>
     </>

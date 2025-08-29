@@ -1,7 +1,8 @@
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import type { ColumnDef } from "@tanstack/react-table";
-import dayjs from "dayjs";
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import type { GetAssetsResponseDto } from '@/services/apis/gen/queries';
+import type { ColumnDef } from '@tanstack/react-table';
+import dayjs from 'dayjs';
 import {
   BriefcaseBusiness,
   EthernetPort,
@@ -9,23 +10,25 @@ import {
   Layers,
   Lock,
   Network,
-} from "lucide-react";
-import type { GetAssetsResponseDto } from "@/services/apis/gen/queries";
-import AssetValue from "./asset-value";
-import BadgeList from "./badge-list";
-import HTTPXStatusCode from "./status-code";
+} from 'lucide-react';
+import AssetValue from './asset-value';
+import BadgeList from './badge-list';
+import HTTPXStatusCode from './status-code';
 
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
-    accessorKey: "value",
-    header: "Value",
+    accessorKey: 'value',
+    header: 'Value',
     enableHiding: false,
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
-      const ports_scanner = data.ports?.ports;
+      const ports_scanner = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
-      const ipAddresses = data.dnsRecords?.["A"];
+      const ipA = (data.dnsRecords?.['A'] as string[]) || [];
+      const ipAAAA = (data.dnsRecords?.['AAAA'] as string[]) || [];
+      const ipAddresses = [...ipA, ...ipAAAA];
+
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
           <div className="flex items-center gap-2 w-full">
@@ -37,26 +40,17 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
               {httpResponse?.title}
             </p>
           )}
-
-          {/* {http_response?.failed && ( */}
-          {/*   <p */}
-          {/*     className="text-red-500 truncate w-full text-sm" */}
-          {/*     title={http_response?.error} */}
-          {/*   > */}
-          {/*     {http_response?.error} */}
-          {/*   </p> */}
-          {/* )} */}
-
           <div className="w-full">
-            <BadgeList list={ipAddresses as string[]} Icon={Network} />
+            <BadgeList list={ipAddresses} Icon={Network} maxDisplay={4} />
           </div>
           {ports_scanner && (
             <div className="w-full">
               <BadgeList
-                list={(ports_scanner as string[]).sort(
+                list={ports_scanner.sort(
                   (a: string, b: string) => parseInt(a) - parseInt(b),
                 )}
                 Icon={EthernetPort}
+                maxDisplay={6}
               />
             </div>
           )}
@@ -65,29 +59,21 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
-    header: "Technologies",
+    header: 'Technologies',
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
       const technologies: string[] = data.httpResponses?.tech ?? [];
-      const maxTechDisplay = 6;
-      const displayedTechs = technologies.slice(0, maxTechDisplay);
-      const remainingCount = technologies.length - maxTechDisplay;
 
       return (
         <div className="flex flex-wrap gap-1 max-w-[250px] min-h-[60px]">
-          <BadgeList list={displayedTechs} Icon={Layers} />
-          {remainingCount > 0 && (
-            <Badge variant="outline" className="text-xs">
-              +{remainingCount}
-            </Badge>
-          )}
+          <BadgeList list={technologies} Icon={Layers} maxDisplay={6} />
         </div>
       );
     },
   },
   {
-    header: "Certificate",
+    header: 'Certificate',
     size: 200,
     cell: ({ row }) => {
       const data = row.original;
@@ -101,19 +87,19 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
             (1000 * 60 * 60 * 24),
         ),
       );
-      const color = daysLeft < 30 ? "red" : daysLeft < 60 ? "yellow" : "green";
+      const color = daysLeft < 30 ? 'red' : daysLeft < 60 ? 'yellow' : 'green';
 
       return (
         <div className="flex flex-col gap-1 max-w-[200px] min-h-[60px]">
           <Badge
             variant="outline"
             className={cn(
-              "h-6 text-xs",
-              color === "red"
-                ? "text-red-500 border-red-500"
-                : color === "yellow"
-                  ? "text-yellow-500 border-yellow-500"
-                  : "text-green-500 border-green-500",
+              'h-6 text-xs',
+              color === 'red'
+                ? 'text-red-500 border-red-500'
+                : color === 'yellow'
+                  ? 'text-yellow-500 border-yellow-500'
+                  : 'text-green-500 border-green-500',
             )}
           >
             <Lock size={14} color={color} className="mr-1" />
@@ -133,7 +119,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
-    header: "Time",
+    header: 'Time',
     size: 120,
     cell: ({ row }) => {
       const data = row.original;
