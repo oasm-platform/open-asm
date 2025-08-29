@@ -48,11 +48,11 @@ export default function StatusCodeAssetsTab() {
           }}
           totalItems={total}
           onRowClick={(row) => {
-            const selectedValue = [
-              ...(filterParams.statusCodes || []),
-              row.statusCode,
-            ];
-            filterHandlers('statusCodes', selectedValue);
+            let selectedValue = filterParams.statusCodes || [];
+            if (selectedValue.indexOf(row.statusCode.toString()) < 0) {
+              selectedValue = [...selectedValue, row.statusCode];
+              filterHandlers('statusCodes', selectedValue);
+            }
           }}
         />
       </TabsContent>

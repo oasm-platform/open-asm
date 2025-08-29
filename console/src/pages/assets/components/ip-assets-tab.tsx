@@ -45,8 +45,11 @@ export default function IpAssetsTab() {
           }}
           totalItems={total}
           onRowClick={(row) => {
-            const selectedValue = [...(filterParams.ipAddresses || []), row.ip];
-            filterHandlers('ipAddresses', selectedValue);
+            let selectedValue = filterParams.ipAddresses || [];
+            if (selectedValue.indexOf(row.ip.toString()) < 0) {
+              selectedValue = [...selectedValue, row.ip];
+              filterHandlers('ipAddresses', selectedValue);
+            }
           }}
         />
       </TabsContent>
