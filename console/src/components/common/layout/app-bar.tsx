@@ -7,6 +7,7 @@ import type { JSX } from "react";
 import { CreateTarget } from "../../ui/create-target";
 import { SearchForm } from "../../ui/search-form";
 import { WorkspaceSwitcher } from "../../ui/workspace-switcher";
+import { GithubBadge } from "../../ui/github-badge";
 
 export default function AppBar({ children }: { children: JSX.Element }) {
   return (
@@ -25,6 +26,7 @@ export default function AppBar({ children }: { children: JSX.Element }) {
         </div>
         <div className="ml-auto flex gap-3">
           <CreateTarget />
+          <GithubBadge />
           <ThemeModeSwitcher />
         </div>
       </header>
