@@ -25,9 +25,9 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const data = row.original;
       const ports_scanner = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
-      const ipA = data.dnsRecords?.['A'] as string[];
-      const ipAAAA = data.dnsRecords?.['AAAA'] as string[];
-      const ipAddresses = ipAAAA ? ipA.concat(ipAAAA) : ipA;
+      const ipA = (data.dnsRecords?.['A'] as string[]) || [];
+      const ipAAAA = (data.dnsRecords?.['AAAA'] as string[]) || [];
+      const ipAddresses = [...ipA, ...ipAAAA];
 
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">

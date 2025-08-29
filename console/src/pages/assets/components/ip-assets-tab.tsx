@@ -10,6 +10,8 @@ export default function IpAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    filterParams,
+    filterHandlers,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetIpAssets(queryParams, {
@@ -42,6 +44,10 @@ export default function IpAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
+          onRowClick={(row) => {
+            const selectedValue = [...(filterParams.ipAddresses || []), row.ip];
+            filterHandlers('ipAddresses', selectedValue);
+          }}
         />
       </TabsContent>
     </>
