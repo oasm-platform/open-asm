@@ -1,12 +1,12 @@
 import { Tabs } from '@/components/ui/tabs';
 import { useMemo, useState } from 'react';
 import AssetTabContent from './components/asset-tab';
-import FilterForm from './components/filter-form';
+import FilterFormInfinite from './components/filter-form-infinite';
 import IpAssetsTab from './components/ip-assets-tab';
 import PortAssetsTab from './components/port-assets-tab';
+import StatusCodeAssetsTab from './components/status-code-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
-import StatusCodeAssetsTab from './components/status-code-assets-tab';
 
 export function ListAssets() {
   const tabList = useMemo(
@@ -44,7 +44,8 @@ export function ListAssets() {
 
   return (
     <div className="w-full">
-      <FilterForm />
+      {/* <FilterForm /> */}
+      <FilterFormInfinite />
       <Tabs
         value={selectedTab}
         onValueChange={setSelectedTab}

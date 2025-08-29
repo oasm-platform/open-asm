@@ -17,6 +17,13 @@ type AssetContextType = ReturnType<typeof useServerDataTable> & {
     sortBy: string;
     sortOrder: 'ASC' | 'DESC';
   };
+  queryFilterParams: {
+    workspaceId: string;
+    targetIds?: string[];
+    value?: string;
+    limit: number;
+    page: number;
+  };
   queryOptions: {
     query: {
       refetchInterval?: number;
@@ -84,6 +91,13 @@ export default function AssetProvider({
     sortOrder: tableParams.sortOrder,
   };
 
+  const queryFilterParams = {
+    workspaceId: selectedWorkspace ?? '',
+    targetIds: targetId ? [targetId] : undefined,
+    limit: 10,
+    page: 1,
+  };
+
   const queryOptions = {
     query: {
       refetchInterval: refetchInterval ?? 30 * 1000,
@@ -106,6 +120,7 @@ export default function AssetProvider({
   return (
     <AssetContext
       value={{
+        queryFilterParams,
         tableHandlers,
         tableParams,
         queryParams,
