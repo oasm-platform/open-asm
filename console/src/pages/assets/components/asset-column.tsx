@@ -1,7 +1,7 @@
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import type { ColumnDef } from "@tanstack/react-table";
-import dayjs from "dayjs";
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import type { ColumnDef } from '@tanstack/react-table';
+import dayjs from 'dayjs';
 import {
   BriefcaseBusiness,
   EthernetPort,
@@ -9,23 +9,23 @@ import {
   Layers,
   Lock,
   Network,
-} from "lucide-react";
-import type { GetAssetsResponseDto } from "@/services/apis/gen/queries";
-import AssetValue from "./asset-value";
-import BadgeList from "./badge-list";
-import HTTPXStatusCode from "./status-code";
+} from 'lucide-react';
+import type { GetAssetsResponseDto } from '@/services/apis/gen/queries';
+import AssetValue from './asset-value';
+import BadgeList from './badge-list';
+import HTTPXStatusCode from './status-code';
 
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
-    accessorKey: "value",
-    header: "Value",
+    accessorKey: 'value',
+    header: 'Value',
     enableHiding: false,
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
       const ports_scanner = data.ports?.ports;
       const httpResponse = data.httpResponses;
-      const ipAddresses = data.dnsRecords?.["A"];
+      const ipAddresses = data.dnsRecords?.['A'];
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
           <div className="flex items-center gap-2 w-full">
@@ -37,16 +37,6 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
               {httpResponse?.title}
             </p>
           )}
-
-          {/* {http_response?.failed && ( */}
-          {/*   <p */}
-          {/*     className="text-red-500 truncate w-full text-sm" */}
-          {/*     title={http_response?.error} */}
-          {/*   > */}
-          {/*     {http_response?.error} */}
-          {/*   </p> */}
-          {/* )} */}
-
           <div className="w-full">
             <BadgeList list={ipAddresses as string[]} Icon={Network} />
           </div>
@@ -65,7 +55,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
-    header: "Technologies",
+    header: 'Technologies',
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
@@ -87,7 +77,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
-    header: "Certificate",
+    header: 'Certificate',
     size: 200,
     cell: ({ row }) => {
       const data = row.original;
@@ -101,19 +91,19 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
             (1000 * 60 * 60 * 24),
         ),
       );
-      const color = daysLeft < 30 ? "red" : daysLeft < 60 ? "yellow" : "green";
+      const color = daysLeft < 30 ? 'red' : daysLeft < 60 ? 'yellow' : 'green';
 
       return (
         <div className="flex flex-col gap-1 max-w-[200px] min-h-[60px]">
           <Badge
             variant="outline"
             className={cn(
-              "h-6 text-xs",
-              color === "red"
-                ? "text-red-500 border-red-500"
-                : color === "yellow"
-                  ? "text-yellow-500 border-yellow-500"
-                  : "text-green-500 border-green-500",
+              'h-6 text-xs',
+              color === 'red'
+                ? 'text-red-500 border-red-500'
+                : color === 'yellow'
+                  ? 'text-yellow-500 border-yellow-500'
+                  : 'text-green-500 border-green-500',
             )}
           >
             <Lock size={14} color={color} className="mr-1" />
@@ -133,7 +123,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
-    header: "Time",
+    header: 'Time',
     size: 120,
     cell: ({ row }) => {
       const data = row.original;
