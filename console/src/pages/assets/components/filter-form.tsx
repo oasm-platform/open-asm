@@ -30,7 +30,7 @@ export default function FilterForm() {
     tableParams: { filter },
     tableHandlers: { setFilter },
     queryParams,
-    filterParams: { ipAddresses, ports, techs },
+    filterParams: { ipAddresses, ports, techs, statusCodes },
   } = useAsset();
 
   const [searchValue, setSearchValue] = useState(filter ?? '');
@@ -77,8 +77,28 @@ export default function FilterForm() {
         }),
         selectedValues: techs,
       },
+      {
+        filterKey: 'statusCodes',
+        title: 'Status Code',
+        options: data?.statusCodes.map((e) => {
+          return {
+            value: e,
+            label: e,
+          };
+        }),
+        selectedValues: statusCodes,
+      },
     ],
-    [data?.ipAddresses, data?.ports, data?.techs, ipAddresses, ports, techs],
+    [
+      data?.ipAddresses,
+      data?.ports,
+      data?.statusCodes,
+      data?.techs,
+      ipAddresses,
+      ports,
+      statusCodes,
+      techs,
+    ],
   );
 
   const facets = filters.map((filter) => filter.filterKey);
@@ -169,7 +189,7 @@ function FacetedFilter({
                 ) : (
                   options
                     .filter((option) =>
-                      selectedValues.has(option.value.toString()),
+                      selectedValues.has(option?.value?.toString()),
                     )
                     .map((option) => (
                       <Badge
@@ -193,15 +213,15 @@ function FacetedFilter({
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
-                const isSelected = selectedValues.has(option.value.toString());
+                const isSelected = selectedValues.has(option?.value?.toString());
                 return (
                   <CommandItem
                     key={option.value}
                     onSelect={() => {
                       if (isSelected) {
-                        selectedValues.delete(option.value.toString());
+                        selectedValues.delete(option?.value?.toString());
                       } else {
-                        selectedValues.add(option.value.toString());
+                        selectedValues.add(option?.value?.toString());
                       }
                       filterHandlers(filterKey, Array.from(selectedValues));
                     }}

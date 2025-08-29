@@ -363,10 +363,25 @@ export type GetManyGetTechnologyAssetsDTODto = {
   pageCount: number;
 };
 
+export type GetStatusCodeAssetsDTO = {
+  statusCode: string;
+  assetCount: number;
+};
+
+export type GetManyGetStatusCodeAssetsDTODto = {
+  data: GetStatusCodeAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type GetFacetedDataDTO = {
   techs: string[];
   ipAddresses: string[];
   ports: string[];
+  statusCodes: string[];
 };
 
 export type WorkerAliveDto = {
@@ -663,6 +678,20 @@ export type AssetsControllerGetPortAssetsParams = {
 };
 
 export type AssetsControllerGetTechnologyAssetsParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  value?: string;
+  workspaceId: string;
+  targetIds?: string[];
+  ipAddresses?: string[];
+  ports?: string[];
+  techs?: string[];
+  statusCodes?: string[];
+};
+
+export type AssetsControllerGetStatusCodeAssetsParams = {
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -5905,6 +5934,361 @@ export function useAssetsControllerGetTechnologyAssets<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getAssetsControllerGetTechnologyAssetsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves a list of technologies with number of assets.
+ * @summary Get technologies along with number of assets
+ */
+export const assetsControllerGetStatusCodeAssets = (
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetStatusCodeAssetsDTODto>(
+    { url: `/api/assets/status-code`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetStatusCodeAssetsQueryKey = (
+  params: AssetsControllerGetStatusCodeAssetsParams,
+) => {
+  return [`/api/assets/status-code`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetStatusCodeAssetsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+    AssetsControllerGetStatusCodeAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetStatusCodeAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetStatusCodeAssetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+    QueryKey,
+    AssetsControllerGetStatusCodeAssetsParams['page']
+  > = ({ signal, pageParam }) =>
+    assetsControllerGetStatusCodeAssets(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+    TError,
+    TData,
+    QueryKey,
+    AssetsControllerGetStatusCodeAssetsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetStatusCodeAssetsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>>;
+export type AssetsControllerGetStatusCodeAssetsInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetStatusCodeAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+    AssetsControllerGetStatusCodeAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetStatusCodeAssetsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetStatusCodeAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+    AssetsControllerGetStatusCodeAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetStatusCodeAssetsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetStatusCodeAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+    AssetsControllerGetStatusCodeAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetStatusCodeAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get technologies along with number of assets
+ */
+
+export function useAssetsControllerGetStatusCodeAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+    AssetsControllerGetStatusCodeAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetStatusCodeAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetsControllerGetStatusCodeAssetsInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetsControllerGetStatusCodeAssetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetStatusCodeAssetsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
+  > = ({ signal }) =>
+    assetsControllerGetStatusCodeAssets(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetStatusCodeAssetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
+>;
+export type AssetsControllerGetStatusCodeAssetsQueryError = unknown;
+
+export function useAssetsControllerGetStatusCodeAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetStatusCodeAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetStatusCodeAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get technologies along with number of assets
+ */
+
+export function useAssetsControllerGetStatusCodeAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+  TError = unknown,
+>(
+  params: AssetsControllerGetStatusCodeAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetStatusCodeAssetsQueryOptions(
     params,
     options,
   );
