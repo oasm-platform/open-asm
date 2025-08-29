@@ -277,6 +277,7 @@ export class AssetsService {
         '"ipAssets"."ip"',
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
       ])
+      .andWhere('"ipAssets"."ip" IS NOT NULL')
       .distinct(true)
       .groupBy('"ipAssets"."ip"');
 
@@ -326,15 +327,13 @@ export class AssetsService {
             .select('"ports"."assetId"', 'assetId')
             .addSelect('unnest("ports"."ports")', 'port')
             .from(Port, 'ports'),
-        'portUnnested',
-        '"portUnnested"."assetId" = "assets"."id"',
+        'sq',
+        '"sq"."assetId" = "assets"."id"',
       )
-      .select([
-        '"portUnnested"."port"',
-        'COUNT(DISTINCT "assets"."id") as "assetCount"',
-      ])
+      .select(['"sq"."port"', 'COUNT(DISTINCT "assets"."id") as "assetCount"'])
+      .andWhere('"sq"."port" IS NOT NULL')
       .distinct(true)
-      .groupBy('"portUnnested"."port"');
+      .groupBy('"sq"."port"');
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
@@ -391,6 +390,7 @@ export class AssetsService {
         '"sq"."technology"',
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
       ])
+      .andWhere('"sq"."technology" IS NOT NULL')
       .distinct(true)
       .groupBy('"sq"."technology"');
 
@@ -438,6 +438,7 @@ export class AssetsService {
         '"statusCodeAssets"."statusCode"',
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
       ])
+      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
       .distinct(true)
       .groupBy('"statusCodeAssets"."statusCode"');
 
@@ -481,6 +482,7 @@ export class AssetsService {
 
     const ipsQb = this.buildBaseQuery(facetedQuery)
       .select(['"ipAssets"."ip"'])
+      .andWhere('"ipAssets"."ip" IS NOT NULL')
       .distinct(true);
 
     const portsQb = this.buildBaseQuery(query)
@@ -494,6 +496,7 @@ export class AssetsService {
         '"sq"."assetId" = "assets"."id"',
       )
       .select(['"sq"."port"'])
+      .andWhere('"sq"."port" IS NOT NULL')
       .distinct(true);
 
     const techsQb = this.buildBaseQuery(query)
@@ -507,10 +510,12 @@ export class AssetsService {
         '"sq"."assetId" = "assets"."id"',
       )
       .select(['"sq"."technology"'])
+      .andWhere('"sq"."technology" IS NOT NULL')
       .distinct(true);
 
     const statusCodeQb = this.buildBaseQuery(facetedQuery)
       .select(['"statusCodeAssets"."statusCode"'])
+      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
       .distinct(true);
 
     const ipAddresses = await ipsQb.getRawMany();
