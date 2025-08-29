@@ -45,8 +45,11 @@ export default function PortAssetsTab() {
           }}
           totalItems={total}
           onRowClick={(row) => {
-            const selectedValue = [...(filterParams.ports || []), row.port];
-            filterHandlers('ports', selectedValue);
+            let selectedValue = filterParams.ports || [];
+            if (selectedValue.indexOf(row.port.toString()) < 0) {
+              selectedValue = [...selectedValue, row.port];
+              filterHandlers('ports', selectedValue);
+            }
           }}
         />
       </TabsContent>
