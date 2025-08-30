@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
@@ -32,10 +33,13 @@ export class Tool {
   updatedAt?: Date;
 
   @ApiProperty()
+  @IsString()
   @Column()
   name: string;
 
   @ApiProperty()
+  @IsString()
+  @IsOptional()
   @Column({ nullable: true })
   description: string;
 
@@ -45,14 +49,19 @@ export class Tool {
   workspaceTools?: WorkspaceTool[];
 
   @ApiProperty({ enum: ToolCategory })
+  @IsEnum(ToolCategory)
   @Column({ type: 'enum', enum: ToolCategory })
   category?: ToolCategory;
 
   @ApiProperty()
+  @IsOptional()
+  @IsString()
   @Column({ nullable: true })
   version?: string;
 
   @ApiProperty()
+  @IsOptional()
+  @IsString()
   @Column({ nullable: true })
   logoUrl?: string;
 

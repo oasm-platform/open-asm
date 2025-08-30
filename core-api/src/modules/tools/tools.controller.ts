@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 
+import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
@@ -14,6 +15,18 @@ import { ToolsService } from './tools.service';
 @Controller('tools')
 export class ToolsController {
   constructor(private readonly toolsService: ToolsService) {}
+
+  @Doc({
+    summary: 'Create a new tool',
+    description: 'Creates a new tool with the provided information.',
+    response: {
+      serialization: Tool,
+    },
+  })
+  @Post()
+  createTool(@Body() dto: CreateToolDto) {
+    return this.toolsService.createTool(dto);
+  }
 
   @Doc({
     summary: 'Add tool to workspace',

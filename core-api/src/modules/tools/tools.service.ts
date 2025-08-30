@@ -12,6 +12,7 @@ import { Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { builtInTools } from './built-in-tools';
+import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
@@ -54,7 +55,7 @@ export class ToolsService implements OnModuleInit {
         .insert()
         .orUpdate({
           conflict_target: ['name'],
-          overwrite: ['description', 'logoUrl', 'version'],
+          overwrite: ['description', 'logoUrl', 'version', 'uniqueName'],
         })
         .values(toolsToInsert)
         .execute();
@@ -171,5 +172,36 @@ export class ToolsService implements OnModuleInit {
       data: combinedTools,
       total: combinedTools.length,
     };
+  }
+
+  /**
+   * Create a new tool.
+   * @param {CreateToolDto} dto - The tool creation data.
+   * @returns {Promise<Tool>} The created tool.
+   */
+  async createTool(dto: CreateToolDto): Promise<Tool> {
+    // Check if a tool with the same name already exists
+    const existingTool = await this.toolsRepository.findOne({
+      where: { name: dto.name },
+    });
+
+    if (existingTool) {
+      throw new BadRequestException(
+        `A tool with the name "${dto.name}" already exists.`,
+      );
+    }
+
+    const tool = this.toolsRepository.create({
+      name: dto.name,
+      description: dto.description,
+      category: dto.category,
+      // Set default values for other required fields
+      type: WorkerType.PROVIDER, // or another appropriate default
+      isOfficialSupport: false,
+      version: dto.version,
+      logoUrl: dto.logoUrl,
+    });
+
+    return this.toolsRepository.save(tool);
   }
 }

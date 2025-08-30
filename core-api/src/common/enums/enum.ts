@@ -26,7 +26,7 @@ export enum ScanStatus {
 
 export enum WorkerType {
   BUILT_IN = 'built_in',
-  PLUGIN = 'plugin',
+  PROVIDER = 'provider',
 }
 
 export enum WorkerScope {
