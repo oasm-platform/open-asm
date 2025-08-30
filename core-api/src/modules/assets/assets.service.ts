@@ -17,6 +17,7 @@ import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
 import { Port } from './entities/ports.entity';
+import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 
 @Injectable()
 export class AssetsService {
@@ -28,6 +29,7 @@ export class AssetsService {
     public readonly targetRepo: Repository<Target>,
     private jobRegistryService: JobsRegistryService,
     private eventEmitter: EventEmitter2,
+    private technologyForwarderService: TechnologyForwarderService,
 
     private dataSource: DataSource,
   ) {}
@@ -409,10 +411,34 @@ export class AssetsService {
 
     const total = totalInDb?.count ?? 0;
 
+    // Enrich technology data with detailed information
+    const enrichedTechs =
+      await this.technologyForwarderService.enrichTechnologies(
+        list.map((item: GetTechnologyAssetsDTO) => item.technology),
+      );
+
     const data = list.map((item: GetTechnologyAssetsDTO) => {
       const obj = new GetTechnologyAssetsDTO();
       obj.technology = item.technology;
       obj.assetCount = item.assetCount;
+
+      // Find the enriched information for this technology
+      const enrichedTech = enrichedTechs.find(
+        (tech) => tech.name === item.technology,
+      );
+
+      // Add additional properties if we have enriched data
+      if (enrichedTech && enrichedTech.info) {
+        obj.info = enrichedTech.info;
+
+        // Add icon URL if icon name is available
+        if (enrichedTech.info.icon) {
+          obj.info.iconUrl = this.technologyForwarderService.getIconUrl(
+            enrichedTech.info.icon,
+          );
+        }
+      }
+
       return obj;
     });
 

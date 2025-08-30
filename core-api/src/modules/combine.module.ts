@@ -6,6 +6,7 @@ import { RootModule } from './root/root.module';
 import { SearchModule } from './search/search.module';
 import { StatisticModule } from './statistic/statistic.module';
 import { TargetsModule } from './targets/targets.module';
+import { TechnologyModule } from './technology/technology.module';
 import { ToolsModule } from './tools/tools.module';
 import { UsersModule } from './users/users.module';
 import { VulnerabilitiesModule } from './vulnerabilities/vulnerabilities.module';
@@ -25,6 +26,7 @@ import { DataAdapterModule } from './data-adapter/data-adapter.module';
     RootModule,
     JobsRegistryModule,
     AssetsModule,
+    TechnologyModule,
     WorkersModule,
     SearchModule,
     ToolsModule,
