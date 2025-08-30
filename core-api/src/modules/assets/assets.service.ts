@@ -47,21 +47,10 @@ export class AssetsService {
   }
 
   private buildBaseQuery(query: GetAssetsQueryDto) {
-    const {
-      targetIds,
-      workspaceId,
-      value,
-      ipAddresses,
-      ports,
-      techs,
-      statusCodes,
-    } = query;
+    const { targetIds, workspaceId, ipAddresses, ports, techs, statusCodes } =
+      query;
 
     const whereBuilder = {
-      value: {
-        value: `%${value}%`,
-        whereClause: `"assets"."value" ILIKE :param`,
-      },
       targetIds: {
         value: targetIds,
         whereClause: `"assets"."targetId" = ANY(:param)`,
@@ -147,6 +136,10 @@ export class AssetsService {
 
     if (assetId && assetId.length > 0) {
       queryBuilder.andWhere('assets.id = :assetId', { assetId });
+    } else {
+      queryBuilder.andWhere('"assets"."value" ILIKE :value', {
+        value: `%${query.value}%`,
+      });
     }
 
     const [list, total] = await queryBuilder
@@ -278,6 +271,9 @@ export class AssetsService {
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
       ])
       .andWhere('"ipAssets"."ip" IS NOT NULL')
+      .andWhere('"ipAssets"."ip" ILIKE :value', {
+        value: `%${query.value}%`,
+      })
       .distinct(true)
       .groupBy('"ipAssets"."ip"');
 
@@ -332,6 +328,9 @@ export class AssetsService {
       )
       .select(['"sq"."port"', 'COUNT(DISTINCT "assets"."id") as "assetCount"'])
       .andWhere('"sq"."port" IS NOT NULL')
+      .andWhere('"sq"."port"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      })
       .distinct(true)
       .groupBy('"sq"."port"');
 
@@ -358,8 +357,6 @@ export class AssetsService {
     });
 
     return getManyResponse({ query, data, total });
-
-    return getManyResponse({ query, data: list, total });
   }
 
   /**
@@ -391,6 +388,9 @@ export class AssetsService {
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
       ])
       .andWhere('"sq"."technology" IS NOT NULL')
+      .andWhere('"sq"."technology" ILIKE :value', {
+        value: `%${query.value}%`,
+      })
       .distinct(true)
       .groupBy('"sq"."technology"');
 
@@ -439,6 +439,9 @@ export class AssetsService {
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
       ])
       .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
+      .andWhere('"statusCodeAssets"."statusCode"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      })
       .distinct(true)
       .groupBy('"statusCodeAssets"."statusCode"');
 

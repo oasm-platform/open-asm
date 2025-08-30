@@ -40,7 +40,9 @@ export default function FilterForm() {
     setFilter(debouncedValue);
   }, [debouncedValue, setFilter]);
 
-  const { data } = useAssetsControllerGetFacetedData(queryParams);
+  const { data } = useAssetsControllerGetFacetedData(
+    queryParams as Pick<typeof queryParams, 'workspaceId' | 'targetIds'>,
+  );
 
   const filters = useMemo(
     () => [
@@ -213,7 +215,9 @@ function FacetedFilter({
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
-                const isSelected = selectedValues.has(option?.value?.toString());
+                const isSelected = selectedValues.has(
+                  option?.value?.toString(),
+                );
                 return (
                   <CommandItem
                     key={option.value}
