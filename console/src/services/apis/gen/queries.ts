@@ -501,6 +501,7 @@ export type CreateToolDto = {
   name: string;
   description: string;
   category: CreateToolDtoCategory;
+  version: string;
   logoUrl: string;
 };
 
@@ -511,6 +512,13 @@ export type WorkspaceTool = {
 };
 
 export type AddToolToWorkspaceDto = {
+  /** The ID of the workspace */
+  workspaceId: string;
+  /** The ID of the tool */
+  toolId: string;
+};
+
+export type InstallToolDto = {
   /** The ID of the workspace */
   workspaceId: string;
   /** The ID of the tool */
@@ -772,6 +780,7 @@ export type ToolsControllerGetManyToolsParams = {
   sortOrder?: string;
   type?: ToolsControllerGetManyToolsType;
   category?: ToolsControllerGetManyToolsCategory;
+  workspaceId?: string;
 };
 
 export type ToolsControllerGetManyToolsType =
@@ -8972,6 +8981,193 @@ export const useToolsControllerAddToolToWorkspace = <
 > => {
   const mutationOptions =
     getToolsControllerAddToolToWorkspaceMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Installs a tool to a specific workspace, checking for duplicates before insertion.
+ * @summary Install tool
+ */
+export const toolsControllerInstallTool = (
+  installToolDto: InstallToolDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspaceTool>(
+    {
+      url: `/api/tools/install`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: installToolDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolsControllerInstallToolMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+    TError,
+    { data: InstallToolDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+  TError,
+  { data: InstallToolDto },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerInstallTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+    { data: InstallToolDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return toolsControllerInstallTool(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolsControllerInstallToolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerInstallTool>>
+>;
+export type ToolsControllerInstallToolMutationBody = InstallToolDto;
+export type ToolsControllerInstallToolMutationError = unknown;
+
+/**
+ * @summary Install tool
+ */
+export const useToolsControllerInstallTool = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+      TError,
+      { data: InstallToolDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerInstallTool>>,
+  TError,
+  { data: InstallToolDto },
+  TContext
+> => {
+  const mutationOptions = getToolsControllerInstallToolMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Uninstalls a tool from a specific workspace by removing the record from workspace_tools table.
+ * @summary Uninstall tool
+ */
+export const toolsControllerUninstallTool = (
+  installToolDto: InstallToolDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/tools/uninstall`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: installToolDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolsControllerUninstallToolMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+    TError,
+    { data: InstallToolDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+  TError,
+  { data: InstallToolDto },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerUninstallTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+    { data: InstallToolDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return toolsControllerUninstallTool(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolsControllerUninstallToolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerUninstallTool>>
+>;
+export type ToolsControllerUninstallToolMutationBody = InstallToolDto;
+export type ToolsControllerUninstallToolMutationError = unknown;
+
+/**
+ * @summary Uninstall tool
+ */
+export const useToolsControllerUninstallTool = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+      TError,
+      { data: InstallToolDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerUninstallTool>>,
+  TError,
+  { data: InstallToolDto },
+  TContext
+> => {
+  const mutationOptions =
+    getToolsControllerUninstallToolMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

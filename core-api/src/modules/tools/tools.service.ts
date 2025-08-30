@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
@@ -14,6 +15,7 @@ import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity'
 import { builtInTools } from './built-in-tools';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
+import { InstallToolDto } from './dto/install-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -85,7 +87,10 @@ export class ToolsService implements OnModuleInit {
    */
   async addToolToWorkspace(dto: AddToolToWorkspaceDto): Promise<WorkspaceTool> {
     const existingEntry = await this.workspaceToolRepository.findOne({
-      where: { isEnabled: true },
+      where: {
+        tool: { id: dto.toolId },
+        workspace: { id: dto.workspaceId },
+      },
     });
 
     if (existingEntry) {
@@ -97,6 +102,57 @@ export class ToolsService implements OnModuleInit {
       workspace: { id: dto.workspaceId },
     });
     return this.workspaceToolRepository.save(newWorkspaceTool);
+  }
+
+  /**
+   * Install a tool to a workspace, checking for duplicates before insertion.
+   * @throws BadRequestException if the tool already exists in this workspace.
+   * @returns The newly created workspace-tool entry.
+   */
+  async installTool(dto: InstallToolDto): Promise<WorkspaceTool> {
+    // Check if the tool already exists in this workspace
+    const existingEntry = await this.workspaceToolRepository.findOne({
+      where: {
+        tool: { id: dto.toolId },
+        workspace: { id: dto.workspaceId },
+      },
+    });
+
+    if (existingEntry) {
+      throw new BadRequestException(
+        'Tool already installed in this workspace.',
+      );
+    }
+
+    // Create and save the new workspace-tool entry
+    const newWorkspaceTool = this.workspaceToolRepository.create({
+      tool: { id: dto.toolId },
+      workspace: { id: dto.workspaceId },
+    });
+    return this.workspaceToolRepository.save(newWorkspaceTool);
+  }
+
+  /**
+   * Uninstall a tool from a workspace by removing the record from workspace_tools table.
+   * @param dto The uninstall tool data containing toolId and workspaceId.
+   * @returns A boolean indicating success.
+   */
+  async uninstallTool(dto: InstallToolDto): Promise<DefaultMessageResponseDto> {
+    const existingEntry = await this.workspaceToolRepository.findOne({
+      where: {
+        tool: { id: dto.toolId },
+        workspace: { id: dto.workspaceId },
+      },
+    });
+
+    if (!existingEntry) {
+      throw new BadRequestException('Tool is not installed in this workspace.');
+    }
+
+    await this.workspaceToolRepository.remove(existingEntry);
+    return {
+      message: 'Tool uninstalled successfully.',
+    };
   }
 
   /**
@@ -131,15 +187,50 @@ export class ToolsService implements OnModuleInit {
     if (query.type) where.type = query.type;
     if (query.category) where.category = query.category;
 
-    const [data, total] = await this.toolsRepository.findAndCount({
-      where: Object.keys(where).length ? where : undefined,
-      take: limit,
-      skip: skip,
-      order: {
-        name: 'ASC',
-      },
-    });
-    return getManyResponse({ query, data, total });
+    // If workspaceId is provided, we need to check which tools are installed
+    if (query.workspaceId) {
+      const [data, total] = await this.toolsRepository.findAndCount({
+        where: Object.keys(where).length ? where : undefined,
+        take: limit,
+        skip: skip,
+        order: {
+          name: 'ASC',
+        },
+      });
+
+      // Get installed tools for this workspace
+      const installedTools = await this.workspaceToolRepository.find({
+        where: {
+          workspace: { id: query.workspaceId },
+        },
+        relations: ['tool'],
+      });
+
+      // Add isInstalled flag to each tool
+      const toolsWithInstalledFlag = data.map((tool) => {
+        const isInstalled = installedTools.some((wt) => wt.tool.id === tool.id);
+        return {
+          ...tool,
+          isInstalled,
+        };
+      });
+
+      return getManyResponse({ query, data: toolsWithInstalledFlag, total });
+    } else {
+      // Original behavior when no workspaceId is provided
+      const [data, total] = await this.toolsRepository.findAndCount({
+        where: Object.keys(where).length ? where : undefined,
+        take: limit,
+        skip: skip,
+        relations: {
+          workspaceTools: true,
+        },
+        order: {
+          name: 'ASC',
+        },
+      });
+      return getManyResponse({ query, data, total });
+    }
   }
 
   async getInstalledTools(dto: GetInstalledToolsDto) {

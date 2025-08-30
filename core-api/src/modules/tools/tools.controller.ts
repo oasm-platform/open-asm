@@ -3,8 +3,10 @@ import { ApiTags } from '@nestjs/swagger';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
+import { InstallToolDto } from './dto/install-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -38,6 +40,32 @@ export class ToolsController {
   @Post('add-to-workspace')
   async addToolToWorkspace(@Body() dto: AddToolToWorkspaceDto) {
     return this.toolsService.addToolToWorkspace(dto);
+  }
+
+  @Doc({
+    summary: 'Install tool',
+    description:
+      'Installs a tool to a specific workspace, checking for duplicates before insertion.',
+    response: {
+      serialization: WorkspaceTool,
+    },
+  })
+  @Post('install')
+  async installTool(@Body() dto: InstallToolDto) {
+    return this.toolsService.installTool(dto);
+  }
+
+  @Doc({
+    summary: 'Uninstall tool',
+    description:
+      'Uninstalls a tool from a specific workspace by removing the record from workspace_tools table.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  @Post('uninstall')
+  async uninstallTool(@Body() dto: InstallToolDto) {
+    return this.toolsService.uninstallTool(dto);
   }
 
   @Doc({
