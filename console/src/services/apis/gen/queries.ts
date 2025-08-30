@@ -400,7 +400,7 @@ export type WorkerInstance = {
 };
 
 export type WorkerJoinDto = {
-  token: string;
+  apiKey: string;
 };
 
 export type GetManyWorkerInstanceDto = {
@@ -460,19 +460,6 @@ export type DeleteResponseDto = {
   success: boolean;
 };
 
-export type WorkspaceTool = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type AddToolToWorkspaceDto = {
-  /** The ID of the workspace */
-  workspaceId: string;
-  /** The ID of the tool */
-  toolId: string;
-};
-
 export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
@@ -496,6 +483,38 @@ export type Tool = {
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;
+};
+
+export type CreateToolDtoCategory =
+  (typeof CreateToolDtoCategory)[keyof typeof CreateToolDtoCategory];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const CreateToolDtoCategory = {
+  subdomains: 'subdomains',
+  http_probe: 'http_probe',
+  http_scraper: 'http_scraper',
+  ports_scanner: 'ports_scanner',
+  vulnerabilities: 'vulnerabilities',
+} as const;
+
+export type CreateToolDto = {
+  name: string;
+  description: string;
+  category: CreateToolDtoCategory;
+  logoUrl: string;
+};
+
+export type WorkspaceTool = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AddToolToWorkspaceDto = {
+  /** The ID of the workspace */
+  workspaceId: string;
+  /** The ID of the tool */
+  toolId: string;
 };
 
 export type GetManyToolDto = {
@@ -761,7 +780,7 @@ export type ToolsControllerGetManyToolsType =
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ToolsControllerGetManyToolsType = {
   built_in: 'built_in',
-  plugin: 'plugin',
+  provider: 'provider',
 } as const;
 
 export type ToolsControllerGetManyToolsCategory =
@@ -8414,6 +8433,455 @@ export const useSearchControllerDeleteSearchHistory = <
 };
 
 /**
+ * Creates a new tool with the provided information.
+ * @summary Create a new tool
+ */
+export const toolsControllerCreateTool = (
+  createToolDto: CreateToolDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Tool>(
+    {
+      url: `/api/tools`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createToolDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolsControllerCreateToolMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+    TError,
+    { data: CreateToolDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+  TError,
+  { data: CreateToolDto },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerCreateTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+    { data: CreateToolDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return toolsControllerCreateTool(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolsControllerCreateToolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerCreateTool>>
+>;
+export type ToolsControllerCreateToolMutationBody = CreateToolDto;
+export type ToolsControllerCreateToolMutationError = unknown;
+
+/**
+ * @summary Create a new tool
+ */
+export const useToolsControllerCreateTool = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+      TError,
+      { data: CreateToolDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerCreateTool>>,
+  TError,
+  { data: CreateToolDto },
+  TContext
+> => {
+  const mutationOptions = getToolsControllerCreateToolMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves a list of tools with pagination.
+ * @summary Get tools
+ */
+export const toolsControllerGetManyTools = (
+  params?: ToolsControllerGetManyToolsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyToolDto>(
+    { url: `/api/tools`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getToolsControllerGetManyToolsQueryKey = (
+  params?: ToolsControllerGetManyToolsParams,
+) => {
+  return [`/api/tools`, ...(params ? [params] : [])] as const;
+};
+
+export const getToolsControllerGetManyToolsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getToolsControllerGetManyToolsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    QueryKey,
+    ToolsControllerGetManyToolsParams['page']
+  > = ({ signal, pageParam }) =>
+    toolsControllerGetManyTools(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    TError,
+    TData,
+    QueryKey,
+    ToolsControllerGetManyToolsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetManyToolsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+>;
+export type ToolsControllerGetManyToolsInfiniteQueryError = unknown;
+
+export function useToolsControllerGetManyToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | ToolsControllerGetManyToolsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetManyToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetManyToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tools
+ */
+
+export function useToolsControllerGetManyToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetManyToolsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getToolsControllerGetManyToolsQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getToolsControllerGetManyToolsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+  > = ({ signal }) =>
+    toolsControllerGetManyTools(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetManyToolsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+>;
+export type ToolsControllerGetManyToolsQueryError = unknown;
+
+export function useToolsControllerGetManyTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params: undefined | ToolsControllerGetManyToolsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetManyTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetManyTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tools
+ */
+
+export function useToolsControllerGetManyTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetManyToolsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Adds a tool to a specific workspace.
  * @summary Add tool to workspace
  */
@@ -8803,362 +9271,6 @@ export function useToolsControllerGetBuiltInTools<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getToolsControllerGetBuiltInToolsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Retrieves a list of tools with pagination.
- * @summary Get tools
- */
-export const toolsControllerGetManyTools = (
-  params?: ToolsControllerGetManyToolsParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyToolDto>(
-    { url: `/api/tools`, method: 'GET', params, signal },
-    options,
-  );
-};
-
-export const getToolsControllerGetManyToolsQueryKey = (
-  params?: ToolsControllerGetManyToolsParams,
-) => {
-  return [`/api/tools`, ...(params ? [params] : [])] as const;
-};
-
-export const getToolsControllerGetManyToolsInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getToolsControllerGetManyToolsQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    QueryKey,
-    ToolsControllerGetManyToolsParams['page']
-  > = ({ signal, pageParam }) =>
-    toolsControllerGetManyTools(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    TError,
-    TData,
-    QueryKey,
-    ToolsControllerGetManyToolsParams['page']
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type ToolsControllerGetManyToolsInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerGetManyTools>>
->;
-export type ToolsControllerGetManyToolsInfiniteQueryError = unknown;
-
-export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params: undefined | ToolsControllerGetManyToolsParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get tools
- */
-
-export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getToolsControllerGetManyToolsInfiniteQueryOptions(
-    params,
-    options,
-  );
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getToolsControllerGetManyToolsQueryOptions = <
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getToolsControllerGetManyToolsQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>
-  > = ({ signal }) =>
-    toolsControllerGetManyTools(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type ToolsControllerGetManyToolsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerGetManyTools>>
->;
-export type ToolsControllerGetManyToolsQueryError = unknown;
-
-export function useToolsControllerGetManyTools<
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params: undefined | ToolsControllerGetManyToolsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerGetManyTools<
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerGetManyTools<
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get tools
- */
-
-export function useToolsControllerGetManyTools<
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getToolsControllerGetManyToolsQueryOptions(
-    params,
-    options,
-  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

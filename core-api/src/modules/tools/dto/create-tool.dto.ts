@@ -6,4 +6,5 @@ export class CreateToolDto extends PickType(Tool, [
   'description',
   'category',
   'logoUrl',
+  'version',
 ] as const) {}

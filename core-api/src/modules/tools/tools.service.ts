@@ -198,6 +198,8 @@ export class ToolsService implements OnModuleInit {
       // Set default values for other required fields
       type: WorkerType.PROVIDER, // or another appropriate default
       isOfficialSupport: false,
+      version: dto.version,
+      logoUrl: dto.logoUrl,
     });
 
     return this.toolsRepository.save(tool);

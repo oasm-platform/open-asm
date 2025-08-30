@@ -54,14 +54,14 @@ export class Tool {
   category?: ToolCategory;
 
   @ApiProperty()
-  @IsString()
   @IsOptional()
+  @IsString()
   @Column({ nullable: true })
   version?: string;
 
   @ApiProperty()
-  @IsString()
   @IsOptional()
+  @IsString()
   @Column({ nullable: true })
   logoUrl?: string;
 
