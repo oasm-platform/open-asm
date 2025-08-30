@@ -1,3 +1,4 @@
+import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { ToolsControllerGetManyToolsType, useToolsControllerGetManyTools } from "@/services/apis/gen/queries";
 import { Package } from "lucide-react";
 import ToolCard from "./tool-card";
@@ -5,9 +6,16 @@ import ToolCardLoading from "./tool-card-loading";
 import ToolInstallButton from "./tool-install-button";
 
 const Marketplace = () => {
+  const { selectedWorkspace } = useWorkspaceSelector();
   const { data, isLoading } = useToolsControllerGetManyTools({
-    type: ToolsControllerGetManyToolsType.provider
+    type: ToolsControllerGetManyToolsType.provider,
+    workspaceId: selectedWorkspace ?? "",
   });
+
+  // Hàm callback để làm mới danh sách công cụ khi trạng thái cài đặt thay đổi
+  const handleInstallChange = () => {
+    // Có thể thêm logic để làm mới dữ liệu nếu cần
+  };
 
   return (
     <div className="flex flex-col gap-4 py-4 mt-8">
@@ -23,7 +31,13 @@ const Marketplace = () => {
             <ToolCard
               key={tool.id}
               tool={tool}
-              button={<ToolInstallButton tool={tool} />}
+              button={
+                <ToolInstallButton 
+                  tool={tool} 
+                  workspaceId={selectedWorkspace ?? ""} 
+                  onInstallChange={handleInstallChange}
+                />
+              }
             />
           ))}
         </div>
