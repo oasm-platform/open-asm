@@ -127,14 +127,19 @@ export class AssetsService {
 
     const offset = (query.page - 1) * query.limit;
 
-    const queryBuilder = this.buildBaseQuery(query)
-      .select(['assets', 'httpResponses', 'ports', 'targets'])
-      .andWhere('"assets"."value" ILIKE :value', {
-        value: `%${query.value}%`,
-      });
+    const queryBuilder = this.buildBaseQuery(query).select([
+      'assets',
+      'httpResponses',
+      'ports',
+      'targets',
+    ]);
 
     if (assetId && assetId.length > 0) {
       queryBuilder.andWhere('assets.id = :assetId', { assetId });
+    } else {
+      queryBuilder.andWhere('"assets"."value" ILIKE :value', {
+        value: `%${query.value}%`,
+      });
     }
 
     const [list, total] = await queryBuilder
@@ -323,7 +328,7 @@ export class AssetsService {
       )
       .select(['"sq"."port"', 'COUNT(DISTINCT "assets"."id") as "assetCount"'])
       .andWhere('"sq"."port" IS NOT NULL')
-      .andWhere('"sq"."port" ILIKE :value', {
+      .andWhere('"sq"."port"::text ILIKE :value', {
         value: `%${query.value}%`,
       })
       .distinct(true)
@@ -352,8 +357,6 @@ export class AssetsService {
     });
 
     return getManyResponse({ query, data, total });
-
-    return getManyResponse({ query, data: list, total });
   }
 
   /**
@@ -436,7 +439,7 @@ export class AssetsService {
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
       ])
       .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
-      .andWhere('"statusCodeAssets"."statusCode" ILIKE :value', {
+      .andWhere('"statusCodeAssets"."statusCode"::text ILIKE :value', {
         value: `%${query.value}%`,
       })
       .distinct(true)
