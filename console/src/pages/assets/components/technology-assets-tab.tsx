@@ -22,7 +22,7 @@ export default function TechnologyAssetsTab() {
     },
   );
 
-  const portAssets = data?.data ?? [];
+  const technologyAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
   if (!data && !isLoading) return <div>Error loading targets.</div>;
@@ -31,7 +31,7 @@ export default function TechnologyAssetsTab() {
     <>
       <TabsContent value="tech" className="overflow-hidden">
         <DataTable
-          data={portAssets}
+          data={technologyAssets}
           columns={technologyAssetsColumn}
           isLoading={isLoading}
           page={page}

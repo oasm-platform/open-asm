@@ -81,4 +81,3 @@ export class TechnologyDetailDTO {
   @ApiProperty({ required: false })
   categoryNames?: string[];
 }
-

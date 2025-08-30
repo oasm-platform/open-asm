@@ -349,9 +349,46 @@ export type GetManyGetPortAssetsDTODto = {
   pageCount: number;
 };
 
+export type TechnologyDetailDTOJs = { [key: string]: unknown };
+
+export type TechnologyDetailDTOMeta = { [key: string]: unknown };
+
+export type TechnologyDetailDTOHeaders = { [key: string]: unknown };
+
+export type TechnologyDetailDTOCookies = { [key: string]: unknown };
+
+export type TechnologyDetailDTODns = { [key: string]: unknown };
+
+export type TechnologyDetailDTO = {
+  cats?: string[];
+  description?: string;
+  html?: string[];
+  icon?: string;
+  implies?: string[];
+  js?: TechnologyDetailDTOJs;
+  oss?: boolean;
+  scriptSrc?: string[];
+  website?: string;
+  pricing?: string[];
+  saas?: boolean;
+  dom?: string[];
+  meta?: TechnologyDetailDTOMeta;
+  headers?: TechnologyDetailDTOHeaders;
+  cookies?: TechnologyDetailDTOCookies;
+  dns?: TechnologyDetailDTODns;
+  url?: string[];
+  scripts?: string[];
+  xhr?: string[];
+  requires?: string[];
+  categories?: string[];
+  iconUrl?: string;
+  categoryNames?: string[];
+};
+
 export type GetTechnologyAssetsDTO = {
   technology: string;
   assetCount: number;
+  info?: TechnologyDetailDTO;
 };
 
 export type GetManyGetTechnologyAssetsDTODto = {
@@ -400,7 +437,7 @@ export type WorkerInstance = {
 };
 
 export type WorkerJoinDto = {
-  token: string;
+  apiKey: string;
 };
 
 export type GetManyWorkerInstanceDto = {
@@ -6982,6 +7019,348 @@ export function useAssetsControllerGetAssetById<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getAssetsControllerGetAssetByIdQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves detailed information about a specific technology.
+ * @summary Get technology information
+ */
+export const technologyControllerGetTechnologyInfo = (
+  name: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TechnologyDetailDTO>(
+    { url: `/api/technology/${name}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getTechnologyControllerGetTechnologyInfoQueryKey = (
+  name: string,
+) => {
+  return [`/api/technology/${name}`] as const;
+};
+
+export const getTechnologyControllerGetTechnologyInfoInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+  >,
+  TError = unknown,
+>(
+  name: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTechnologyControllerGetTechnologyInfoQueryKey(name);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+  > = ({ signal }) =>
+    technologyControllerGetTechnologyInfo(name, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!name,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TechnologyControllerGetTechnologyInfoInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+  >;
+export type TechnologyControllerGetTechnologyInfoInfiniteQueryError = unknown;
+
+export function useTechnologyControllerGetTechnologyInfoInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+  >,
+  TError = unknown,
+>(
+  name: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+          TError,
+          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTechnologyControllerGetTechnologyInfoInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+  >,
+  TError = unknown,
+>(
+  name: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+          TError,
+          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTechnologyControllerGetTechnologyInfoInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+  >,
+  TError = unknown,
+>(
+  name: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get technology information
+ */
+
+export function useTechnologyControllerGetTechnologyInfoInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+  >,
+  TError = unknown,
+>(
+  name: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getTechnologyControllerGetTechnologyInfoInfiniteQueryOptions(name, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getTechnologyControllerGetTechnologyInfoQueryOptions = <
+  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+  TError = unknown,
+>(
+  name: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTechnologyControllerGetTechnologyInfoQueryKey(name);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+  > = ({ signal }) =>
+    technologyControllerGetTechnologyInfo(name, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!name,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TechnologyControllerGetTechnologyInfoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+>;
+export type TechnologyControllerGetTechnologyInfoQueryError = unknown;
+
+export function useTechnologyControllerGetTechnologyInfo<
+  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+  TError = unknown,
+>(
+  name: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+          TError,
+          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTechnologyControllerGetTechnologyInfo<
+  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+  TError = unknown,
+>(
+  name: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+          TError,
+          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTechnologyControllerGetTechnologyInfo<
+  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+  TError = unknown,
+>(
+  name: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get technology information
+ */
+
+export function useTechnologyControllerGetTechnologyInfo<
+  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+  TError = unknown,
+>(
+  name: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTechnologyControllerGetTechnologyInfoQueryOptions(
+    name,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
