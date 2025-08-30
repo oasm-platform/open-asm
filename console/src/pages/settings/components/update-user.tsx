@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 const formSchema = z.object({
-  name: z.string().min(1, 'Username is required'),
+  name: z.string().min(1, 'Name is required'),
 });
 
 export default function UpdateUser() {
@@ -37,13 +37,13 @@ export default function UpdateUser() {
     try {
       const res = await authClient.updateUser({ ...values, image: '' });
       if (!res.data) {
-        form.setError('name', { message: 'Invalid username' });
+        form.setError('name', { message: 'Invalid name' });
       } else {
-        toast.success('Username updated successfully');
+        toast.success('Name updated successfully');
         form.reset({ name: values.name });
       }
     } catch {
-      form.setError('name', { message: 'Failed to update username' });
+      form.setError('name', { message: 'Failed to update name' });
     } finally {
       setLoading(false);
     }
@@ -58,10 +58,10 @@ export default function UpdateUser() {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Username</FormLabel>
+                <FormLabel>Name</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Enter your username"
+                    placeholder="Enter your name"
                     {...field}
                     className="w-full"
                     disabled={loading}
@@ -78,7 +78,7 @@ export default function UpdateUser() {
             size="sm"
           >
             {loading && <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />}
-            Update Username
+            Update
           </Button>
         </form>
       </Form>

@@ -5,8 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import CreateWorkspaceDialog from '../workspaces/create-workspace-dialog';
 import ListWorkspaces from './components/list-workspaces';
 import { ThemeSwitcher } from './components/theme-switcher';
-import UpdateUser from './components/update-user';
-import ChangePassword from './components/change-password';
+import AccountSettings from './components/account-settings';
 
 interface TabContentProps {
   title: string;
@@ -48,18 +47,7 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
         title: 'Account Settings',
         description: 'Manage your account settings and preferences',
       },
-      component: (
-        <div className="flex gap-4 justify-between flex-col md:flex-row">
-          <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 w-full">
-            <h4 className="font-semibold text-lg mb-4">Username</h4>
-            <UpdateUser />
-          </div>
-          <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 w-full">
-            <h4 className="font-semibold text-lg mb-4">Password</h4>
-            <ChangePassword />
-          </div>
-        </div>
-      ),
+      component: <AccountSettings />,
     },
     {
       id: 'appearance',
