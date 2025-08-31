@@ -52,7 +52,7 @@ export function useWorkspaceSelector() {
   const handleSelectWorkspace = React.useCallback(
     (id: string) => {
       setSelectedWorkspace(id);
-      // Remove window.location.reload() since we're using global state
+      setGlobalWorkspaceId(id); // Always set the global workspace ID when manually selecting
     },
     [setSelectedWorkspace],
   );
@@ -73,17 +73,17 @@ export function useWorkspaceSelector() {
         finalSelectedId = response.data[0].id;
       }
 
+      // Always update the global workspace ID to ensure it's in sync
+      setGlobalWorkspaceId(finalSelectedId);
+
       // Update state only if different
       if (state.selectedWorkspaceId !== finalSelectedId) {
         setSelectedWorkspace(finalSelectedId);
-        setGlobalWorkspaceId(finalSelectedId);
       }
     } else if (response?.data && response.data.length === 0) {
       // Clear selection when no workspaces
-      if (state.selectedWorkspaceId !== null) {
-        clearSelectedWorkspace();
-        setGlobalWorkspaceId(null);
-      }
+      clearSelectedWorkspace();
+      setGlobalWorkspaceId(null);
     }
   }, [
     response,
@@ -95,7 +95,7 @@ export function useWorkspaceSelector() {
   return {
     workspaces: response?.data || [],
     isLoading,
-    selectedWorkspace: state.selectedWorkspaceId,
+    selectedWorkspace: state.selectedWorkspaceId || null, // Return null if empty string
     handleSelectWorkspace,
     setSelectedWorkspaceState: setSelectedWorkspace, // Keep for backward compatibility
     refetch,
