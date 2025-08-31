@@ -1,20 +1,20 @@
-import { useWorkspacesControllerGetWorkspaces } from "@/services/apis/gen/queries";
-import { setGlobalWorkspaceId } from "@/utils/workspaceState";
-import React from "react";
-import createState from "./createState"; // adjust path as needed
+import { useWorkspacesControllerGetWorkspaces } from '@/services/apis/gen/queries';
+import { setGlobalWorkspaceId } from '@/utils/workspaceState';
+import React from 'react';
+import createState from './createState'; // adjust path as needed
 
 // Define workspace state type
 interface WorkspaceState {
-  selectedWorkspaceId: string | null;
+  selectedWorkspaceId: string;
 }
 
 // Create global workspace state
 const useWorkspaceState = createState<WorkspaceState>(
-  "workspace",
-  { selectedWorkspaceId: null },
+  'workspace',
+  { selectedWorkspaceId: '' },
   {
     setSelectedWorkspace: (state, id) => {
-      return typeof id === "string"
+      return typeof id === 'string'
         ? {
             ...state,
             selectedWorkspaceId: id,
@@ -23,9 +23,9 @@ const useWorkspaceState = createState<WorkspaceState>(
     },
     clearSelectedWorkspace: (state) => ({
       ...state,
-      selectedWorkspaceId: null,
+      selectedWorkspaceId: '',
     }),
-  }
+  },
 );
 
 export function useWorkspaceSelector() {
@@ -41,9 +41,9 @@ export function useWorkspaceSelector() {
     },
     {
       query: {
-        queryKey: ["workspaces"],
+        queryKey: ['workspaces'],
       },
-    }
+    },
   );
 
   const { state, setSelectedWorkspace, clearSelectedWorkspace } =
@@ -54,7 +54,7 @@ export function useWorkspaceSelector() {
       setSelectedWorkspace(id);
       // Remove window.location.reload() since we're using global state
     },
-    [setSelectedWorkspace]
+    [setSelectedWorkspace],
   );
 
   // Auto-select workspace logic

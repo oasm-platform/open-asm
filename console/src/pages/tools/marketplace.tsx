@@ -9,13 +9,8 @@ const Marketplace = () => {
   const { selectedWorkspace } = useWorkspaceSelector();
   const { data, isLoading } = useToolsControllerGetManyTools({
     type: ToolsControllerGetManyToolsType.provider,
-    workspaceId: selectedWorkspace ?? "",
+    workspaceId: selectedWorkspace,
   });
-
-  // Hàm callback để làm mới danh sách công cụ khi trạng thái cài đặt thay đổi
-  const handleInstallChange = () => {
-    // Có thể thêm logic để làm mới dữ liệu nếu cần
-  };
 
   return (
     <div className="flex flex-col gap-4 py-4 mt-8">
@@ -34,8 +29,7 @@ const Marketplace = () => {
               button={
                 <ToolInstallButton
                   tool={tool}
-                  workspaceId={selectedWorkspace ?? ""}
-                  onInstallChange={handleInstallChange}
+                  workspaceId={selectedWorkspace}
                 />
               }
             />
