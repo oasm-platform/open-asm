@@ -14,10 +14,11 @@ export default function ToolDetail() {
   const { selectedWorkspace } = useWorkspaceSelector();
 
   const { data: toolResponse, isLoading, error, refetch } = useToolsControllerGetToolById(
-    id || "",
-    {
-      workspaceId: selectedWorkspace || "",
+    id || "", {
+    query: {
+      queryKey: [selectedWorkspace, id]
     }
+  },
   );
 
   // Local state to track installation status
@@ -100,7 +101,7 @@ export default function ToolDetail() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex-shrink-0 flex">
+                  <div className="flex-shrink-0 flex items-center ">
                     <ToolInstallButton
                       tool={tool}
                       workspaceId={selectedWorkspace || ""}

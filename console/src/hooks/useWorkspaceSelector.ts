@@ -95,9 +95,9 @@ export function useWorkspaceSelector() {
   return {
     workspaces: response?.data || [],
     isLoading,
-    selectedWorkspace: state.selectedWorkspaceId || null, // Return null if empty string
+    selectedWorkspace: state.selectedWorkspaceId,
     handleSelectWorkspace,
-    setSelectedWorkspaceState: setSelectedWorkspace, // Keep for backward compatibility
+    setSelectedWorkspaceState: setSelectedWorkspace,
     refetch,
   };
 }
