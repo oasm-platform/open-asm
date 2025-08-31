@@ -28,7 +28,7 @@ const ToolCard = ({ tool, button }: ToolCardProps) => {
             className="flex flex-col overflow-hidden pt-0 cursor-pointer transition-all duration-200 hover:shadow-md"
             onClick={handleCardClick}
         >
-            <div className="w-full bg-black dark:bg-white p-4 flex justify-center transition-colors duration-200 hover:bg-gray-800 dark:hover:bg-gray-100">
+            <div className="w-full bg-white p-4 flex justify-center transition-colors duration-200 hover:bg-gray-100">
                 <img
                     src={tool.logoUrl}
                     alt={tool.name}

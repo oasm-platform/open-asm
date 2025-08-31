@@ -53,7 +53,7 @@ export default function ToolDetail() {
         <CardHeader>
           {/* Logo hiển thị full width trên mobile */}
           <div className="flex flex-col items-center mb-6 sm:hidden">
-            <div className="bg-black dark:bg-white p-4 rounded-xl flex items-center justify-center w-full max-w-xs">
+            <div className="bg-white p-4 rounded-xl flex items-center justify-center w-full max-w-xs">
               {tool.logoUrl ? (
                 <img
                   src={tool.logoUrl}
@@ -61,7 +61,7 @@ export default function ToolDetail() {
                   className="max-h-24 object-contain"
                 />
               ) : (
-                <div className="h-24 w-24 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg">
+                <div className="h-24 w-24 flex items-center justify-center bg-gray-200 rounded-lg">
                   <span className="text-3xl font-bold text-gray-500">
                     {tool.name.charAt(0)}
                   </span>
@@ -151,7 +151,7 @@ export default function ToolDetail() {
 
             {/* Logo chỉ hiển thị trên tablet và desktop */}
             <div className="flex-col items-end hidden sm:flex">
-              <div className="bg-black dark:bg-white p-4 rounded-xl flex items-center justify-center w-32 h-32">
+              <div className="bg-white p-4 rounded-xl flex items-center justify-center w-32 h-32">
                 {tool.logoUrl ? (
                   <img
                     src={tool.logoUrl}
@@ -159,7 +159,7 @@ export default function ToolDetail() {
                     className="max-h-24 object-contain"
                   />
                 ) : (
-                  <div className="h-24 w-24 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg">
+                  <div className="h-24 w-24 flex items-center justify-center bg-gray-200 rounded-lg">
                     <span className="text-3xl font-bold text-gray-500">
                       {tool.name.charAt(0)}
                     </span>
