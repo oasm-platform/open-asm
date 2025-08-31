@@ -1,24 +1,40 @@
 import Page from "@/components/common/page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { useToolsControllerGetToolById } from "@/services/apis/gen/queries";
-import { Calendar, Hash, RefreshCw, Verified } from "lucide-react";
+import { Hash, Verified } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import ToolInstallButton from "../tool-install-button";
+import ToolRunButton from "../tool-run-button";
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
   const { selectedWorkspace } = useWorkspaceSelector();
 
-  const { data: tool, isLoading, error } = useToolsControllerGetToolById(
+  const { data: toolResponse, isLoading, error, refetch } = useToolsControllerGetToolById(
     id || "",
     {
-      workspaceId: selectedWorkspace,
+      workspaceId: selectedWorkspace || "",
     }
   );
 
+  // Local state to track installation status
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  // Update local state when tool data changes
+  useEffect(() => {
+    if (toolResponse) {
+      setIsInstalled(toolResponse.isInstalled);
+    }
+  }, [toolResponse]);
+
+  // Callback function to update installation status
+  const handleInstallChange = () => {
+    setIsInstalled(prev => !prev);
+    refetch();
+  };
 
   if (isLoading) {
     return (
@@ -28,13 +44,15 @@ export default function ToolDetail() {
     );
   }
 
-  if (error || !tool) {
+  if (error || !toolResponse) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-lg text-red-500">Error loading tool details</div>
       </div>
     );
   }
+
+  const tool = toolResponse;
 
   // Format category name for display
   const formatCategory = (category: string | undefined) => {
@@ -43,16 +61,6 @@ export default function ToolDetail() {
       .split("_")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
-  };
-
-  // Format date for display
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
   };
 
   return (
@@ -92,11 +100,18 @@ export default function ToolDetail() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex-shrink-0 flex items-center">
+                  <div className="flex-shrink-0 flex">
                     <ToolInstallButton
                       tool={tool}
-                      workspaceId={selectedWorkspace}
+                      workspaceId={selectedWorkspace || ""}
+                      onInstallChange={handleInstallChange}
                     />
+                    {(isInstalled || tool.isInstalled) && tool.type !== "built_in" && (
+                      <ToolRunButton
+                        tool={tool}
+                        workspaceId={selectedWorkspace || ""}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -113,55 +128,8 @@ export default function ToolDetail() {
                     Category: {formatCategory(tool.category)}
                   </Badge>
                   <Badge variant="secondary" className="gap-1">
-                    Type: {tool.type === "BUILT_IN" ? "Built-in" : "Provider"}
+                    Type: {tool.type === "built_in" ? "Built-in" : "Provider"}
                   </Badge>
-                </div>
-              </div>
-
-              <Separator className="my-6" />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Hash className="w-5 h-5" />
-                    Tool Information
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-muted-foreground">Tool ID</span>
-                      <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                        {tool.id}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-muted-foreground">Category</span>
-                      <span>{formatCategory(tool.category)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-muted-foreground">Type</span>
-                      <span>{tool.type === "built_in" ? "Built-in" : "Provider"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Calendar className="w-5 h-5" />
-                    Timestamps
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-muted-foreground">Created</span>
-                      <span>{formatDate(tool.createdAt)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-muted-foreground">Last Updated</span>
-                      <span className="flex items-center gap-1">
-                        <RefreshCw className="w-4 h-4" />
-                        {formatDate(tool.updatedAt)}
-                      </span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

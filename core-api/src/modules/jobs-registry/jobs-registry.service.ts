@@ -304,11 +304,13 @@ export class JobsRegistryService {
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
     await this.updateJobStatus(job.id, newStatus);
 
-    // await this.processStepResult(step, job, dto.data);
-
     return { workerId, dto };
   }
 
+  /**
+   * Updates the result of a job with the given worker ID.
+   * @param job
+   */
   private async getNextStepForJob(job: Job) {
     const workflow = job.jobHistory.workflow;
     const currentTool = job.tool.name;

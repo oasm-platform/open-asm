@@ -140,11 +140,8 @@ export class ToolsController {
   @Get(':id')
   getToolById(
     @Param() { id }: GetToolByIdDto,
-    @WorkspaceId() workspaceId?: string,
+    @WorkspaceId() workspaceId: string,
   ) {
-    if (!workspaceId) {
-      throw new BadRequestException('Workspace ID is required');
-    }
     return this.toolsService.getToolById(id, workspaceId);
   }
 }
