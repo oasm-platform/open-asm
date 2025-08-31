@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { Tool } from "@/services/apis/gen/queries";
-import { useToolsControllerInstallTool, useToolsControllerUninstallTool } from "@/services/apis/gen/queries";
+import { ToolsControllerGetManyToolsType, useToolsControllerInstallTool, useToolsControllerUninstallTool, type Tool } from "@/services/apis/gen/queries";
 import { CheckCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -93,19 +92,26 @@ const ToolInstallButton = ({ tool, workspaceId, onInstallChange }: ToolInstallBu
 
   // If the tool is installed (based on local state), show the installed button with checkmark
   if (isInstalled) {
+    // For built-in tools, they cannot be uninstalled
+    const isBuiltIn = tool.type === ToolsControllerGetManyToolsType.built_in;
+
     return (
       <ConfirmDialog
         title="Uninstall Tool"
         description={`Are you sure you want to uninstall "${tool.name}"?`}
         onConfirm={handleUninstall}
+        disabled={isBuiltIn}
         trigger={
-          <Button variant="outline" disabled={uninstallToolMutation.isPending}>
+          <Button
+            variant="outline"
+            disabled={uninstallToolMutation.isPending || isBuiltIn}
+          >
             {uninstallToolMutation.isPending ? (
               "Uninstalling..."
             ) : (
               <>
                 <CheckCircle className="w-4 h-4" />
-                Installed
+                {isBuiltIn ? "Built-in" : "Installed"}
               </>
             )}
           </Button>

@@ -269,16 +269,36 @@ export class ToolsService implements OnModuleInit {
   /**
    * Get a tool by its ID.
    * @param {string} id - The ID of the tool.
+   * @param {string} workspaceId - Optional workspace ID to check if tool is installed.
    * @returns {Promise<Tool>} The tool with the specified ID.
    * @throws {NotFoundException} If no tool is found with the provided ID.
    */
-  async getToolById(id: string): Promise<Tool> {
+  async getToolById(id: string, workspaceId?: string): Promise<Tool> {
     const tool = await this.toolsRepository.findOne({
       where: { id },
     });
 
     if (!tool) {
       throw new NotFoundException(`Tool with ID "${id}" not found.`);
+    }
+
+    // If tool is built-in, it's always considered installed
+    if (tool.type === WorkerType.BUILT_IN) {
+      tool.isInstalled = true;
+      return tool;
+    }
+
+    // If workspaceId is provided, check if the tool is installed in that workspace
+    if (workspaceId) {
+      const workspaceTool = await this.workspaceToolRepository.findOne({
+        where: {
+          tool: { id: tool.id },
+          workspace: { id: workspaceId },
+        },
+      });
+      
+      // Add isInstalled flag to the tool
+      tool.isInstalled = !!workspaceTool;
     }
 
     return tool;

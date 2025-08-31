@@ -113,7 +113,7 @@ export class ToolsController {
     },
   })
   @Get(':id')
-  getToolById(@Param() { id }: GetToolByIdDto) {
-    return this.toolsService.getToolById(id);
+  getToolById(@Param() { id }: GetToolByIdDto, @Query('workspaceId') workspaceId?: string) {
+    return this.toolsService.getToolById(id, workspaceId);
   }
 }
