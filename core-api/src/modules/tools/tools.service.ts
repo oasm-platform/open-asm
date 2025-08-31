@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -263,6 +264,24 @@ export class ToolsService implements OnModuleInit {
       data: combinedTools,
       total: combinedTools.length,
     };
+  }
+
+  /**
+   * Get a tool by its ID.
+   * @param {string} id - The ID of the tool.
+   * @returns {Promise<Tool>} The tool with the specified ID.
+   * @throws {NotFoundException} If no tool is found with the provided ID.
+   */
+  async getToolById(id: string): Promise<Tool> {
+    const tool = await this.toolsRepository.findOne({
+      where: { id },
+    });
+
+    if (!tool) {
+      throw new NotFoundException(`Tool with ID "${id}" not found.`);
+    }
+
+    return tool;
   }
 
   /**

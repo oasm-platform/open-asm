@@ -8,6 +8,7 @@ import Search from "@/pages/search/search";
 import Settings from "@/pages/settings/settings";
 import DetailTarget from "@/pages/targets/detail-target";
 import Targets from "@/pages/targets/targets";
+import ToolDetail from "@/pages/tools/components/tool-detail";
 import Tools from "@/pages/tools/tools";
 import Vulnerabilities from "@/pages/vulnerabilities/vulnerabilities";
 import Workers from "@/pages/workers/workers";
@@ -88,7 +89,7 @@ export const router = createBrowserRouter([
               },
               {
                 path: ":id",
-                element: <Tools />,
+                element: <ToolDetail />,
               },
             ],
           },

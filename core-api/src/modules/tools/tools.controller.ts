@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
@@ -6,6 +6,7 @@ import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
+import { GetToolByIdDto } from './dto/get-tool-by-id.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
@@ -102,5 +103,17 @@ export class ToolsController {
   @Get('installed')
   async getInstalledTools(@Query() dto: GetInstalledToolsDto) {
     return this.toolsService.getInstalledTools(dto);
+  }
+
+  @Doc({
+    summary: 'Get tool by ID',
+    description: 'Retrieves a tool by its unique identifier.',
+    response: {
+      serialization: Tool,
+    },
+  })
+  @Get(':id')
+  getToolById(@Param() { id }: GetToolByIdDto) {
+    return this.toolsService.getToolById(id);
   }
 }

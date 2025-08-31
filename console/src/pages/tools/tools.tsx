@@ -3,6 +3,7 @@ import BuiltInTools from "./components/built-in-tools";
 import Marketplace from "./components/marketplace";
 
 const Tools = () => {
+  // Otherwise show the main tools page
   return (
     <Page title="Tools">
       <BuiltInTools />
