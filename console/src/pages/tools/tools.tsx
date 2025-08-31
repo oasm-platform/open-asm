@@ -1,6 +1,6 @@
 import Page from "@/components/common/page";
-import BuiltInTools from "./built-in-tools";
-import Marketplace from "./marketplace";
+import BuiltInTools from "./components/built-in-tools";
+import Marketplace from "./components/marketplace";
 
 const Tools = () => {
   return (
