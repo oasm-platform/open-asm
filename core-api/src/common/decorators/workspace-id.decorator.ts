@@ -6,7 +6,7 @@ import { createParamDecorator } from '@nestjs/common';
  * Provides easy access to the workspace ID in controller methods.
  */
 export const WorkspaceId = createParamDecorator(
-  (_data: unknown, context: ExecutionContext) => {
+  (_data: unknown, context: ExecutionContext): string | undefined => {
     const request = context.switchToHttp().getRequest<{
       headers: Record<string, string | undefined>;
     }>();
