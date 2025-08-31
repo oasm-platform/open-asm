@@ -2,6 +2,7 @@ import type { ExecutionContext } from '@nestjs/common';
 import { createParamDecorator, SetMetadata } from '@nestjs/common';
 import type { Session } from 'src/modules/auth/entities/session.entity';
 import type { User } from 'src/modules/auth/entities/user.entity';
+import { WorkspaceId } from './workspace-id.decorator';
 import {
   AFTER_HOOK_KEY,
   BEFORE_HOOK_KEY,
@@ -74,3 +75,5 @@ export const Hook = () => SetMetadata(HOOK_KEY, true);
 export const Roles = (...roles: Role[]) => {
   return SetMetadata(ROLE_METADATA_KEY, roles);
 };
+
+export { WorkspaceId };
