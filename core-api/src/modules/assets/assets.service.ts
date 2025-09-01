@@ -133,6 +133,12 @@ export class AssetsService {
       'httpResponses.status_code',
     ]);
 
+    if (query.value) {
+      queryBuilder.andWhere('assets.value ILIKE :value', {
+        value: `%${query.value}%`,
+      });
+    }
+
     const [list, total] = await queryBuilder
       .orderBy(`assets.${query.sortBy}`, query.sortOrder)
       .skip(offset)
@@ -329,6 +335,12 @@ export class AssetsService {
       .distinct(true)
       .groupBy('"ipAssets"."ip"');
 
+    if (query.value) {
+      queryBuilder.andWhere('"ipAssets"."ip"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      });
+    }
+
     const totalInDb = await this.dataSource
       .createQueryBuilder()
       .select('COUNT(*)')
@@ -386,6 +398,12 @@ export class AssetsService {
       })
       .distinct(true)
       .groupBy('"sq"."port"');
+
+    if (query.value) {
+      queryBuilder.andWhere('"sq"."port"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      });
+    }
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
@@ -445,7 +463,11 @@ export class AssetsService {
       .distinct(true)
       .groupBy('"sq"."technology"');
 
-    //TODO: check value before query
+    if (query.value) {
+      queryBuilder.andWhere('"sq"."technology"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      });
+    }
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
@@ -515,6 +537,15 @@ export class AssetsService {
       })
       .distinct(true)
       .groupBy('"statusCodeAssets"."statusCode"');
+
+    if (query.value) {
+      queryBuilder.andWhere(
+        '"statusCodeAssets"."statusCode"::text ILIKE :value',
+        {
+          value: `%${query.value}%`,
+        },
+      );
+    }
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
