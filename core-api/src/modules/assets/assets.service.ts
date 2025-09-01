@@ -112,7 +112,6 @@ export class AssetsService {
   public async getAssetsInWorkspace(
     query: GetAssetsQueryDto,
     workspaceId: string,
-    assetId?: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
     if (!(query.sortBy in Asset)) {
       query.sortBy = 'createdAt';
@@ -133,10 +132,6 @@ export class AssetsService {
       'httpResponses.chain_status_codes',
       'httpResponses.status_code',
     ]);
-
-    if (assetId && assetId.length > 0) {
-      queryBuilder.andWhere('assets.id = :assetId', { assetId });
-    }
 
     const [list, total] = await queryBuilder
       .orderBy(`assets.${query.sortBy}`, query.sortOrder)
@@ -258,8 +253,53 @@ export class AssetsService {
    * @throws NotFoundException if the asset with the given ID is not found.
    */
   public async getAssetById(id: string): Promise<GetAssetsResponseDto> {
-    const asset = await this.getAssetsInWorkspace(new GetAssetsQueryDto(), id);
-    return asset.data[0];
+    const queryBuilder = this.buildBaseQuery(new GetAssetsQueryDto())
+      .select([
+        'assets.value',
+        'assets.id',
+        'assets.targetId',
+        'assets.createdAt',
+        'ipAssets.ipAddress',
+        'httpResponses.tech',
+        'httpResponses.title',
+        'httpResponses.tls',
+        'ports.ports',
+        'httpResponses.chain_status_codes',
+        'httpResponses.status_code',
+        'httpResponses.raw_header',
+      ])
+      .andWhere('assets.id = :id', { id });
+
+    const item = await queryBuilder.getOneOrFail();
+
+    const asset = new GetAssetsResponseDto();
+    asset.id = item.id;
+    asset.value = item.value;
+    asset.targetId = item.targetId;
+    asset.createdAt = item.createdAt;
+    asset.dnsRecords = item.dnsRecords;
+    asset.ports = item.ports ? item.ports[0] : undefined;
+    asset.ipAddresses = item.ipAssets
+      ? item.ipAssets.map((e) => e.ipAddress)
+      : [];
+
+    if (item.httpResponses) {
+      asset.httpResponses = item.httpResponses[0];
+      const techList = (
+        await this.technologyForwarderService.enrichTechnologies(
+          asset.httpResponses.tech,
+        )
+      ).map((e) => ({
+        name: e.name,
+        description: e.description,
+        iconUrl: e.iconUrl,
+        categoryNames: e.categoryNames,
+      }));
+
+      asset.httpResponses.techList = techList;
+    }
+
+    return asset;
   }
 
   /**

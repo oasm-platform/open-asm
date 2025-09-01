@@ -1,11 +1,15 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import { useAssetsControllerGetAssetById } from "@/services/apis/gen/queries";
-import dayjs from "dayjs";
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 import {
+  useAssetsControllerGetAssetById,
+  type TechnologyDetailDTO,
+} from '@/services/apis/gen/queries';
+import dayjs from 'dayjs';
+import {
+  Boxes,
   ChartNoAxesGantt,
   Copy,
   EthernetPort,
@@ -14,19 +18,18 @@ import {
   Lock,
   Network,
   ShieldCheck,
-} from "lucide-react";
-import { toast } from "sonner";
-import AssetValue from "./asset-value";
-import BadgeList from "./badge-list";
-import HTTPXStatusCode from "./status-code";
+} from 'lucide-react';
+import { toast } from 'sonner';
+import AssetValue from './asset-value';
+import BadgeList from './badge-list';
+import HTTPXStatusCode from './status-code';
 
 export default function AssetDetail({ id }: { id: string }) {
   const { data } = useAssetsControllerGetAssetById(id);
-  if (!data) return "Loading";
+  if (!data) return 'Loading';
 
-  const { value, httpResponses, ports, dnsRecords } = data;
+  const { value, httpResponses, ports, ipAddresses } = data;
   const ports_scanner = ports;
-  const ipAddresses = dnsRecords?.["A"] as string[];
   const tls = httpResponses?.tls;
 
   // Calculate days left for SSL certificate
@@ -44,11 +47,11 @@ export default function AssetDetail({ id }: { id: string }) {
     : undefined;
   const certAgeDisplay = certAgeStartDate
     ? dayjs(certAgeStartDate).fromNow()
-    : "N/A";
+    : 'N/A';
 
   const handleCopyHeader = async () => {
-    await navigator.clipboard.writeText(httpResponses?.raw_header ?? "");
-    toast.success("HTTP response copied to clipboard");
+    await navigator.clipboard.writeText(httpResponses?.raw_header ?? '');
+    toast.success('HTTP response copied to clipboard');
   };
 
   return (
@@ -91,20 +94,20 @@ export default function AssetDetail({ id }: { id: string }) {
                 <Badge
                   variant="outline"
                   className={cn(
-                    "flex items-center gap-1 rounded-lg",
+                    'flex items-center gap-1 rounded-lg',
                     daysLeft < 0
-                      ? "text-red-500 border-red-500"
+                      ? 'text-red-500 border-red-500'
                       : daysLeft < 30
-                        ? "text-yellow-500 border-yellow-500"
-                        : "text-green-500 border-green-500",
+                        ? 'text-yellow-500 border-yellow-500'
+                        : 'text-green-500 border-green-500',
                   )}
                 >
-                  <Lock size={16} /> SSL{" "}
+                  <Lock size={16} /> SSL{' '}
                   {daysLeft < 0
-                    ? "Expired"
+                    ? 'Expired'
                     : daysLeft < 30
-                      ? "Expiring Soon"
-                      : "Valid"}
+                      ? 'Expiring Soon'
+                      : 'Valid'}
                 </Badge>
               </div>
             )}
@@ -115,15 +118,6 @@ export default function AssetDetail({ id }: { id: string }) {
                 <p className="  break-words">{httpResponses.title}</p>
               </div>
             )}
-
-            {/* {httpResponses?.error && ( */}
-            {/*   <div className="md:col-span-2"> */}
-            {/*     <span className="block mb-1">Error</span> */}
-            {/*     <p className="text-red-600 dark:text-red-400 "> */}
-            {/*       {httpResponses.error} */}
-            {/*     </p> */}
-            {/*   </div> */}
-            {/* )} */}
           </div>
         </section>
 
@@ -171,7 +165,7 @@ export default function AssetDetail({ id }: { id: string }) {
             <Separator className="my-5" />
             <section>
               <h3 className="font-bold text-green-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                <ShieldCheck size={20} className="text-green-500" />{" "}
+                <ShieldCheck size={20} className="text-green-500" />{' '}
                 Certification
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
@@ -204,7 +198,7 @@ export default function AssetDetail({ id }: { id: string }) {
                         )}
                       {tls.subject_an.length > 2 && (
                         <Badge className="rounded-md">
-                          +{tls.subject_an.length - 2}{" "}
+                          +{tls.subject_an.length - 2}{' '}
                         </Badge>
                       )}
                       {tls.subject_an.length === 2 && !tls.subject_an[1] && (
@@ -219,7 +213,7 @@ export default function AssetDetail({ id }: { id: string }) {
                     <span className="block mb-1">Certificate Age</span>
                     <span className="">
                       {certAgeDisplay} (
-                      {dayjs(tls.not_before).format("DD MMM, YYYY")})
+                      {dayjs(tls.not_before).format('DD MMM, YYYY')})
                     </span>
                   </div>
                 )}
@@ -227,20 +221,20 @@ export default function AssetDetail({ id }: { id: string }) {
                   <div>
                     <span className="block mb-1">Expires On</span>
                     <span className="">
-                      {dayjs(tls.not_after).format("DD MMM, YYYY")}{" "}
+                      {dayjs(tls.not_after).format('DD MMM, YYYY')}{' '}
                       <span
                         className={cn(
                           daysLeft < 0
-                            ? "text-red-500"
+                            ? 'text-red-500'
                             : daysLeft < 30
-                              ? "text-yellow-500"
-                              : "text-green-500",
+                              ? 'text-yellow-500'
+                              : 'text-green-500',
                         )}
                       >
                         (
                         {daysLeft < 0
-                          ? Math.abs(daysLeft) + " days ago"
-                          : daysLeft + " days left"}
+                          ? Math.abs(daysLeft) + ' days ago'
+                          : daysLeft + ' days left'}
                         )
                       </span>
                     </span>
@@ -251,7 +245,7 @@ export default function AssetDetail({ id }: { id: string }) {
           </>
         )}
 
-        {!!httpResponses?.tech && httpResponses.tech.length > 0 && (
+        {!!httpResponses?.techList && httpResponses.techList.length > 0 && (
           <>
             <Separator className="my-5" />
             <section>
@@ -260,7 +254,34 @@ export default function AssetDetail({ id }: { id: string }) {
                 Technologies
               </h3>
               <div className="flex flex-wrap gap-2">
-                <BadgeList list={httpResponses.tech} />
+                {(
+                  httpResponses.techList as unknown as TechnologyDetailDTO[]
+                ).map((item) => (
+                  <Badge variant="outline" className="h-7" key={item.name}>
+                    {item?.iconUrl ? (
+                      <img
+                        src={item?.iconUrl}
+                        alt={item.name}
+                        className="size-4"
+                        onError={(e) => {
+                          // Fallback to globe icon if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const globeIcon = document.createElement('div');
+                            globeIcon.innerHTML =
+                              '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>';
+                            parent.appendChild(globeIcon);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <Boxes className="size-8" />
+                    )}
+                    {item.name}
+                  </Badge>
+                ))}
               </div>
             </section>
           </>

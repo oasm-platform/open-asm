@@ -26,7 +26,6 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
-      console.log(data);
       const ports = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
       const ipAddresses = data.ipAddresses;
