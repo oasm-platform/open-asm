@@ -17,7 +17,7 @@ export default function IpAssetsTab() {
   const { data, isLoading } = useAssetsControllerGetIpAssets(queryParams, {
     query: {
       ...queryOptions.query,
-      queryKey: ['assets', ...queryOptions.query.queryKey],
+      queryKey: ['ipAssets', ...queryOptions.query.queryKey],
     },
   });
 

@@ -1,4 +1,6 @@
-import { ViewColumn, ViewEntity } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
+import { JoinColumn, ManyToOne, ViewColumn, ViewEntity } from 'typeorm';
+import { Asset } from './assets.entity';
 
 @ViewEntity({
   name: 'ip_assets_view',
@@ -18,10 +20,16 @@ import { ViewColumn, ViewEntity } from 'typeorm';
 })
 export class IpAssetsView {
   @ViewColumn()
+  @ApiProperty()
   assetId: string;
 
   @ViewColumn({
     name: 'ip',
   })
+  @ApiProperty()
   ipAddress: string;
+
+  @ManyToOne(() => Asset, (asset) => asset.ipAssets)
+  @JoinColumn({ name: 'assetId' })
+  asset: Asset;
 }

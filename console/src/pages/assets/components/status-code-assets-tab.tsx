@@ -19,7 +19,7 @@ export default function StatusCodeAssetsTab() {
     {
       query: {
         ...queryOptions.query,
-        queryKey: ['assets', ...queryOptions.query.queryKey],
+        queryKey: ['statusCode', ...queryOptions.query.queryKey],
       },
     },
   );

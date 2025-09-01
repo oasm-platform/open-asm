@@ -1,6 +1,6 @@
 import { Controller, Get, Query, Delete, Param } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { UserContext } from 'src/common/decorators/app.decorator';
+import { UserContext, WorkspaceId } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { User } from '../auth/entities/user.entity';
@@ -29,8 +29,9 @@ export class SearchController {
   searchAssetsTargets(
     @UserContext() user: User,
     @Query() query: SearchAssetsTargetsDto,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.searchService.searchAssetsTargets(user, query);
+    return this.searchService.searchAssetsTargets(user, query, workspaceId);
   }
 
   @Doc({
@@ -56,10 +57,7 @@ export class SearchController {
     },
   })
   @Delete('histories/:id')
-  deleteSearchHistory(
-    @UserContext() user: User,
-    @Param('id') id: string,
-  ) {
+  deleteSearchHistory(@UserContext() user: User, @Param('id') id: string) {
     return this.searchService.deleteSearchHistory(user, id);
   }
 
@@ -71,9 +69,7 @@ export class SearchController {
     },
   })
   @Delete('histories')
-  deleteAllSearchHistories(
-    @UserContext() user: User,
-  ) {
+  deleteAllSearchHistories(@UserContext() user: User) {
     return this.searchService.deleteAllSearchHistories(user);
   }
 }

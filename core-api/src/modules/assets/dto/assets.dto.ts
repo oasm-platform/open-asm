@@ -6,9 +6,14 @@ import { TechnologyDetailDTO } from 'src/modules/technology/dto/technology-detai
 import { HttpResponse } from '../entities/http-response.entity';
 import { Port } from '../entities/ports.entity';
 
+export type PickTechnologyDetailDTO = Pick<
+  TechnologyDetailDTO,
+  'name' | 'description' | 'iconUrl' | 'categoryNames'
+>;
+
 class HttpResponseDTO extends HttpResponse {
   @ApiProperty()
-  techList?: TechnologyDetailDTO[];
+  techList?: PickTechnologyDetailDTO[];
 }
 
 export class GetAssetsResponseDto {
@@ -24,18 +29,18 @@ export class GetAssetsResponseDto {
   @ApiProperty()
   createdAt: Date;
   @ApiProperty()
-  updatedAt: Date;
+  updatedAt?: Date;
   @ApiProperty({ required: false })
   dnsRecords?: object;
+
+  @ApiProperty()
+  ipAddresses?: string[];
 
   @ApiProperty({ required: false })
   httpResponses?: HttpResponseDTO;
 
   @ApiProperty({ required: false })
   ports?: Port;
-
-  @ApiProperty({ required: false })
-  isErrorPage?: boolean;
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {
@@ -43,10 +48,6 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   @IsOptional()
   @IsString()
   value?: string;
-
-  @ApiProperty()
-  @IsUUID(4)
-  workspaceId?: string;
 
   @ApiProperty({
     required: false,

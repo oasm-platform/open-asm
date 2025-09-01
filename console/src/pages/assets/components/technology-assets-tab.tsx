@@ -19,7 +19,7 @@ export default function TechnologyAssetsTab() {
     {
       query: {
         ...queryOptions.query,
-        queryKey: ['assets', ...queryOptions.query.queryKey],
+        queryKey: ['technology', ...queryOptions.query.queryKey],
       },
     },
   );

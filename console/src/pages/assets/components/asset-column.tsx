@@ -26,11 +26,10 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
-      const ports_scanner = data.ports?.ports as string[];
+      console.log(data);
+      const ports = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
-      const ipA = (data.dnsRecords?.['A'] as string[]) || [];
-      const ipAAAA = (data.dnsRecords?.['AAAA'] as string[]) || [];
-      const ipAddresses = [...ipA, ...ipAAAA];
+      const ipAddresses = data.ipAddresses;
 
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
@@ -46,10 +45,10 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
           <div className="w-full">
             <BadgeList list={ipAddresses} Icon={Network} maxDisplay={4} />
           </div>
-          {ports_scanner && (
+          {ports && (
             <div className="w-full">
               <BadgeList
-                list={ports_scanner.sort(
+                list={ports.sort(
                   (a: string, b: string) => parseInt(a) - parseInt(b),
                 )}
                 Icon={EthernetPort}
@@ -68,7 +67,6 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const data = row.original;
       const technologies = data.httpResponses
         ?.techList as unknown as TechnologyDetailDTO[];
-      console.log(technologies);
       const maxDisplay = 4;
       const displayList = technologies.slice(0, maxDisplay);
       const remainCount = technologies.length - maxDisplay;
