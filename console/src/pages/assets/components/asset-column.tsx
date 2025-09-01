@@ -69,10 +69,13 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const technologies = data.httpResponses
         ?.techList as unknown as TechnologyDetailDTO[];
       console.log(technologies);
+      const maxDisplay = 4;
+      const displayList = technologies.slice(0, maxDisplay);
+      const remainCount = technologies.length - maxDisplay;
 
       return (
         <div className="flex flex-wrap gap-1 max-w-[250px] min-h-[60px]">
-          {technologies?.map((item) => (
+          {displayList?.map((item) => (
             <Badge variant="outline" className="h-7" key={item.name}>
               {item?.iconUrl ? (
                 <img
@@ -98,6 +101,11 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
               {item.name}
             </Badge>
           ))}
+          {remainCount > 0 && (
+            <Badge variant="outline" className="text-xs">
+              +{remainCount}
+            </Badge>
+          )}
         </div>
       );
     },
@@ -142,6 +150,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
             <BadgeList
               list={tls.subject_an as string[]}
               Icon={BriefcaseBusiness}
+              maxDisplay={2}
             />
           )}
         </div>
