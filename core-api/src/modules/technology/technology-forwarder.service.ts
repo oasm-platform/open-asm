@@ -1,18 +1,10 @@
 /* eslint-disable no-magic-numbers */
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../../services/redis/redis.service';
-import { TechnologyDetailDTO } from './dto/technology-detail.dto';
-
-interface CategoryInfo {
-  groups: number[];
-  name: string;
-  priority: number;
-}
-
-interface TechnologyWithCategory extends TechnologyDetailDTO {
-  categories?: CategoryInfo[];
-  categoryNames?: string[];
-}
+import {
+  CategoryInfoDTO,
+  TechnologyDetailDTO,
+} from './dto/technology-detail.dto';
 
 @Injectable()
 export class TechnologyForwarderService {
@@ -30,7 +22,7 @@ export class TechnologyForwarderService {
    */
   async fetchTechnologyInfo(
     techName: string,
-  ): Promise<TechnologyWithCategory | null> {
+  ): Promise<TechnologyDetailDTO | null> {
     try {
       const cached = await this.getCachedTechnologyInfo(techName);
       if (cached) {
@@ -53,16 +45,18 @@ export class TechnologyForwarderService {
 
       if (data && data[techName]) {
         const techInfo = data[techName] as TechnologyDetailDTO;
+        techInfo.name = techName;
 
         const categories = await this.getCategoriesForTechnology(techInfo);
 
         const categoryNames =
           categories?.map((category) => category.name) || [];
 
-        const enrichedTechInfo: TechnologyWithCategory = {
+        const enrichedTechInfo: TechnologyDetailDTO = {
           ...techInfo,
           categories: categories,
           categoryNames: categoryNames,
+          iconUrl: techInfo.icon ? this.getIconUrl(techInfo.icon) : '',
         };
 
         await this.cacheTechnologyInfo(techName, enrichedTechInfo);
@@ -87,13 +81,13 @@ export class TechnologyForwarderService {
    */
   private async getCachedTechnologyInfo(
     techName: string,
-  ): Promise<TechnologyWithCategory | null> {
+  ): Promise<TechnologyDetailDTO | null> {
     try {
       const key = `${this.CACHE_KEY_PREFIX}${techName}`;
       const cached = await this.redisService.client.get(key);
 
       if (cached) {
-        return JSON.parse(cached) as TechnologyWithCategory;
+        return JSON.parse(cached) as TechnologyDetailDTO;
       }
 
       return null;
@@ -113,7 +107,7 @@ export class TechnologyForwarderService {
    */
   private async cacheTechnologyInfo(
     techName: string,
-    techInfo: TechnologyWithCategory,
+    techInfo: TechnologyDetailDTO,
   ): Promise<void> {
     try {
       const key = `${this.CACHE_KEY_PREFIX}${techName}`;
@@ -137,12 +131,13 @@ export class TechnologyForwarderService {
    */
   async enrichTechnologies(
     techNames: string[],
-  ): Promise<{ name: string; info: TechnologyWithCategory | null }[]> {
+  ): Promise<TechnologyDetailDTO[]> {
     const enrichedTechs = await Promise.all(
-      techNames.map(async (techName) => ({
-        name: techName,
-        info: await this.fetchTechnologyInfo(techName),
-      })),
+      techNames.map(
+        async (techName) =>
+          (await this.fetchTechnologyInfo(techName)) ??
+          new TechnologyDetailDTO(),
+      ),
     );
 
     return enrichedTechs;
@@ -154,7 +149,7 @@ export class TechnologyForwarderService {
    */
   private async fetchCategories(): Promise<Record<
     string,
-    CategoryInfo
+    CategoryInfoDTO
   > | null> {
     try {
       // Check if we have categories in cache first
@@ -173,8 +168,8 @@ export class TechnologyForwarderService {
         );
       }
 
-      const categories: Record<string, CategoryInfo> =
-        (await response.json()) as Record<string, CategoryInfo>;
+      const categories: Record<string, CategoryInfoDTO> =
+        (await response.json()) as Record<string, CategoryInfoDTO>;
 
       // Cache the categories
       await this.cacheCategories(categories);
@@ -192,7 +187,7 @@ export class TechnologyForwarderService {
    */
   private async getCachedCategories(): Promise<Record<
     string,
-    CategoryInfo
+    CategoryInfoDTO
   > | null> {
     try {
       const cached = await this.redisService.client.get(
@@ -200,7 +195,7 @@ export class TechnologyForwarderService {
       );
 
       if (cached) {
-        return JSON.parse(cached) as Record<string, CategoryInfo>;
+        return JSON.parse(cached) as Record<string, CategoryInfoDTO>;
       }
 
       return null;
@@ -215,7 +210,7 @@ export class TechnologyForwarderService {
    * @param categories The categories to cache
    */
   private async cacheCategories(
-    categories: Record<string, CategoryInfo>,
+    categories: Record<string, CategoryInfoDTO>,
   ): Promise<void> {
     try {
       await this.redisService.client.setex(
@@ -235,7 +230,7 @@ export class TechnologyForwarderService {
    */
   private async getCategoriesForTechnology(
     techInfo: TechnologyDetailDTO,
-  ): Promise<CategoryInfo[] | undefined> {
+  ): Promise<CategoryInfoDTO[] | undefined> {
     if (!techInfo.cats || techInfo.cats.length === 0) {
       return undefined;
     }
@@ -265,4 +260,3 @@ export class TechnologyForwarderService {
     return `https://raw.githubusercontent.com/oasm-platform/webappanalyzer/main/src/images/icons/${iconName}${extension}`;
   }
 }
-

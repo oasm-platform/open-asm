@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-class CategoryInfoDTO {
+export class CategoryInfoDTO {
   @ApiProperty()
   groups: number[];
 
@@ -12,6 +12,9 @@ class CategoryInfoDTO {
 }
 
 export class TechnologyDetailDTO {
+  @ApiProperty()
+  name: string;
+
   @ApiProperty({ required: false })
   cats?: number[];
 

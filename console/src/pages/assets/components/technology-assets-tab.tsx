@@ -48,9 +48,9 @@ export default function TechnologyAssetsTab() {
           }}
           totalItems={total}
           onRowClick={(row) => {
-            let selectedValue = filterParams.statusCodes || [];
-            if (selectedValue.indexOf(row.technology.toString()) < 0) {
-              selectedValue = [...selectedValue, row.technology];
+            let selectedValue = filterParams.techs || [];
+            if (selectedValue.indexOf(row.technology.name) < 0) {
+              selectedValue = [...selectedValue, row.technology.name];
               filterHandlers('techs', selectedValue);
             }
           }}

@@ -11,8 +11,8 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
-      const iconUrl = data.info?.iconUrl;
-      const categories = data.info?.categoryNames || [];
+      const iconUrl = data.technology?.iconUrl as string;
+      const categories = (data.technology?.categoryNames as string[]) || [];
 
       return (
         <div className="flex items-center gap-3 py-2 ">
@@ -20,7 +20,7 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
             {iconUrl ? (
               <img
                 src={iconUrl}
-                alt={data.technology}
+                alt={data.technology?.name as string}
                 className="size-8"
                 onError={(e) => {
                   // Fallback to globe icon if image fails to load
@@ -40,7 +40,7 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
             )}
           </div>
           <div className="flex flex-col gap-1">
-            <div>{data.technology}</div>
+            <div>{data.technology?.name as string}</div>
             <div className="flex items-center gap-1">
               <BadgeList list={categories} Icon={Box} maxDisplay={4} />
             </div>
@@ -58,7 +58,8 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
       return (
         <div className="flex items-center whitespace-normal">
           <p className="text-sm text-muted-foreground">
-            {data.info?.description || 'No description available'}
+            {(data.technology?.description as string) ||
+              'No description available'}
           </p>
         </div>
       );
@@ -72,8 +73,8 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
     cell: ({ row }) => {
       const data = row.original;
       return (
-        <div className="flex items-center justify-center">
-          {data.assetCount}
+        <div className="flex items-center ">
+          {data.assetCount} {data.assetCount > 1 ? 'services' : 'service'}
         </div>
       );
     },

@@ -248,9 +248,9 @@ export type KnowledgebaseInfo = {
   pHash: number;
 };
 
-export type HttpResponseHeader = { [key: string]: unknown };
+export type HttpResponseDTOHeader = { [key: string]: unknown };
 
-export type HttpResponse = {
+export type HttpResponseDTO = {
   id: string;
   createdAt: string;
   updatedAt: string;
@@ -270,7 +270,7 @@ export type HttpResponse = {
   favicon: string;
   favicon_md5: string;
   favicon_url: string;
-  header: HttpResponseHeader;
+  header: HttpResponseDTOHeader;
   raw_header: string;
   request: string;
   time: string;
@@ -286,6 +286,7 @@ export type HttpResponse = {
   chain_status_codes: string[];
   assetId: string;
   jobHistoryId: string;
+  techList: string[];
 };
 
 export type Port = {
@@ -307,7 +308,7 @@ export type GetAssetsResponseDto = {
   createdAt: string;
   updatedAt: string;
   dnsRecords?: GetAssetsResponseDtoDnsRecords;
-  httpResponses?: HttpResponse;
+  httpResponses?: HttpResponseDTO;
   ports?: Port;
   isErrorPage?: boolean;
 };
@@ -360,6 +361,7 @@ export type TechnologyDetailDTOCookies = { [key: string]: unknown };
 export type TechnologyDetailDTODns = { [key: string]: unknown };
 
 export type TechnologyDetailDTO = {
+  name: string;
   cats?: string[];
   description?: string;
   html?: string[];
@@ -386,9 +388,8 @@ export type TechnologyDetailDTO = {
 };
 
 export type GetTechnologyAssetsDTO = {
-  technology: string;
+  technology: TechnologyDetailDTO;
   assetCount: number;
-  info?: TechnologyDetailDTO;
 };
 
 export type GetManyGetTechnologyAssetsDTODto = {

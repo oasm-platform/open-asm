@@ -127,6 +127,7 @@ export class AssetsService {
       query.sortBy = 'createdAt';
     }
 
+    //TODO: map info  HTTP Responses
     const offset = (query.page - 1) * query.limit;
 
     const queryBuilder = this.buildBaseQuery(query).select([
@@ -150,7 +151,7 @@ export class AssetsService {
       .take(query.limit)
       .getManyAndCount();
 
-    const assets = list.map((item) => {
+    const assets = list.map(async (item) => {
       const asset = new GetAssetsResponseDto();
       asset.id = item.id;
       asset.value = item.value;
@@ -160,14 +161,21 @@ export class AssetsService {
       asset.updatedAt = item.updatedAt;
       asset.dnsRecords = item.dnsRecords;
       asset.isErrorPage = item.isErrorPage;
-      asset.httpResponses = item.httpResponses
-        ? item.httpResponses[0]
-        : undefined;
       asset.ports = item.ports ? item.ports[0] : undefined;
+
+      if (item.httpResponses) {
+        asset.httpResponses = item.httpResponses[0];
+        asset.httpResponses.techList =
+          await this.technologyForwarderService.enrichTechnologies(
+            asset.httpResponses.tech,
+          );
+      }
       return asset;
     });
 
-    return getManyResponse({ query, data: assets, total });
+    const data = await Promise.all(assets);
+
+    return getManyResponse({ query, data, total });
   }
 
   /**
@@ -390,11 +398,10 @@ export class AssetsService {
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
       ])
       .andWhere('"sq"."technology" IS NOT NULL')
-      .andWhere('"sq"."technology" ILIKE :value', {
-        value: `%${query.value}%`,
-      })
       .distinct(true)
       .groupBy('"sq"."technology"');
+
+    //TODO: check value before query
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
@@ -411,36 +418,29 @@ export class AssetsService {
 
     const total = totalInDb?.count ?? 0;
 
-    // Enrich technology data with detailed information
     const enrichedTechs =
       await this.technologyForwarderService.enrichTechnologies(
-        list.map((item: GetTechnologyAssetsDTO) => item.technology),
+        list.map(
+          (item: { technology: string; assetCount: number }) => item.technology,
+        ),
       );
 
-    const data = list.map((item: GetTechnologyAssetsDTO) => {
-      const obj = new GetTechnologyAssetsDTO();
-      obj.technology = item.technology;
-      obj.assetCount = item.assetCount;
+    const data = list.map(
+      (item: { technology: string; assetCount: number }) => {
+        const obj = new GetTechnologyAssetsDTO();
+        obj.assetCount = item.assetCount;
 
-      // Find the enriched information for this technology
-      const enrichedTech = enrichedTechs.find(
-        (tech) => tech.name === item.technology,
-      );
+        const enrichedTech = enrichedTechs.find(
+          (tech) => tech?.name === item.technology,
+        );
 
-      // Add additional properties if we have enriched data
-      if (enrichedTech && enrichedTech.info) {
-        obj.info = enrichedTech.info;
-
-        // Add icon URL if icon name is available
-        if (enrichedTech.info.icon) {
-          obj.info.iconUrl = this.technologyForwarderService.getIconUrl(
-            enrichedTech.info.icon,
-          );
+        if (enrichedTech) {
+          obj.technology = enrichedTech;
         }
-      }
 
-      return obj;
-    });
+        return obj;
+      },
+    );
 
     return getManyResponse({ query, data, total });
   }

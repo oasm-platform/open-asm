@@ -2,8 +2,14 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
+import { TechnologyDetailDTO } from 'src/modules/technology/dto/technology-detail.dto';
 import { HttpResponse } from '../entities/http-response.entity';
 import { Port } from '../entities/ports.entity';
+
+class HttpResponseDTO extends HttpResponse {
+  @ApiProperty()
+  techList?: TechnologyDetailDTO[];
+}
 
 export class GetAssetsResponseDto {
   @ApiProperty()
@@ -23,7 +29,7 @@ export class GetAssetsResponseDto {
   dnsRecords?: object;
 
   @ApiProperty({ required: false })
-  httpResponses?: HttpResponse;
+  httpResponses?: HttpResponseDTO;
 
   @ApiProperty({ required: false })
   ports?: Port;
