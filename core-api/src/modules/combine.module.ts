@@ -13,6 +13,7 @@ import { WorkersModule } from './workers/workers.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { DataAdapterModule } from './data-adapter/data-adapter.module';
+import { ApiKeysModule } from './apikeys/apikeys.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { DataAdapterModule } from './data-adapter/data-adapter.module';
     DataAdapterModule,
     WorkflowsModule,
     StatisticModule,
+    ApiKeysModule,
   ],
 })
 export class CombineModule {}
