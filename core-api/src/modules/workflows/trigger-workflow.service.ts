@@ -3,12 +3,14 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JobsRegistryService } from 'src/modules/jobs-registry/jobs-registry.service';
 import { Target } from 'src/modules/targets/entities/target.entity';
 import { DataSource } from 'typeorm';
+import { ToolsService } from '../tools/tools.service';
 import { Workflow } from './entities/workflow.entity';
 
 @Injectable()
 export class TriggerWorkflowService implements OnModuleInit {
   constructor(
     private jobRegistryService: JobsRegistryService,
+    private toolsService: ToolsService,
     private dataSource: DataSource,
     private eventEmitter: EventEmitter2,
   ) {}
@@ -20,10 +22,10 @@ export class TriggerWorkflowService implements OnModuleInit {
         .then(async (workflow: Workflow | null) => {
           if (workflow) {
             const firstJobs = Object.keys(workflow.content.jobs);
-
-            await this.jobRegistryService.createJob({
-              toolNames: firstJobs,
-              target: payload,
+            const tools = await this.toolsService.getToolByNames(firstJobs);
+            await this.jobRegistryService.createJobs({
+              tools,
+              targets: [payload],
               workflow: workflow,
             });
           }

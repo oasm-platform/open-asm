@@ -1,5 +1,14 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { WorkspaceId } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 
@@ -88,7 +97,15 @@ export class ToolsController {
     },
   })
   @Get()
-  async getManyTools(@Query() query: ToolsQueryDto) {
+  async getManyTools(
+    @Query() query: ToolsQueryDto,
+    @WorkspaceId() workspaceId?: string,
+  ) {
+    if (!workspaceId) {
+      throw new BadRequestException('Workspace ID is required');
+    }
+    // Override the workspaceId from DTO with the one from header
+    query.workspaceId = workspaceId;
     return this.toolsService.getManyTools(query);
   }
 
@@ -101,7 +118,15 @@ export class ToolsController {
     },
   })
   @Get('installed')
-  async getInstalledTools(@Query() dto: GetInstalledToolsDto) {
+  async getInstalledTools(
+    @Query() dto: GetInstalledToolsDto,
+    @WorkspaceId() workspaceId?: string,
+  ) {
+    if (!workspaceId) {
+      throw new BadRequestException('Workspace ID is required');
+    }
+    // Override the workspaceId from DTO with the one from header
+    dto.workspaceId = workspaceId;
     return this.toolsService.getInstalledTools(dto);
   }
 
@@ -113,7 +138,10 @@ export class ToolsController {
     },
   })
   @Get(':id')
-  getToolById(@Param() { id }: GetToolByIdDto, @Query('workspaceId') workspaceId?: string) {
+  getToolById(
+    @Param() { id }: GetToolByIdDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.toolsService.getToolById(id, workspaceId);
   }
 }

@@ -13,7 +13,7 @@ interface ToolCardProps {
 
 const ToolCard = ({ tool, button }: ToolCardProps) => {
     const navigate = useNavigate();
-    
+
     const handleCardClick = (e: React.MouseEvent) => {
         // Don't navigate if clicking on the button
         if ((e.target as HTMLElement).closest('button')) {
@@ -23,8 +23,8 @@ const ToolCard = ({ tool, button }: ToolCardProps) => {
     };
 
     return (
-        <Card 
-            key={tool.id} 
+        <Card
+            key={tool.id}
             className="flex flex-col overflow-hidden pt-0 cursor-pointer transition-all duration-200 hover:shadow-md"
             onClick={handleCardClick}
         >

@@ -6,7 +6,8 @@ export class GetInstalledToolsDto {
     description: 'The ID of the workspace',
   })
   @IsString()
-  workspaceId: string;
+  @IsOptional()
+  workspaceId?: string;
 
   @ApiProperty({
     enum: ToolCategory,
