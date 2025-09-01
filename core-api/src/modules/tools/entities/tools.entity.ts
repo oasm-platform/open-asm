@@ -79,6 +79,7 @@ export class Tool {
 
   @ApiProperty()
   @Column({ type: 'enum', enum: WorkerType, default: WorkerType.BUILT_IN })
+  @IsEnum(WorkerType)
   type?: WorkerType;
 
   @OneToMany(() => Job, (job) => job.tool, {

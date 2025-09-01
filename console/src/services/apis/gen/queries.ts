@@ -5,7 +5,6 @@
  * Open-source platform for cybersecurity Attack Surface Management (ASM)
  * OpenAPI spec version: 1.0
  */
-import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -24,11 +23,12 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 
 import { orvalClient } from '../axios-client';
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const JobStatus = {
   pending: 'pending',
   in_progress: 'in_progress',
@@ -39,7 +39,7 @@ export const JobStatus = {
 
 export type CronSchedule = (typeof CronSchedule)[keyof typeof CronSchedule];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const CronSchedule = {
   '0_0_*_*_0': '0 0 * * 0',
   '0_0_*/14_*_*': '0 0 */14 * *',
@@ -70,7 +70,7 @@ export type CreateTargetDto = {
 export type GetManyTargetResponseDtoScanSchedule =
   (typeof GetManyTargetResponseDtoScanSchedule)[keyof typeof GetManyTargetResponseDtoScanSchedule];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const GetManyTargetResponseDtoScanSchedule = {
   '0_0_*_*_0': '0 0 * * 0',
   '0_0_*/14_*_*': '0 0 */14 * *',
@@ -80,7 +80,7 @@ export const GetManyTargetResponseDtoScanSchedule = {
 export type GetManyTargetResponseDtoStatus =
   (typeof GetManyTargetResponseDtoStatus)[keyof typeof GetManyTargetResponseDtoStatus];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const GetManyTargetResponseDtoStatus = {
   RUNNING: 'RUNNING',
   DONE: 'DONE',
@@ -113,7 +113,7 @@ export type DefaultMessageResponseDto = {
 export type UpdateTargetDtoScanSchedule =
   (typeof UpdateTargetDtoScanSchedule)[keyof typeof UpdateTargetDtoScanSchedule];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const UpdateTargetDtoScanSchedule = {
   '0_0_*_*_0': '0 0 * * 0',
   '0_0_*/14_*_*': '0 0 */14 * *',
@@ -462,7 +462,7 @@ export type DeleteResponseDto = {
 
 export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ToolCategory = {
   subdomains: 'subdomains',
   http_probe: 'http_probe',
@@ -488,7 +488,7 @@ export type Tool = {
 export type CreateToolDtoCategory =
   (typeof CreateToolDtoCategory)[keyof typeof CreateToolDtoCategory];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const CreateToolDtoCategory = {
   subdomains: 'subdomains',
   http_probe: 'http_probe',
@@ -574,7 +574,7 @@ export type GetManyVulnerabilityDto = {
 export type VulnerabilityStatisticsDtoSeverity =
   (typeof VulnerabilityStatisticsDtoSeverity)[keyof typeof VulnerabilityStatisticsDtoSeverity];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const VulnerabilityStatisticsDtoSeverity = {
   info: 'info',
   low: 'low',
@@ -595,7 +595,7 @@ export type GetVulnerabilitiesStatisticsResponseDto = {
 export type VulnerabilitySeverityDtoSeverity =
   (typeof VulnerabilitySeverityDtoSeverity)[keyof typeof VulnerabilitySeverityDtoSeverity];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const VulnerabilitySeverityDtoSeverity = {
   info: 'info',
   low: 'low',
@@ -786,7 +786,7 @@ export type ToolsControllerGetManyToolsParams = {
 export type ToolsControllerGetManyToolsType =
   (typeof ToolsControllerGetManyToolsType)[keyof typeof ToolsControllerGetManyToolsType];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ToolsControllerGetManyToolsType = {
   built_in: 'built_in',
   provider: 'provider',
@@ -795,7 +795,7 @@ export const ToolsControllerGetManyToolsType = {
 export type ToolsControllerGetManyToolsCategory =
   (typeof ToolsControllerGetManyToolsCategory)[keyof typeof ToolsControllerGetManyToolsCategory];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ToolsControllerGetManyToolsCategory = {
   subdomains: 'subdomains',
   http_probe: 'http_probe',
@@ -815,7 +815,7 @@ export type ToolsControllerGetInstalledToolsParams = {
 export type ToolsControllerGetInstalledToolsCategory =
   (typeof ToolsControllerGetInstalledToolsCategory)[keyof typeof ToolsControllerGetInstalledToolsCategory];
 
- 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ToolsControllerGetInstalledToolsCategory = {
   subdomains: 'subdomains',
   http_probe: 'http_probe',
@@ -823,10 +823,6 @@ export const ToolsControllerGetInstalledToolsCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
 } as const;
-
-export type ToolsControllerGetToolByIdParams = {
-  workspaceId: string;
-};
 
 export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
   page?: number;
@@ -9846,40 +9842,30 @@ export function useToolsControllerGetInstalledTools<
  */
 export const toolsControllerGetToolById = (
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<Tool>(
-    { url: `/api/tools/${id}`, method: 'GET', params, signal },
+    { url: `/api/tools/${id}`, method: 'GET', signal },
     options,
   );
 };
 
-export const getToolsControllerGetToolByIdQueryKey = (
-  id: string,
-  params: ToolsControllerGetToolByIdParams,
-) => {
-  return [`/api/tools/${id}`, ...(params ? [params] : [])] as const;
+export const getToolsControllerGetToolByIdQueryKey = (id: string) => {
+  return [`/api/tools/${id}`] as const;
 };
 
 export const getToolsControllerGetToolByIdInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-    ToolsControllerGetToolByIdParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetToolById>>>,
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetToolById>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetToolByIdParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -9888,19 +9874,11 @@ export const getToolsControllerGetToolByIdInfiniteQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getToolsControllerGetToolByIdQueryKey(id, params);
+    queryOptions?.queryKey ?? getToolsControllerGetToolByIdQueryKey(id);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-    QueryKey,
-    ToolsControllerGetToolByIdParams['page']
-  > = ({ signal, pageParam }) =>
-    toolsControllerGetToolById(
-      id,
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof toolsControllerGetToolById>>
+  > = ({ signal }) => toolsControllerGetToolById(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -9910,9 +9888,7 @@ export const getToolsControllerGetToolByIdInfiniteQueryOptions = <
   } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof toolsControllerGetToolById>>,
     TError,
-    TData,
-    QueryKey,
-    ToolsControllerGetToolByIdParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -9922,30 +9898,23 @@ export type ToolsControllerGetToolByIdInfiniteQueryResult = NonNullable<
 export type ToolsControllerGetToolByIdInfiniteQueryError = unknown;
 
 export function useToolsControllerGetToolByIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-    ToolsControllerGetToolByIdParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetToolById>>>,
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetToolById>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetToolByIdParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof toolsControllerGetToolById>>,
           TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-          QueryKey
+          Awaited<ReturnType<typeof toolsControllerGetToolById>>
         >,
         'initialData'
       >;
@@ -9956,30 +9925,23 @@ export function useToolsControllerGetToolByIdInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useToolsControllerGetToolByIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-    ToolsControllerGetToolByIdParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetToolById>>>,
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetToolById>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetToolByIdParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof toolsControllerGetToolById>>,
           TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-          QueryKey
+          Awaited<ReturnType<typeof toolsControllerGetToolById>>
         >,
         'initialData'
       >;
@@ -9990,22 +9952,16 @@ export function useToolsControllerGetToolByIdInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useToolsControllerGetToolByIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-    ToolsControllerGetToolByIdParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetToolById>>>,
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetToolById>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetToolByIdParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -10019,22 +9975,16 @@ export function useToolsControllerGetToolByIdInfinite<
  */
 
 export function useToolsControllerGetToolByIdInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-    ToolsControllerGetToolByIdParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetToolById>>>,
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetToolById>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetToolByIdParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -10045,7 +9995,6 @@ export function useToolsControllerGetToolByIdInfinite<
 } {
   const queryOptions = getToolsControllerGetToolByIdInfiniteQueryOptions(
     id,
-    params,
     options,
   );
 
@@ -10066,7 +10015,6 @@ export const getToolsControllerGetToolByIdQueryOptions = <
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -10081,12 +10029,11 @@ export const getToolsControllerGetToolByIdQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getToolsControllerGetToolByIdQueryKey(id, params);
+    queryOptions?.queryKey ?? getToolsControllerGetToolByIdQueryKey(id);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof toolsControllerGetToolById>>
-  > = ({ signal }) =>
-    toolsControllerGetToolById(id, params, requestOptions, signal);
+  > = ({ signal }) => toolsControllerGetToolById(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -10110,7 +10057,6 @@ export function useToolsControllerGetToolById<
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -10138,7 +10084,6 @@ export function useToolsControllerGetToolById<
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -10166,7 +10111,6 @@ export function useToolsControllerGetToolById<
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -10190,7 +10134,6 @@ export function useToolsControllerGetToolById<
   TError = unknown,
 >(
   id: string,
-  params: ToolsControllerGetToolByIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -10205,11 +10148,7 @@ export function useToolsControllerGetToolById<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getToolsControllerGetToolByIdQueryOptions(
-    id,
-    params,
-    options,
-  );
+  const queryOptions = getToolsControllerGetToolByIdQueryOptions(id, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
