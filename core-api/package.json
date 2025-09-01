@@ -45,7 +45,8 @@
     "rxjs": "^7.8.2",
     "swagger-typescript-api": "^13.2.4",
     "swagger-ui-express": "^5.0.1",
-    "typeorm": "^0.3.24"
+    "typeorm": "^0.3.24",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",

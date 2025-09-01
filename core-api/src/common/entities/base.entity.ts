@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Generated, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Column, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { v7 as uuidv7 } from 'uuid';
 
 export class BaseEntity {
   @ApiProperty()
-  @PrimaryColumn({ type: 'uuid' })
-  @Generated('uuid')
+  @PrimaryColumn({ type: 'uuid', default: () => `${uuidv7()}` })
   id: string;
 
   @ApiProperty()

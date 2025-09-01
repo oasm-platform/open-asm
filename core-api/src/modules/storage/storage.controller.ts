@@ -13,7 +13,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { randomUUID } from 'crypto';
+import { v7 as uuidv7 } from 'uuid';
 import { Roles } from 'src/common/decorators/app.decorator';
 import { Role } from 'src/common/enums/enum';
 import { StorageService } from './storage.service';
@@ -74,7 +74,7 @@ export class StorageController {
       throw new BadRequestException(`File type .${extension} is not allowed`);
     }
 
-    const filename = `${randomUUID()}.${extension}`;
+    const filename = `${uuidv7()}.${extension}`;
 
     const result = this.storageService.uploadFile(filename, file.buffer);
     return { path: result.path };
