@@ -10,7 +10,7 @@ import { randomUUID } from 'crypto';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { builtInTools } from './built-in-tools';
@@ -25,7 +25,7 @@ import { WorkspaceTool } from './entities/workspace_tools.entity';
 export class ToolsService implements OnModuleInit {
   constructor(
     @InjectRepository(Tool)
-    private readonly toolsRepository: Repository<Tool>,
+    public readonly toolsRepository: Repository<Tool>,
     @InjectRepository(WorkspaceTool)
     private readonly workspaceToolRepository: Repository<WorkspaceTool>,
 
@@ -296,7 +296,7 @@ export class ToolsService implements OnModuleInit {
           workspace: { id: workspaceId },
         },
       });
-      
+
       // Add isInstalled flag to the tool
       tool.isInstalled = !!workspaceTool;
     }
@@ -333,5 +333,18 @@ export class ToolsService implements OnModuleInit {
     });
 
     return this.toolsRepository.save(tool);
+  }
+
+  /**
+   * Get tools by names.
+   * @param {string[]} names - The names of the tools.
+   * @returns {Promise<Tool[]>} The tools with the specified names.
+   */
+  public getToolByNames(names: string[]) {
+    return this.toolsRepository.find({
+      where: {
+        name: In(names),
+      },
+    });
   }
 }

@@ -2,7 +2,7 @@ import Page from "@/components/common/page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useToolsControllerGetToolById } from "@/services/apis/gen/queries";
+import { ToolsControllerGetManyToolsType, useToolsControllerGetToolById } from "@/services/apis/gen/queries";
 import { Hash, Verified } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -107,7 +107,7 @@ export default function ToolDetail() {
                       workspaceId={selectedWorkspace || ""}
                       onInstallChange={handleInstallChange}
                     />
-                    {(isInstalled || tool.isInstalled) && tool.type !== "built_in" && (
+                    {(isInstalled || tool.isInstalled) && tool.type !== ToolsControllerGetManyToolsType.built_in && (
                       <ToolRunButton
                         tool={tool}
                         workspaceId={selectedWorkspace || ""}
@@ -129,7 +129,7 @@ export default function ToolDetail() {
                     Category: {formatCategory(tool.category)}
                   </Badge>
                   <Badge variant="secondary" className="gap-1">
-                    Type: {tool.type === "built_in" ? "Built-in" : "Provider"}
+                    Type: {tool.type === ToolsControllerGetManyToolsType.built_in ? "Built-in" : "Provider"}
                   </Badge>
                 </div>
               </div>

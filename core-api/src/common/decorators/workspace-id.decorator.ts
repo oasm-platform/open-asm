@@ -1,5 +1,6 @@
 import type { ExecutionContext } from '@nestjs/common';
-import { createParamDecorator } from '@nestjs/common';
+import { BadRequestException, createParamDecorator } from '@nestjs/common';
+import { isUUID } from 'class-validator';
 import type { IncomingHttpHeaders } from 'http';
 
 export const WorkspaceId = createParamDecorator<string | undefined>(
@@ -13,10 +14,10 @@ export const WorkspaceId = createParamDecorator<string | undefined>(
       return rawHeader[0];
     }
 
-    if (typeof rawHeader === 'string') {
+    if (typeof rawHeader === 'string' && isUUID(rawHeader)) {
       return rawHeader;
     }
 
-    return undefined;
+    throw new BadRequestException('Workspace id null or invalid');
   },
 );
