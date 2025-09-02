@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsUUID } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { ApiKeyType } from 'src/common/enums/enum';
 import { Column, Entity } from 'typeorm';
@@ -16,6 +17,10 @@ export class ApiKey extends BaseEntity {
   @ApiProperty({ enum: ApiKeyType })
   @Column({ type: 'enum', enum: ApiKeyType })
   type: ApiKeyType;
+
+  @Column({ nullable: true })
+  @IsUUID()
+  ref: string;
 
   @ApiProperty()
   @Column({ type: 'timestamp', nullable: true })

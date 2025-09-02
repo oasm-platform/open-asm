@@ -5,16 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  API_KEY_LENGTH,
-  LIMIT_WORKSPACE_CREATE,
-} from 'src/common/constants/app.constants';
+import { LIMIT_WORKSPACE_CREATE } from 'src/common/constants/app.constants';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
+import { ApiKeyType } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { generateToken } from 'src/utils/genToken';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
+import { ApiKeysService } from '../apikeys/apikeys.service';
 import {
   CreateWorkspaceDto,
   GetApiKeyResponseDto,
@@ -31,6 +29,7 @@ export class WorkspacesService {
     private readonly repo: Repository<Workspace>,
     @InjectRepository(WorkspaceMembers)
     private readonly workspaceMembersRepository: Repository<WorkspaceMembers>,
+    private apiKeyService: ApiKeysService,
   ) {}
 
   /**
@@ -59,7 +58,7 @@ export class WorkspacesService {
       name: dto.name,
       description: dto?.description,
       owner: { id },
-      apiKey: generateToken(API_KEY_LENGTH),
+      // apiKey: generateToken(API_KEY_LENGTH),
     });
 
     await this.workspaceMembersRepository.save({
@@ -161,14 +160,40 @@ export class WorkspacesService {
     workspaceId: string,
     userContext: UserContextPayload,
   ): Promise<GetApiKeyResponseDto> {
+    const apiKey = await this.apiKeyService.create({
+      name: `API Key for workspace ${workspaceId}`,
+      type: ApiKeyType.WORKSPACE,
+      ref: workspaceId,
+    });
+
     const workspace = await this.getWorkspaceByIdAndOwner(
       workspaceId,
       userContext,
     );
-    workspace.apiKey = generateToken(API_KEY_LENGTH);
+
+    workspace.apiKey = apiKey;
     await this.repo.save(workspace);
     return {
-      apiKey: workspace.apiKey,
+      apiKey: workspace.apiKey.key,
+    };
+  }
+
+  /**
+   * Retrieves the API key for a workspace.
+   * @param workspaceId The ID of the workspace to retrieve the API key for.
+   * @returns The API key for the workspace.
+   */
+  public async getWorkspaceApiKey(
+    workspaceId: string,
+    userContext: UserContextPayload,
+  ): Promise<GetApiKeyResponseDto> {
+    await this.getWorkspaceByIdAndOwner(workspaceId, userContext);
+    const apiKey = await this.apiKeyService.getCurrentApiKey(
+      ApiKeyType.WORKSPACE,
+      workspaceId,
+    );
+    return {
+      apiKey: apiKey.key,
     };
   }
 

@@ -11,4 +11,9 @@ export class CreateApiKeyDto {
   @ApiProperty({ enum: ApiKeyType })
   @IsEnum(ApiKeyType)
   type: ApiKeyType;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  ref: string;
 }

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { API_KEY_LENGTH } from 'src/common/constants/app.constants';
+import { ApiKeyType } from 'src/common/enums/enum';
 import { generateToken } from 'src/utils/genToken';
 import { Repository } from 'typeorm';
 import { CreateApiKeyDto } from './dto/create-apikey.dto';
@@ -19,6 +20,29 @@ export class ApiKeysService {
   ) {}
 
   /**
+   * Retrieves the current API key by type and reference ID
+   * @param type - The type of the API key
+   * @param refId - The reference ID of the API key
+   * @returns The API key entity
+   * @throws NotFoundException if the API key with the given type and reference ID is not found
+   */
+  public async getCurrentApiKey(
+    type: ApiKeyType,
+    ref?: string,
+  ): Promise<ApiKey> {
+    const apiKey = await this.apiKeysRepository.findOne({
+      where: { type, ref, isRevoked: false },
+    });
+
+    if (!apiKey) {
+      throw new NotFoundException(
+        `API key with type ${type} and ref ${ref} not found`,
+      );
+    }
+    return apiKey;
+  }
+
+  /**
    * Creates a new API key
    * @param createApiKeyDto - Data transfer object containing API key creation data
    * @returns The created API key entity
@@ -29,18 +53,19 @@ export class ApiKeysService {
     apiKey.type = createApiKeyDto.type;
     apiKey.key = generateToken(API_KEY_LENGTH);
     apiKey.isRevoked = false;
-
+    apiKey.ref = createApiKeyDto.ref;
+    await this.apiKeysRepository
+      .createQueryBuilder('apiKey')
+      .update(ApiKey)
+      .set({ isRevoked: true, revokedAt: new Date() })
+      .where({
+        type: createApiKeyDto.type,
+        ref: createApiKeyDto.ref,
+        isRevoked: false,
+      })
+      .execute();
     return this.apiKeysRepository.save(apiKey);
   }
-
-  /**
-   * Retrieves all API keys
-   * @returns Array of all API key entities
-   */
-  async findAll(): Promise<ApiKey[]> {
-    return this.apiKeysRepository.find();
-  }
-
   /**
    * Retrieves a single API key by its ID
    * @param id - The unique identifier of the API key

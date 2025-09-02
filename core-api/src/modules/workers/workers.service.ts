@@ -203,7 +203,7 @@ export class WorkersService {
     // Find the workspace by API key
     const workspace = await this.dataSource.getRepository(Workspace).findOne({
       where: {
-        apiKey,
+        apiKey: { key: apiKey },
       },
     });
 

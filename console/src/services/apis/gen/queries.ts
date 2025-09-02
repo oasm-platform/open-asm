@@ -5,6 +5,7 @@
  * Open-source platform for cybersecurity Attack Surface Management (ASM)
  * OpenAPI spec version: 1.0
  */
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -23,7 +24,6 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from '@tanstack/react-query';
-import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 
 import { orvalClient } from '../axios-client';
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
@@ -134,8 +134,6 @@ export type Workspace = {
   name: string;
   /** The description of the workspace */
   description: string;
-  /** The API key of the workspace */
-  apiKey: string;
   archivedAt?: WorkspaceArchivedAt;
 };
 
@@ -147,6 +145,10 @@ export type CreateWorkspaceDto = {
   /** The description of the workspace */
   description: string;
   archivedAt?: CreateWorkspaceDtoArchivedAt;
+};
+
+export type GetApiKeyResponseDto = {
+  apiKey: string;
 };
 
 export type GetManyWorkspaceDto = {
@@ -166,10 +168,6 @@ export type UpdateWorkspaceDto = {
   /** The description of the workspace */
   description?: string;
   archivedAt?: UpdateWorkspaceDtoArchivedAt;
-};
-
-export type GetApiKeyResponseDto = {
-  apiKey: string;
 };
 
 export type ArchiveWorkspaceDto = {
@@ -218,6 +216,11 @@ export type UpdateResultDtoData = { [key: string]: unknown };
 export type UpdateResultDto = {
   jobId: string;
   data: UpdateResultDtoData;
+};
+
+export type CreateJobsDto = {
+  toolIds: string[];
+  targetId: string;
 };
 
 export type TlsInfoFingerprintHash = { [key: string]: unknown };
@@ -2394,6 +2397,319 @@ export function useWorkspacesControllerGetWorkspaces<
 }
 
 /**
+ * Retrieves the API key for a workspace.
+ * @summary Get workspace API key
+ */
+export const workspacesControllerGetWorkspaceApiKey = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetApiKeyResponseDto>(
+    { url: `/api/workspaces/api-key`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerGetWorkspaceApiKeyQueryKey = () => {
+  return [`/api/workspaces/api-key`] as const;
+};
+
+export const getWorkspacesControllerGetWorkspaceApiKeyInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetWorkspaceApiKeyQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+  > = ({ signal }) =>
+    workspacesControllerGetWorkspaceApiKey(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetWorkspaceApiKeyInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+  >;
+export type WorkspacesControllerGetWorkspaceApiKeyInfiniteQueryError = unknown;
+
+export function useWorkspacesControllerGetWorkspaceApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace API key
+ */
+
+export function useWorkspacesControllerGetWorkspaceApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetWorkspaceApiKeyInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkspacesControllerGetWorkspaceApiKeyQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetWorkspaceApiKeyQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+  > = ({ signal }) =>
+    workspacesControllerGetWorkspaceApiKey(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetWorkspaceApiKeyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+>;
+export type WorkspacesControllerGetWorkspaceApiKeyQueryError = unknown;
+
+export function useWorkspacesControllerGetWorkspaceApiKey<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceApiKey<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceApiKey<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace API key
+ */
+
+export function useWorkspacesControllerGetWorkspaceApiKey<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetWorkspaceApiKeyQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Retrieves a workspace by its ID.
  * @summary Get Workspace By ID
  */
@@ -4127,6 +4443,101 @@ export function useJobsRegistryControllerGetManyJobs<
 
   return query;
 }
+
+/**
+ * @summary Creates a new job associated with the given asset and worker name.
+ */
+export const jobsRegistryControllerCreateJobsForTarget = (
+  createJobsDto: CreateJobsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/jobs-registry`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createJobsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getJobsRegistryControllerCreateJobsForTargetMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
+    TError,
+    { data: CreateJobsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
+  TError,
+  { data: CreateJobsDto },
+  TContext
+> => {
+  const mutationKey = ['jobsRegistryControllerCreateJobsForTarget'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
+    { data: CreateJobsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return jobsRegistryControllerCreateJobsForTarget(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type JobsRegistryControllerCreateJobsForTargetMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>
+  >;
+export type JobsRegistryControllerCreateJobsForTargetMutationBody =
+  CreateJobsDto;
+export type JobsRegistryControllerCreateJobsForTargetMutationError = unknown;
+
+/**
+ * @summary Creates a new job associated with the given asset and worker name.
+ */
+export const useJobsRegistryControllerCreateJobsForTarget = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
+      TError,
+      { data: CreateJobsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
+  TError,
+  { data: CreateJobsDto },
+  TContext
+> => {
+  const mutationOptions =
+    getJobsRegistryControllerCreateJobsForTargetMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * @summary Retrieves the next job associated with the given worker that has not yet been started.

@@ -35,7 +35,7 @@ const ToolCard = ({ tool, button }: ToolCardProps) => {
                     className="h-16 object-contain"
                 />
             </div>
-            <CardContent className="flex flex-col gap-4 pt-4">
+            <CardContent className="flex flex-col gap-4">
                 <div className="flex gap-3 items-center justify-between">
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2">
