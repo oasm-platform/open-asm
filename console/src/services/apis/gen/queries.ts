@@ -875,6 +875,7 @@ export type ToolsControllerGetManyToolsParams = {
   type?: ToolsControllerGetManyToolsType;
   category?: ToolsControllerGetManyToolsCategory;
   workspaceId?: string;
+  providerId?: string;
 };
 
 export type ToolsControllerGetManyToolsType =
@@ -949,6 +950,7 @@ export type ProvidersControllerGetManyProvidersParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  name?: string;
 };
 
 export type StorageControllerUploadFileBody = {

@@ -16,4 +16,9 @@ export class ToolsQueryDto extends GetManyBaseQueryParams {
   @IsUUID()
   @IsOptional()
   workspaceId?: string;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  providerId?: string;
 }

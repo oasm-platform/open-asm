@@ -4,6 +4,7 @@ import DetailAsset from "@/pages/assets/detail-asset";
 import Dashboard from "@/pages/dashboard/dashboard";
 import Login from "@/pages/login/login";
 import ProvidersPage from "@/pages/providers/providers";
+import DetailProvider from "@/pages/providers/detail-provider";
 import Register from "@/pages/register/register";
 import Search from "@/pages/search/search";
 import Settings from "@/pages/settings/settings";
@@ -113,7 +114,16 @@ export const router = createBrowserRouter([
           },
           {
             path: "providers",
-            element: <ProvidersPage />,
+            children: [
+              {
+                path: "",
+                element: <ProvidersPage />,
+              },
+              {
+                path: ":id",
+                element: <DetailProvider />,
+              },
+            ],
           },
         ],
       },

@@ -3,8 +3,7 @@ import { ListProviders } from "./list-provider";
 
 export default function ProvidersPage() {
   return (
-
-    <Page title="Providers">
+    <Page title="Tool Providers">
       <ListProviders />
     </Page>
   );
