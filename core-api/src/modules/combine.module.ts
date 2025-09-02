@@ -15,6 +15,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { DataAdapterModule } from './data-adapter/data-adapter.module';
 import { ApiKeysModule } from './apikeys/apikeys.module';
+import { ProvidersModule } from './providers/providers.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ApiKeysModule } from './apikeys/apikeys.module';
     WorkflowsModule,
     StatisticModule,
     ApiKeysModule,
+    ProvidersModule,
   ],
 })
 export class CombineModule {}
