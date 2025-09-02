@@ -6,6 +6,7 @@ import { RootModule } from './root/root.module';
 import { SearchModule } from './search/search.module';
 import { StatisticModule } from './statistic/statistic.module';
 import { TargetsModule } from './targets/targets.module';
+import { TechnologyModule } from './technology/technology.module';
 import { ToolsModule } from './tools/tools.module';
 import { UsersModule } from './users/users.module';
 import { VulnerabilitiesModule } from './vulnerabilities/vulnerabilities.module';
@@ -26,6 +27,7 @@ import { ApiKeysModule } from './apikeys/apikeys.module';
     RootModule,
     JobsRegistryModule,
     AssetsModule,
+    TechnologyModule,
     WorkersModule,
     SearchModule,
     ToolsModule,

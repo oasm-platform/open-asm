@@ -17,7 +17,7 @@ export default function PortAssetsTab() {
   const { data, isLoading } = useAssetsControllerGetPortAssets(queryParams, {
     query: {
       ...queryOptions.query,
-      queryKey: ['assets', ...queryOptions.query.queryKey],
+      queryKey: ['ports', ...queryOptions.query.queryKey],
     },
   });
 

@@ -6,6 +6,8 @@ import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerabilit
 import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { HttpResponse } from './http-response.entity';
 import { Port } from './ports.entity';
+import { IpAssetsView } from './ip-assets.entity';
+import { StatusCodeAssetsView } from './status-code-assets.entity';
 
 @Entity('assets')
 @Unique(['value', 'target'])
@@ -13,6 +15,10 @@ export class Asset extends BaseEntity {
   @ApiProperty()
   @Column()
   value: string;
+
+  @ApiProperty()
+  @Column({ type: 'varchar', nullable: true })
+  targetId: string;
 
   // Relationships
   @ManyToOne(() => Target, (target) => target.assets, {
@@ -51,4 +57,13 @@ export class Asset extends BaseEntity {
     onDelete: 'CASCADE',
   })
   vulnerabilities?: Vulnerability[];
+
+  @OneToMany(() => IpAssetsView, (ipAssets) => ipAssets.asset)
+  ipAssets?: IpAssetsView[];
+
+  @OneToMany(
+    () => StatusCodeAssetsView,
+    (statusCodeAssets) => statusCodeAssets.asset,
+  )
+  statusCodeAssets?: StatusCodeAssetsView[];
 }

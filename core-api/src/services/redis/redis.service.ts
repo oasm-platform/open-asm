@@ -54,7 +54,6 @@ export class RedisService implements OnModuleDestroy {
       // Log error but don't throw to avoid blocking shutdown
       // Using process.env.NODE_ENV check to allow console.error in non-production environments
       if (process.env.NODE_ENV !== 'production') {
-        // eslint-disable-next-line no-console
         console.error('Error during Redis cleanup:', error);
       }
     }
@@ -68,7 +67,6 @@ export class RedisService implements OnModuleDestroy {
    * @returns The received message or null if timed out
    */
   async waitForEvent(channel: string, timeout = 5000): Promise<string | null> {
-    // eslint-disable-line no-magic-numbers
     return new Promise<string | null>((resolve) => {
       let isResolved = false;
 

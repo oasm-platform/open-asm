@@ -1,4 +1,6 @@
-import { ViewColumn, ViewEntity } from 'typeorm';
+import { JoinColumn, ManyToOne, ViewColumn, ViewEntity } from 'typeorm';
+import { Asset } from './assets.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @ViewEntity({
   name: 'status_code_assets_view',
@@ -14,8 +16,14 @@ import { ViewColumn, ViewEntity } from 'typeorm';
 })
 export class StatusCodeAssetsView {
   @ViewColumn()
+  @ApiProperty()
   statusCode: number;
 
   @ViewColumn()
+  @ApiProperty()
   assetId: string;
+
+  @ManyToOne(() => Asset, (asset) => asset.ipAssets)
+  @JoinColumn({ name: 'assetId' })
+  asset: Asset;
 }
