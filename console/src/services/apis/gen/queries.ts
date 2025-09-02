@@ -518,6 +518,7 @@ export type Tool = {
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;
+  providerId: string;
 };
 
 export type CreateToolDtoCategory =
@@ -668,6 +669,83 @@ export type StatisticResponseDto = {
   totalVulnerabilities: number;
   /** Total number of unique technologies in the workspace */
   totalUniqueTechnologies: number;
+};
+
+export type ToolProvider = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Provider name */
+  name: string;
+  /** Unique code/slug for provider */
+  code: string;
+  /** Provider description */
+  description: string;
+  /** Logo URL */
+  logoUrl: string;
+  /** Official website URL */
+  websiteUrl: string;
+  /** Support email */
+  supportEmail: string;
+  /** Company name */
+  company: string;
+  /** License info */
+  licenseInfo: string;
+  /** API documentation URL */
+  apiDocsUrl: string;
+  /** Is provider active */
+  isActive: boolean;
+};
+
+export type GetManyToolProviderDto = {
+  data: ToolProvider[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type CreateProviderDto = {
+  /** Provider name */
+  name: string;
+  /** Unique code/slug for provider */
+  code: string;
+  /** Provider description */
+  description: string;
+  /** Logo URL */
+  logoUrl: string;
+  /** Official website URL */
+  websiteUrl: string;
+  /** Support email */
+  supportEmail: string;
+  /** Company name */
+  company: string;
+  /** License info */
+  licenseInfo: string;
+  /** API documentation URL */
+  apiDocsUrl: string;
+};
+
+export type UpdateProviderDto = {
+  /** Provider name */
+  name?: string;
+  /** Unique code/slug for provider */
+  code?: string;
+  /** Provider description */
+  description?: string;
+  /** Logo URL */
+  logoUrl?: string;
+  /** Official website URL */
+  websiteUrl?: string;
+  /** Support email */
+  supportEmail?: string;
+  /** Company name */
+  company?: string;
+  /** License info */
+  licenseInfo?: string;
+  /** API documentation URL */
+  apiDocsUrl?: string;
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
@@ -864,6 +942,13 @@ export type StatisticControllerGetStatisticsParams = {
    * The ID of the workspace to get statistics for
    */
   workspaceId: string;
+};
+
+export type ProvidersControllerGetManyProvidersParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -12647,6 +12732,887 @@ export function useStatisticControllerGetStatistics<
 
   return query;
 }
+
+/**
+ * Get all providers with pagination, filtered by owner
+ * @summary Get all providers
+ */
+export const providersControllerGetManyProviders = (
+  params?: ProvidersControllerGetManyProvidersParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyToolProviderDto>(
+    { url: `/api/providers`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getProvidersControllerGetManyProvidersQueryKey = (
+  params?: ProvidersControllerGetManyProvidersParams,
+) => {
+  return [`/api/providers`, ...(params ? [params] : [])] as const;
+};
+
+export const getProvidersControllerGetManyProvidersInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+    ProvidersControllerGetManyProvidersParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ProvidersControllerGetManyProvidersParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData,
+        QueryKey,
+        ProvidersControllerGetManyProvidersParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getProvidersControllerGetManyProvidersQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+    QueryKey,
+    ProvidersControllerGetManyProvidersParams['page']
+  > = ({ signal, pageParam }) =>
+    providersControllerGetManyProviders(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+    TError,
+    TData,
+    QueryKey,
+    ProvidersControllerGetManyProvidersParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProvidersControllerGetManyProvidersInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof providersControllerGetManyProviders>>>;
+export type ProvidersControllerGetManyProvidersInfiniteQueryError = unknown;
+
+export function useProvidersControllerGetManyProvidersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+    ProvidersControllerGetManyProvidersParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | ProvidersControllerGetManyProvidersParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData,
+        QueryKey,
+        ProvidersControllerGetManyProvidersParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+          TError,
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProvidersControllerGetManyProvidersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+    ProvidersControllerGetManyProvidersParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ProvidersControllerGetManyProvidersParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData,
+        QueryKey,
+        ProvidersControllerGetManyProvidersParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+          TError,
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProvidersControllerGetManyProvidersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+    ProvidersControllerGetManyProvidersParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ProvidersControllerGetManyProvidersParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData,
+        QueryKey,
+        ProvidersControllerGetManyProvidersParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all providers
+ */
+
+export function useProvidersControllerGetManyProvidersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+    ProvidersControllerGetManyProvidersParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ProvidersControllerGetManyProvidersParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData,
+        QueryKey,
+        ProvidersControllerGetManyProvidersParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getProvidersControllerGetManyProvidersInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getProvidersControllerGetManyProvidersQueryOptions = <
+  TData = Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+  TError = unknown,
+>(
+  params?: ProvidersControllerGetManyProvidersParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getProvidersControllerGetManyProvidersQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>
+  > = ({ signal }) =>
+    providersControllerGetManyProviders(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProvidersControllerGetManyProvidersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof providersControllerGetManyProviders>>
+>;
+export type ProvidersControllerGetManyProvidersQueryError = unknown;
+
+export function useProvidersControllerGetManyProviders<
+  TData = Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+  TError = unknown,
+>(
+  params: undefined | ProvidersControllerGetManyProvidersParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+          TError,
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProvidersControllerGetManyProviders<
+  TData = Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+  TError = unknown,
+>(
+  params?: ProvidersControllerGetManyProvidersParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+          TError,
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProvidersControllerGetManyProviders<
+  TData = Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+  TError = unknown,
+>(
+  params?: ProvidersControllerGetManyProvidersParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all providers
+ */
+
+export function useProvidersControllerGetManyProviders<
+  TData = Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+  TError = unknown,
+>(
+  params?: ProvidersControllerGetManyProvidersParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getProvidersControllerGetManyProvidersQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Create a new provider
+ * @summary Create a new provider
+ */
+export const providersControllerCreateProvider = (
+  createProviderDto: CreateProviderDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolProvider>(
+    {
+      url: `/api/providers`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createProviderDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getProvidersControllerCreateProviderMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+    TError,
+    { data: CreateProviderDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+  TError,
+  { data: CreateProviderDto },
+  TContext
+> => {
+  const mutationKey = ['providersControllerCreateProvider'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+    { data: CreateProviderDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return providersControllerCreateProvider(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProvidersControllerCreateProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof providersControllerCreateProvider>>
+>;
+export type ProvidersControllerCreateProviderMutationBody = CreateProviderDto;
+export type ProvidersControllerCreateProviderMutationError = unknown;
+
+/**
+ * @summary Create a new provider
+ */
+export const useProvidersControllerCreateProvider = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+      TError,
+      { data: CreateProviderDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof providersControllerCreateProvider>>,
+  TError,
+  { data: CreateProviderDto },
+  TContext
+> => {
+  const mutationOptions =
+    getProvidersControllerCreateProviderMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Get detailed information about a specific provider
+ * @summary Get a provider by ID
+ */
+export const providersControllerGetProvider = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ToolProvider>(
+    { url: `/api/providers/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getProvidersControllerGetProviderQueryKey = (id: string) => {
+  return [`/api/providers/${id}`] as const;
+};
+
+export const getProvidersControllerGetProviderInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetProvider>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getProvidersControllerGetProviderQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof providersControllerGetProvider>>
+  > = ({ signal }) =>
+    providersControllerGetProvider(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof providersControllerGetProvider>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProvidersControllerGetProviderInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof providersControllerGetProvider>>
+>;
+export type ProvidersControllerGetProviderInfiniteQueryError = unknown;
+
+export function useProvidersControllerGetProviderInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetProvider>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof providersControllerGetProvider>>,
+          TError,
+          Awaited<ReturnType<typeof providersControllerGetProvider>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProvidersControllerGetProviderInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetProvider>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof providersControllerGetProvider>>,
+          TError,
+          Awaited<ReturnType<typeof providersControllerGetProvider>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProvidersControllerGetProviderInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetProvider>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a provider by ID
+ */
+
+export function useProvidersControllerGetProviderInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof providersControllerGetProvider>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getProvidersControllerGetProviderInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getProvidersControllerGetProviderQueryOptions = <
+  TData = Awaited<ReturnType<typeof providersControllerGetProvider>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getProvidersControllerGetProviderQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof providersControllerGetProvider>>
+  > = ({ signal }) =>
+    providersControllerGetProvider(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof providersControllerGetProvider>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProvidersControllerGetProviderQueryResult = NonNullable<
+  Awaited<ReturnType<typeof providersControllerGetProvider>>
+>;
+export type ProvidersControllerGetProviderQueryError = unknown;
+
+export function useProvidersControllerGetProvider<
+  TData = Awaited<ReturnType<typeof providersControllerGetProvider>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof providersControllerGetProvider>>,
+          TError,
+          Awaited<ReturnType<typeof providersControllerGetProvider>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProvidersControllerGetProvider<
+  TData = Awaited<ReturnType<typeof providersControllerGetProvider>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof providersControllerGetProvider>>,
+          TError,
+          Awaited<ReturnType<typeof providersControllerGetProvider>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProvidersControllerGetProvider<
+  TData = Awaited<ReturnType<typeof providersControllerGetProvider>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a provider by ID
+ */
+
+export function useProvidersControllerGetProvider<
+  TData = Awaited<ReturnType<typeof providersControllerGetProvider>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getProvidersControllerGetProviderQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Update an existing provider by ID
+ * @summary Update a provider
+ */
+export const providersControllerUpdateProvider = (
+  id: string,
+  updateProviderDto: UpdateProviderDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<ToolProvider>(
+    {
+      url: `/api/providers/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateProviderDto,
+    },
+    options,
+  );
+};
+
+export const getProvidersControllerUpdateProviderMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+    TError,
+    { id: string; data: UpdateProviderDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+  TError,
+  { id: string; data: UpdateProviderDto },
+  TContext
+> => {
+  const mutationKey = ['providersControllerUpdateProvider'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+    { id: string; data: UpdateProviderDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return providersControllerUpdateProvider(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProvidersControllerUpdateProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof providersControllerUpdateProvider>>
+>;
+export type ProvidersControllerUpdateProviderMutationBody = UpdateProviderDto;
+export type ProvidersControllerUpdateProviderMutationError = unknown;
+
+/**
+ * @summary Update a provider
+ */
+export const useProvidersControllerUpdateProvider = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+      TError,
+      { id: string; data: UpdateProviderDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof providersControllerUpdateProvider>>,
+  TError,
+  { id: string; data: UpdateProviderDto },
+  TContext
+> => {
+  const mutationOptions =
+    getProvidersControllerUpdateProviderMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * @summary Upload a file to storage

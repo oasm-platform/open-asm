@@ -3,6 +3,7 @@ import Assets from "@/pages/assets/assets";
 import DetailAsset from "@/pages/assets/detail-asset";
 import Dashboard from "@/pages/dashboard/dashboard";
 import Login from "@/pages/login/login";
+import ProvidersPage from "@/pages/providers/providers";
 import Register from "@/pages/register/register";
 import Search from "@/pages/search/search";
 import Settings from "@/pages/settings/settings";
@@ -109,6 +110,10 @@ export const router = createBrowserRouter([
                 element: <DetailAsset />,
               },
             ],
+          },
+          {
+            path: "providers",
+            element: <ProvidersPage />,
           },
         ],
       },

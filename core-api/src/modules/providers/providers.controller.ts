@@ -1,14 +1,30 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { UserContext } from '../../common/decorators/app.decorator';
 import { UserContextPayload } from '../../common/interfaces/app.interface';
-import { CreateProviderDto, UpdateProviderDto } from './dto';
+import { GetManyResponseDto } from 'src/utils/getManyResponse';
+import { CreateProviderDto, ProvidersQueryDto, UpdateProviderDto } from './dto';
 import { ToolProvider } from './entities';
 import { ProvidersService } from './providers.service';
 
 @Controller('providers')
 export class ProvidersController {
   constructor(private readonly providersService: ProvidersService) {}
+
+  @Doc({
+    summary: 'Get all providers',
+    description: 'Get all providers with pagination, filtered by owner',
+    response: {
+      serialization: GetManyResponseDto(ToolProvider),
+    },
+  })
+  @Get()
+  async getManyProviders(
+    @Query() query: ProvidersQueryDto,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.providersService.getManyProviders(query, userContext);
+  }
 
   @Doc({
     summary: 'Create a new provider',
@@ -33,7 +49,7 @@ export class ProvidersController {
     },
   })
   @Get(':id')
-  async getProvider(@Param('id') id: string) {
+  getProvider(@Param('id') id: string) {
     return this.providersService.getProviderById(id);
   }
 
@@ -50,6 +66,10 @@ export class ProvidersController {
     @Body() updateProviderDto: UpdateProviderDto,
     @UserContext() userContext: UserContextPayload,
   ) {
-    return this.providersService.updateProvider(id, updateProviderDto, userContext);
+    return this.providersService.updateProvider(
+      id,
+      updateProviderDto,
+      userContext,
+    );
   }
 }
