@@ -68,14 +68,14 @@ const JobsTimeline = () => {
                                         <div key={`${item.name}-${index}`} className="relative mb-12 last:mb-0">
                                             {/* Timeline dot positioned at the center left of the card */}
                                             <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                                                <div className="w-4 h-4 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center">
-                                                    <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                                                <div className="w-5 h-5 rounded-full bg-primary border-2 border-primary-foreground flex items-center justify-center">
+                                                    <div className="w-2 h-2 rounded-full bg-primary-foreground"></div>
                                                 </div>
                                             </div>
                                             
                                             {/* Vertical line connecting to the next dot (if not the last item) */}
                                             {index < items.length - 1 && (
-                                                <div className="absolute left-0 -translate-x-1/2 w-px bg-gray-300" style={{
+                                                <div className="absolute left-0 -translate-x-1/2 w-[2px] bg-primary" style={{
                                                     top: 'calc(70% + 4px)', // Start 4px below the center of current dot
                                                     height: 'calc(100% + 4px)', // Extend to 4px above the next dot
                                                 }}></div>
