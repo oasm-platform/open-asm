@@ -6,7 +6,6 @@ import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   CreateJobsDto,
   GetNextJobResponseDto,
-  JobTimelineResponseDto,
   UpdateResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
@@ -27,18 +26,6 @@ export class JobsRegistryController {
   @Get('')
   getManyJobs(@Query() query: GetManyBaseQueryParams) {
     return this.jobsRegistryService.getManyJobs(query);
-  }
-
-  @Doc({
-    summary: 'Get Jobs Timeline',
-    description: 'Retrieves a timeline of jobs grouped by tool name and target.',
-    response: {
-      serialization: JobTimelineResponseDto,
-    },
-  })
-  @Get('/timeline')
-  getJobsTimeline() {
-    return this.jobsRegistryService.getJobsTimeline();
   }
 
   @Doc({
@@ -63,7 +50,7 @@ export class JobsRegistryController {
   ) {
     return this.jobsRegistryService.updateResult(workerId, dto);
   }
-}
+
   @Doc({
     summary:
       'Creates a new job associated with the given asset and worker name.',
