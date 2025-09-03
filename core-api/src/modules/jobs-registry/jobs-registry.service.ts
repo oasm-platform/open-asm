@@ -10,7 +10,7 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus } from 'src/common/enums/enum';
+import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
@@ -23,6 +23,8 @@ import { Workflow } from '../workflows/entities/workflow.entity';
 import {
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
+  JobTimelineItem,
+  JobTimelineResponseDto,
   UpdateResultDto,
 } from './dto/jobs-registry.dto';
 import { JobHistory } from './entities/job-history.entity';
@@ -46,13 +48,17 @@ export class JobsRegistryService {
     if (!(sortBy in Job)) {
       sortBy = 'createdAt';
     }
-    const [data, total] = await this.repo.findAndCount({
-      take: query.limit,
-      skip: (page - 1) * limit,
-      order: {
-        [sortBy]: sortOrder,
-      },
-    });
+    
+    const qb = this.repo
+      .createQueryBuilder('job')
+      .leftJoinAndSelect('job.tool', 'tool')
+      .leftJoinAndSelect('job.asset', 'asset')
+      .leftJoinAndSelect('asset.target', 'target')
+      .take(query.limit)
+      .skip((page - 1) * limit)
+      .orderBy(`job.${sortBy}`, sortOrder);
+      
+    const [data, total] = await qb.getManyAndCount();
 
     return getManyResponse<Job>({ query, data, total });
   }
@@ -307,6 +313,86 @@ export class JobsRegistryService {
     // await this.processStepResult(step, job, dto.data);
 
     return { workerId, dto };
+  }
+
+  /**
+   * Retrieves a timeline of jobs grouped by tool name and target
+   * @returns A promise that resolves to a JobTimelineResponseDto containing the timeline data
+   */
+  public async getJobsTimeline(): Promise<JobTimelineResponseDto> {
+    // Execute the raw SQL query based on the provided example
+    const result = await this.dataSource.query(`
+      with grouped as (
+        select
+          tools.name,
+          tools.description as tool_description,
+          tools.category as tool_category,
+          assets.value as asset_value,
+          targets.value as target,
+          targets.id as target_id,
+          jobs.status,
+          jobs."createdAt",
+          jobs."updatedAt",
+          jobs."completedAt",
+          -- check if a new group should start
+          case
+            when lag(tools.name) over (order by jobs."createdAt" desc) = tools.name
+             and lag(targets.value) over (order by jobs."createdAt" desc) = targets.value
+            then 0 else 1
+          end as is_new_group
+        from jobs
+        join assets on jobs."assetId" = assets.id
+        join tools on jobs."toolId" = tools.id
+        join targets on assets."targetId" = targets.id
+        order by jobs."createdAt" desc
+      ),
+      grouped_with_id as (
+        select *,
+               sum(is_new_group) over (order by "createdAt" desc) as grp_id
+        from grouped
+      )
+      select
+        name,
+        target,
+        target_id,
+        min("createdAt") as start_time,
+        max(COALESCE("completedAt", "updatedAt")) as end_time,
+        string_agg(status::text, ', ') as statuses,
+        max(tool_description) as description,
+        max(tool_category) as tool_category,
+        EXTRACT(EPOCH FROM (max(COALESCE("completedAt", "updatedAt")) - min("createdAt"))) as duration_seconds
+      from grouped_with_id
+      group by grp_id, name, target, target_id
+      order by end_time desc
+      limit 15;
+    `);
+
+    // Map the raw SQL results to our DTO format
+    const timelineItems: JobTimelineItem[] = result.map(item => {
+      // Determine the overall status based on the statuses string
+      let status = JobStatus.PENDING;
+      if (item.statuses.includes(JobStatus.IN_PROGRESS)) {
+        status = JobStatus.IN_PROGRESS;
+      } else if (item.statuses.includes(JobStatus.FAILED)) {
+        status = JobStatus.FAILED;
+      } else if (item.statuses.includes(JobStatus.COMPLETED)) {
+        status = JobStatus.COMPLETED;
+      }
+
+      return {
+        name: item.name,
+        target: item.target,
+        targetId: item.target_id,
+        startTime: item.start_time,
+        endTime: item.end_time,
+        status: status,
+        description: item.description,
+        toolCategory: item.tool_category,
+        duration: Math.round(item.duration_seconds)
+      };
+    });
+
+    return { data: timelineItems };
   }
 
   private async getNextStepForJob(job: Job) {

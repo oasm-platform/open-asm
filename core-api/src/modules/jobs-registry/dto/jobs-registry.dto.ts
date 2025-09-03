@@ -51,3 +51,37 @@ export class GetManyJobsQueryParams extends GetManyBaseQueryParams {
   @IsIn([...Object.values(ToolCategory), 'all'])
   workerName: ToolCategory | 'all';
 }
+
+export class JobTimelineItem {
+  @ApiProperty()
+  name: string;
+  
+  @ApiProperty()
+  target: string;
+  
+  @ApiProperty()
+  targetId: string;
+  
+  @ApiProperty()
+  startTime: Date;
+  
+  @ApiProperty()
+  endTime: Date;
+  
+  @ApiProperty()
+  status: JobStatus;
+  
+  @ApiProperty()
+  description?: string;
+  
+  @ApiProperty()
+  toolCategory?: ToolCategory;
+  
+  @ApiProperty()
+  duration?: number;
+}
+
+export class JobTimelineResponseDto {
+  @ApiProperty({ type: [JobTimelineItem] })
+  data: JobTimelineItem[];
+}
