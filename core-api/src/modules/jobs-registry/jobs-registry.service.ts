@@ -490,6 +490,10 @@ export class JobsRegistryService {
     return { data: timelineItems };
   }
 
+  /**
+   * Updates the result of a job with the given worker ID.
+   * @param job
+   */
   private async getNextStepForJob(job: Job) {
     const workflow = job.jobHistory.workflow;
     if (!workflow) return;
