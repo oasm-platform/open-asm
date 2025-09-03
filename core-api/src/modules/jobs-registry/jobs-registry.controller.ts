@@ -63,7 +63,7 @@ export class JobsRegistryController {
   ) {
     return this.jobsRegistryService.updateResult(workerId, dto);
   }
-}
+
   @Doc({
     summary:
       'Creates a new job associated with the given asset and worker name.',

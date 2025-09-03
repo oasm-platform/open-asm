@@ -438,6 +438,7 @@ export class JobsRegistryService {
     return { data: timelineItems };
   }
 
+  /**
    * Updates the result of a job with the given worker ID.
    * @param job
    */
