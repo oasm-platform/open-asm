@@ -10,20 +10,19 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useWorkspacesControllerRotateApiKey } from "@/services/apis/gen/queries";
+import { useWorkspacesControllerGetWorkspaceApiKey, useWorkspacesControllerRotateApiKey } from "@/services/apis/gen/queries";
 import { Copy, SquareTerminal } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "./confirm-dialog";
-
 export function ConnectWorker() {
-    const { workspaces, selectedWorkspace, refetch } = useWorkspaceSelector()
-    const apiKey = workspaces[workspaces.findIndex((workspace) => workspace.id === selectedWorkspace)]?.apiKey;
+    const { selectedWorkspace } = useWorkspaceSelector()
+    const { data, refetch } = useWorkspacesControllerGetWorkspaceApiKey()
     const [open, setOpen] = useState(false);
 
     const rawCommand = import.meta.env.PROD
-        ? `docker run -d --name open-asm-worker -e API_KEY=${apiKey} -e API=${window.location.origin} -e MAX_JOBS=10 open-asm-worker:latest`
-        : `task worker:dev replicas=1 maxJobs=10 apiKey=${apiKey}`;
+        ? `docker run -d --name open-asm-worker -e API_KEY=${data?.apiKey} -e API=${window.location.origin} -e MAX_JOBS=10 open-asm-worker:latest`
+        : `task worker:dev replicas=1 maxJobs=10 apiKey=${data?.apiKey}`;
 
     const { mutate } = useWorkspacesControllerRotateApiKey({
         mutation: {
@@ -43,12 +42,6 @@ export function ConnectWorker() {
         toast.success("Command copied to clipboard");
     };
 
-    // const handleCopyApiKey = async () => {
-    //     await navigator.clipboard.writeText(apiKey || "");
-    //     toast.success("API key copied to clipboard");
-    // };
-
-    if (!selectedWorkspace) return null;
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>

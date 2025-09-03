@@ -55,3 +55,8 @@ export enum JobPriority {
   LOW = 3,
   BACKGROUND = 4,
 }
+
+export enum ApiKeyType {
+  TOOL = 'tool',
+  WORKSPACE = 'workspace',
+}

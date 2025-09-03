@@ -6,21 +6,24 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { Target } from '../targets/entities/target.entity';
 import { builtInTools } from '../tools/built-in-tools';
 import { Tool } from '../tools/entities/tools.entity';
+import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import {
+  CreateJobsDto,
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
   JobTimelineItem,
@@ -38,6 +41,7 @@ export class JobsRegistryService {
     public readonly jobHistoryRepo: Repository<JobHistory>,
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
+    private toolsService: ToolsService,
   ) {}
   public async getManyJobs(
     query: GetManyBaseQueryParams,
@@ -64,51 +68,75 @@ export class JobsRegistryService {
   }
 
   /**
-   * Creates a new job associated with the given asset and worker name.
-   * @param asset the asset the job is associated with
-   * @param category the name of the worker to run on the asset
-   * @returns the newly created job
+   * Creates jobs for given tools and targets, linked to a jobHistory.
+   * @param tools list of tools to run
+   * @param targets list of targets to scan
+   * @param workflow optional workflow to link
    */
-  public async createJob({
-    toolNames,
-    target,
+  /**
+   * Creates jobs for given tools and targets, linked to a jobHistory.
+   * @param tools list of tools to run
+   * @param targets list of targets to scan
+   * @param workflow optional workflow to link
+   */
+  public async createJobs({
+    tools,
+    targets,
     workflow,
   }: {
-    toolNames: string[];
-    target: Target;
+    tools: Tool[];
+    targets: Target[];
     workflow?: Workflow;
-  }): Promise<void> {
+  }): Promise<Job[]> {
+    // Step 1: create job history
     const jobHistory = this.jobHistoryRepo.create({
       workflow,
     });
     await this.jobHistoryRepo.save(jobHistory);
+
+    // Step 2: find assets of the given targets
     const assets = await this.dataSource.getRepository(Asset).find({
       where: {
-        target: { id: target.id },
-      },
-    });
-    const jobHistoryId = jobHistory.id;
-    const toolsForFirstJob = await this.dataSource.getRepository(Tool).find({
-      where: {
-        name: In(toolNames),
+        target: In(targets.map((target) => target.id)),
       },
     });
 
-    await Promise.all(
-      toolsForFirstJob.map(async (tool) => {
-        await this.dataSource.getRepository(Job).save(
-          assets.map((asset) => ({
-            id: randomUUID(),
-            asset,
-            jobName: tool.name,
-            status: JobStatus.PENDING,
-            category: tool.category,
-            tool,
-            jobHistory: { id: jobHistoryId },
-          })),
-        );
-      }),
-    );
+    const jobRepo = this.dataSource.getRepository(Job);
+    const jobsToInsert: Job[] = [];
+
+    // Step 3: iterate tools and create jobs
+    for (const tool of tools) {
+      let filteredAssets: Asset[];
+
+      if (tool.category === ToolCategory.SUBDOMAINS) {
+        filteredAssets = assets.filter((asset) => asset.isPrimary);
+      } else if (tool.category === ToolCategory.PORTS_SCANNER) {
+        filteredAssets = assets.filter((asset) => asset.isPrimary);
+      } else {
+        filteredAssets = assets;
+      }
+
+      for (const asset of filteredAssets) {
+        const job = jobRepo.create({
+          id: randomUUID(),
+          asset,
+          jobName: tool.name,
+          status: JobStatus.PENDING,
+          category: tool.category,
+          tool,
+          jobHistory,
+        } as DeepPartial<Job>);
+
+        jobsToInsert.push(job);
+      }
+    }
+
+    // Step 4: save all jobs
+    if (jobsToInsert.length > 0) {
+      await jobRepo.save(jobsToInsert);
+    }
+
+    return jobsToInsert;
   }
 
   /**
@@ -264,6 +292,23 @@ export class JobsRegistryService {
   }
 
   /**
+   * Creates jobs for a target.
+   * @param dto the data transfer object containing the target ID and tool IDs
+   * @returns an object with a success message
+   */
+  public async createJobsForTarget(
+    dto: CreateJobsDto,
+  ): Promise<DefaultMessageResponseDto> {
+    const tools = await this.toolsService.toolsRepository.find({
+      where: { id: In(dto.toolIds) },
+    });
+    await this.createJobs({ tools, targets: [{ id: dto.targetId } as Target] });
+    return {
+      message: 'Jobs created successfully',
+    };
+  }
+
+  /**
    * Updates the result of a job with the given worker ID.
    * @param workerId the ID of the worker that ran the job
    * @param dto the data transfer object containing the result of the job
@@ -309,8 +354,6 @@ export class JobsRegistryService {
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
     await this.updateJobStatus(job.id, newStatus);
-
-    // await this.processStepResult(step, job, dto.data);
 
     return { workerId, dto };
   }
@@ -395,19 +438,30 @@ export class JobsRegistryService {
     return { data: timelineItems };
   }
 
+   * Updates the result of a job with the given worker ID.
+   * @param job
+   */
   private async getNextStepForJob(job: Job) {
     const workflow = job.jobHistory.workflow;
     const currentTool = job.tool.name;
     const nextTool = workflow?.content.jobs[currentTool];
+
     if (nextTool) {
-      await this.createJob({
-        toolNames: nextTool,
-        target: job.asset.target,
+      const tools = await this.toolsService.getToolByNames(nextTool);
+      await this.createJobs({
+        tools,
+        targets: [job.asset.target],
         workflow: job.jobHistory.workflow,
       });
     }
   }
 
+  /**
+   * Find job for update
+   * @param workerId
+   * @param jobId
+   * @returns
+   */
   private async findJobForUpdate(workerId: string, jobId: string) {
     return this.repo.findOne({
       where: {
@@ -427,6 +481,11 @@ export class JobsRegistryService {
     });
   }
 
+  /**
+   * Updates the status of a job.
+   * @param jobId the ID of the job to update
+   * @param status the new status of the job
+   */
   private async updateJobStatus(
     jobId: string,
     status: JobStatus,

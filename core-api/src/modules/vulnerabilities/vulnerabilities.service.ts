@@ -3,9 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Severity } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
-import { AssetsService } from '../assets/assets.service';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';
+import { ToolsService } from '../tools/tools.service';
 import {
   GetVulnerabilitiesSeverityQueryDto,
   VulnerabilitySeverityDto,
@@ -22,9 +22,8 @@ export class VulnerabilitiesService {
   constructor(
     @InjectRepository(Vulnerability)
     private vulnerabilitiesRepository: Repository<Vulnerability>,
-
     private jobRegistryService: JobsRegistryService,
-    private assetService: AssetsService,
+    private toolsService: ToolsService,
   ) {}
 
   /**
@@ -35,9 +34,10 @@ export class VulnerabilitiesService {
    * @returns A message indicating the scan has started.
    */
   public async scan(targetId: string) {
-    await this.jobRegistryService.createJob({
-      toolNames: ['nuclei'],
-      target: { id: targetId } as Target,
+    const tools = await this.toolsService.getToolByNames(['nuclei']);
+    await this.jobRegistryService.createJobs({
+      tools,
+      targets: [{ id: targetId } as Target],
     });
     return { message: `Scanning target ${targetId}...` };
   }

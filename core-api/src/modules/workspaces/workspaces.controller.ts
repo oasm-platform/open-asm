@@ -10,7 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { UserContext } from 'src/common/decorators/app.decorator';
+import { UserContext, WorkspaceId } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
@@ -44,6 +44,21 @@ export class WorkspacesController {
     @UserContext() userContextPayload: UserContextPayload,
   ) {
     return this.workspacesService.createWorkspace(dto, userContextPayload);
+  }
+
+  @Doc({
+    summary: 'Get workspace API key',
+    description: 'Retrieves the API key for a workspace.',
+    response: {
+      serialization: GetApiKeyResponseDto,
+    },
+  })
+  @Get('api-key')
+  getWorkspaceApiKey(
+    @WorkspaceId() workspaceId: string,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.workspacesService.getWorkspaceApiKey(workspaceId, userContext);
   }
 
   @Doc({

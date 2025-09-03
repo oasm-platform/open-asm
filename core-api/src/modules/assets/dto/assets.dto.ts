@@ -2,8 +2,19 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
+import { TechnologyDetailDTO } from 'src/modules/technology/dto/technology-detail.dto';
 import { HttpResponse } from '../entities/http-response.entity';
 import { Port } from '../entities/ports.entity';
+
+export type PickTechnologyDetailDTO = Pick<
+  TechnologyDetailDTO,
+  'name' | 'description' | 'iconUrl' | 'categoryNames'
+>;
+
+class HttpResponseDTO extends HttpResponse {
+  @ApiProperty()
+  techList?: PickTechnologyDetailDTO[];
+}
 
 export class GetAssetsResponseDto {
   @ApiProperty()
@@ -18,18 +29,18 @@ export class GetAssetsResponseDto {
   @ApiProperty()
   createdAt: Date;
   @ApiProperty()
-  updatedAt: Date;
+  updatedAt?: Date;
   @ApiProperty({ required: false })
   dnsRecords?: object;
 
+  @ApiProperty()
+  ipAddresses?: string[];
+
   @ApiProperty({ required: false })
-  httpResponses?: HttpResponse;
+  httpResponses?: HttpResponseDTO;
 
   @ApiProperty({ required: false })
   ports?: Port;
-
-  @ApiProperty({ required: false })
-  isErrorPage?: boolean;
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {
@@ -37,10 +48,6 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   @IsOptional()
   @IsString()
   value?: string;
-
-  @ApiProperty()
-  @IsUUID(4)
-  workspaceId?: string;
 
   @ApiProperty({
     required: false,

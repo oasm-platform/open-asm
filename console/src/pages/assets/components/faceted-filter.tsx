@@ -345,8 +345,8 @@ export function TechsFacetedFilter() {
           select: (res) => {
             const items = res?.pages.flatMap((page) => page.data) || [];
             return items.map((e) => ({
-              value: e.technology?.toString() ?? '',
-              label: e.technology?.toString() ?? '',
+              value: e.technology?.name?.toString() ?? '',
+              label: e.technology?.name?.toString() ?? '',
             }));
           },
         },

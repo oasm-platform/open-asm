@@ -1,11 +1,11 @@
 import StatusCode from '@/components/ui/status-code';
-import type { HttpResponse } from '@/services/apis/gen/queries';
+import type { HttpResponseDTO } from '@/services/apis/gen/queries';
 import { MoveRight } from 'lucide-react';
 
 export default function HTTPXStatusCode({
   httpResponse,
 }: {
-  httpResponse: HttpResponse | undefined;
+  httpResponse: HttpResponseDTO | undefined;
 }) {
   return httpResponse?.chain_status_codes ? (
     <div className="flex items-center gap-1">

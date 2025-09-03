@@ -13,9 +13,9 @@ export default function BadgeList({
   const displayList = list.slice(0, maxDisplay);
   const remainCount = list.length - maxDisplay;
   return (
-    <div className="flex flex-wrap gap-0.5">
+    <div className="flex flex-wrap gap-1">
       {displayList?.map((item: string | number) => (
-        <Badge variant="outline" className="mr-1 h-7" key={item}>
+        <Badge variant="outline" className="h-7" key={item}>
           {Icon && <Icon />}
           {item}
         </Badge>

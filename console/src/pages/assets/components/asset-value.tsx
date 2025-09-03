@@ -1,10 +1,10 @@
-import type { HttpResponse } from "@/services/apis/gen/queries";
+import type { HttpResponseDTO } from '@/services/apis/gen/queries';
 
 export default function AssetValue({
   httpResponse,
   value,
 }: {
-  httpResponse: HttpResponse | undefined;
+  httpResponse: HttpResponseDTO | undefined;
   value: string;
 }) {
   return httpResponse?.failed ? (

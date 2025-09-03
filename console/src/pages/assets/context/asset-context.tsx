@@ -1,12 +1,9 @@
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { createContext, useCallback, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 type AssetContextType = ReturnType<typeof useServerDataTable> & {
-  selectedWorkspace?: string;
   queryParams: {
-    workspaceId: string;
     targetIds?: string[];
     value?: string;
     limit: number;
@@ -18,7 +15,6 @@ type AssetContextType = ReturnType<typeof useServerDataTable> & {
     sortOrder: 'ASC' | 'DESC';
   };
   queryFilterParams: {
-    workspaceId: string;
     targetIds?: string[];
     value?: string;
     limit: number;
@@ -54,8 +50,6 @@ export default function AssetProvider({
 }) {
   const [params, setParams] = useSearchParams();
 
-  const { selectedWorkspace } = useWorkspaceSelector();
-
   const { tableParams, tableHandlers } = useServerDataTable({
     defaultSortBy: 'value',
     defaultSortOrder: 'ASC',
@@ -78,7 +72,6 @@ export default function AssetProvider({
   );
 
   const queryParams = {
-    workspaceId: selectedWorkspace ?? '',
     targetIds: targetId ? [targetId] : undefined,
     value: tableParams.filter,
     limit: tableParams.pageSize,
@@ -92,7 +85,6 @@ export default function AssetProvider({
   };
 
   const queryFilterParams = {
-    workspaceId: selectedWorkspace ?? '',
     targetIds: targetId ? [targetId] : undefined,
     limit: 10,
     page: 1,
@@ -103,7 +95,6 @@ export default function AssetProvider({
       refetchInterval: refetchInterval ?? 30 * 1000,
       queryKey: [
         targetId,
-        selectedWorkspace,
         tableParams.page,
         tableParams.filter,
         tableParams.pageSize,

@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import * as fs from 'fs';
+import * as path from 'path';
 import 'reflect-metadata';
 import { AppModule } from './app.module';
 import {
@@ -13,7 +14,6 @@ import {
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
-import * as path from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
@@ -63,6 +63,12 @@ async function bootstrap() {
     )
     .setVersion('1.0')
     .setExternalDoc('Authentication Docs', 'auth/docs')
+    .addGlobalParameters({
+      in: 'header',
+      required: false,
+      schema: { type: 'string' },
+      name: 'X-Workspace-Id',
+    })
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, documentFactory, {

@@ -1,13 +1,16 @@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { GetAssetsResponseDto } from '@/services/apis/gen/queries';
+import type {
+  GetAssetsResponseDto,
+  TechnologyDetailDTO,
+} from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import {
+  Boxes,
   BriefcaseBusiness,
   EthernetPort,
   Globe,
-  Layers,
   Lock,
   Network,
 } from 'lucide-react';
@@ -23,11 +26,9 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
-      const ports_scanner = data.ports?.ports as string[];
+      const ports = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
-      const ipA = (data.dnsRecords?.['A'] as string[]) || [];
-      const ipAAAA = (data.dnsRecords?.['AAAA'] as string[]) || [];
-      const ipAddresses = [...ipA, ...ipAAAA];
+      const ipAddresses = data.ipAddresses;
 
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
@@ -43,10 +44,10 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
           <div className="w-full">
             <BadgeList list={ipAddresses} Icon={Network} maxDisplay={4} />
           </div>
-          {ports_scanner && (
+          {ports && (
             <div className="w-full">
               <BadgeList
-                list={ports_scanner.sort(
+                list={ports.sort(
                   (a: string, b: string) => parseInt(a) - parseInt(b),
                 )}
                 Icon={EthernetPort}
@@ -63,11 +64,45 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
-      const technologies: string[] = data.httpResponses?.tech ?? [];
+      const technologies = data.httpResponses
+        ?.techList as unknown as TechnologyDetailDTO[];
+      const maxDisplay = 4;
+      const displayList = technologies.slice(0, maxDisplay);
+      const remainCount = technologies.length - maxDisplay;
 
       return (
         <div className="flex flex-wrap gap-1 max-w-[250px] min-h-[60px]">
-          <BadgeList list={technologies} Icon={Layers} maxDisplay={6} />
+          {displayList?.map((item) => (
+            <Badge variant="outline" className="h-7" key={item.name}>
+              {item?.iconUrl ? (
+                <img
+                  src={item?.iconUrl}
+                  alt={item.name}
+                  className="size-4"
+                  onError={(e) => {
+                    // Fallback to globe icon if image fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      const globeIcon = document.createElement('div');
+                      globeIcon.innerHTML =
+                        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>';
+                      parent.appendChild(globeIcon);
+                    }
+                  }}
+                />
+              ) : (
+                <Boxes className="size-8" />
+              )}
+              {item.name}
+            </Badge>
+          ))}
+          {remainCount > 0 && (
+            <Badge variant="outline" className="text-xs">
+              +{remainCount}
+            </Badge>
+          )}
         </div>
       );
     },
@@ -112,6 +147,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
             <BadgeList
               list={tls.subject_an as string[]}
               Icon={BriefcaseBusiness}
+              maxDisplay={2}
             />
           )}
         </div>

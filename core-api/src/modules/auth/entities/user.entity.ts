@@ -1,5 +1,6 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { Role } from 'src/common/enums/enum';
+import { ToolProvider } from 'src/modules/providers/entities/provider.entity';
 import { SearchHistory } from 'src/modules/search/entities/search-history.entity';
 import { WorkspaceMembers } from 'src/modules/workspaces/entities/workspace-members.entity';
 import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
@@ -50,4 +51,7 @@ export class User extends BaseEntity {
 
   @OneToMany(() => SearchHistory, (searchHistory) => searchHistory.user)
   searchHistory: SearchHistory[];
+
+  @OneToMany(() => ToolProvider, (toolProvider) => toolProvider.owner)
+  toolProviders: ToolProvider[];
 }

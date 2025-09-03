@@ -8,8 +8,8 @@ import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';
+import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
-import { GetFacetedDataDTO } from './dto/get-faceted-data.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
@@ -28,6 +28,7 @@ export class AssetsService {
     public readonly targetRepo: Repository<Target>,
     private jobRegistryService: JobsRegistryService,
     private eventEmitter: EventEmitter2,
+    private technologyForwarderService: TechnologyForwarderService,
 
     private dataSource: DataSource,
   ) {}
@@ -46,9 +47,8 @@ export class AssetsService {
     });
   }
 
-  private buildBaseQuery(query: GetAssetsQueryDto) {
-    const { targetIds, workspaceId, ipAddresses, ports, techs, statusCodes } =
-      query;
+  private buildBaseQuery(query: GetAssetsQueryDto, workspaceId?: string) {
+    const { targetIds, ipAddresses, ports, techs, statusCodes } = query;
 
     const whereBuilder = {
       targetIds: {
@@ -83,16 +83,8 @@ export class AssetsService {
       .innerJoin('assets.ports', 'ports')
       .leftJoin('assets.target', 'targets')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .innerJoin(
-        'ip_assets_view',
-        'ipAssets',
-        '"ipAssets"."assetId" = assets."id"',
-      )
-      .innerJoin(
-        'status_code_assets_view',
-        'statusCodeAssets',
-        '"statusCodeAssets"."assetId" = assets."id"',
-      )
+      .innerJoin('assets.ipAssets', 'ipAssets')
+      .innerJoin('assets.statusCodeAssets', 'statusCodeAssets')
       .where('assets."isErrorPage" = false');
 
     for (const [key, value] of Object.entries(whereBuilder)) {
@@ -119,7 +111,7 @@ export class AssetsService {
    */
   public async getAssetsInWorkspace(
     query: GetAssetsQueryDto,
-    assetId?: string,
+    workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
     if (!(query.sortBy in Asset)) {
       query.sortBy = 'createdAt';
@@ -127,17 +119,22 @@ export class AssetsService {
 
     const offset = (query.page - 1) * query.limit;
 
-    const queryBuilder = this.buildBaseQuery(query).select([
-      'assets',
-      'httpResponses',
-      'ports',
-      'targets',
+    const queryBuilder = this.buildBaseQuery(query, workspaceId).select([
+      'assets.value',
+      'assets.id',
+      'assets.targetId',
+      'assets.createdAt',
+      'ipAssets.ipAddress',
+      'httpResponses.tech',
+      'httpResponses.title',
+      'httpResponses.tls',
+      'ports.ports',
+      'httpResponses.chain_status_codes',
+      'httpResponses.status_code',
     ]);
 
-    if (assetId && assetId.length > 0) {
-      queryBuilder.andWhere('assets.id = :assetId', { assetId });
-    } else {
-      queryBuilder.andWhere('"assets"."value" ILIKE :value', {
+    if (query.value) {
+      queryBuilder.andWhere('assets.value ILIKE :value', {
         value: `%${query.value}%`,
       });
     }
@@ -148,24 +145,39 @@ export class AssetsService {
       .take(query.limit)
       .getManyAndCount();
 
-    const assets = list.map((item) => {
+    const assets = list.map(async (item) => {
       const asset = new GetAssetsResponseDto();
       asset.id = item.id;
       asset.value = item.value;
-      asset.targetId = item.target.id;
-      asset.isPrimary = item.isPrimary;
+      asset.targetId = item.targetId;
       asset.createdAt = item.createdAt;
-      asset.updatedAt = item.updatedAt;
       asset.dnsRecords = item.dnsRecords;
-      asset.isErrorPage = item.isErrorPage;
-      asset.httpResponses = item.httpResponses
-        ? item.httpResponses[0]
-        : undefined;
       asset.ports = item.ports ? item.ports[0] : undefined;
+      asset.ipAddresses = item.ipAssets
+        ? item.ipAssets.map((e) => e.ipAddress)
+        : [];
+
+      if (item.httpResponses) {
+        asset.httpResponses = item.httpResponses[0];
+        const techList = (
+          await this.technologyForwarderService.enrichTechnologies(
+            asset.httpResponses.tech,
+          )
+        ).map((e) => ({
+          name: e.name,
+          description: e.description,
+          iconUrl: e.iconUrl,
+          categoryNames: e.categoryNames,
+        }));
+
+        asset.httpResponses.techList = techList;
+      }
       return asset;
     });
 
-    return getManyResponse({ query, data: assets, total });
+    const data = await Promise.all(assets);
+
+    return getManyResponse({ query, data, total });
   }
 
   /**
@@ -247,8 +259,53 @@ export class AssetsService {
    * @throws NotFoundException if the asset with the given ID is not found.
    */
   public async getAssetById(id: string): Promise<GetAssetsResponseDto> {
-    const asset = await this.getAssetsInWorkspace(new GetAssetsQueryDto(), id);
-    return asset.data[0];
+    const queryBuilder = this.buildBaseQuery(new GetAssetsQueryDto())
+      .select([
+        'assets.value',
+        'assets.id',
+        'assets.targetId',
+        'assets.createdAt',
+        'ipAssets.ipAddress',
+        'httpResponses.tech',
+        'httpResponses.title',
+        'httpResponses.tls',
+        'ports.ports',
+        'httpResponses.chain_status_codes',
+        'httpResponses.status_code',
+        'httpResponses.raw_header',
+      ])
+      .andWhere('assets.id = :id', { id });
+
+    const item = await queryBuilder.getOneOrFail();
+
+    const asset = new GetAssetsResponseDto();
+    asset.id = item.id;
+    asset.value = item.value;
+    asset.targetId = item.targetId;
+    asset.createdAt = item.createdAt;
+    asset.dnsRecords = item.dnsRecords;
+    asset.ports = item.ports ? item.ports[0] : undefined;
+    asset.ipAddresses = item.ipAssets
+      ? item.ipAssets.map((e) => e.ipAddress)
+      : [];
+
+    if (item.httpResponses) {
+      asset.httpResponses = item.httpResponses[0];
+      const techList = (
+        await this.technologyForwarderService.enrichTechnologies(
+          asset.httpResponses.tech,
+        )
+      ).map((e) => ({
+        name: e.name,
+        description: e.description,
+        iconUrl: e.iconUrl,
+        categoryNames: e.categoryNames,
+      }));
+
+      asset.httpResponses.techList = techList;
+    }
+
+    return asset;
   }
 
   /**
@@ -259,13 +316,14 @@ export class AssetsService {
    */
   public async getIpAssets(
     query: GetAssetsQueryDto,
+    workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetIpAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
     if (!(query.sortBy in GetIpAssetsDTO)) {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.buildBaseQuery(query)
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
         '"ipAssets"."ip"',
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
@@ -276,6 +334,12 @@ export class AssetsService {
       })
       .distinct(true)
       .groupBy('"ipAssets"."ip"');
+
+    if (query.value) {
+      queryBuilder.andWhere('"ipAssets"."ip"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      });
+    }
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
@@ -310,13 +374,14 @@ export class AssetsService {
    */
   public async getPortAssets(
     query: GetAssetsQueryDto,
+    workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetPortAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
     if (!(query.sortBy in GetIpAssetsDTO)) {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.buildBaseQuery(query)
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .innerJoin(
         (subQuery) =>
           subQuery
@@ -333,6 +398,12 @@ export class AssetsService {
       })
       .distinct(true)
       .groupBy('"sq"."port"');
+
+    if (query.value) {
+      queryBuilder.andWhere('"sq"."port"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      });
+    }
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
@@ -367,13 +438,14 @@ export class AssetsService {
    */
   public async getTechnologyAssets(
     query: GetAssetsQueryDto,
+    workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetTechnologyAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
     if (!(query.sortBy in GetIpAssetsDTO)) {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.buildBaseQuery(query)
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .innerJoin(
         (subQuery) =>
           subQuery
@@ -388,11 +460,14 @@ export class AssetsService {
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
       ])
       .andWhere('"sq"."technology" IS NOT NULL')
-      .andWhere('"sq"."technology" ILIKE :value', {
-        value: `%${query.value}%`,
-      })
       .distinct(true)
       .groupBy('"sq"."technology"');
+
+    if (query.value) {
+      queryBuilder.andWhere('"sq"."technology"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      });
+    }
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
@@ -409,12 +484,29 @@ export class AssetsService {
 
     const total = totalInDb?.count ?? 0;
 
-    const data = list.map((item: GetTechnologyAssetsDTO) => {
-      const obj = new GetTechnologyAssetsDTO();
-      obj.technology = item.technology;
-      obj.assetCount = item.assetCount;
-      return obj;
-    });
+    const enrichedTechs =
+      await this.technologyForwarderService.enrichTechnologies(
+        list.map(
+          (item: { technology: string; assetCount: number }) => item.technology,
+        ),
+      );
+
+    const data = list.map(
+      (item: { technology: string; assetCount: number }) => {
+        const obj = new GetTechnologyAssetsDTO();
+        obj.assetCount = item.assetCount;
+
+        const enrichedTech = enrichedTechs.find(
+          (tech) => tech?.name === item.technology,
+        );
+
+        if (enrichedTech) {
+          obj.technology = enrichedTech;
+        }
+
+        return obj;
+      },
+    );
 
     return getManyResponse({ query, data, total });
   }
@@ -427,13 +519,14 @@ export class AssetsService {
    */
   public async getStatusCodeAssets(
     query: GetAssetsQueryDto,
+    workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetStatusCodeAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
     if (!(query.sortBy in GetIpAssetsDTO)) {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.buildBaseQuery(query)
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
         '"statusCodeAssets"."statusCode"',
         'COUNT(DISTINCT "assets"."id") as "assetCount"',
@@ -444,6 +537,15 @@ export class AssetsService {
       })
       .distinct(true)
       .groupBy('"statusCodeAssets"."statusCode"');
+
+    if (query.value) {
+      queryBuilder.andWhere(
+        '"statusCodeAssets"."statusCode"::text ILIKE :value',
+        {
+          value: `%${query.value}%`,
+        },
+      );
+    }
 
     const totalInDb = await this.dataSource
       .createQueryBuilder()
@@ -468,73 +570,6 @@ export class AssetsService {
     });
 
     return getManyResponse({ query, data, total });
-  }
-
-  /**
-   * Retrieves faceted data to display for faceted filter
-   *
-   * @returns A promise that resolves to faceted data.
-   *
-   */
-  public async getFacetedData(
-    query: GetAssetsQueryDto,
-  ): Promise<GetFacetedDataDTO> {
-    const facetedQuery = new GetAssetsQueryDto();
-    facetedQuery.workspaceId = query.workspaceId;
-    facetedQuery.targetIds = query.targetIds;
-
-    const ipsQb = this.buildBaseQuery(facetedQuery)
-      .select(['"ipAssets"."ip"'])
-      .andWhere('"ipAssets"."ip" IS NOT NULL')
-      .distinct(true);
-
-    const portsQb = this.buildBaseQuery(query)
-      .leftJoin(
-        (subQuery) =>
-          subQuery
-            .select('"ports"."assetId"', 'assetId')
-            .addSelect('unnest("ports"."ports")', 'port')
-            .from(Port, 'ports'),
-        'sq',
-        '"sq"."assetId" = "assets"."id"',
-      )
-      .select(['"sq"."port"'])
-      .andWhere('"sq"."port" IS NOT NULL')
-      .distinct(true);
-
-    const techsQb = this.buildBaseQuery(query)
-      .leftJoin(
-        (subQuery) =>
-          subQuery
-            .select('"httpResponses"."assetId"', 'assetId')
-            .addSelect('unnest("httpResponses"."tech")', 'technology')
-            .from(HttpResponse, 'httpResponses'),
-        'sq',
-        '"sq"."assetId" = "assets"."id"',
-      )
-      .select(['"sq"."technology"'])
-      .andWhere('"sq"."technology" IS NOT NULL')
-      .distinct(true);
-
-    const statusCodeQb = this.buildBaseQuery(facetedQuery)
-      .select(['"statusCodeAssets"."statusCode"'])
-      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
-      .distinct(true);
-
-    const ipAddresses = await ipsQb.getRawMany();
-    const ports = await portsQb.getRawMany();
-    const techs = await techsQb.getRawMany();
-    const statusCodes = await statusCodeQb.getRawMany();
-
-    const result = new GetFacetedDataDTO();
-    result.techs = techs.map((e: { technology: string }) => e.technology);
-    result.ipAddresses = ipAddresses.map((e: { ip: string }) => e.ip);
-    result.ports = ports.map((e: { port: string }) => e.port);
-    result.statusCodes = statusCodes.map(
-      (e: { statusCode: string }) => e.statusCode,
-    );
-
-    return result;
   }
 
   /**

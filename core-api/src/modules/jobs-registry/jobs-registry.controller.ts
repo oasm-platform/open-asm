@@ -4,6 +4,7 @@ import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
+  CreateJobsDto,
   GetNextJobResponseDto,
   JobTimelineResponseDto,
   UpdateResultDto,
@@ -61,5 +62,17 @@ export class JobsRegistryController {
     @Body() dto: UpdateResultDto,
   ) {
     return this.jobsRegistryService.updateResult(workerId, dto);
+  }
+}
+  @Doc({
+    summary:
+      'Creates a new job associated with the given asset and worker name.',
+  })
+  @Post()
+  createJobsForTarget(
+    @Body() dto: CreateJobsDto,
+    // @WorkspaceId() workspaceId: string,
+  ) {
+    return this.jobsRegistryService.createJobsForTarget(dto);
   }
 }

@@ -85,3 +85,13 @@ export class JobTimelineResponseDto {
   @ApiProperty({ type: [JobTimelineItem] })
   data: JobTimelineItem[];
 }
+
+export class CreateJobsDto {
+  @ApiProperty()
+  @IsUUID('all', { each: true })
+  toolIds: string[];
+
+  @ApiProperty()
+  @IsUUID()
+  targetId: string;
+}
