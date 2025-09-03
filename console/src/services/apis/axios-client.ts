@@ -11,7 +11,6 @@ export const axiosInstance = Axios.create({
 
 axiosInstance.interceptors.request.use((config) => {
   const workspaceId = getGlobalWorkspaceId();
-  console.log(workspaceId);
   if (workspaceId) {
     config.headers.set('X-Workspace-Id', workspaceId);
   }

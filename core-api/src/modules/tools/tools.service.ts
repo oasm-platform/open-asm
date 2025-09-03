@@ -184,9 +184,10 @@ export class ToolsService implements OnModuleInit {
     const { page, limit } = query;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, string | number> = {};
+    const where: Record<string, string | number | object> = {};
     if (query.type) where.type = query.type;
     if (query.category) where.category = query.category;
+    if (query.providerId) where.provider = { id: query.providerId };
 
     // If workspaceId is provided, we need to check which tools are installed
     if (query.workspaceId) {
@@ -225,6 +226,7 @@ export class ToolsService implements OnModuleInit {
         skip: skip,
         relations: {
           workspaceTools: true,
+          provider: true,
         },
         order: {
           name: 'ASC',

@@ -1,4 +1,5 @@
 import { type ColumnDef } from "@tanstack/react-table";
+import { useNavigate } from "react-router-dom";
 
 import { DataTable } from "@/components/ui/data-table";
 import { useProvidersControllerGetManyProviders } from "@/services/apis/gen/queries";
@@ -69,6 +70,7 @@ const providerColumns: ColumnDef<ToolProvider>[] = [
 ];
 
 export function ListProviders() {
+  const navigate = useNavigate();
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder, setFilter },
@@ -99,6 +101,11 @@ export function ListProviders() {
   const providers = data?.data ?? [];
   const total = data?.total ?? 0;
 
+  // Handle row click to navigate to provider detail page
+  const handleRowClick = (row: ToolProvider) => {
+    navigate(`/providers/${row.id}`);
+  };
+
   return (
     <DataTable
       data={providers}
@@ -118,6 +125,7 @@ export function ListProviders() {
       filterValue={filter}
       onFilterChange={setFilter}
       totalItems={total}
+      onRowClick={handleRowClick} // Add row click handler
     />
   );
 }
