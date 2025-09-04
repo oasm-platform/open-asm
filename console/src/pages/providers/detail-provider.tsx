@@ -1,17 +1,26 @@
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Tool } from '@/services/apis/gen/queries';
 import {
+  useProvidersControllerDeleteProvider,
   useProvidersControllerGetProvider,
   useToolsControllerGetManyTools,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Copy, Loader2, RotateCw } from 'lucide-react';
+import { Copy, Loader2, MoreHorizontal, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // Define columns for tools table
 const toolColumns: ColumnDef<Tool>[] = [
@@ -73,7 +82,7 @@ const toolColumns: ColumnDef<Tool>[] = [
   {
     id: "apiKey",
     header: "Api key",
-    cell: ({ row }) => (
+    cell: () => (
       <div className="flex space-x-2">
         <Button variant="outline" size="sm">
           <Copy className="w-4 h-4 mr-2" />
@@ -113,6 +122,8 @@ export function DetailProvider() {
     query: { enabled: !!id },
   });
 
+  const { mutate: deleteProvider, isPending: isDeleting } = useProvidersControllerDeleteProvider();
+
   const {
     data: toolsData,
     isLoading: toolsLoading,
@@ -138,6 +149,28 @@ export function DetailProvider() {
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('tab', value);
     navigate(`?${newSearchParams.toString()}`);
+  };
+
+  // Handle provider deletion
+  const handleDeleteProvider = () => {
+    deleteProvider(
+      { id: id || '' },
+      {
+        onSuccess: () => {
+          toast.success('Provider deleted successfully');
+          navigate('/providers');
+        },
+        onError: (error) => {
+          toast.error('Failed to delete provider');
+          console.error('Error deleting provider:', error);
+        },
+      }
+    );
+  };
+
+  // Handle provider edit
+  const handleEditProvider = () => {
+    navigate(`/providers/${id}/edit`);
   };
 
   if (isLoading) {
@@ -166,11 +199,6 @@ export function DetailProvider() {
   const tools = toolsData?.data || [];
   const totalTools = toolsData?.total || 0;
 
-  // Handle row click to navigate to tool detail page
-  const handleToolRowClick = (row: Tool) => {
-    navigate(`/tools/${row.id}`);
-  };
-
   return (
     <Page
       isShowButtonGoBack
@@ -189,7 +217,7 @@ export function DetailProvider() {
               <p className="text-muted-foreground text-sm">{provider.company}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               onClick={() => window.open(provider.websiteUrl || '', '_blank')}
@@ -197,6 +225,41 @@ export function DetailProvider() {
             >
               Visit Website
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="px-2">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleEditProvider}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  <span>Edit</span>
+                </DropdownMenuItem>
+                <ConfirmDialog
+                  title="Delete Provider"
+                  description={`Are you sure you want to delete the provider "${provider.name}"? This action cannot be undone.`}
+                  onConfirm={handleDeleteProvider}
+                  trigger={
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      disabled={isDeleting}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                      )}
+                      <span className="text-red-600">Delete</span>
+                    </DropdownMenuItem>
+                  }
+                  confirmText="Delete"
+                  cancelText="Cancel"
+                  disabled={isDeleting}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       }

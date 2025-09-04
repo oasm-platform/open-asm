@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { Doc } from 'src/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
+import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { UserContext } from '../../common/decorators/app.decorator';
 import { UserContextPayload } from '../../common/interfaces/app.interface';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { CreateProviderDto, ProvidersQueryDto, UpdateProviderDto } from './dto';
 import { ToolProvider } from './entities';
 import { ProvidersService } from './providers.service';
@@ -71,5 +81,20 @@ export class ProvidersController {
       updateProviderDto,
       userContext,
     );
+  }
+
+  @Doc({
+    summary: 'Delete a provider',
+    description: 'Soft delete a provider by ID',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  @Delete(':id')
+  deleteProvider(
+    @Param('id') id: string,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.providersService.deleteProvider(id, userContext);
   }
 }
