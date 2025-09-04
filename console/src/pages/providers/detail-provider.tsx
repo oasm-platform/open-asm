@@ -1,4 +1,5 @@
 import Page from '@/components/common/page';
+import { ToolApiKeyDialog } from '@/components/tools/tool-api-key-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -13,12 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Tool } from '@/services/apis/gen/queries';
 import {
+  ToolsControllerGetManyToolsType,
   useProvidersControllerDeleteProvider,
   useProvidersControllerGetProvider,
   useToolsControllerGetManyTools,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Copy, Loader2, MoreHorizontal, Pencil, RotateCw, Trash2 } from 'lucide-react';
+import { Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -81,19 +83,17 @@ const toolColumns: ColumnDef<Tool>[] = [
   },
   {
     id: "apiKey",
-    header: "Api key",
-    cell: () => (
-      <div className="flex space-x-2">
-        <Button variant="outline" size="sm">
-          <Copy className="w-4 h-4 mr-2" />
-          Copy
-        </Button>
-        <Button variant="outline" size="sm">
-          <RotateCw className="w-4 h-4 mr-2" />
-          Rotate
-        </Button>
-      </div>
-    ),
+    header: "API",
+    cell: ({ row }) => {
+      if (row.original.type === ToolsControllerGetManyToolsType.built_in) {
+        return <Button variant="outline" disabled>Built-in</Button>
+      }
+      return (
+        <ToolApiKeyDialog
+          tool={row.original}
+        />
+      );
+    },
   },
 ];
 

@@ -10657,6 +10657,428 @@ export function useToolsControllerGetToolById<
   return query;
 }
 
+/**
+ * Retrieves the API key for a tool.
+ * @summary Get tool API key
+ */
+export const toolsControllerGetToolApiKey = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetApiKeyResponseDto>(
+    { url: `/api/tools/${id}/api-key`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getToolsControllerGetToolApiKeyQueryKey = (id: string) => {
+  return [`/api/tools/${id}/api-key`] as const;
+};
+
+export const getToolsControllerGetToolApiKeyInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getToolsControllerGetToolApiKeyQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  > = ({ signal }) => toolsControllerGetToolApiKey(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetToolApiKeyInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+>;
+export type ToolsControllerGetToolApiKeyInfiniteQueryError = unknown;
+
+export function useToolsControllerGetToolApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetToolApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetToolApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tool API key
+ */
+
+export function useToolsControllerGetToolApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetToolApiKeyInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getToolsControllerGetToolApiKeyQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getToolsControllerGetToolApiKeyQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  > = ({ signal }) => toolsControllerGetToolApiKey(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetToolApiKeyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+>;
+export type ToolsControllerGetToolApiKeyQueryError = unknown;
+
+export function useToolsControllerGetToolApiKey<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetToolApiKey<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetToolApiKey<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tool API key
+ */
+
+export function useToolsControllerGetToolApiKey<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetToolApiKeyQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Regenerates the API key for a tool.
+ * @summary Rotate tool API key
+ */
+export const toolsControllerRotateToolApiKey = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetApiKeyResponseDto>(
+    { url: `/api/tools/${id}/api-key/rotate`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getToolsControllerRotateToolApiKeyMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerRotateToolApiKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return toolsControllerRotateToolApiKey(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolsControllerRotateToolApiKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>
+>;
+
+export type ToolsControllerRotateToolApiKeyMutationError = unknown;
+
+/**
+ * @summary Rotate tool API key
+ */
+export const useToolsControllerRotateToolApiKey = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getToolsControllerRotateToolApiKeyMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
 export const vulnerabilitiesControllerScan = (
   scanDto: ScanDto,
   options?: SecondParameter<typeof orvalClient>,

@@ -8,13 +8,15 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { ToolCategory, WorkerType } from 'src/common/enums/enum';
+import { ApiKeyType, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { In, Repository } from 'typeorm';
+import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { builtInTools } from './built-in-tools';
 import { CreateToolDto } from './dto/create-tool.dto';
+import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
@@ -34,6 +36,8 @@ export class ToolsService implements OnModuleInit {
 
     @InjectRepository(Vulnerability)
     public readonly vulnerabilityRepo: Repository<Vulnerability>,
+
+    private readonly apiKeysService: ApiKeysService,
   ) {}
 
   async onModuleInit() {
@@ -335,6 +339,60 @@ export class ToolsService implements OnModuleInit {
     });
 
     return this.toolsRepository.save(tool);
+  }
+
+  /**
+   * Retrieves the API key for a tool.
+   * @param toolId The ID of the tool to retrieve the API key for.
+   * @returns The API key for the tool.
+   */
+  public async getToolApiKey(toolId: string): Promise<GetApiKeyResponseDto> {
+    const tool = await this.toolsRepository.findOne({
+      where: { id: toolId },
+    });
+
+    if (!tool) {
+      throw new NotFoundException(`Tool with ID "${toolId}" not found.`);
+    }
+
+    const apiKey = await this.apiKeysService.getCurrentApiKey(
+      ApiKeyType.TOOL,
+      toolId,
+    );
+
+    if (!apiKey) {
+      return this.rotateToolApiKey(toolId);
+    }
+
+    return {
+      apiKey: apiKey.key,
+    };
+  }
+
+  /**
+   * Regenerates the API key for a tool.
+   * @param toolId The ID of the tool to regenerate the API key for.
+   * @returns The new API key for the tool.
+   */
+  public async rotateToolApiKey(toolId: string): Promise<GetApiKeyResponseDto> {
+    const tool = await this.toolsRepository.findOne({
+      where: { id: toolId },
+    });
+
+    if (!tool) {
+      throw new NotFoundException(`Tool with ID "${toolId}" not found.`);
+    }
+
+    const apiKey = await this.apiKeysService.create({
+      name: `API Key for tool ${toolId}`,
+      type: ApiKeyType.TOOL,
+      ref: toolId,
+    });
+    await this.toolsRepository.update(toolId, { apiKey });
+
+    return {
+      apiKey: apiKey.key,
+    };
   }
 
   /**

@@ -192,6 +192,10 @@ export class WorkspacesService {
       ApiKeyType.WORKSPACE,
       workspaceId,
     );
+
+    if (!apiKey) {
+      return this.rotateApiKey(workspaceId, userContext);
+    }
     return {
       apiKey: apiKey.key,
     };

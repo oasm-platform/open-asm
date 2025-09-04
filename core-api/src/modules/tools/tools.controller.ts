@@ -13,7 +13,9 @@ import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
+import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { CreateToolDto } from './dto/create-tool.dto';
+import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { GetToolByIdDto } from './dto/get-tool-by-id.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
@@ -143,5 +145,29 @@ export class ToolsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.toolsService.getToolById(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get tool API key',
+    description: 'Retrieves the API key for a tool.',
+    response: {
+      serialization: GetApiKeyResponseDto,
+    },
+  })
+  @Get(':id/api-key')
+  getToolApiKey(@Param() { id }: IdQueryParamDto) {
+    return this.toolsService.getToolApiKey(id);
+  }
+
+  @Doc({
+    summary: 'Rotate tool API key',
+    description: 'Regenerates the API key for a tool.',
+    response: {
+      serialization: GetApiKeyResponseDto,
+    },
+  })
+  @Post(':id/api-key/rotate')
+  rotateToolApiKey(@Param() { id }: IdQueryParamDto) {
+    return this.toolsService.rotateToolApiKey(id);
   }
 }

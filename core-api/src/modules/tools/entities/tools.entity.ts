@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
+import { ApiKey } from 'src/modules/apikeys/entities/apikey.entity';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
@@ -10,8 +11,10 @@ import {
   Column,
   Entity,
   Generated,
+  JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryColumn,
   Unique,
   UpdateDateColumn,
@@ -103,4 +106,8 @@ export class Tool {
     onDelete: 'SET NULL',
   })
   provider?: ToolProvider;
+
+  @OneToOne(() => ApiKey)
+  @JoinColumn({ name: 'apiKeyId', referencedColumnName: 'id' })
+  apiKey?: ApiKey;
 }
