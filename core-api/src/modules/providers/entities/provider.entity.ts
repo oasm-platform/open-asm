@@ -3,7 +3,13 @@ import { IsBoolean, IsOptional, IsString, IsUrl } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { User } from 'src/modules/auth/entities/user.entity';
 import { Tool } from 'src/modules/tools/entities/tools.entity';
-import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
+import {
+  Column,
+  DeleteDateColumn,
+  Entity,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm';
 
 export enum AuthType {
   NONE = 'none',
@@ -76,4 +82,7 @@ export class ToolProvider extends BaseEntity {
 
   @OneToMany(() => Tool, (tool) => tool.provider)
   tools: Tool[];
+
+  @DeleteDateColumn()
+  deletedAt?: Date;
 }

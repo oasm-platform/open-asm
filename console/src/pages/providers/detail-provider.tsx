@@ -1,17 +1,20 @@
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Tool } from '@/services/apis/gen/queries';
 import {
+  useProvidersControllerDeleteProvider,
   useProvidersControllerGetProvider,
   useToolsControllerGetManyTools,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Copy, Loader2, RotateCw } from 'lucide-react';
+import { Copy, Loader2, RotateCw, Trash2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // Define columns for tools table
 const toolColumns: ColumnDef<Tool>[] = [
@@ -73,7 +76,7 @@ const toolColumns: ColumnDef<Tool>[] = [
   {
     id: "apiKey",
     header: "Api key",
-    cell: ({ row }) => (
+    cell: () => (
       <div className="flex space-x-2">
         <Button variant="outline" size="sm">
           <Copy className="w-4 h-4 mr-2" />
@@ -113,6 +116,8 @@ export function DetailProvider() {
     query: { enabled: !!id },
   });
 
+  const { mutate: deleteProvider, isPending: isDeleting } = useProvidersControllerDeleteProvider();
+
   const {
     data: toolsData,
     isLoading: toolsLoading,
@@ -140,6 +145,23 @@ export function DetailProvider() {
     navigate(`?${newSearchParams.toString()}`);
   };
 
+  // Handle provider deletion
+  const handleDeleteProvider = () => {
+    deleteProvider(
+      { id: id || '' },
+      {
+        onSuccess: () => {
+          toast.success('Provider deleted successfully');
+          navigate('/providers');
+        },
+        onError: (error) => {
+          toast.error('Failed to delete provider');
+          console.error('Error deleting provider:', error);
+        },
+      }
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -165,12 +187,6 @@ export function DetailProvider() {
 
   const tools = toolsData?.data || [];
   const totalTools = toolsData?.total || 0;
-
-  // Handle row click to navigate to tool detail page
-  const handleToolRowClick = (row: Tool) => {
-    navigate(`/tools/${row.id}`);
-  };
-
   return (
     <Page
       isShowButtonGoBack
@@ -197,6 +213,23 @@ export function DetailProvider() {
             >
               Visit Website
             </Button>
+            <ConfirmDialog
+              title="Delete Provider"
+              description={`Are you sure you want to delete the provider "${provider.name}"? This action cannot be undone.`}
+              onConfirm={handleDeleteProvider}
+              trigger={
+                <Button variant="destructive" disabled={isDeleting}>
+                  {isDeleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </Button>
+              }
+              confirmText="Delete"
+              cancelText="Cancel"
+              disabled={isDeleting}
+            />
           </div>
         </div>
       }

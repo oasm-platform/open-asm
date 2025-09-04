@@ -13617,6 +13617,93 @@ export const useProvidersControllerUpdateProvider = <
 };
 
 /**
+ * Soft delete a provider by ID
+ * @summary Delete a provider
+ */
+export const providersControllerDeleteProvider = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/providers/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getProvidersControllerDeleteProviderMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['providersControllerDeleteProvider'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return providersControllerDeleteProvider(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProvidersControllerDeleteProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof providersControllerDeleteProvider>>
+>;
+
+export type ProvidersControllerDeleteProviderMutationError = unknown;
+
+/**
+ * @summary Delete a provider
+ */
+export const useProvidersControllerDeleteProvider = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getProvidersControllerDeleteProviderMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * @summary Upload a file to storage
  */
 export const storageControllerUploadFile = (
