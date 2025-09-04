@@ -32,10 +32,8 @@ services:
     build:
       context: ./worker
       dockerfile: Dockerfile
-    environment:
-      - API=http://core-api:6276/
-      - API_KEY=change_me
-      - MAX_JOBS=10
+    env_file:
+      - ./worker/.env
     volumes:
       - nuclei-templates:/root/nuclei-templates:rw
     networks:
