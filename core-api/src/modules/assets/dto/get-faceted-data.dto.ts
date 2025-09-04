@@ -7,4 +7,6 @@ export class GetFacetedDataDTO {
   ipAddresses: string[];
   @ApiProperty()
   ports: string[];
+  @ApiProperty()
+  statusCodes: string[];
 }

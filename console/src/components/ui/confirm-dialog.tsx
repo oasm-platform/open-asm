@@ -16,6 +16,7 @@ interface ConfirmDialogProps {
     onConfirm: () => void;
     trigger: JSX.Element;
     confirmText?: string;
+    disabled?: boolean;
     cancelText?: string;
 }
 
@@ -25,6 +26,7 @@ export const ConfirmDialog = ({
     onConfirm,
     trigger,
     confirmText = "Confirm",
+    disabled = false,
     cancelText = "Cancel",
 }: ConfirmDialogProps) => {
     const [open, setOpen] = useState(false);
@@ -47,7 +49,7 @@ export const ConfirmDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+            <DialogTrigger asChild disabled={disabled}>
                 {clonedTrigger}
             </DialogTrigger>
             <DialogContent>
@@ -56,10 +58,10 @@ export const ConfirmDialog = ({
                     {description && <DialogDescription>{description}</DialogDescription>}
                 </DialogHeader>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setOpen(false)}>
+                    <Button variant="outline" onClick={() => setOpen(false)} disabled={disabled}>
                         {cancelText}
                     </Button>
-                    <Button onClick={handleConfirm}>{confirmText}</Button>
+                    <Button onClick={handleConfirm} disabled={disabled}>{confirmText}</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

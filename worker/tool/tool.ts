@@ -121,7 +121,7 @@ export class Tool {
     while (true) {
       try {
         const worker: any = await coreApi.workersControllerJoin({
-          token: process.env.API_KEY!,
+          apiKey: process.env.API_KEY!,
         });
         Tool.workerId = worker.id;
         Tool.token = worker.token;
@@ -157,7 +157,7 @@ export class Tool {
 
     while (!this.isShuttingDown) {
       const now = Date.now();
-      
+
       // Ensure we don't pull more often than pullInterval
       if (now - lastPullTime < this.pullInterval) {
         await this.sleep(100); // Small delay to prevent busy waiting
@@ -170,8 +170,11 @@ export class Tool {
           const job = await this.pullSingleJob();
           if (job) {
             this.queue.push(job);
-            if (this.queue.length % 5 === 0) { // Log every 5 jobs to reduce noise
-              logger.info(`Queue size: ${this.queue.length}/${this.maxJobsQueue}`);
+            if (this.queue.length % 5 === 0) {
+              // Log every 5 jobs to reduce noise
+              logger.info(
+                `Queue size: ${this.queue.length}/${this.maxJobsQueue}`
+              );
             }
           }
         }

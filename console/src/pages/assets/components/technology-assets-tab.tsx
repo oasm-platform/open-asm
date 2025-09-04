@@ -10,6 +10,8 @@ export default function TechnologyAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    filterParams,
+    filterHandlers,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetTechnologyAssets(
@@ -17,12 +19,12 @@ export default function TechnologyAssetsTab() {
     {
       query: {
         ...queryOptions.query,
-        queryKey: ['assets', ...queryOptions.query.queryKey],
+        queryKey: ['technology', ...queryOptions.query.queryKey],
       },
     },
   );
 
-  const portAssets = data?.data ?? [];
+  const technologyAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
   if (!data && !isLoading) return <div>Error loading targets.</div>;
@@ -31,7 +33,7 @@ export default function TechnologyAssetsTab() {
     <>
       <TabsContent value="tech" className="overflow-hidden">
         <DataTable
-          data={portAssets}
+          data={technologyAssets}
           columns={technologyAssetsColumn}
           isLoading={isLoading}
           page={page}
@@ -45,6 +47,13 @@ export default function TechnologyAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
+          onRowClick={(row) => {
+            let selectedValue = filterParams.techs || [];
+            if (selectedValue.indexOf(row.technology.name) < 0) {
+              selectedValue = [...selectedValue, row.technology.name];
+              filterHandlers('techs', selectedValue);
+            }
+          }}
         />
       </TabsContent>
     </>

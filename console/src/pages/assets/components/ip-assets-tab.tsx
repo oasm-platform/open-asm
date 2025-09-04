@@ -10,12 +10,14 @@ export default function IpAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    filterParams,
+    filterHandlers,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetIpAssets(queryParams, {
     query: {
       ...queryOptions.query,
-      queryKey: ['assets', ...queryOptions.query.queryKey],
+      queryKey: ['ipAssets', ...queryOptions.query.queryKey],
     },
   });
 
@@ -42,6 +44,13 @@ export default function IpAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
+          onRowClick={(row) => {
+            let selectedValue = filterParams.ipAddresses || [];
+            if (selectedValue.indexOf(row.ip.toString()) < 0) {
+              selectedValue = [...selectedValue, row.ip];
+              filterHandlers('ipAddresses', selectedValue);
+            }
+          }}
         />
       </TabsContent>
     </>

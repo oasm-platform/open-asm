@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   core-api:
-    container_name: core-api
+    container_name: oasm-api
     build:
       context: .
       dockerfile: ./core-api/Dockerfile
@@ -16,9 +16,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
     volumes:
       - ./open-api:/open-api
-      - ./core-api/.storage:/app/.storage
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6276/api/health"]
       interval: 1s
@@ -43,8 +46,8 @@ services:
         condition: service_healthy
 
   postgres:
-    container_name: open-asm-postgres
-    image: postgres:18beta3
+    container_name: oasm-postgres
+    image: postgres:17
     restart: always
     env_file:
       - ./core-api/.env
@@ -67,9 +70,69 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    container_name: oasm-redis
+    image: redis:alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - oasm
+    volumes:
+      - redis-data:/data
+    command: "redis-server --requirepass password"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1500M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  redpanda:
+    container_name: oasm-redpanda
+    image: redpandadata/redpanda:latest
+    restart: always
+    ports:
+      - "9092:9092"
+    networks:
+      - oasm
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data:rw
+    command:
+      - redpanda start
+      - --smp 1
+      # - --memory 512M
+      - --reserve-memory 0M
+      - --overprovisioned
+      - --node-id 0
+      - --check=false
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092 # change localhost to your IP
+      - --rpc-addr 0.0.0.0:33145
+      - --set redpanda.log_cleanup_policy=compact
+      - --set redpanda.log_compression_type=zstd
+      - --set redpanda.retention_bytes=64424509440
+      - --set redpanda.transaction_coordinator_cleanup_policy=compact
+    healthcheck:
+      test: [ "CMD", "rpk", "cluster", "health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
 volumes:
   pgdata:
   nuclei-templates:
+  redis-data:
+  redpanda-data:
 
 networks:
   oasm:

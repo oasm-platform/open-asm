@@ -1,13 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
+import { ToolProvider } from 'src/modules/providers/entities/provider.entity';
 import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
 import {
   Column,
   Entity,
   Generated,
+  ManyToOne,
   OneToMany,
   PrimaryColumn,
   Unique,
@@ -32,10 +35,13 @@ export class Tool {
   updatedAt?: Date;
 
   @ApiProperty()
+  @IsString()
   @Column()
   name: string;
 
   @ApiProperty()
+  @IsString()
+  @IsOptional()
   @Column({ nullable: true })
   description: string;
 
@@ -45,14 +51,19 @@ export class Tool {
   workspaceTools?: WorkspaceTool[];
 
   @ApiProperty({ enum: ToolCategory })
+  @IsEnum(ToolCategory)
   @Column({ type: 'enum', enum: ToolCategory })
   category?: ToolCategory;
 
   @ApiProperty()
+  @IsOptional()
+  @IsString()
   @Column({ nullable: true })
   version?: string;
 
   @ApiProperty()
+  @IsOptional()
+  @IsString()
   @Column({ nullable: true })
   logoUrl?: string;
 
@@ -70,6 +81,7 @@ export class Tool {
 
   @ApiProperty()
   @Column({ type: 'enum', enum: WorkerType, default: WorkerType.BUILT_IN })
+  @IsEnum(WorkerType)
   type?: WorkerType;
 
   @OneToMany(() => Job, (job) => job.tool, {
@@ -81,4 +93,14 @@ export class Tool {
     onDelete: 'CASCADE',
   })
   vulnerabilities?: Vulnerability[];
+
+  @ApiProperty()
+  @Column({ name: 'provider_id', nullable: true })
+  providerId?: string;
+
+  @ManyToOne(() => ToolProvider, (provider) => provider.tools, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  provider?: ToolProvider;
 }

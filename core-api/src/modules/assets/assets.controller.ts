@@ -1,13 +1,14 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { WorkspaceId } from 'src/common/decorators/workspace-id.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
+import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
-import { GetFacetedDataDTO } from './dto/get-faceted-data.dto';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -22,8 +23,11 @@ export class AssetsController {
     },
   })
   @Get()
-  getAssetsInWorkspace(@Query() query: GetAssetsQueryDto) {
-    return this.assetsService.getAssetsInWorkspace(query);
+  getAssetsInWorkspace(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getAssetsInWorkspace(query, workspaceId);
   }
 
   @Doc({
@@ -34,8 +38,11 @@ export class AssetsController {
     },
   })
   @Get('/ip')
-  getIpAssets(@Query() query: GetAssetsQueryDto) {
-    return this.assetsService.getIpAssets(query);
+  getIpAssets(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getIpAssets(query, workspaceId);
   }
 
   @Doc({
@@ -46,8 +53,11 @@ export class AssetsController {
     },
   })
   @Get('/port')
-  getPortAssets(@Query() query: GetAssetsQueryDto) {
-    return this.assetsService.getPortAssets(query);
+  getPortAssets(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getPortAssets(query, workspaceId);
   }
 
   @Doc({
@@ -58,20 +68,26 @@ export class AssetsController {
     },
   })
   @Get('/tech')
-  getTechnologyAssets(@Query() query: GetAssetsQueryDto) {
-    return this.assetsService.getTechnologyAssets(query);
+  getTechnologyAssets(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getTechnologyAssets(query, workspaceId);
   }
 
   @Doc({
-    summary: 'Get faceted data',
-    description: 'Retrieves faceted data for faceted filter.',
+    summary: 'Get technologies along with number of assets',
+    description: 'Retrieves a list of technologies with number of assets.',
     response: {
-      serialization: GetFacetedDataDTO,
+      serialization: GetManyResponseDto(GetStatusCodeAssetsDTO),
     },
   })
-  @Get('/faceted-data')
-  getFacetedData(@Query() query: GetAssetsQueryDto) {
-    return this.assetsService.getFacetedData(query);
+  @Get('/status-code')
+  getStatusCodeAssets(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getStatusCodeAssets(query, workspaceId);
   }
 
   @Doc({

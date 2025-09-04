@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsOptional, IsString } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
+import { ApiKey } from 'src/modules/apikeys/entities/apikey.entity';
 import { User } from 'src/modules/auth/entities/user.entity';
 import { WorkspaceTarget } from 'src/modules/targets/entities/workspace-target.entity';
 import { WorkspaceTool } from 'src/modules/tools/entities/workspace_tools.entity';
@@ -9,8 +10,10 @@ import {
   Column,
   DeleteDateColumn,
   Entity,
+  JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
 
@@ -53,18 +56,16 @@ export class Workspace extends BaseEntity {
   @DeleteDateColumn()
   deletedAt?: Date;
 
-  @ApiProperty({
-    example: '1234567890',
-    description: 'The API key of the workspace',
-  })
-  @Column('text', { nullable: true })
-  apiKey?: string;
-
   @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.workspace)
   workers: WorkerInstance[];
 
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsDateString()
   @Column({ type: 'timestamp', nullable: true })
   archivedAt?: Date | null;
+
+  @OneToOne(() => ApiKey)
+  @JoinColumn({ name: 'apiKeyId', referencedColumnName: 'id' })
+  apiKey: ApiKey;
 }

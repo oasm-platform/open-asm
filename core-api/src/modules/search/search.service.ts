@@ -36,6 +36,7 @@ export class SearchService {
   public async searchAssetsTargets(
     user: User,
     query: SearchAssetsTargetsDto,
+    workspaceId: string,
   ): Promise<SearchResponseDto> {
     // First, get the total count for both assets and targets
     const [assetsCount, targetsCount] = await Promise.all([
@@ -63,10 +64,13 @@ export class SearchService {
     // Fetch the actual data with calculated limits
     const [assets, targets] = await Promise.all([
       assetsLimit > 0
-        ? this.assetService.getAssetsInWorkspace({
-            ...query,
-            limit: assetsLimit,
-          })
+        ? this.assetService.getAssetsInWorkspace(
+            {
+              ...query,
+              limit: assetsLimit,
+            },
+            workspaceId,
+          )
         : { data: [], total: 0, page: 1, pageCount: 0 },
       targetsLimit > 0
         ? this.targetService.getTargetsInWorkspace({
@@ -111,7 +115,7 @@ export class SearchService {
           query: query.value,
           userId: user.id,
         });
-        this.searchHistoryRepo.save(searchHistory);
+        await this.searchHistoryRepo.save(searchHistory);
       }
     }
     return response as any;

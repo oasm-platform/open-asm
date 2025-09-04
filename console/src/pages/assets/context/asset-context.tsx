@@ -1,12 +1,9 @@
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { createContext, useCallback, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 type AssetContextType = ReturnType<typeof useServerDataTable> & {
-  selectedWorkspace?: string;
   queryParams: {
-    workspaceId: string;
     targetIds?: string[];
     value?: string;
     limit: number;
@@ -16,6 +13,12 @@ type AssetContextType = ReturnType<typeof useServerDataTable> & {
     page: number;
     sortBy: string;
     sortOrder: 'ASC' | 'DESC';
+  };
+  queryFilterParams: {
+    targetIds?: string[];
+    value?: string;
+    limit: number;
+    page: number;
   };
   queryOptions: {
     query: {
@@ -29,6 +32,7 @@ type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ipAddresses?: string[];
     techs?: string[];
     ports?: string[];
+    statusCodes?: string[];
   };
   filterHandlers: (key: string, value: string[]) => void;
 };
@@ -46,8 +50,6 @@ export default function AssetProvider({
 }) {
   const [params, setParams] = useSearchParams();
 
-  const { selectedWorkspace } = useWorkspaceSelector();
-
   const { tableParams, tableHandlers } = useServerDataTable({
     defaultSortBy: 'value',
     defaultSortOrder: 'ASC',
@@ -56,6 +58,7 @@ export default function AssetProvider({
   const ipAddresses = params.getAll('ipAddresses');
   const ports = params.getAll('ports');
   const techs = params.getAll('techs');
+  const statusCodes = params.getAll('statusCodes');
 
   const filterHandlers = useCallback(
     (key: string, value: string[]) => {
@@ -69,16 +72,22 @@ export default function AssetProvider({
   );
 
   const queryParams = {
-    workspaceId: selectedWorkspace ?? '',
     targetIds: targetId ? [targetId] : undefined,
     value: tableParams.filter,
     limit: tableParams.pageSize,
     ipAddresses: ipAddresses,
     ports: ports,
     techs: techs,
+    statusCodes: statusCodes,
     page: tableParams.page,
     sortBy: tableParams.sortBy,
     sortOrder: tableParams.sortOrder,
+  };
+
+  const queryFilterParams = {
+    targetIds: targetId ? [targetId] : undefined,
+    limit: 10,
+    page: 1,
   };
 
   const queryOptions = {
@@ -86,7 +95,6 @@ export default function AssetProvider({
       refetchInterval: refetchInterval ?? 30 * 1000,
       queryKey: [
         targetId,
-        selectedWorkspace,
         tableParams.page,
         tableParams.filter,
         tableParams.pageSize,
@@ -95,6 +103,7 @@ export default function AssetProvider({
         ipAddresses,
         ports,
         techs,
+        statusCodes,
       ],
     },
   };
@@ -102,6 +111,7 @@ export default function AssetProvider({
   return (
     <AssetContext
       value={{
+        queryFilterParams,
         tableHandlers,
         tableParams,
         queryParams,
@@ -111,6 +121,7 @@ export default function AssetProvider({
           ipAddresses,
           ports,
           techs,
+          statusCodes,
         },
         filterHandlers,
         targetId,

@@ -24,7 +24,7 @@ export class GetManyTargetResponseDto {
   @ApiProperty()
   reScanCount: number;
 
-  @ApiProperty({ enum: CronSchedule, example: CronSchedule.BI_WEEKLY })
+  @ApiProperty({ enum: CronSchedule })
   scanSchedule: CronSchedule;
 
   @ApiProperty({ enum: ScanStatus, example: ScanStatus.DONE })
@@ -52,7 +52,7 @@ export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
 }
 
 export class UpdateTargetDto {
-  @ApiProperty({ enum: CronSchedule, example: CronSchedule.BI_WEEKLY })
+  @ApiProperty({ enum: CronSchedule })
   @IsString()
   @IsEnum(CronSchedule)
   @IsOptional()

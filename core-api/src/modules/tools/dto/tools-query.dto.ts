@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional } from 'class-validator';
+import { IsOptional, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
 
@@ -11,4 +11,14 @@ export class ToolsQueryDto extends GetManyBaseQueryParams {
   @ApiProperty({ enum: ToolCategory, required: false })
   @IsOptional()
   category?: ToolCategory;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  workspaceId?: string;
+
+  @ApiProperty({ required: false })
+  @IsUUID()
+  @IsOptional()
+  providerId?: string;
 }

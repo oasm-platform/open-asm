@@ -26,7 +26,7 @@ export enum ScanStatus {
 
 export enum WorkerType {
   BUILT_IN = 'built_in',
-  PLUGIN = 'plugin',
+  PROVIDER = 'provider',
 }
 
 export enum WorkerScope {
@@ -54,4 +54,9 @@ export enum JobPriority {
   MEDIUM = 2,
   LOW = 3,
   BACKGROUND = 4,
+}
+
+export enum ApiKeyType {
+  TOOL = 'tool',
+  WORKSPACE = 'workspace',
 }

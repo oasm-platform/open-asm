@@ -51,3 +51,13 @@ export class GetManyJobsQueryParams extends GetManyBaseQueryParams {
   @IsIn([...Object.values(ToolCategory), 'all'])
   workerName: ToolCategory | 'all';
 }
+
+export class CreateJobsDto {
+  @ApiProperty()
+  @IsUUID('all', { each: true })
+  toolIds: string[];
+
+  @ApiProperty()
+  @IsUUID()
+  targetId: string;
+}

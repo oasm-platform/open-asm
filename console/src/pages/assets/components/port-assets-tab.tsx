@@ -10,12 +10,14 @@ export default function PortAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    filterParams,
+    filterHandlers,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetPortAssets(queryParams, {
     query: {
       ...queryOptions.query,
-      queryKey: ['assets', ...queryOptions.query.queryKey],
+      queryKey: ['ports', ...queryOptions.query.queryKey],
     },
   });
 
@@ -42,6 +44,13 @@ export default function PortAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
+          onRowClick={(row) => {
+            let selectedValue = filterParams.ports || [];
+            if (selectedValue.indexOf(row.port.toString()) < 0) {
+              selectedValue = [...selectedValue, row.port];
+              filterHandlers('ports', selectedValue);
+            }
+          }}
         />
       </TabsContent>
     </>

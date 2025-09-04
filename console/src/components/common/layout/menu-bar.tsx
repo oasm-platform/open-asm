@@ -15,7 +15,7 @@ import {
     SidebarRail,
     useSidebar
 } from "@/components/ui/sidebar";
-import { Bug, CloudCheck, Cpu, LayoutDashboard, Radar, SquareTerminal, Target } from "lucide-react";
+import { Bug, CloudCheck, Cpu, LayoutDashboard, MessageSquareCode, Radar, SquareTerminal, Target } from "lucide-react";
 import { NavUser } from "../../ui/nav-user";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -59,6 +59,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             title: "Management (admin)",
             url: "#",
             items: [
+                {
+                    title: "Providers",
+                    icon: <MessageSquareCode />,
+                    url: "/providers",
+                },
                 {
                     title: "Workers",
                     icon: <SquareTerminal />,

@@ -1,9 +1,22 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { WorkspaceId } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
+import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
+import { GetToolByIdDto } from './dto/get-tool-by-id.dto';
+import { InstallToolDto } from './dto/install-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -16,6 +29,18 @@ export class ToolsController {
   constructor(private readonly toolsService: ToolsService) {}
 
   @Doc({
+    summary: 'Create a new tool',
+    description: 'Creates a new tool with the provided information.',
+    response: {
+      serialization: Tool,
+    },
+  })
+  @Post()
+  createTool(@Body() dto: CreateToolDto) {
+    return this.toolsService.createTool(dto);
+  }
+
+  @Doc({
     summary: 'Add tool to workspace',
     description: 'Adds a tool to a specific workspace.',
     response: {
@@ -25,6 +50,32 @@ export class ToolsController {
   @Post('add-to-workspace')
   async addToolToWorkspace(@Body() dto: AddToolToWorkspaceDto) {
     return this.toolsService.addToolToWorkspace(dto);
+  }
+
+  @Doc({
+    summary: 'Install tool',
+    description:
+      'Installs a tool to a specific workspace, checking for duplicates before insertion.',
+    response: {
+      serialization: WorkspaceTool,
+    },
+  })
+  @Post('install')
+  async installTool(@Body() dto: InstallToolDto) {
+    return this.toolsService.installTool(dto);
+  }
+
+  @Doc({
+    summary: 'Uninstall tool',
+    description:
+      'Uninstalls a tool from a specific workspace by removing the record from workspace_tools table.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  @Post('uninstall')
+  async uninstallTool(@Body() dto: InstallToolDto) {
+    return this.toolsService.uninstallTool(dto);
   }
 
   @Doc({
@@ -46,7 +97,15 @@ export class ToolsController {
     },
   })
   @Get()
-  async getManyTools(@Query() query: ToolsQueryDto) {
+  async getManyTools(
+    @Query() query: ToolsQueryDto,
+    @WorkspaceId() workspaceId?: string,
+  ) {
+    if (!workspaceId) {
+      throw new BadRequestException('Workspace ID is required');
+    }
+    // Override the workspaceId from DTO with the one from header
+    query.workspaceId = workspaceId;
     return this.toolsService.getManyTools(query);
   }
 
@@ -59,7 +118,30 @@ export class ToolsController {
     },
   })
   @Get('installed')
-  async getInstalledTools(@Query() dto: GetInstalledToolsDto) {
+  async getInstalledTools(
+    @Query() dto: GetInstalledToolsDto,
+    @WorkspaceId() workspaceId?: string,
+  ) {
+    if (!workspaceId) {
+      throw new BadRequestException('Workspace ID is required');
+    }
+    // Override the workspaceId from DTO with the one from header
+    dto.workspaceId = workspaceId;
     return this.toolsService.getInstalledTools(dto);
+  }
+
+  @Doc({
+    summary: 'Get tool by ID',
+    description: 'Retrieves a tool by its unique identifier.',
+    response: {
+      serialization: Tool,
+    },
+  })
+  @Get(':id')
+  getToolById(
+    @Param() { id }: GetToolByIdDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.toolsService.getToolById(id, workspaceId);
   }
 }
