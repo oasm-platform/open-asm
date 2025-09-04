@@ -1,43 +1,16 @@
 import Page from "@/components/common/page";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useProvidersControllerCreateProvider } from "@/services/apis/gen/queries";
-import { Loader2Icon } from "lucide-react";
-import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-
-type FormData = {
-  name: string;
-  code: string;
-  description: string;
-  logoUrl: string;
-  websiteUrl: string;
-  supportEmail: string;
-  company: string;
-  licenseInfo: string;
-  apiDocsUrl: string;
-};
+import { ProviderForm } from "./provider-form";
 
 export default function CreateProviderPage() {
   const { mutate, isPending } = useProvidersControllerCreateProvider();
   const navigate = useNavigate();
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
-
-  const onSubmit = (data: FormData) => {
-    // Filter out empty fields to avoid sending them in the request
-    const filteredData: Record<string, any> = {};
-    Object.keys(data).forEach(key => {
-      const value = data[key as keyof FormData];
-      if (value !== undefined && value !== null && value !== '') {
-        filteredData[key] = value;
-      }
-    });
-
+  const onSubmit = (data: any) => {
     mutate({
-      data: filteredData as any,
+      data,
     }, {
       onSuccess: () => {
         toast.success("Provider created successfully");
@@ -62,101 +35,11 @@ export default function CreateProviderPage() {
             </p>
           </div>
           
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Name *</label>
-                <Input
-                  {...register("name", { required: "Provider name is required" })}
-                  placeholder="Provider Name"
-                />
-                {errors.name && <p className="text-red-600 text-sm">{errors.name.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Code *</label>
-                <Input
-                  {...register("code", { required: "Provider code is required" })}
-                  placeholder="Provider Code"
-                />
-                {errors.code && <p className="text-red-600 text-sm">{errors.code.message}</p>}
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
-              <Textarea
-                {...register("description")}
-                placeholder="Provider Description"
-                rows={4}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Company</label>
-              <Input
-                {...register("company")}
-                placeholder="Company Name"
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Logo URL</label>
-                <Input
-                  {...register("logoUrl")}
-                  placeholder="https://example.com/logo.png"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Website URL</label>
-                <Input
-                  {...register("websiteUrl")}
-                  placeholder="https://example.com"
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Support Email</label>
-                <Input
-                  {...register("supportEmail")}
-                  placeholder="support@example.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">API Documentation URL</label>
-                <Input
-                  {...register("apiDocsUrl")}
-                  placeholder="https://docs.example.com/api"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">License Info</label>
-              <Textarea
-                {...register("licenseInfo")}
-                placeholder="License Information"
-                rows={3}
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => navigate(-1)}
-                disabled={isPending}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2Icon className="animate-spin mr-2" />}
-                Create Provider
-              </Button>
-            </div>
-          </form>
+          <ProviderForm 
+            onSubmit={onSubmit} 
+            isPending={isPending}
+            submitButtonText="Create Provider"
+          />
         </div>
       </div>
     </Page>

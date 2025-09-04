@@ -3,6 +3,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Tool } from '@/services/apis/gen/queries';
@@ -12,7 +18,7 @@ import {
   useToolsControllerGetManyTools,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Copy, Loader2, RotateCw, Trash2 } from 'lucide-react';
+import { Copy, Loader2, MoreHorizontal, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -162,6 +168,11 @@ export function DetailProvider() {
     );
   };
 
+  // Handle provider edit
+  const handleEditProvider = () => {
+    navigate(`/providers/${id}/edit`);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -187,6 +198,7 @@ export function DetailProvider() {
 
   const tools = toolsData?.data || [];
   const totalTools = toolsData?.total || 0;
+
   return (
     <Page
       isShowButtonGoBack
@@ -205,7 +217,7 @@ export function DetailProvider() {
               <p className="text-muted-foreground text-sm">{provider.company}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               onClick={() => window.open(provider.websiteUrl || '', '_blank')}
@@ -213,23 +225,41 @@ export function DetailProvider() {
             >
               Visit Website
             </Button>
-            <ConfirmDialog
-              title="Delete Provider"
-              description={`Are you sure you want to delete the provider "${provider.name}"? This action cannot be undone.`}
-              onConfirm={handleDeleteProvider}
-              trigger={
-                <Button variant="destructive" disabled={isDeleting}>
-                  {isDeleting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="px-2">
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
-              }
-              confirmText="Delete"
-              cancelText="Cancel"
-              disabled={isDeleting}
-            />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleEditProvider}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  <span>Edit</span>
+                </DropdownMenuItem>
+                <ConfirmDialog
+                  title="Delete Provider"
+                  description={`Are you sure you want to delete the provider "${provider.name}"? This action cannot be undone.`}
+                  onConfirm={handleDeleteProvider}
+                  trigger={
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      disabled={isDeleting}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                      )}
+                      <span className="text-red-600">Delete</span>
+                    </DropdownMenuItem>
+                  }
+                  confirmText="Delete"
+                  cancelText="Cancel"
+                  disabled={isDeleting}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       }
