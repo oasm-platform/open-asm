@@ -1,31 +1,32 @@
-import Layout from "@/components/common/layout/layout";
-import Assets from "@/pages/assets/assets";
-import DetailAsset from "@/pages/assets/detail-asset";
-import Dashboard from "@/pages/dashboard/dashboard";
-import Login from "@/pages/login/login";
-import ProvidersPage from "@/pages/providers/providers";
-import Register from "@/pages/register/register";
-import Search from "@/pages/search/search";
-import Settings from "@/pages/settings/settings";
-import DetailTarget from "@/pages/targets/detail-target";
-import Targets from "@/pages/targets/targets";
-import ToolDetail from "@/pages/tools/components/tool-detail";
-import Tools from "@/pages/tools/tools";
-import Vulnerabilities from "@/pages/vulnerabilities/vulnerabilities";
-import Workers from "@/pages/workers/workers";
-import { createBrowserRouter } from "react-router-dom";
-import GuestRoute from "./GuestRoute";
-import NotFound from "./NotFound";
-import ProtectedRoute from "./ProtectedRoute";
-import RegisterRoute from "./RegisterRoute";
+import Layout from '@/components/common/layout/layout';
+import Assets from '@/pages/assets/assets';
+import DetailAsset from '@/pages/assets/detail-asset';
+import Dashboard from '@/pages/dashboard/dashboard';
+import Login from '@/pages/login/login';
+import ProvidersPage from '@/pages/providers/providers';
+import Register from '@/pages/register/register';
+import Search from '@/pages/search/search';
+import Settings from '@/pages/settings/settings';
+import DetailTarget from '@/pages/targets/detail-target';
+import Targets from '@/pages/targets/targets';
+import ToolDetail from '@/pages/tools/components/tool-detail';
+import Tools from '@/pages/tools/tools';
+import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
+import Workers from '@/pages/workers/workers';
+import { createBrowserRouter } from 'react-router-dom';
+import GuestRoute from './GuestRoute';
+import NotFound from './NotFound';
+import ProtectedRoute from './ProtectedRoute';
+import RegisterRoute from './RegisterRoute';
+import Editor from '@/pages/editor/editor';
 
 export const router = createBrowserRouter([
   {
-    path: "/",
+    path: '/',
     element: <Layout />,
     children: [
       {
-        path: "login",
+        path: 'login',
         element: (
           <GuestRoute>
             <Login />
@@ -33,7 +34,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "init-admin",
+        path: 'init-admin',
         element: (
           <RegisterRoute>
             <Register />
@@ -44,80 +45,84 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           {
-            path: "",
+            path: '',
             element: <Dashboard />,
           },
           {
-            path: "settings",
+            path: 'editor',
+            children: [{ path: '', element: <Editor /> }],
+          },
+          {
+            path: 'settings',
             children: [
               {
-                path: "",
+                path: '',
                 element: <Settings defaultTab="account" />,
               },
               {
-                path: ":tab",
+                path: ':tab',
                 element: <Settings />,
               },
             ],
           },
           {
-            path: "targets",
+            path: 'targets',
             children: [
               {
-                path: "",
+                path: '',
                 element: <Targets />,
               },
               {
-                path: ":id",
+                path: ':id',
                 element: <DetailTarget />,
               },
             ],
           },
           {
-            path: "vulnerabilities",
+            path: 'vulnerabilities',
             element: <Vulnerabilities />,
           },
           {
             element: <Workers />,
-            path: "workers",
+            path: 'workers',
           },
           {
-            path: "tools",
+            path: 'tools',
             children: [
               {
-                path: "",
+                path: '',
                 element: <Tools />,
               },
               {
-                path: ":id",
+                path: ':id',
                 element: <ToolDetail />,
               },
             ],
           },
           {
             element: <Search />,
-            path: "search",
+            path: 'search',
           },
           {
-            path: "assets",
+            path: 'assets',
             children: [
               {
-                path: "",
+                path: '',
                 element: <Assets />,
               },
               {
-                path: ":id",
+                path: ':id',
                 element: <DetailAsset />,
               },
             ],
           },
           {
-            path: "providers",
+            path: 'providers',
             element: <ProvidersPage />,
           },
         ],
       },
-      { path: "*", element: <NotFound /> },
+      { path: '*', element: <NotFound /> },
     ],
   },
 ]);
