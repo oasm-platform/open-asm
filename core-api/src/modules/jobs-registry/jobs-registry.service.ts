@@ -182,23 +182,25 @@ export class JobsRegistryService {
         .leftJoin('workspace_targets.workspace', 'workspaces')
         .leftJoin('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
-        .andWhere('workspaces.id = :workspaceId', {
-          workspaceId: worker.workspace.id,
-        })
         .orderBy('jobs.createdAt', 'ASC')
-        .orderBy('jobs.priority', 'ASC')
-        .setLock('pessimistic_write')
-        .limit(1);
+        .orderBy('jobs.priority', 'ASC');
 
       if (worker.type === WorkerType.BUILT_IN) {
         const builtInToolsName = builtInTools.map((tool) => tool.name);
-        queryBuilder.andWhere('tool.name IN (:...names)', {
-          names: builtInToolsName,
-        });
+        queryBuilder
+          .andWhere('tool.name IN (:...names)', {
+            names: builtInToolsName,
+          })
+          .andWhere('workspaces.id = :workspaceId', {
+            workspaceId: worker.workspace.id,
+          });
       } else {
         queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
       }
-      const job = await queryBuilder.getOne();
+      const job = await queryBuilder
+        .setLock('pessimistic_write', undefined, ['jobs'])
+        .limit(1)
+        .getOne();
 
       if (!job) {
         await queryRunner.rollbackTransaction();
