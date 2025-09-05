@@ -34,7 +34,7 @@ export class StorageService {
       fs.writeFileSync(filePath, buffer);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      throw new Error(`Failed to save file: ${errorMessage}`);
+      throw new InternalServerErrorException(`Failed to save file: ${errorMessage}`);
     }
 
     return {
