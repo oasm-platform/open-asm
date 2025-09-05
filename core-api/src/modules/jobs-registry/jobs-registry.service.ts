@@ -95,7 +95,7 @@ export class JobsRegistryService {
       .createQueryBuilder('assets');
 
     if (targetIds.length > 0) {
-      assetsQueryBuilder.where('assets.targetId IN (:...targetIds)', {
+      assetsQueryBuilder.andWhere('assets.targetId IN (:...targetIds)', {
         targetIds,
       });
     }
@@ -105,7 +105,7 @@ export class JobsRegistryService {
         .innerJoin('assets.target', 'target')
         .innerJoin('target.workspaceTargets', 'workspaceTarget')
         .innerJoin('workspaceTarget.workspace', 'workspace')
-        .where('workspace.id = :workspaceId', { workspaceId });
+        .andWhere('workspace.id = :workspaceId', { workspaceId });
     }
     const assets = await assetsQueryBuilder.getMany();
 
