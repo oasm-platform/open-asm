@@ -11,7 +11,7 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory } from 'src/common/enums/enum';
+import { JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
@@ -153,19 +153,20 @@ export class JobsRegistryService {
           where: {
             id: workerId,
           },
-          relations: ['workspace'],
+          relations: ['workspace', 'tool'],
         });
 
       if (!worker) {
         throw new NotFoundException('Worker not found');
       }
 
-      const job = await queryRunner.manager
+      const queryBuilder = queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
         .innerJoin('asset.target', 'target')
         .leftJoin('target.workspaceTargets', 'workspace_targets')
         .leftJoin('workspace_targets.workspace', 'workspaces')
+        .leftJoin('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
         .andWhere('workspaces.id = :workspaceId', {
           workspaceId: worker.workspace.id,
@@ -173,8 +174,17 @@ export class JobsRegistryService {
         .orderBy('jobs.createdAt', 'ASC')
         .orderBy('jobs.priority', 'ASC')
         .setLock('pessimistic_write')
-        .limit(1)
-        .getOne();
+        .limit(1);
+
+      if (worker.type === WorkerType.BUILT_IN) {
+        const builtInToolsName = builtInTools.map((tool) => tool.name);
+        queryBuilder.andWhere('tool.name IN (:...names)', {
+          names: builtInToolsName,
+        });
+      } else {
+        queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
+      }
+      const job = await queryBuilder.getOne();
 
       if (!job) {
         await queryRunner.rollbackTransaction();
