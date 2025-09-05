@@ -72,7 +72,7 @@ export class StorageController {
       properties: {
         path: {
           type: 'string',
-          example: '/storage/9bea7ee3-ddc3-4215-a9e6-74fa7b5be92f.png',
+          example: 'default/9bea7ee3-ddc3-4215-a9e6-74fa7b5be92f.png',
         },
         bucket: {
           type: 'string',
