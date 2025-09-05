@@ -41,10 +41,6 @@ export class GetManyTargetResponseDto {
 }
 
 export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
-  @ApiProperty({ required: true })
-  @IsUUID('4')
-  workspaceId: string;
-
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()

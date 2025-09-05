@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -13,12 +15,14 @@ import { getManyResponse } from 'src/utils/getManyResponse';
 import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
+import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { builtInTools } from './built-in-tools';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
+import { RunToolDto } from './dto/run-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -38,6 +42,9 @@ export class ToolsService implements OnModuleInit {
     public readonly vulnerabilityRepo: Repository<Vulnerability>,
 
     private readonly apiKeysService: ApiKeysService,
+
+    @Inject(forwardRef(() => JobsRegistryService))
+    private jobRegistryService: JobsRegistryService,
   ) {}
 
   async onModuleInit() {
@@ -407,5 +414,23 @@ export class ToolsService implements OnModuleInit {
         name: In(names),
       },
     });
+  }
+
+  /**
+   * Run a tool.
+   * @param {string} id - The ID of the tool.
+   * @param {RunToolDto} dto - The tool run data.
+   * @returns {Promise<RunToolResponseDto>} The tool run response.
+   */
+  async runTool(id: string, dto: RunToolDto, workspaceId: string) {
+    const { targetIds } = dto;
+    const tool = await this.getToolById(id, workspaceId);
+
+    await this.jobRegistryService.createJobs({
+      tools: [tool],
+      targetIds: targetIds || [],
+      workspaceId,
+    });
+    return;
   }
 }

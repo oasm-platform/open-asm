@@ -16,7 +16,6 @@ import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
-import { Target } from '../targets/entities/target.entity';
 import { builtInTools } from '../tools/built-in-tools';
 import { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
@@ -75,11 +74,13 @@ export class JobsRegistryService {
    */
   public async createJobs({
     tools,
-    targets,
+    targetIds,
+    workspaceId,
     workflow,
   }: {
     tools: Tool[];
-    targets: Target[];
+    targetIds: string[];
+    workspaceId?: string;
     workflow?: Workflow;
   }): Promise<Job[]> {
     // Step 1: create job history
@@ -89,11 +90,24 @@ export class JobsRegistryService {
     await this.jobHistoryRepo.save(jobHistory);
 
     // Step 2: find assets of the given targets
-    const assets = await this.dataSource.getRepository(Asset).find({
-      where: {
-        target: In(targets.map((target) => target.id)),
-      },
-    });
+    const assetsQueryBuilder = this.dataSource
+      .getRepository(Asset)
+      .createQueryBuilder('assets');
+
+    if (targetIds.length > 0) {
+      assetsQueryBuilder.where('assets.targetId IN (:...targetIds)', {
+        targetIds,
+      });
+    }
+
+    if (workspaceId) {
+      assetsQueryBuilder
+        .innerJoin('assets.target', 'target')
+        .innerJoin('target.workspaceTargets', 'workspaceTarget')
+        .innerJoin('workspaceTarget.workspace', 'workspace')
+        .where('workspace.id = :workspaceId', { workspaceId });
+    }
+    const assets = await assetsQueryBuilder.getMany();
 
     const jobRepo = this.dataSource.getRepository(Job);
     const jobsToInsert: Job[] = [];
@@ -306,7 +320,7 @@ export class JobsRegistryService {
     const tools = await this.toolsService.toolsRepository.find({
       where: { id: In(dto.toolIds) },
     });
-    await this.createJobs({ tools, targets: [{ id: dto.targetId } as Target] });
+    await this.createJobs({ tools, targetIds: [dto.targetId] });
     return {
       message: 'Jobs created successfully',
     };
@@ -375,7 +389,7 @@ export class JobsRegistryService {
       const tools = await this.toolsService.getToolByNames(nextTool);
       await this.createJobs({
         tools,
-        targets: [job.asset.target],
+        targetIds: [job.asset.target.id],
         workflow: job.jobHistory.workflow,
       });
     }

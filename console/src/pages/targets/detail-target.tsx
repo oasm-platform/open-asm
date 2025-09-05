@@ -12,12 +12,12 @@ import dayjs from 'dayjs';
 import { Bug, Loader2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import AssetProvider from '../assets/context/asset-context';
 import { ListAssets } from '../assets/list-assets';
 import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
 import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
 import AssetsDiscovering from './assets-discovering';
 import SettingTarget from './setting-target';
-import AssetProvider from '../assets/context/asset-context';
 
 // Define tabs configuration
 const TABS = [
@@ -37,6 +37,7 @@ export function DetailTarget() {
     data: target,
     isLoading,
     error,
+    refetch
   } = useTargetsControllerGetTargetById(id || '', {
     query: { enabled: !!id, refetchInterval: 5000 },
   });
@@ -90,8 +91,7 @@ export function DetailTarget() {
             <p className="text-muted-foreground">
               {dayjs(target.lastDiscoveredAt).fromNow()}
             </p>
-
-            <SettingTarget target={target} />
+            <SettingTarget target={target} refetch={refetch} />
           </div>
         </div>
       }

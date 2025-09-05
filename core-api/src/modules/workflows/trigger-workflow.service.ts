@@ -25,7 +25,7 @@ export class TriggerWorkflowService implements OnModuleInit {
             const tools = await this.toolsService.getToolByNames(firstJobs);
             await this.jobRegistryService.createJobs({
               tools,
-              targets: [payload],
+              targetIds: [payload.id],
               workflow: workflow,
             });
           }

@@ -19,6 +19,7 @@ import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { GetToolByIdDto } from './dto/get-tool-by-id.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
+import { RunToolDto } from './dto/run-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -40,6 +41,25 @@ export class ToolsController {
   @Post()
   createTool(@Body() dto: CreateToolDto) {
     return this.toolsService.createTool(dto);
+  }
+
+  @Doc({
+    summary: 'Run a tool',
+    description: 'Runs a tool with the provided information.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post(':id/run')
+  runTool(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: RunToolDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.toolsService.runTool(id, dto, workspaceId);
   }
 
   @Doc({

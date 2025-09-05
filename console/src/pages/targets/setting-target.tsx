@@ -24,7 +24,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
-const SettingTarget = ({ target }: { target: Target }) => {
+const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => void }) => {
+
     const { selectedWorkspace } = useWorkspaceSelector();
     const queryClient = useQueryClient();
     const navigate = useNavigate();
@@ -51,6 +52,9 @@ const SettingTarget = ({ target }: { target: Target }) => {
         mutation: {
             onSettled: () => setIsRediscovering(false),
             onError: () => setIsRediscovering(false),
+            onSuccess: () => {
+                refetch();
+            },
         },
     });
 
@@ -59,6 +63,7 @@ const SettingTarget = ({ target }: { target: Target }) => {
         mutation: {
             onSuccess: () => {
                 toast.success("Updated");
+                refetch();
             },
             onError: () => toast.error("Failed to update target scan schedule"),
         },

@@ -757,7 +757,6 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
-  workspaceId: string;
   value?: string;
 };
 
@@ -1077,7 +1076,7 @@ export const useTargetsControllerCreateTarget = <
  * @summary Get all targets in a workspace
  */
 export const targetsControllerGetTargetsInWorkspace = (
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -1088,7 +1087,7 @@ export const targetsControllerGetTargetsInWorkspace = (
 };
 
 export const getTargetsControllerGetTargetsInWorkspaceQueryKey = (
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
 ) => {
   return [`/api/targets`, ...(params ? [params] : [])] as const;
 };
@@ -1100,7 +1099,7 @@ export const getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions = <
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1153,7 +1152,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params: undefined | TargetsControllerGetTargetsInWorkspaceParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -1186,7 +1185,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1219,7 +1218,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1247,7 +1246,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1286,7 +1285,7 @@ export const getTargetsControllerGetTargetsInWorkspaceQueryOptions = <
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1325,7 +1324,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params: undefined | TargetsControllerGetTargetsInWorkspaceParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -1352,7 +1351,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1379,7 +1378,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1402,7 +1401,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
