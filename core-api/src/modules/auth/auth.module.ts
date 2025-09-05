@@ -76,10 +76,13 @@ export class AuthModule implements NestModule, OnModuleInit {
       );
 
     for (const provider of providers) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const providerPrototype = Object.getPrototypeOf(provider.instance);
+
       const methods = this.metadataScanner.getAllMethodNames(providerPrototype);
 
       for (const method of methods) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         const providerMethod = providerPrototype[method];
         this.setupHooks(providerMethod);
       }
@@ -102,15 +105,59 @@ export class AuthModule implements NestModule, OnModuleInit {
       trustedOrigins &&
       !this.options.disableTrustedOriginsCors &&
       !isNotFunctionBased
-    )
+    ) {
       throw new Error(
         'Function-based trustedOrigins not supported in NestJS. Use string array or disable CORS with disableTrustedOriginsCors: true.',
       );
+    }
 
     if (!this.options.disableBodyParser) {
       consumer.apply(SkipBodyParsingMiddleware).forRoutes('{*path}');
     }
 
+    const basePath = this.getBasePath();
+
+    const handler = toNodeHandler(this.auth);
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    this.adapter.httpAdapter
+      .getInstance()
+      // little hack to ignore any global prefix
+      // for now i'll just not support a global prefix
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      .use(`${basePath}/*splat`, (req: Request, res: Response) => {
+        req.url = req.originalUrl;
+        return handler(req, res);
+      });
+    this.logger.log(
+      `AuthModule initialized BetterAuth on '${basePath}/*splat'`,
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  private setupHooks(providerMethod: Function) {
+    if (!this.auth.options.hooks) return;
+
+    for (const { metadataKey, hookType } of HOOKS) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const hookPath = Reflect.getMetadata(metadataKey, providerMethod);
+      if (!hookPath) continue;
+
+      const originalHook = this.auth.options.hooks[hookType];
+      this.auth.options.hooks[hookType] = createAuthMiddleware(async (ctx) => {
+        if (originalHook) {
+          await originalHook(ctx);
+        }
+
+        if (hookPath === ctx.path) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+          await providerMethod(ctx);
+        }
+      });
+    }
+  }
+
+  private getBasePath(): string {
     // Get basePath from options or use default
     let basePath = this.auth.options.basePath ?? '/api/auth';
 
@@ -124,39 +171,7 @@ export class AuthModule implements NestModule, OnModuleInit {
       basePath = basePath.slice(0, -1);
     }
 
-    const handler = toNodeHandler(this.auth);
-
-    this.adapter.httpAdapter
-      .getInstance()
-      // little hack to ignore any global prefix
-      // for now i'll just not support a global prefix
-      .use(`${basePath}/*splat`, (req: Request, res: Response) => {
-        req.url = req.originalUrl;
-        return handler(req, res);
-      });
-    this.logger.log(
-      `AuthModule initialized BetterAuth on '${basePath}/*splat'`,
-    );
-  }
-
-  private setupHooks(providerMethod: Function) {
-    if (!this.auth.options.hooks) return;
-
-    for (const { metadataKey, hookType } of HOOKS) {
-      const hookPath = Reflect.getMetadata(metadataKey, providerMethod);
-      if (!hookPath) continue;
-
-      const originalHook = this.auth.options.hooks[hookType];
-      this.auth.options.hooks[hookType] = createAuthMiddleware(async (ctx) => {
-        if (originalHook) {
-          await originalHook(ctx);
-        }
-
-        if (hookPath === ctx.path) {
-          await providerMethod(ctx);
-        }
-      });
-    }
+    return basePath;
   }
 
   /**

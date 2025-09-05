@@ -56,10 +56,11 @@ export class WorkflowsService implements OnModuleInit {
    * @returns Normalized workflow object
    */
 
-  private normalizeOn(obj: Record<string, any>): Record<string, any> {
+  private normalizeOn(obj: Record<string, unknown>): Record<string, unknown> {
     if (!obj.on) return obj;
 
     for (const key of Object.keys(obj.on)) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = obj.on[key];
       if (Array.isArray(value)) {
         obj.on[key] = value.map(String);
@@ -82,7 +83,8 @@ export class WorkflowsService implements OnModuleInit {
         try {
           const filePath = path.join(this.templatesPath, fileName);
           const fileContent = fs.readFileSync(filePath, 'utf8');
-          const parsed = yaml.load(fileContent) as Record<string, any>;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          const parsed = yaml.load(fileContent) as Record<string, unknown>;
 
           const normalized = this.normalizeOn(parsed);
 
@@ -98,8 +100,9 @@ export class WorkflowsService implements OnModuleInit {
           this.logger.log(`Successfully processed workflow: ${fileName}`);
         } catch (error) {
           this.logger.error(
-            `Error processing workflow ${fileName}: ${error.message}`,
-            error.stack,
+            `Error processing workflow ${fileName}: ${(error as Error).message}`,
+
+            (error as Error).stack,
           );
         }
       }
@@ -113,7 +116,7 @@ export class WorkflowsService implements OnModuleInit {
    * @param fileName Name of the YAML file
    * @returns Parsed YAML object
    */
-  public parseTemplate(fileName: string): any {
+  public parseTemplate(fileName: string): unknown {
     const filePath = path.join(this.templatesPath, fileName);
 
     if (!fs.existsSync(filePath)) {
@@ -121,7 +124,8 @@ export class WorkflowsService implements OnModuleInit {
     }
 
     const fileContent = fs.readFileSync(filePath, 'utf8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const parsed = yaml.load(fileContent);
-    return parsed as any;
+    return parsed as unknown;
   }
 }

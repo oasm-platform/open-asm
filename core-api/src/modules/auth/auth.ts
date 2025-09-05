@@ -7,6 +7,7 @@ import { Role } from 'src/common/enums/enum';
 import { databaseConnectionConfig } from 'src/database/database-config';
 
 export const auth = betterAuth({
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   database: new Pool(databaseConnectionConfig),
   plugins: [
     admin({

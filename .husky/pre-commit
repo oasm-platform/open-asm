@@ -8,3 +8,11 @@ if [ "$branch" = "main" ]; then
   echo "Please create a feature branch and submit a pull request."
   exit 1
 fi
+
+# Run lint check
+echo "Running lint check..."
+cd core-api && npm run lint
+if [ $? -ne 0 ]; then
+  echo "Lint check failed. Please fix lint errors before committing."
+  exit 1
+fi

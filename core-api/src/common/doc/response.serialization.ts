@@ -1,3 +1,3 @@
-export class AppResponseSerialization<T = Record<string, any>> {
+export class AppResponseSerialization<T = Record<string, unknown>> {
   data: T;
 }
