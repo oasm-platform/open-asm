@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   StreamableFile,
 } from '@nestjs/common';
@@ -81,5 +83,67 @@ export class StorageService {
 
     const file = createReadStream(resolvedPath);
     return new StreamableFile(file);
+  }
+
+  /**
+   * Forward an image from a URL.
+   * @param url The URL of the image to forward.
+   * @returns A StreamableFile containing the image data.
+   * @throws BadRequestException if the URL is invalid or doesn't point to an image.
+   * @throws NotFoundException if the image is not found at the provided URL.
+   */
+  public async forwardImage(
+    url: string,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    // Validate URL format
+    // Validate URL format with regex first for better error messages
+    const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
+    if (!urlRegex.test(url)) {
+      throw new BadRequestException(
+        'Invalid URL format. URL must start with http://, https://, or ftp:// and be a valid URL.',
+      );
+    }
+    try {
+      new URL(url);
+    } catch (err) {
+      Logger.error(err);
+      throw new BadRequestException('Invalid URL format');
+    }
+
+    try {
+      // Fetch the image from the provided URL
+      const response = await fetch(url);
+
+      // Check if the request was successful
+      if (!response.ok) {
+        throw new NotFoundException('Image not found at the provided URL');
+      }
+
+      // Check content type to ensure it's an image
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.startsWith('image/')) {
+        throw new BadRequestException(
+          'The provided URL does not point to an image',
+        );
+      }
+
+      // Get the image data as ArrayBuffer
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      return { buffer, contentType };
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      // Handle network errors or other unexpected errors
+      throw new BadRequestException(
+        'Failed to fetch image from the provided URL',
+      );
+    }
   }
 }
