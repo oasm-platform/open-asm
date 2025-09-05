@@ -96,13 +96,6 @@ export class StorageService {
     url: string,
   ): Promise<{ buffer: Buffer; contentType: string }> {
     // Validate URL format
-    // Validate URL format with regex first for better error messages
-    const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
-    if (!urlRegex.test(url)) {
-      throw new BadRequestException(
-        'Invalid URL format. URL must start with http://, https://, or ftp:// and be a valid URL.',
-      );
-    }
     try {
       new URL(url);
     } catch (err) {
