@@ -21,6 +21,9 @@ export class AssetsController {
     response: {
       serialization: GetManyResponseDto(GetAssetsResponseDto),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get()
   getAssetsInWorkspace(
@@ -35,6 +38,9 @@ export class AssetsController {
     description: 'Retrieves a list of ip with number of assets.',
     response: {
       serialization: GetManyResponseDto(GetIpAssetsDTO),
+    },
+    request: {
+      getWorkspaceId: true,
     },
   })
   @Get('/ip')
@@ -51,6 +57,9 @@ export class AssetsController {
     response: {
       serialization: GetManyResponseDto(GetPortAssetsDTO),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get('/port')
   getPortAssets(
@@ -66,6 +75,9 @@ export class AssetsController {
     response: {
       serialization: GetManyResponseDto(GetTechnologyAssetsDTO),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get('/tech')
   getTechnologyAssets(
@@ -80,6 +92,9 @@ export class AssetsController {
     description: 'Retrieves a list of technologies with number of assets.',
     response: {
       serialization: GetManyResponseDto(GetStatusCodeAssetsDTO),
+    },
+    request: {
+      getWorkspaceId: true,
     },
   })
   @Get('/status-code')

@@ -23,4 +23,8 @@ interface IDocRequestOptions {
   params?: ApiParamOptions[];
   queries?: ApiQueryOptions[];
   bodyType?: 'FORM_DATA' | 'JSON';
+  /**
+   * If true, the decorator will add the X-Workspace-Id header to the request.
+   */
+  getWorkspaceId?: boolean;
 }

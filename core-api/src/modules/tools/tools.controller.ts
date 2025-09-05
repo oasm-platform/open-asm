@@ -97,6 +97,9 @@ export class ToolsController {
     response: {
       serialization: GetManyResponseDto(Tool),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get()
   async getManyTools(
@@ -118,6 +121,9 @@ export class ToolsController {
     response: {
       serialization: GetManyResponseDto(Tool),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get('installed')
   async getInstalledTools(
@@ -138,6 +144,9 @@ export class ToolsController {
     response: {
       serialization: Tool,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get(':id')
   getToolById(
@@ -152,6 +161,9 @@ export class ToolsController {
     description: 'Retrieves the API key for a tool.',
     response: {
       serialization: GetApiKeyResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
     },
   })
   @Get(':id/api-key')

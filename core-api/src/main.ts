@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import 'dotenv/config';
+import type { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import 'reflect-metadata';
@@ -23,7 +24,7 @@ async function bootstrap() {
   // Serve files from .storage directory
   app.useStaticAssets(path.join(__dirname, '..', '.storage'), {
     prefix: '/storage/',
-    setHeaders: (res) => {
+    setHeaders: (res: Response) => {
       res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     },
   });
@@ -37,9 +38,7 @@ async function bootstrap() {
   // Configure global guards
   const reflector = app.get(Reflector);
 
-  const auth = app.get(AUTH_INSTANCE_KEY);
-
-  app.useGlobalGuards(new AuthGuard(reflector, auth));
+  app.useGlobalGuards(new AuthGuard(reflector, app.get(AUTH_INSTANCE_KEY)));
 
   // Configure cookie parser
   app.use(cookieParser());
@@ -63,12 +62,6 @@ async function bootstrap() {
     )
     .setVersion('1.0')
     .setExternalDoc('Authentication Docs', 'auth/docs')
-    .addGlobalParameters({
-      in: 'header',
-      required: false,
-      schema: { type: 'string' },
-      name: 'X-Workspace-Id',
-    })
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, documentFactory, {

@@ -3,6 +3,12 @@ import { BadRequestException, createParamDecorator } from '@nestjs/common';
 import { isUUID } from 'class-validator';
 import type { IncomingHttpHeaders } from 'http';
 
+/**
+ * Get workspace id from request header [x-workspace-id]
+ * @param _data - Not used
+ * @param context - The execution context of the current request
+ * @returns The workspace id from the request headers
+ */
 export const WorkspaceId = createParamDecorator<string | undefined>(
   (_data: unknown, context: ExecutionContext) => {
     const request = context

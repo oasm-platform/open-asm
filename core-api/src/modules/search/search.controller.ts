@@ -1,16 +1,16 @@
-import { Controller, Get, Query, Delete, Param } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserContext, WorkspaceId } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { User } from '../auth/entities/user.entity';
+import { DeleteResponseDto } from './dto/delete-response.dto';
 import {
   GetManySearchHistoryDto,
   GetSearchHistoryResponseDto,
   SearchAssetsTargetsDto,
   SearchResponseDto,
 } from './dto/search.dto';
-import { DeleteResponseDto } from './dto/delete-response.dto';
 import { SearchService } from './search.service';
 
 @ApiTags('Search')
@@ -23,6 +23,9 @@ export class SearchController {
     description: 'Search assets and targets',
     response: {
       serialization: SearchResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
     },
   })
   @Get()
