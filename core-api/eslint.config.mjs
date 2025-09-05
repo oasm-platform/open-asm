@@ -58,4 +58,17 @@ export default tseslint.config(
       'no-new-func': 'error',
     },
   },
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts'],
+    rules: {
+      // Disable all rules for test files
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/unbound-method': 'off',
+      'complexity': 'off',
+      'no-magic-numbers': 'off',
+    },
+  },
 );

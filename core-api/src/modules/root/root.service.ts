@@ -31,10 +31,21 @@ export class RootService {
    * @returns A promise that resolves to a get metadata dto.
    */
   public async getMetadata(): Promise<GetMetadataDto> {
+    const MILLISECONDS_PER_SECOND = 100;
+    const SECONDS_PER_MINUTE = 60;
+    const MINUTES_PER_HOUR = 60;
+    const HOURS_PER_DAY = 24;
+    const DAYS_PER_YEAR = 365;
+
     const userCount = await this.usersService.usersRepository.count({
       cache: {
         id: 'isInit',
-        milliseconds: 1000 * 60 * 60 * 24 * 365,
+        milliseconds:
+          MILLISECONDS_PER_SECOND *
+          SECONDS_PER_MINUTE *
+          MINUTES_PER_HOUR *
+          HOURS_PER_DAY *
+          DAYS_PER_YEAR,
       },
     });
     return {
