@@ -7,6 +7,7 @@ import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { ToolProvider } from 'src/modules/providers/entities/provider.entity';
 import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
+import { WorkerInstance } from 'src/modules/workers/entities/worker.entity';
 import {
   Column,
   Entity,
@@ -64,7 +65,7 @@ export class Tool {
   @Column({ nullable: true })
   version?: string;
 
-  @ApiProperty()
+  @ApiProperty({ nullable: true, required: false })
   @IsOptional()
   @IsString()
   @Column({ nullable: true })
@@ -110,4 +111,7 @@ export class Tool {
   @OneToOne(() => ApiKey)
   @JoinColumn({ name: 'apiKeyId', referencedColumnName: 'id' })
   apiKey?: ApiKey;
+
+  @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.tool)
+  workers?: WorkerInstance[];
 }

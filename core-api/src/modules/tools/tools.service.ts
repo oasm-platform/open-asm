@@ -336,6 +336,7 @@ export class ToolsService implements OnModuleInit {
       isOfficialSupport: false,
       version: dto.version,
       logoUrl: dto.logoUrl,
+      provider: { id: dto.providerId },
     });
 
     return this.toolsRepository.save(tool);

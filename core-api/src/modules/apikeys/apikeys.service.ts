@@ -16,7 +16,7 @@ import { ApiKey } from './entities/apikey.entity';
 export class ApiKeysService {
   constructor(
     @InjectRepository(ApiKey)
-    private apiKeysRepository: Repository<ApiKey>,
+    public apiKeysRepository: Repository<ApiKey>,
   ) {}
 
   /**

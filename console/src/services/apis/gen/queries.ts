@@ -514,7 +514,8 @@ export type Tool = {
   description: string;
   category: ToolCategory;
   version: string;
-  logoUrl: string;
+  /** @nullable */
+  logoUrl?: string | null;
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;
@@ -538,7 +539,10 @@ export type CreateToolDto = {
   description: string;
   category: CreateToolDtoCategory;
   version: string;
-  logoUrl: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  /** The ID of the provider */
+  providerId: string;
 };
 
 export type WorkspaceTool = {
@@ -954,11 +958,22 @@ export type ProvidersControllerGetManyProvidersParams = {
 };
 
 export type StorageControllerUploadFileBody = {
-  file?: Blob;
+  file: Blob;
+  /** Bucket name (default: "default") */
+  bucket?: string;
 };
 
 export type StorageControllerUploadFile200 = {
   path?: string;
+  bucket?: string;
+  fullPath?: string;
+};
+
+export type StorageControllerForwardImageParams = {
+  /**
+   * The URL of the image to forward
+   */
+  url: string;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -14134,8 +14149,9 @@ export const storageControllerUploadFile = (
   signal?: AbortSignal,
 ) => {
   const formData = new FormData();
-  if (storageControllerUploadFileBody.file !== undefined) {
-    formData.append(`file`, storageControllerUploadFileBody.file);
+  formData.append(`file`, storageControllerUploadFileBody.file);
+  if (storageControllerUploadFileBody.bucket !== undefined) {
+    formData.append(`bucket`, storageControllerUploadFileBody.bucket);
   }
 
   return orvalClient<StorageControllerUploadFile200>(
@@ -14223,3 +14239,713 @@ export const useStorageControllerUploadFile = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * @summary Get a file from storage (public)
+ */
+export const storageControllerGetFile = (
+  bucket: string,
+  path: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Blob>(
+    {
+      url: `/api/storage/${bucket}/${path}`,
+      method: 'GET',
+      responseType: 'blob',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerGetFileQueryKey = (
+  bucket: string,
+  path: string,
+) => {
+  return [`/api/storage/${bucket}/${path}`] as const;
+};
+
+export const getStorageControllerGetFileInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStorageControllerGetFileQueryKey(bucket, path);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerGetFile>>
+  > = ({ signal }) =>
+    storageControllerGetFile(bucket, path, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bucket && path),
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof storageControllerGetFile>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerGetFileInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerGetFile>>
+>;
+export type StorageControllerGetFileInfiniteQueryError = void;
+
+export function useStorageControllerGetFileInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerGetFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerGetFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerGetFileInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerGetFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerGetFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerGetFileInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a file from storage (public)
+ */
+
+export function useStorageControllerGetFileInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerGetFileInfiniteQueryOptions(
+    bucket,
+    path,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStorageControllerGetFileQueryOptions = <
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStorageControllerGetFileQueryKey(bucket, path);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerGetFile>>
+  > = ({ signal }) =>
+    storageControllerGetFile(bucket, path, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bucket && path),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof storageControllerGetFile>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerGetFileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerGetFile>>
+>;
+export type StorageControllerGetFileQueryError = void;
+
+export function useStorageControllerGetFile<
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerGetFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerGetFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerGetFile<
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerGetFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerGetFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerGetFile<
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a file from storage (public)
+ */
+
+export function useStorageControllerGetFile<
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerGetFileQueryOptions(
+    bucket,
+    path,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * @summary Forward an image from a URL
+ */
+export const storageControllerForwardImage = (
+  params: StorageControllerForwardImageParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Blob>(
+    {
+      url: `/api/storage/forward`,
+      method: 'GET',
+      params,
+      responseType: 'blob',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerForwardImageQueryKey = (
+  params: StorageControllerForwardImageParams,
+) => {
+  return [`/api/storage/forward`, ...(params ? [params] : [])] as const;
+};
+
+export const getStorageControllerForwardImageInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStorageControllerForwardImageQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    QueryKey,
+    StorageControllerForwardImageParams['page']
+  > = ({ signal, pageParam }) =>
+    storageControllerForwardImage(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    TError,
+    TData,
+    QueryKey,
+    StorageControllerForwardImageParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerForwardImageInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerForwardImage>>
+>;
+export type StorageControllerForwardImageInfiniteQueryError = void;
+
+export function useStorageControllerForwardImageInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerForwardImageInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerForwardImageInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Forward an image from a URL
+ */
+
+export function useStorageControllerForwardImageInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerForwardImageInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStorageControllerForwardImageQueryOptions = <
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStorageControllerForwardImageQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>
+  > = ({ signal }) =>
+    storageControllerForwardImage(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerForwardImageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerForwardImage>>
+>;
+export type StorageControllerForwardImageQueryError = void;
+
+export function useStorageControllerForwardImage<
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerForwardImage>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerForwardImage<
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerForwardImage>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerForwardImage<
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Forward an image from a URL
+ */
+
+export function useStorageControllerForwardImage<
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerForwardImageQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}

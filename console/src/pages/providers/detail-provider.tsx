@@ -1,4 +1,5 @@
 import Page from '@/components/common/page';
+import { CreateToolDialog } from '@/components/tools/create-tool-dialog';
 import { ToolApiKeyDialog } from '@/components/tools/tool-api-key-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ import {
   useToolsControllerGetManyTools,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -226,6 +227,12 @@ export function DetailProvider() {
             >
               Visit Website
             </Button>
+            <CreateToolDialog providerId={id || ''}>
+              <Button variant="outline">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Tool
+              </Button>
+            </CreateToolDialog>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="px-2">
