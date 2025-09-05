@@ -28,12 +28,16 @@ const ToolCard = ({ tool, button }: ToolCardProps) => {
             className="flex flex-col overflow-hidden pt-0 cursor-pointer transition-all duration-200 hover:shadow-md"
             onClick={handleCardClick}
         >
-            <div className="w-full bg-white p-4 flex justify-center transition-colors duration-200 hover:bg-gray-100">
-                <img
-                    src={tool.logoUrl}
-                    alt={tool.name}
-                    className="h-16 object-contain"
-                />
+            <div className="w-full bg-white p-4 flex justify-center items-center transition-colors duration-200 hover:bg-gray-100 min-h-[80px]">
+                {tool.logoUrl ? (
+                    <img
+                        src={tool.logoUrl}
+                        alt={tool.name}
+                        className="h-16 object-contain"
+                    />
+                ) : (
+                    <span className="text-gray-500 text-lg font-medium">no logo</span>
+                )}
             </div>
             <CardContent className="flex flex-col gap-4">
                 <div className="flex gap-3 items-center justify-between">

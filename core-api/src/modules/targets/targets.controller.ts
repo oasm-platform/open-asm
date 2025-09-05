@@ -9,7 +9,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { UserContext } from 'src/common/decorators/app.decorator';
+import { UserContext, WorkspaceId } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
@@ -49,10 +49,16 @@ export class TargetsController {
     response: {
       serialization: GetManyResponseDto(GetManyTargetResponseDto),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get()
-  getTargetsInWorkspace(@Query() query: GetManyWorkspaceQueryParamsDto) {
-    return this.targetsService.getTargetsInWorkspace(query);
+  getTargetsInWorkspace(
+    @Query() query: GetManyWorkspaceQueryParamsDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.getTargetsInWorkspace(query, workspaceId);
   }
 
   @Doc({

@@ -157,12 +157,13 @@ export class TargetsService implements OnModuleInit {
    */
   public async getTargetsInWorkspace(
     query: GetManyWorkspaceQueryParamsDto,
+    workspaceId: string,
   ): Promise<
     GetManyBaseResponseDto<
       Target & { totalAssets: number; status: string; duration: number }
     >
   > {
-    const { limit, page, sortBy, sortOrder, workspaceId, value } = query;
+    const { limit, page, sortBy, sortOrder, value } = query;
 
     const offset = (page - 1) * limit;
 

@@ -257,6 +257,6 @@ export class TechnologyForwarderService {
 
     // Determine the file extension
     const extension = iconName.includes('.') ? '' : '.svg';
-    return `api/storage/forward?url=${WEBAPP_ANALYZER_SRC_URL}/images/icons/${iconName}${extension}`;
+    return `/api/storage/forward?url=${WEBAPP_ANALYZER_SRC_URL}/images/icons/${iconName}${extension}`;
   }
 }

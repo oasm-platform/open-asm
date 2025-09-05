@@ -73,10 +73,13 @@ export class SearchService {
           )
         : { data: [], total: 0, page: 1, pageCount: 0 },
       targetsLimit > 0
-        ? this.targetService.getTargetsInWorkspace({
-            ...query,
-            limit: targetsLimit,
-          })
+        ? this.targetService.getTargetsInWorkspace(
+            {
+              ...query,
+              limit: targetsLimit,
+            },
+            workspaceId,
+          )
         : { data: [], total: 0, page: 1, pageCount: 0 },
     ]);
 
