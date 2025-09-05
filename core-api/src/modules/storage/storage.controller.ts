@@ -156,6 +156,7 @@ export class StorageController {
       if (mimeType) {
         res.set({
           'Content-Type': mimeType,
+          'Cache-Control': 'max-age=1209600, no-transform',
         });
       }
     }
