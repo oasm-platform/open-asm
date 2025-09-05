@@ -28,7 +28,7 @@ export class ProvidersService {
     const { page = 1, limit = 10, name } = query;
     const skip = (page - 1) * limit;
 
-    const whereConditions: any = {
+    const whereConditions: Record<string, unknown> = {
       owner: { id: userContext.id },
     };
 

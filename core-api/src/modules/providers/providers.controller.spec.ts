@@ -1,8 +1,8 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { Role } from 'src/common/enums/enum';
-import { CreateProviderDto } from './dto/create-provider.dto';
-import { ToolProvider } from './entities/provider.entity';
+import type { CreateProviderDto } from './dto/create-provider.dto';
+import type { ToolProvider } from './entities/provider.entity';
 import { ProvidersController } from './providers.controller';
 import { ProvidersService } from './providers.service';
 
@@ -35,12 +35,18 @@ describe('ProvidersController', () => {
 
   const mockCreateProviderDto: CreateProviderDto = {
     name: 'Test Provider',
+    code: 'test-provider-code',
   };
 
   const mockProvider: ToolProvider = {
     id: 'provider-id',
     name: 'Test Provider',
+    code: 'test-provider-code',
     ownerId: 'user-id',
+    isActive: true,
+     
+    owner: mockUserContext as any,
+    tools: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   } as ToolProvider;
@@ -70,10 +76,12 @@ describe('ProvidersController', () => {
     it('should create a provider', async () => {
       const result = await controller.createProvider(
         mockCreateProviderDto,
+         
         mockUserContext as any,
       );
       expect(result).toEqual(mockProvider);
-      expect(service.createProvider).toHaveBeenCalledWith(
+      const createProviderSpy = jest.spyOn(service, 'createProvider');
+      expect(createProviderSpy).toHaveBeenCalledWith(
         mockCreateProviderDto,
         mockUserContext,
       );
