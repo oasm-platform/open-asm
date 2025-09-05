@@ -99,6 +99,7 @@ const toolColumns: ColumnDef<Tool>[] = [
 
 // Define tabs configuration
 const TABS = [
+  { value: 'information', label: 'Information' },
   { value: 'tools', label: 'Tools' },
 ];
 
@@ -140,8 +141,8 @@ export function DetailProvider() {
     },
   );
 
-  // Determine active tab, default to "tools" if not specified
-  const activeTab = TABS.some((t) => t.value === tab) ? tab : 'tools';
+  // Determine active tab, default to "information" if not specified
+  const activeTab = TABS.some((t) => t.value === tab) ? tab : 'information';
 
   // Handle tab change
   const handleTabChange = (value: string) => {
@@ -264,50 +265,6 @@ export function DetailProvider() {
         </div>
       }
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-6">
-        <div className="md:col-span-2">
-          <h2 className="text-lg font-semibold mb-2">Description</h2>
-          <p className="text-muted-foreground">
-            {provider.description || 'No description available.'}
-          </p>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground">Code</h3>
-            <p>{provider.code}</p>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground">
-              Support Email
-            </h3>
-            <p>{provider.supportEmail || 'N/A'}</p>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground">
-              API Docs
-            </h3>
-            {provider.apiDocsUrl ? (
-              <a
-                href={provider.apiDocsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:underline"
-              >
-                View Documentation
-              </a>
-            ) : (
-              <p>N/A</p>
-            )}
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground">
-              License
-            </h3>
-            <p>{provider.licenseInfo || 'N/A'}</p>
-          </div>
-        </div>
-      </div>
-
       <Tabs
         value={activeTab!}
         onValueChange={handleTabChange}
@@ -324,6 +281,53 @@ export function DetailProvider() {
             </TabsTrigger>
           ))}
         </TabsList>
+
+        <TabsContent value="information">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <h2 className="text-lg font-semibold mb-2">Description</h2>
+              <p className="text-muted-foreground">
+                {provider.description || 'No description available.'}
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">Code</h3>
+                <p>{provider.code}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  Support Email
+                </h3>
+                <p>{provider.supportEmail || 'N/A'}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  API Docs
+                </h3>
+                {provider.apiDocsUrl ? (
+                  <a
+                    href={provider.apiDocsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline"
+                  >
+                    View Documentation
+                  </a>
+                ) : (
+                  <p>N/A</p>
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  License
+                </h3>
+                <p>{provider.licenseInfo || 'N/A'}</p>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
         <TabsContent value="tools">
           <DataTable
             data={tools}
