@@ -160,6 +160,7 @@ export class JobsRegistryService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
     try {
       const worker = await queryRunner.manager
         .getRepository(WorkerInstance)
@@ -174,6 +175,7 @@ export class JobsRegistryService {
         throw new NotFoundException('Worker not found');
       }
 
+      const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
       const queryBuilder = queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
@@ -185,7 +187,7 @@ export class JobsRegistryService {
         .orderBy('jobs.createdAt', 'ASC')
         .orderBy('jobs.priority', 'ASC');
 
-      if (worker.type === WorkerType.BUILT_IN) {
+      if (isBuiltInTools) {
         const builtInToolsName = builtInTools.map((tool) => tool.name);
         queryBuilder
           .andWhere('tool.name IN (:...names)', {
@@ -211,13 +213,19 @@ export class JobsRegistryService {
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
-      const workerStep = builtInTools.find(
-        (tool) => tool.category === job.category,
-      );
 
-      if (!workerStep) {
-        await queryRunner.rollbackTransaction();
-        return null;
+      let command = '';
+
+      if (isBuiltInTools) {
+        const workerStep = builtInTools.find(
+          (tool) => tool.category === job.category,
+        );
+        if (!workerStep) {
+          await queryRunner.rollbackTransaction();
+          return null;
+        } else {
+          command = workerStep?.command || '';
+        }
       }
 
       await queryRunner.commitTransaction();
@@ -225,8 +233,9 @@ export class JobsRegistryService {
       return {
         jobId: job.id,
         value: job.asset.value,
+        job,
         category: job.category,
-        command: workerStep.command,
+        command,
       };
     } catch (error) {
       Logger.error('Error in getNextJob', error);
