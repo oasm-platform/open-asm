@@ -11,7 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Tool } from '@/services/apis/gen/queries';
 import {
@@ -22,7 +21,7 @@ import {
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 // Define columns for tools table
@@ -34,15 +33,17 @@ const toolColumns: ColumnDef<Tool>[] = [
     cell: ({ row }) => (
       <div className="flex items-center">
         {row.getValue("logoUrl") ? (
-          <div className="w-30 p-1 h-12 bg-white rounded flex items-center justify-center">
-            <img
-              src={row.getValue("logoUrl")}
-              alt={row.getValue("name")}
-              className=" object-contain"
-            />
+          <div className="w-30 p-1 h-12 bg-white rounded-lg flex items-center justify-center border border-gray-400">
+            <div className="w-28 h-10 flex items-center justify-center">
+              <img
+                src={row.getValue("logoUrl")}
+                alt={row.getValue("name")}
+                className="object-contain max-h-8"
+              />
+            </div>
           </div>
         ) : (
-          <div className="w-30 p-1 h-12 bg-white rounded flex items-center justify-center">
+          <div className="w-30 p-1 h-12 bg-white rounded-lg flex items-center justify-center border border-gray-400">
             <span className="text-xs text-gray-500">No Logo</span>
           </div>
         )}
@@ -98,18 +99,9 @@ const toolColumns: ColumnDef<Tool>[] = [
   },
 ];
 
-// Define tabs configuration
-const TABS = [
-  { value: 'information', label: 'Information' },
-  { value: 'tools', label: 'Tools' },
-];
-
 export function DetailProvider() {
   const { id } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const tab = searchParams.get('tab');
 
   const {
     tableParams: { page, pageSize, sortBy, sortOrder },
@@ -141,17 +133,6 @@ export function DetailProvider() {
       query: { enabled: !!id },
     },
   );
-
-  // Determine active tab, default to "information" if not specified
-  const activeTab = TABS.some((t) => t.value === tab) ? tab : 'information';
-
-  // Handle tab change
-  const handleTabChange = (value: string) => {
-    // Create new search params with the selected tab
-    const newSearchParams = new URLSearchParams(searchParams);
-    newSearchParams.set('tab', value);
-    navigate(`?${newSearchParams.toString()}`);
-  };
 
   // Handle provider deletion
   const handleDeleteProvider = () => {
@@ -207,17 +188,9 @@ export function DetailProvider() {
       header={
         <div className="flex items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
-            {provider.logoUrl && (
-              <img
-                src={provider.logoUrl}
-                alt={provider.name}
-                className="w-10 h-10 rounded-full object-contain"
-              />
-            )}
-            <div>
+            {/* <div>
               <h1 className="text-2xl font-bold">{provider.name}</h1>
-              <p className="text-muted-foreground text-sm">{provider.company}</p>
-            </div>
+            </div> */}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -272,88 +245,85 @@ export function DetailProvider() {
         </div>
       }
     >
-      <Tabs
-        value={activeTab!}
-        onValueChange={handleTabChange}
-        className="w-full my-6"
-      >
-        <TabsList>
-          {TABS.map((t) => (
-            <TabsTrigger
-              key={t.value}
-              value={t.value}
-              className="hover:cursor-pointer"
-            >
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContent value="information">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              <h2 className="text-lg font-semibold mb-2">Description</h2>
-              <p className="text-muted-foreground">
-                {provider.description || 'No description available.'}
-              </p>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Code</h3>
-                <p>{provider.code}</p>
+      {/* Provider Information Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-6">
+        <div className="md:col-span-2">
+          <div className="flex gap-6 mb-6">
+            {provider.logoUrl && (
+              <div className="flex-shrink-0">
+                <div className="w-24 h-24 rounded-lg border-2 border-muted-800 flex items-center justify-center">
+                  <img
+                    src={provider.logoUrl}
+                    alt={provider.name}
+                    className="w-20 h-20 object-contain"
+                  />
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  Support Email
-                </h3>
-                <p>{provider.supportEmail || 'N/A'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  API Docs
-                </h3>
-                {provider.apiDocsUrl ? (
-                  <a
-                    href={provider.apiDocsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline"
-                  >
-                    View Documentation
-                  </a>
-                ) : (
-                  <p>N/A</p>
-                )}
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  License
-                </h3>
-                <p>{provider.licenseInfo || 'N/A'}</p>
-              </div>
+            )}
+            <div className="flex flex-col justify-center">
+              <h1 className="text-2xl font-bold">{provider.name}</h1>
+              <p className="text-muted-foreground mb-2">{provider.code}</p>
+              {provider.supportEmail && (
+                <p className="text-muted-foreground text-sm">
+                  Support Email: {provider.supportEmail}
+                </p>
+              )}
             </div>
           </div>
-        </TabsContent>
+          <h2 className="text-lg font-semibold mb-2">Description</h2>
+          <p className="text-muted-foreground">
+            {provider.description || 'No description available.'}
+          </p>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground">
+              API Docs
+            </h3>
+            {provider.apiDocsUrl ? (
+              <a
+                href={provider.apiDocsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline"
+              >
+                View Documentation
+              </a>
+            ) : (
+              <p>N/A</p>
+            )}
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground">
+              License
+            </h3>
+            <p>{provider.licenseInfo || 'N/A'}</p>
+          </div>
+        </div>
+      </div>
 
-        <TabsContent value="tools">
-          <DataTable
-            data={tools}
-            columns={toolColumns}
-            isLoading={toolsLoading}
-            page={page}
-            pageSize={pageSize}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            onSortChange={(col, order) => {
-              setSortBy(col);
-              setSortOrder(order);
-            }}
-            totalItems={totalTools}
-          />
-        </TabsContent>
-      </Tabs>
+      {/* Tools Section */}
+      <div className="my-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Tools</h2>
+        </div>
+        <DataTable
+          data={tools}
+          columns={toolColumns}
+          isLoading={toolsLoading}
+          page={page}
+          pageSize={pageSize}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          onSortChange={(col, order) => {
+            setSortBy(col);
+            setSortOrder(order);
+          }}
+          totalItems={totalTools}
+        />
+      </div>
     </Page>
   );
 }
