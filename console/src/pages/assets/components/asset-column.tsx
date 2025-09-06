@@ -7,7 +7,6 @@ import type {
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import {
-  Boxes,
   BriefcaseBusiness,
   EthernetPort,
   Globe,
@@ -18,6 +17,7 @@ import {
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
 import HTTPXStatusCode from './status-code';
+import { TechnologyTooltip } from './technology-tooltip';
 
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
@@ -95,30 +95,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       return (
         <div className="flex flex-wrap gap-1 max-w-[250px] min-h-[60px]">
           {displayList?.map((item) => (
-            <Badge variant="outline" className="h-7" key={item.name}>
-              {item?.iconUrl ? (
-                <img
-                  src={item?.iconUrl}
-                  alt={item.name}
-                  className="size-4"
-                  onError={(e) => {
-                    // Fallback to globe icon if image fails to load
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent) {
-                      const globeIcon = document.createElement('div');
-                      globeIcon.innerHTML =
-                        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="lucide lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>';
-                      parent.appendChild(globeIcon);
-                    }
-                  }}
-                />
-              ) : (
-                <Boxes className="size-8" />
-              )}
-              {item.name}
-            </Badge>
+            <TechnologyTooltip tech={item} />
           ))}
           {remainCount > 0 && (
             <Badge variant="outline" className="text-xs">
