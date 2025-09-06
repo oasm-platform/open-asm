@@ -28,7 +28,8 @@ export const auth = betterAuth({
         name: 'session',
         attributes: {
           httpOnly: true,
-          secure: true,
+          // secure: true,
+          // sameSite: 'strict',
         },
       },
     },
