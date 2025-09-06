@@ -34,6 +34,7 @@ export class GetAssetsResponseDto {
   @ApiProperty({ type: () => [AssetTag] })
   tags?: AssetTag[];
   @ApiProperty({ required: false })
+  tags?: string[];
   dnsRecords?: object;
   @ApiProperty()
   ipAddresses?: string[];

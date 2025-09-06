@@ -83,7 +83,6 @@ export class AssetsService {
       .innerJoin('assets.httpResponses', 'httpResponses')
       .innerJoin('assets.ports', 'ports')
       .leftJoin('assets.target', 'targets')
-      .leftJoin('assets.tags', 'tags')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .innerJoin('assets.ipAssets', 'ipAssets')
       .innerJoin('assets.statusCodeAssets', 'statusCodeAssets')
@@ -126,12 +125,12 @@ export class AssetsService {
       'assets.id',
       'assets.targetId',
       'assets.createdAt',
+      'assets.tags',
       'ipAssets.ipAddress',
       'httpResponses.tech',
       'httpResponses.title',
       'httpResponses.tls',
       'ports.ports',
-      'tags.tag',
       'httpResponses.chain_status_codes',
       'httpResponses.status_code',
     ]);
@@ -270,7 +269,6 @@ export class AssetsService {
         'assets.targetId',
         'assets.createdAt',
         'ipAssets.ipAddress',
-        'tags',
         'httpResponses.tech',
         'httpResponses.title',
         'httpResponses.tls',
@@ -289,7 +287,6 @@ export class AssetsService {
     asset.targetId = item.targetId;
     asset.createdAt = item.createdAt;
     asset.dnsRecords = item.dnsRecords;
-    asset.tags = item.tags;
     asset.ports = item.ports ? item.ports[0] : undefined;
     asset.ipAddresses = item.ipAssets
       ? item.ipAssets.map((e) => e.ipAddress)
@@ -630,32 +627,7 @@ export class AssetsService {
     }
 
     // Update the asset with the provided data
-    // Handle tags update
-    if (updateAssetDto.tags) {
-      // Remove existing tags
-      await this.dataSource
-        .createQueryBuilder()
-        .delete()
-        .from('asset_tags')
-        .where('assetId = :assetId', { assetId: id })
-        .execute();
-
-      // Add new tags
-      const tagsToInsert = updateAssetDto.tags.map((tag) => ({
-        tag,
-        assetId: id,
-      }));
-
-      if (tagsToInsert.length > 0) {
-        await this.dataSource
-          .createQueryBuilder()
-          .insert()
-          .into('asset_tags')
-          .values(tagsToInsert)
-          .execute();
-      }
-    }
-
+    Object.assign(asset, updateAssetDto);
     // Save the updated asset
     return this.assetRepo.save(asset);
   }

@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsArray } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import { Target } from 'src/modules/targets/entities/target.entity';
 import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
 import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
-import { AssetTag } from './asset-tags.entity';
 import { HttpResponse } from './http-response.entity';
 import { IpAssetsView } from './ip-assets.entity';
 import { Port } from './ports.entity';
@@ -45,10 +45,10 @@ export class Asset extends BaseEntity {
   @Column({ type: 'json', nullable: true })
   dnsRecords?: object;
 
-  @OneToMany(() => AssetTag, (assetTag) => assetTag.asset, {
-    onDelete: 'CASCADE',
-  })
-  tags: AssetTag[];
+  @ApiProperty({ type: [String], nullable: true, default: [] })
+  @IsArray()
+  @Column('text', { array: true, nullable: true })
+  tags: string[];
 
   @ApiProperty()
   @Column({ default: false })
