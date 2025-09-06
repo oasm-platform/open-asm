@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { ApiKey } from 'src/modules/apikeys/entities/apikey.entity';
+import { AssetTag } from 'src/modules/assets/entities/asset-tags.entity';
 import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
 import { Job } from 'src/modules/jobs-registry/entities/job.entity';
@@ -97,6 +98,11 @@ export class Tool {
     onDelete: 'CASCADE',
   })
   vulnerabilities?: Vulnerability[];
+
+  @OneToMany(() => AssetTag, (assetTag) => assetTag.tool, {
+    onDelete: 'CASCADE',
+  })
+  assetTags?: AssetTag[];
 
   @ApiProperty()
   @Column({ name: 'provider_id', nullable: true })
