@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { WorkspaceId } from 'src/common/decorators/workspace-id.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
@@ -9,6 +9,7 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
+import { UpdateAssetDto } from './dto/update-asset.dto';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -115,5 +116,20 @@ export class AssetsController {
   @Get(':id')
   getAssetById(@Param('id') id: string) {
     return this.assetsService.getAssetById(id);
+  }
+
+  @Doc({
+    summary: 'Update asset by ID',
+    description: 'Updates an asset by its ID. Only tags can be updated.',
+    response: {
+      serialization: GetAssetsResponseDto,
+    },
+  })
+  @Patch(':id')
+  updateAssetById(
+    @Param('id') id: string,
+    @Body() updateAssetDto: UpdateAssetDto,
+  ) {
+    return this.assetsService.updateAssetById(id, updateAssetDto);
   }
 }

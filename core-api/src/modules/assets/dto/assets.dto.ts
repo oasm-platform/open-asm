@@ -31,8 +31,8 @@ export class GetAssetsResponseDto {
   @ApiProperty()
   updatedAt?: Date;
   @ApiProperty({ required: false })
+  tags?: string[];
   dnsRecords?: object;
-
   @ApiProperty()
   ipAddresses?: string[];
 

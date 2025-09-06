@@ -14,6 +14,7 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
+import { UpdateAssetDto } from './dto/update-asset.dto';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
 import { Port } from './entities/ports.entity';
@@ -124,6 +125,7 @@ export class AssetsService {
       'assets.id',
       'assets.targetId',
       'assets.createdAt',
+      'assets.tags',
       'ipAssets.ipAddress',
       'httpResponses.tech',
       'httpResponses.title',
@@ -152,6 +154,7 @@ export class AssetsService {
       asset.targetId = item.targetId;
       asset.createdAt = item.createdAt;
       asset.dnsRecords = item.dnsRecords;
+      asset.tags = item.tags;
       asset.ports = item.ports ? item.ports[0] : undefined;
       asset.ipAddresses = item.ipAssets
         ? item.ipAssets.map((e) => e.ipAddress)
@@ -601,5 +604,31 @@ export class AssetsService {
       .getRawMany();
 
     return result.length;
+  }
+
+  /**
+   * Updates an asset by its ID.
+   *
+   * @param id - The ID of the asset to update.
+   * @param updateAssetDto - The DTO containing the update information.
+   * @returns A promise that resolves to the updated asset.
+   * @throws NotFoundException if the asset with the given ID is not found.
+   */
+  public async updateAssetById(
+    id: string,
+    updateAssetDto: UpdateAssetDto,
+  ): Promise<Asset> {
+    const asset = await this.assetRepo.findOne({
+      where: { id },
+    });
+
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    // Update the asset with the provided data
+    Object.assign(asset, updateAssetDto);
+    // Save the updated asset
+    return this.assetRepo.save(asset);
   }
 }
