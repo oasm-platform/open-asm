@@ -497,8 +497,8 @@ export class AssetsService {
         ),
       );
 
-    const data = list.map(
-      (item: { technology: string; assetCount: number }) => {
+    const data = list
+      .map((item: { technology: string; assetCount: number }) => {
         const obj = new GetTechnologyAssetsDTO();
         obj.assetCount = item.assetCount;
 
@@ -511,8 +511,8 @@ export class AssetsService {
         }
 
         return obj;
-      },
-    );
+      })
+      .filter((e) => e.technology !== undefined);
 
     return getManyResponse({ query, data, total });
   }
