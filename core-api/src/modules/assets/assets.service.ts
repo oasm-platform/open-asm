@@ -159,18 +159,24 @@ export class AssetsService {
 
       if (item.httpResponses) {
         asset.httpResponses = item.httpResponses[0];
-        const techList = (
-          await this.technologyForwarderService.enrichTechnologies(
-            asset.httpResponses.tech,
-          )
-        ).map((e) => ({
-          name: e.name,
-          description: e.description,
-          iconUrl: e.iconUrl,
-          categoryNames: e.categoryNames,
-        }));
+        if (asset.httpResponses.tech) {
+          const techList = (
+            await this.technologyForwarderService.enrichTechnologies(
+              asset.httpResponses.tech,
+            )
+          ).map((e) => {
+            return {
+              name: e.name,
+              description: e.description,
+              iconUrl: e.iconUrl,
+              categoryNames: e.categoryNames,
+            };
+          });
 
-        asset.httpResponses.techList = techList;
+          asset.httpResponses.techList = techList.filter(
+            (e) => e.name !== undefined,
+          );
+        }
       }
       return asset;
     });
