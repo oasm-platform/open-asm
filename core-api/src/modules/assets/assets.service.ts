@@ -79,12 +79,12 @@ export class AssetsService {
 
     const queryBuilder = this.assetRepo
       .createQueryBuilder('assets')
-      .innerJoin('assets.httpResponses', 'httpResponses')
-      .innerJoin('assets.ports', 'ports')
+      .leftJoin('assets.httpResponses', 'httpResponses')
+      .leftJoin('assets.ports', 'ports')
       .leftJoin('assets.target', 'targets')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .innerJoin('assets.ipAssets', 'ipAssets')
-      .innerJoin('assets.statusCodeAssets', 'statusCodeAssets')
+      .leftJoin('assets.ipAssets', 'ipAssets')
+      .leftJoin('assets.statusCodeAssets', 'statusCodeAssets')
       .where('assets."isErrorPage" = false');
 
     for (const [key, value] of Object.entries(whereBuilder)) {

@@ -58,7 +58,7 @@ export class ToolsService implements OnModuleInit {
         .insert()
         .orUpdate({
           conflict_target: ['name'],
-          overwrite: ['description', 'logoUrl', 'version', 'uniqueName'],
+          overwrite: ['description', 'logoUrl', 'version'],
         })
         .values(toolsToInsert)
         .execute();
