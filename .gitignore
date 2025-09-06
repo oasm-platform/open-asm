@@ -64,3 +64,6 @@ core-api/.storage/*
 /nix/
 .direnv/
 .envrc
+
+.roo/*
+AGENTS.md

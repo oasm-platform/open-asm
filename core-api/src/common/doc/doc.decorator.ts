@@ -2,6 +2,7 @@ import { applyDecorators, HttpStatus, SetMetadata } from '@nestjs/common';
 import {
   ApiConsumes,
   ApiExtraModels,
+  ApiHeader,
   ApiOperation,
   ApiParam,
   ApiProduces,
@@ -22,7 +23,6 @@ export const RESPONSE_DOCS_METADATA = 'RESPONSE_DOCS_METADATA';
  */
 function applyCommonDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
   const decorators: MethodDecorator[] = [];
-
   decorators.push(ApiConsumes(getContentType(options?.request?.bodyType)));
   decorators.push(ApiProduces('application/json'));
   decorators.push(DocDefault(options?.response || {}));
@@ -35,8 +35,19 @@ function applyCommonDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
  * @param options Documentation options
  * @returns Array of method decorators
  */
+// eslint-disable-next-line complexity
 function applyParamDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
   const decorators: MethodDecorator[] = [];
+
+  if (options?.request?.getWorkspaceId) {
+    decorators.push(
+      ApiHeader({
+        name: 'X-Workspace-Id',
+        description: 'Workspace ID',
+        required: true,
+      }),
+    );
+  }
 
   if (options?.request?.params?.length) {
     decorators.push(...options.request.params.map(ApiParam));
@@ -54,7 +65,9 @@ function applyParamDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
  * @param options Documentation options
  * @returns Array of method decorators
  */
-function applyOperationDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
+function applyOperationDecorators<T>(
+  options?: IDocOptions<T>,
+): MethodDecorator[] {
   const decorators: MethodDecorator[] = [];
 
   if (options?.description || options?.summary) {

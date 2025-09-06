@@ -52,6 +52,9 @@ export class WorkspacesController {
     response: {
       serialization: GetApiKeyResponseDto,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get('api-key')
   getWorkspaceApiKey(

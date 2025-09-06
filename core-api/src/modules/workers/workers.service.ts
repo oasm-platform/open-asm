@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
@@ -10,12 +11,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { WORKER_TIMEOUT } from 'src/common/constants/app.constants';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus } from 'src/common/enums/enum';
+import {
+  ApiKeyType,
+  JobStatus,
+  WorkerScope,
+  WorkerType,
+} from 'src/common/enums/enum';
 import { generateToken } from 'src/utils/genToken';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, LessThan, Repository } from 'typeorm';
+import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { Tool } from '../tools/entities/tools.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import {
   GetManyWorkersDto,
@@ -38,6 +46,8 @@ export class WorkersService {
     private jobsRegistryService: JobsRegistryService,
 
     private dataSource: DataSource,
+
+    private apiKeyService: ApiKeysService,
   ) {}
 
   /**
@@ -186,6 +196,46 @@ export class WorkersService {
   }
 
   /**
+   * Determines the worker type and scope based on the API key type.
+   * @param apiKeyType - The type of the API key.
+   * @returns An object containing the worker type and scope.
+   */
+  private determineWorkerTypeAndScope(apiKeyType: ApiKeyType): {
+    type: WorkerType;
+    scope: WorkerScope;
+  } {
+    if (apiKeyType === ApiKeyType.WORKSPACE) {
+      return {
+        type: WorkerType.BUILT_IN,
+        scope: WorkerScope.WORKSPACE,
+      };
+    }
+    return {
+      type: WorkerType.PROVIDER,
+      scope: WorkerScope.CLOUD,
+    };
+  }
+
+  /**
+   * Determines the worker association (workspace or tool) based on the API key type and reference.
+   * @param apiKeyType - The type of the API key.
+   * @param ref - The reference ID associated with the API key.
+   * @returns An object containing either the workspace or tool association.
+   */
+  private determineWorkerAssociation(
+    apiKeyType: ApiKeyType,
+    ref: string,
+  ): Partial<Pick<WorkerInstance, 'workspace' | 'tool'>> {
+    if (apiKeyType === ApiKeyType.WORKSPACE) {
+      return { workspace: { id: ref } as Workspace };
+    }
+    if (apiKeyType === ApiKeyType.TOOL) {
+      return { tool: { id: ref } as Tool };
+    }
+    return {};
+  }
+
+  /**
    * Registers a worker in the database by inserting a new record
    * with a unique worker index for the given worker name ID.
    *
@@ -200,28 +250,36 @@ export class WorkersService {
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance | null> {
     const { apiKey } = dto;
 
-    // Find the workspace by API key
-    const workspace = await this.dataSource.getRepository(Workspace).findOne({
+    const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
       where: {
-        apiKey: { key: apiKey },
+        key: apiKey,
       },
     });
 
-    // Validate the provided token against the admin token
-    if (!workspace) {
-      throw new UnauthorizedException('Invalid API key');
+    if (!apiKeyRecord) {
+      throw new NotFoundException(`API key not found: ${apiKey}`);
     }
 
     // Generate a unique ID for the new worker instance
     const workerId = randomUUID();
-
     const TOKEN_LENGTH = 48;
 
-    await this.repo.save({
+    const { type, scope } = this.determineWorkerTypeAndScope(apiKeyRecord.type);
+    const association = this.determineWorkerAssociation(
+      apiKeyRecord.type,
+      apiKeyRecord.ref,
+    );
+
+    const data: Partial<WorkerInstance> = {
       id: workerId,
       token: generateToken(TOKEN_LENGTH),
-      workspace: { id: workspace.id },
-    });
+      type,
+      scope,
+      ...association,
+    };
+
+    await this.repo.save(data);
+
     // Fetch and return the newly created worker instance from the repository
     return this.repo.findOne({
       where: {

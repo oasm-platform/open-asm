@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { WorkerScope, WorkerType } from 'src/common/enums/enum';
+import { Tool } from 'src/modules/tools/entities/tools.entity';
 import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
 
@@ -27,4 +28,7 @@ export class WorkerInstance extends BaseEntity {
 
   @ManyToOne(() => Workspace, (workspace) => workspace.workers)
   workspace: Workspace;
+
+  @ManyToOne(() => Tool, (tool) => tool.workers)
+  tool: Tool;
 }

@@ -223,6 +223,19 @@ export type CreateJobsDto = {
   targetId: string;
 };
 
+export type PickTypeClass = {
+  id: string;
+  name: string;
+};
+
+export type AssetTag = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  tag: string;
+  tool: PickTypeClass;
+};
+
 export type TlsInfoFingerprintHash = { [key: string]: unknown };
 
 export type TlsInfo = {
@@ -310,6 +323,7 @@ export type GetAssetsResponseDto = {
   isPrimary?: boolean;
   createdAt: string;
   updatedAt: string;
+  tags: AssetTag[];
   dnsRecords?: GetAssetsResponseDtoDnsRecords;
   ipAddresses: string[];
   httpResponses?: HttpResponseDTO;
@@ -418,6 +432,11 @@ export type GetManyGetStatusCodeAssetsDTODto = {
   pageCount: number;
 };
 
+export type UpdateAssetDto = {
+  /** @nullable */
+  tags: string[] | null;
+};
+
 export type WorkerAliveDto = {
   token: string;
 };
@@ -514,7 +533,8 @@ export type Tool = {
   description: string;
   category: ToolCategory;
   version: string;
-  logoUrl: string;
+  /** @nullable */
+  logoUrl?: string | null;
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;
@@ -538,7 +558,14 @@ export type CreateToolDto = {
   description: string;
   category: CreateToolDtoCategory;
   version: string;
-  logoUrl: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  /** The ID of the provider */
+  providerId: string;
+};
+
+export type RunToolDto = {
+  targetIds?: string[];
 };
 
 export type WorkspaceTool = {
@@ -753,7 +780,6 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
-  workspaceId: string;
   value?: string;
 };
 
@@ -875,6 +901,7 @@ export type ToolsControllerGetManyToolsParams = {
   type?: ToolsControllerGetManyToolsType;
   category?: ToolsControllerGetManyToolsCategory;
   workspaceId?: string;
+  providerId?: string;
 };
 
 export type ToolsControllerGetManyToolsType =
@@ -949,14 +976,26 @@ export type ProvidersControllerGetManyProvidersParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  name?: string;
 };
 
 export type StorageControllerUploadFileBody = {
-  file?: Blob;
+  file: Blob;
+  /** Bucket name (default: "default") */
+  bucket?: string;
 };
 
 export type StorageControllerUploadFile200 = {
   path?: string;
+  bucket?: string;
+  fullPath?: string;
+};
+
+export type StorageControllerForwardImageParams = {
+  /**
+   * The URL of the image to forward
+   */
+  url: string;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -1060,7 +1099,7 @@ export const useTargetsControllerCreateTarget = <
  * @summary Get all targets in a workspace
  */
 export const targetsControllerGetTargetsInWorkspace = (
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -1071,7 +1110,7 @@ export const targetsControllerGetTargetsInWorkspace = (
 };
 
 export const getTargetsControllerGetTargetsInWorkspaceQueryKey = (
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
 ) => {
   return [`/api/targets`, ...(params ? [params] : [])] as const;
 };
@@ -1083,7 +1122,7 @@ export const getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions = <
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1136,7 +1175,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params: undefined | TargetsControllerGetTargetsInWorkspaceParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -1169,7 +1208,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1202,7 +1241,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1230,7 +1269,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   >,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -1269,7 +1308,7 @@ export const getTargetsControllerGetTargetsInWorkspaceQueryOptions = <
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1308,7 +1347,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params: undefined | TargetsControllerGetTargetsInWorkspaceParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -1335,7 +1374,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1362,7 +1401,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1385,7 +1424,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
   TData = Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
   TError = unknown,
 >(
-  params: TargetsControllerGetTargetsInWorkspaceParams,
+  params?: TargetsControllerGetTargetsInWorkspaceParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -7175,6 +7214,99 @@ export function useAssetsControllerGetAssetById<
 }
 
 /**
+ * Updates an asset by its ID. Only tags can be updated.
+ * @summary Update asset by ID
+ */
+export const assetsControllerUpdateAssetById = (
+  id: string,
+  updateAssetDto: UpdateAssetDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<GetAssetsResponseDto>(
+    {
+      url: `/api/assets/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAssetDto,
+    },
+    options,
+  );
+};
+
+export const getAssetsControllerUpdateAssetByIdMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+    TError,
+    { id: string; data: UpdateAssetDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+  TError,
+  { id: string; data: UpdateAssetDto },
+  TContext
+> => {
+  const mutationKey = ['assetsControllerUpdateAssetById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+    { id: string; data: UpdateAssetDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetsControllerUpdateAssetById(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetsControllerUpdateAssetByIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>
+>;
+export type AssetsControllerUpdateAssetByIdMutationBody = UpdateAssetDto;
+export type AssetsControllerUpdateAssetByIdMutationError = unknown;
+
+/**
+ * @summary Update asset by ID
+ */
+export const useAssetsControllerUpdateAssetById = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+      TError,
+      { id: string; data: UpdateAssetDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+  TError,
+  { id: string; data: UpdateAssetDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetsControllerUpdateAssetByIdMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Retrieves detailed information about a specific technology.
  * @summary Get technology information
  */
@@ -9386,6 +9518,97 @@ export function useToolsControllerGetManyTools<
 }
 
 /**
+ * Runs a tool with the provided information.
+ * @summary Run a tool
+ */
+export const toolsControllerRunTool = (
+  id: string,
+  runToolDto: RunToolDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/tools/${id}/run`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: runToolDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolsControllerRunToolMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolsControllerRunTool>>,
+    TError,
+    { id: string; data: RunToolDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerRunTool>>,
+  TError,
+  { id: string; data: RunToolDto },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerRunTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerRunTool>>,
+    { id: string; data: RunToolDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return toolsControllerRunTool(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolsControllerRunToolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerRunTool>>
+>;
+export type ToolsControllerRunToolMutationBody = RunToolDto;
+export type ToolsControllerRunToolMutationError = unknown;
+
+/**
+ * @summary Run a tool
+ */
+export const useToolsControllerRunTool = <TError = unknown, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerRunTool>>,
+      TError,
+      { id: string; data: RunToolDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerRunTool>>,
+  TError,
+  { id: string; data: RunToolDto },
+  TContext
+> => {
+  const mutationOptions = getToolsControllerRunToolMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Adds a tool to a specific workspace.
  * @summary Add tool to workspace
  */
@@ -10654,6 +10877,428 @@ export function useToolsControllerGetToolById<
 
   return query;
 }
+
+/**
+ * Retrieves the API key for a tool.
+ * @summary Get tool API key
+ */
+export const toolsControllerGetToolApiKey = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetApiKeyResponseDto>(
+    { url: `/api/tools/${id}/api-key`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getToolsControllerGetToolApiKeyQueryKey = (id: string) => {
+  return [`/api/tools/${id}/api-key`] as const;
+};
+
+export const getToolsControllerGetToolApiKeyInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getToolsControllerGetToolApiKeyQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  > = ({ signal }) => toolsControllerGetToolApiKey(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetToolApiKeyInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+>;
+export type ToolsControllerGetToolApiKeyInfiniteQueryError = unknown;
+
+export function useToolsControllerGetToolApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetToolApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetToolApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tool API key
+ */
+
+export function useToolsControllerGetToolApiKeyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetToolApiKeyInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getToolsControllerGetToolApiKeyQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getToolsControllerGetToolApiKeyQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+  > = ({ signal }) => toolsControllerGetToolApiKey(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetToolApiKeyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+>;
+export type ToolsControllerGetToolApiKeyQueryError = unknown;
+
+export function useToolsControllerGetToolApiKey<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetToolApiKey<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetToolApiKey<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tool API key
+ */
+
+export function useToolsControllerGetToolApiKey<
+  TData = Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetToolApiKeyQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Regenerates the API key for a tool.
+ * @summary Rotate tool API key
+ */
+export const toolsControllerRotateToolApiKey = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetApiKeyResponseDto>(
+    { url: `/api/tools/${id}/api-key/rotate`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getToolsControllerRotateToolApiKeyMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerRotateToolApiKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return toolsControllerRotateToolApiKey(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolsControllerRotateToolApiKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>
+>;
+
+export type ToolsControllerRotateToolApiKeyMutationError = unknown;
+
+/**
+ * @summary Rotate tool API key
+ */
+export const useToolsControllerRotateToolApiKey = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerRotateToolApiKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getToolsControllerRotateToolApiKeyMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 export const vulnerabilitiesControllerScan = (
   scanDto: ScanDto,
@@ -13615,6 +14260,93 @@ export const useProvidersControllerUpdateProvider = <
 };
 
 /**
+ * Soft delete a provider by ID
+ * @summary Delete a provider
+ */
+export const providersControllerDeleteProvider = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/providers/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getProvidersControllerDeleteProviderMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['providersControllerDeleteProvider'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return providersControllerDeleteProvider(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProvidersControllerDeleteProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof providersControllerDeleteProvider>>
+>;
+
+export type ProvidersControllerDeleteProviderMutationError = unknown;
+
+/**
+ * @summary Delete a provider
+ */
+export const useProvidersControllerDeleteProvider = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof providersControllerDeleteProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getProvidersControllerDeleteProviderMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * @summary Upload a file to storage
  */
 export const storageControllerUploadFile = (
@@ -13623,8 +14355,9 @@ export const storageControllerUploadFile = (
   signal?: AbortSignal,
 ) => {
   const formData = new FormData();
-  if (storageControllerUploadFileBody.file !== undefined) {
-    formData.append(`file`, storageControllerUploadFileBody.file);
+  formData.append(`file`, storageControllerUploadFileBody.file);
+  if (storageControllerUploadFileBody.bucket !== undefined) {
+    formData.append(`bucket`, storageControllerUploadFileBody.bucket);
   }
 
   return orvalClient<StorageControllerUploadFile200>(
@@ -13712,3 +14445,713 @@ export const useStorageControllerUploadFile = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * @summary Get a file from storage (public)
+ */
+export const storageControllerGetFile = (
+  bucket: string,
+  path: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Blob>(
+    {
+      url: `/api/storage/${bucket}/${path}`,
+      method: 'GET',
+      responseType: 'blob',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerGetFileQueryKey = (
+  bucket: string,
+  path: string,
+) => {
+  return [`/api/storage/${bucket}/${path}`] as const;
+};
+
+export const getStorageControllerGetFileInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStorageControllerGetFileQueryKey(bucket, path);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerGetFile>>
+  > = ({ signal }) =>
+    storageControllerGetFile(bucket, path, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bucket && path),
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof storageControllerGetFile>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerGetFileInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerGetFile>>
+>;
+export type StorageControllerGetFileInfiniteQueryError = void;
+
+export function useStorageControllerGetFileInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerGetFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerGetFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerGetFileInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerGetFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerGetFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerGetFileInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a file from storage (public)
+ */
+
+export function useStorageControllerGetFileInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof storageControllerGetFile>>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerGetFileInfiniteQueryOptions(
+    bucket,
+    path,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStorageControllerGetFileQueryOptions = <
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStorageControllerGetFileQueryKey(bucket, path);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerGetFile>>
+  > = ({ signal }) =>
+    storageControllerGetFile(bucket, path, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(bucket && path),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof storageControllerGetFile>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerGetFileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerGetFile>>
+>;
+export type StorageControllerGetFileQueryError = void;
+
+export function useStorageControllerGetFile<
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerGetFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerGetFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerGetFile<
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerGetFile>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerGetFile>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerGetFile<
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a file from storage (public)
+ */
+
+export function useStorageControllerGetFile<
+  TData = Awaited<ReturnType<typeof storageControllerGetFile>>,
+  TError = void,
+>(
+  bucket: string,
+  path: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerGetFileQueryOptions(
+    bucket,
+    path,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * @summary Forward an image from a URL
+ */
+export const storageControllerForwardImage = (
+  params: StorageControllerForwardImageParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Blob>(
+    {
+      url: `/api/storage/forward`,
+      method: 'GET',
+      params,
+      responseType: 'blob',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerForwardImageQueryKey = (
+  params: StorageControllerForwardImageParams,
+) => {
+  return [`/api/storage/forward`, ...(params ? [params] : [])] as const;
+};
+
+export const getStorageControllerForwardImageInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStorageControllerForwardImageQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    QueryKey,
+    StorageControllerForwardImageParams['page']
+  > = ({ signal, pageParam }) =>
+    storageControllerForwardImage(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    TError,
+    TData,
+    QueryKey,
+    StorageControllerForwardImageParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerForwardImageInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerForwardImage>>
+>;
+export type StorageControllerForwardImageInfiniteQueryError = void;
+
+export function useStorageControllerForwardImageInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerForwardImageInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerForwardImageInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Forward an image from a URL
+ */
+
+export function useStorageControllerForwardImageInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    StorageControllerForwardImageParams['page']
+  >,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData,
+        QueryKey,
+        StorageControllerForwardImageParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerForwardImageInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStorageControllerForwardImageQueryOptions = <
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStorageControllerForwardImageQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>
+  > = ({ signal }) =>
+    storageControllerForwardImage(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof storageControllerForwardImage>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerForwardImageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerForwardImage>>
+>;
+export type StorageControllerForwardImageQueryError = void;
+
+export function useStorageControllerForwardImage<
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerForwardImage>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerForwardImage<
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerForwardImage>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerForwardImage>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerForwardImage<
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Forward an image from a URL
+ */
+
+export function useStorageControllerForwardImage<
+  TData = Awaited<ReturnType<typeof storageControllerForwardImage>>,
+  TError = void,
+>(
+  params: StorageControllerForwardImageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerForwardImageQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}

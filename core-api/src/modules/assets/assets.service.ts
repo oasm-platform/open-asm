@@ -14,6 +14,7 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
+import { UpdateAssetDto } from './dto/update-asset.dto';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
 import { Port } from './entities/ports.entity';
@@ -82,6 +83,7 @@ export class AssetsService {
       .leftJoin('assets.httpResponses', 'httpResponses')
       .leftJoin('assets.ports', 'ports')
       .leftJoin('assets.target', 'targets')
+      .leftJoin('assets.tags', 'tags')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoin('assets.ipAssets', 'ipAssets')
       .leftJoin('assets.statusCodeAssets', 'statusCodeAssets')
@@ -129,6 +131,7 @@ export class AssetsService {
       'httpResponses.title',
       'httpResponses.tls',
       'ports.ports',
+      'tags.tag',
       'httpResponses.chain_status_codes',
       'httpResponses.status_code',
     ]);
@@ -152,6 +155,7 @@ export class AssetsService {
       asset.targetId = item.targetId;
       asset.createdAt = item.createdAt;
       asset.dnsRecords = item.dnsRecords;
+      asset.tags = item.tags;
       asset.ports = item.ports ? item.ports[0] : undefined;
       asset.ipAddresses = item.ipAssets
         ? item.ipAssets.map((e) => e.ipAddress)
@@ -272,6 +276,7 @@ export class AssetsService {
         'assets.targetId',
         'assets.createdAt',
         'ipAssets.ipAddress',
+        'tags',
         'httpResponses.tech',
         'httpResponses.title',
         'httpResponses.tls',
@@ -290,6 +295,7 @@ export class AssetsService {
     asset.targetId = item.targetId;
     asset.createdAt = item.createdAt;
     asset.dnsRecords = item.dnsRecords;
+    asset.tags = item.tags;
     asset.ports = item.ports ? item.ports[0] : undefined;
     asset.ipAddresses = item.ipAssets
       ? item.ipAssets.map((e) => e.ipAddress)
@@ -607,5 +613,56 @@ export class AssetsService {
       .getRawMany();
 
     return result.length;
+  }
+
+  /**
+   * Updates an asset by its ID.
+   *
+   * @param id - The ID of the asset to update.
+   * @param updateAssetDto - The DTO containing the update information.
+   * @returns A promise that resolves to the updated asset.
+   * @throws NotFoundException if the asset with the given ID is not found.
+   */
+  public async updateAssetById(
+    id: string,
+    updateAssetDto: UpdateAssetDto,
+  ): Promise<Asset> {
+    const asset = await this.assetRepo.findOne({
+      where: { id },
+    });
+
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    // Update the asset with the provided data
+    // Handle tags update
+    if (updateAssetDto.tags) {
+      // Remove existing tags
+      await this.dataSource
+        .createQueryBuilder()
+        .delete()
+        .from('asset_tags')
+        .where('assetId = :assetId', { assetId: id })
+        .execute();
+
+      // Add new tags
+      const tagsToInsert = updateAssetDto.tags.map((tag) => ({
+        tag,
+        assetId: id,
+      }));
+
+      if (tagsToInsert.length > 0) {
+        await this.dataSource
+          .createQueryBuilder()
+          .insert()
+          .into('asset_tags')
+          .values(tagsToInsert)
+          .execute();
+      }
+    }
+
+    // Save the updated asset
+    return this.assetRepo.save(asset);
   }
 }

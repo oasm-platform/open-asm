@@ -13,10 +13,13 @@ import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
+import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { CreateToolDto } from './dto/create-tool.dto';
+import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { GetToolByIdDto } from './dto/get-tool-by-id.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
+import { RunToolDto } from './dto/run-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -38,6 +41,25 @@ export class ToolsController {
   @Post()
   createTool(@Body() dto: CreateToolDto) {
     return this.toolsService.createTool(dto);
+  }
+
+  @Doc({
+    summary: 'Run a tool',
+    description: 'Runs a tool with the provided information.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post(':id/run')
+  runTool(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: RunToolDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.toolsService.runTool(id, dto, workspaceId);
   }
 
   @Doc({
@@ -95,6 +117,9 @@ export class ToolsController {
     response: {
       serialization: GetManyResponseDto(Tool),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get()
   async getManyTools(
@@ -116,6 +141,9 @@ export class ToolsController {
     response: {
       serialization: GetManyResponseDto(Tool),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get('installed')
   async getInstalledTools(
@@ -136,6 +164,9 @@ export class ToolsController {
     response: {
       serialization: Tool,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get(':id')
   getToolById(
@@ -143,5 +174,32 @@ export class ToolsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.toolsService.getToolById(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get tool API key',
+    description: 'Retrieves the API key for a tool.',
+    response: {
+      serialization: GetApiKeyResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get(':id/api-key')
+  getToolApiKey(@Param() { id }: IdQueryParamDto) {
+    return this.toolsService.getToolApiKey(id);
+  }
+
+  @Doc({
+    summary: 'Rotate tool API key',
+    description: 'Regenerates the API key for a tool.',
+    response: {
+      serialization: GetApiKeyResponseDto,
+    },
+  })
+  @Post(':id/api-key/rotate')
+  rotateToolApiKey(@Param() { id }: IdQueryParamDto) {
+    return this.toolsService.rotateToolApiKey(id);
   }
 }

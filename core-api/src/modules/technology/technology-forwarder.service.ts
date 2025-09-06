@@ -1,5 +1,6 @@
 /* eslint-disable no-magic-numbers */
 import { Injectable, Logger } from '@nestjs/common';
+import { WEBAPP_ANALYZER_SRC_URL } from '../../common/constants/app.constants';
 import { RedisService } from '../../services/redis/redis.service';
 import {
   CategoryInfoDTO,
@@ -34,7 +35,7 @@ export class TechnologyForwarderService {
         ? `${firstChar}.json`
         : '_.json';
 
-      const url = `https://raw.githubusercontent.com/oasm-platform/webappanalyzer/main/src/technologies/${fileName}`;
+      const url = `${WEBAPP_ANALYZER_SRC_URL}/technologies/${fileName}`;
 
       const response = await fetch(url);
 
@@ -158,8 +159,7 @@ export class TechnologyForwarderService {
         return cachedCategories;
       }
 
-      const url =
-        'https://raw.githubusercontent.com/oasm-platform/webappanalyzer/main/src/categories.json';
+      const url = `${WEBAPP_ANALYZER_SRC_URL}/categories.json`;
 
       const response = await fetch(url);
       if (!response.ok) {
@@ -257,6 +257,6 @@ export class TechnologyForwarderService {
 
     // Determine the file extension
     const extension = iconName.includes('.') ? '' : '.svg';
-    return `https://raw.githubusercontent.com/oasm-platform/webappanalyzer/main/src/images/icons/${iconName}${extension}`;
+    return `/api/storage/forward?url=${WEBAPP_ANALYZER_SRC_URL}/images/icons/${iconName}${extension}`;
   }
 }

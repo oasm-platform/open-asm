@@ -39,22 +39,31 @@ export class AuthGuard implements CanActivate {
    * @param context - The execution context of the current request
    * @returns True if the request is authorized to proceed, throws an error otherwise
    */
+  /**
+   * Validates if the current request is authenticated
+   * Attaches session and user information to the request object
+   * @param context - The execution context of the current request
+   * @returns True if the request is authorized to proceed, throws an error otherwise
+   */
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const request = context.switchToHttp().getRequest();
     const session = await this.auth.api.getSession({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       headers: fromNodeHeaders(request.headers),
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     request.session = session;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     request.user = session?.user ?? null; // useful for observability tools like Sentry
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const isPublic = this.reflector.get('PUBLIC', context.getHandler());
-
-    if (isPublic) return true;
-
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const isOptional = this.reflector.get('OPTIONAL', context.getHandler());
 
-    if (isOptional && !session) return true;
+    if (isPublic || (isOptional && !session)) return true;
 
     if (!session) {
       throw new APIError(401, {
@@ -68,11 +77,21 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
     );
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const userRole = request.user?.role;
-    if (rolesAccepted?.length && !rolesAccepted.includes(userRole)) {
+    this.validateUserRole(rolesAccepted, userRole);
+    return true;
+  }
+
+  private validateUserRole(
+    rolesAccepted: Role[] | undefined,
+    userRole: string,
+  ) {
+    if (
+      rolesAccepted?.length &&
+      !(rolesAccepted as string[]).includes(userRole)
+    ) {
       throw new ForbiddenException(`Role ${userRole} cannot access`);
     }
-
-    return true;
   }
 }

@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type {
   GetAssetsResponseDto,
-  TechnologyDetailDTO,
+  TechnologyDetailDTO
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
@@ -13,6 +13,7 @@ import {
   Globe,
   Lock,
   Network,
+  Tag,
 } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
@@ -29,6 +30,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const ports = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
       const ipAddresses = data.ipAddresses;
+      const tags = data.tags
 
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
@@ -42,7 +44,27 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
             </p>
           )}
           <div className="w-full">
-            <BadgeList list={ipAddresses} Icon={Network} maxDisplay={4} />
+            <BadgeList
+              list={
+                ipAddresses?.sort((a: string, b: string) => {
+                  const isIPv4 = (ip: string) => /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
+                  if (isIPv4(a) && !isIPv4(b)) return -1;
+                  if (!isIPv4(a) && isIPv4(b)) return 1;
+                  return 0;
+                })
+              }
+              Icon={Network}
+              maxDisplay={2}
+            />
+          </div>
+          <div className="w-full">
+            <BadgeList
+              list={
+                tags.map(t => t.tag)
+              }
+              Icon={Tag}
+              maxDisplay={2}
+            />
           </div>
           {ports && (
             <div className="w-full">
@@ -119,7 +141,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
         Math.abs(
           (new Date(tls.not_after as unknown as Date).getTime() -
             new Date().getTime()) /
-            (1000 * 60 * 60 * 24),
+          (1000 * 60 * 60 * 24),
         ),
       );
       const color = daysLeft < 30 ? 'red' : daysLeft < 60 ? 'yellow' : 'green';

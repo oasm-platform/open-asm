@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -8,15 +10,19 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { ToolCategory, WorkerType } from 'src/common/enums/enum';
+import { ApiKeyType, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { In, Repository } from 'typeorm';
+import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
+import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { builtInTools } from './built-in-tools';
 import { CreateToolDto } from './dto/create-tool.dto';
+import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
+import { RunToolDto } from './dto/run-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -34,6 +40,11 @@ export class ToolsService implements OnModuleInit {
 
     @InjectRepository(Vulnerability)
     public readonly vulnerabilityRepo: Repository<Vulnerability>,
+
+    private readonly apiKeysService: ApiKeysService,
+
+    @Inject(forwardRef(() => JobsRegistryService))
+    private jobRegistryService: JobsRegistryService,
   ) {}
 
   async onModuleInit() {
@@ -184,9 +195,10 @@ export class ToolsService implements OnModuleInit {
     const { page, limit } = query;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, string | number> = {};
+    const where: Record<string, string | number | object> = {};
     if (query.type) where.type = query.type;
     if (query.category) where.category = query.category;
+    if (query.providerId) where.provider = { id: query.providerId };
 
     // If workspaceId is provided, we need to check which tools are installed
     if (query.workspaceId) {
@@ -225,6 +237,7 @@ export class ToolsService implements OnModuleInit {
         skip: skip,
         relations: {
           workspaceTools: true,
+          provider: true,
         },
         order: {
           name: 'ASC',
@@ -330,9 +343,64 @@ export class ToolsService implements OnModuleInit {
       isOfficialSupport: false,
       version: dto.version,
       logoUrl: dto.logoUrl,
+      provider: { id: dto.providerId },
     });
 
     return this.toolsRepository.save(tool);
+  }
+
+  /**
+   * Retrieves the API key for a tool.
+   * @param toolId The ID of the tool to retrieve the API key for.
+   * @returns The API key for the tool.
+   */
+  public async getToolApiKey(toolId: string): Promise<GetApiKeyResponseDto> {
+    const tool = await this.toolsRepository.findOne({
+      where: { id: toolId },
+    });
+
+    if (!tool) {
+      throw new NotFoundException(`Tool with ID "${toolId}" not found.`);
+    }
+
+    const apiKey = await this.apiKeysService.getCurrentApiKey(
+      ApiKeyType.TOOL,
+      toolId,
+    );
+
+    if (!apiKey) {
+      return this.rotateToolApiKey(toolId);
+    }
+
+    return {
+      apiKey: apiKey.key,
+    };
+  }
+
+  /**
+   * Regenerates the API key for a tool.
+   * @param toolId The ID of the tool to regenerate the API key for.
+   * @returns The new API key for the tool.
+   */
+  public async rotateToolApiKey(toolId: string): Promise<GetApiKeyResponseDto> {
+    const tool = await this.toolsRepository.findOne({
+      where: { id: toolId },
+    });
+
+    if (!tool) {
+      throw new NotFoundException(`Tool with ID "${toolId}" not found.`);
+    }
+
+    const apiKey = await this.apiKeysService.create({
+      name: `API Key for tool ${toolId}`,
+      type: ApiKeyType.TOOL,
+      ref: toolId,
+    });
+    await this.toolsRepository.update(toolId, { apiKey });
+
+    return {
+      apiKey: apiKey.key,
+    };
   }
 
   /**
@@ -346,5 +414,23 @@ export class ToolsService implements OnModuleInit {
         name: In(names),
       },
     });
+  }
+
+  /**
+   * Run a tool.
+   * @param {string} id - The ID of the tool.
+   * @param {RunToolDto} dto - The tool run data.
+   * @returns {Promise<RunToolResponseDto>} The tool run response.
+   */
+  async runTool(id: string, dto: RunToolDto, workspaceId: string) {
+    const { targetIds } = dto;
+    const tool = await this.getToolById(id, workspaceId);
+
+    await this.jobRegistryService.createJobs({
+      tools: [tool],
+      targetIds: targetIds || [],
+      workspaceId,
+    });
+    return;
   }
 }

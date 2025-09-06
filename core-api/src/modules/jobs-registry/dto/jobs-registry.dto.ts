@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsObject, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
+import { Job } from '../entities/job.entity';
 
 export class GetNextJobResponseDto {
   @ApiProperty()
@@ -14,6 +15,7 @@ export class GetNextJobResponseDto {
     description: 'Command to run',
   })
   command?: string;
+  job: Job;
 }
 
 export class WorkerIdParams {

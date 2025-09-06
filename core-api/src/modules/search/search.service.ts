@@ -45,21 +45,11 @@ export class SearchService {
     ]);
 
     const totalItems = assetsCount + targetsCount;
-    let assetsLimit = 0;
-    let targetsLimit = 0;
-
-    if (totalItems > 0) {
-      // Calculate the ratio of assets to targets
-      const targetsRatio = targetsCount / totalItems;
-      targetsLimit = Math.max(1, Math.round(query.limit * targetsRatio));
-      assetsLimit = query.limit - targetsLimit;
-
-      // Adjust if we went over the limit due to rounding
-      if (assetsLimit + targetsLimit > query.limit) {
-        assetsLimit = Math.max(1, assetsLimit - 1);
-        targetsLimit = Math.max(1, targetsLimit - 1);
-      }
-    }
+    const { assetsLimit, targetsLimit } = this.calculateLimits(
+      assetsCount,
+      targetsCount,
+      query.limit,
+    );
 
     // Fetch the actual data with calculated limits
     const [assets, targets] = await Promise.all([
@@ -73,10 +63,13 @@ export class SearchService {
           )
         : { data: [], total: 0, page: 1, pageCount: 0 },
       targetsLimit > 0
-        ? this.targetService.getTargetsInWorkspace({
-            ...query,
-            limit: targetsLimit,
-          })
+        ? this.targetService.getTargetsInWorkspace(
+            {
+              ...query,
+              limit: targetsLimit,
+            },
+            workspaceId,
+          )
         : { data: [], total: 0, page: 1, pageCount: 0 },
     ]);
 
@@ -118,7 +111,32 @@ export class SearchService {
         await this.searchHistoryRepo.save(searchHistory);
       }
     }
-    return response as any;
+    return response as unknown as SearchResponseDto;
+  }
+
+  private calculateLimits(
+    assetsCount: number,
+    targetsCount: number,
+    limit: number,
+  ): { assetsLimit: number; targetsLimit: number } {
+    const totalItems = assetsCount + targetsCount;
+    let assetsLimit = 0;
+    let targetsLimit = 0;
+
+    if (totalItems > 0) {
+      // Calculate the ratio of assets to targets
+      const targetsRatio = targetsCount / totalItems;
+      targetsLimit = Math.max(1, Math.round(limit * targetsRatio));
+      assetsLimit = limit - targetsLimit;
+
+      // Adjust if we went over the limit due to rounding
+      if (assetsLimit + targetsLimit > limit) {
+        assetsLimit = Math.max(1, assetsLimit - 1);
+        targetsLimit = Math.max(1, targetsLimit - 1);
+      }
+    }
+
+    return { assetsLimit, targetsLimit };
   }
 
   /**

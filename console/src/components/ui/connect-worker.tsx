@@ -17,7 +17,12 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "./confirm-dialog";
 export function ConnectWorker() {
     const { selectedWorkspace } = useWorkspaceSelector()
-    const { data, refetch } = useWorkspacesControllerGetWorkspaceApiKey()
+    const { data, refetch } = useWorkspacesControllerGetWorkspaceApiKey({
+        query: {
+            queryKey: [selectedWorkspace],
+            enabled: !!selectedWorkspace,
+        }
+    })
     const [open, setOpen] = useState(false);
 
     const rawCommand = import.meta.env.PROD
@@ -32,8 +37,8 @@ export function ConnectWorker() {
             },
             onError: () => {
                 toast.error("Failed to rotate API key");
-            }
-        }
+            },
+        },
     })
     // if (import.meta.env.DEV) return null;
 

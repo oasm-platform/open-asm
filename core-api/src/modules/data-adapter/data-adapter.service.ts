@@ -214,6 +214,7 @@ export class DataAdapterService {
     }
 
     // Call the appropriate sync function
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await syncFunction(data as DataAdapterInput<any>);
 
     return;

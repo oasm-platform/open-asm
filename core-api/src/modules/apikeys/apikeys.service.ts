@@ -16,7 +16,7 @@ import { ApiKey } from './entities/apikey.entity';
 export class ApiKeysService {
   constructor(
     @InjectRepository(ApiKey)
-    private apiKeysRepository: Repository<ApiKey>,
+    public apiKeysRepository: Repository<ApiKey>,
   ) {}
 
   /**
@@ -29,16 +29,11 @@ export class ApiKeysService {
   public async getCurrentApiKey(
     type: ApiKeyType,
     ref?: string,
-  ): Promise<ApiKey> {
+  ): Promise<ApiKey | null> {
     const apiKey = await this.apiKeysRepository.findOne({
       where: { type, ref, isRevoked: false },
     });
 
-    if (!apiKey) {
-      throw new NotFoundException(
-        `API key with type ${type} and ref ${ref} not found`,
-      );
-    }
     return apiKey;
   }
 

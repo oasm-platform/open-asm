@@ -11,12 +11,11 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory } from 'src/common/enums/enum';
+import { JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
-import { Target } from '../targets/entities/target.entity';
 import { builtInTools } from '../tools/built-in-tools';
 import { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
@@ -75,11 +74,13 @@ export class JobsRegistryService {
    */
   public async createJobs({
     tools,
-    targets,
+    targetIds,
+    workspaceId,
     workflow,
   }: {
     tools: Tool[];
-    targets: Target[];
+    targetIds: string[];
+    workspaceId?: string;
     workflow?: Workflow;
   }): Promise<Job[]> {
     // Step 1: create job history
@@ -89,11 +90,24 @@ export class JobsRegistryService {
     await this.jobHistoryRepo.save(jobHistory);
 
     // Step 2: find assets of the given targets
-    const assets = await this.dataSource.getRepository(Asset).find({
-      where: {
-        target: In(targets.map((target) => target.id)),
-      },
-    });
+    const assetsQueryBuilder = this.dataSource
+      .getRepository(Asset)
+      .createQueryBuilder('assets');
+
+    if (targetIds.length > 0) {
+      assetsQueryBuilder.andWhere('assets.targetId IN (:...targetIds)', {
+        targetIds,
+      });
+    }
+
+    if (workspaceId) {
+      assetsQueryBuilder
+        .innerJoin('assets.target', 'target')
+        .innerJoin('target.workspaceTargets', 'workspaceTarget')
+        .innerJoin('workspaceTarget.workspace', 'workspace')
+        .andWhere('workspace.id = :workspaceId', { workspaceId });
+    }
+    const assets = await assetsQueryBuilder.getMany();
 
     const jobRepo = this.dataSource.getRepository(Job);
     const jobsToInsert: Job[] = [];
@@ -146,6 +160,7 @@ export class JobsRegistryService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
     try {
       const worker = await queryRunner.manager
         .getRepository(WorkerInstance)
@@ -153,26 +168,39 @@ export class JobsRegistryService {
           where: {
             id: workerId,
           },
-          relations: ['workspace'],
+          relations: ['workspace', 'tool'],
         });
 
       if (!worker) {
         throw new NotFoundException('Worker not found');
       }
 
-      const job = await queryRunner.manager
+      const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
+      const queryBuilder = queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
         .innerJoin('asset.target', 'target')
         .leftJoin('target.workspaceTargets', 'workspace_targets')
         .leftJoin('workspace_targets.workspace', 'workspaces')
+        .leftJoin('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
-        .andWhere('workspaces.id = :workspaceId', {
-          workspaceId: worker.workspace.id,
-        })
         .orderBy('jobs.createdAt', 'ASC')
-        .orderBy('jobs.priority', 'ASC')
-        .setLock('pessimistic_write')
+        .orderBy('jobs.priority', 'ASC');
+
+      if (isBuiltInTools) {
+        const builtInToolsName = builtInTools.map((tool) => tool.name);
+        queryBuilder
+          .andWhere('tool.name IN (:...names)', {
+            names: builtInToolsName,
+          })
+          .andWhere('workspaces.id = :workspaceId', {
+            workspaceId: worker.workspace.id,
+          });
+      } else {
+        queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
+      }
+      const job = await queryBuilder
+        .setLock('pessimistic_write', undefined, ['jobs'])
         .limit(1)
         .getOne();
 
@@ -185,13 +213,19 @@ export class JobsRegistryService {
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
-      const workerStep = builtInTools.find(
-        (tool) => tool.category === job.category,
-      );
 
-      if (!workerStep) {
-        await queryRunner.rollbackTransaction();
-        return null;
+      let command = '';
+
+      if (isBuiltInTools) {
+        const workerStep = builtInTools.find(
+          (tool) => tool.category === job.category,
+        );
+        if (!workerStep) {
+          await queryRunner.rollbackTransaction();
+          return null;
+        } else {
+          command = workerStep?.command || '';
+        }
       }
 
       await queryRunner.commitTransaction();
@@ -199,8 +233,9 @@ export class JobsRegistryService {
       return {
         jobId: job.id,
         value: job.asset.value,
+        job,
         category: job.category,
-        command: workerStep.command,
+        command,
       };
     } catch (error) {
       Logger.error('Error in getNextJob', error);
@@ -296,7 +331,7 @@ export class JobsRegistryService {
     const tools = await this.toolsService.toolsRepository.find({
       where: { id: In(dto.toolIds) },
     });
-    await this.createJobs({ tools, targets: [{ id: dto.targetId } as Target] });
+    await this.createJobs({ tools, targetIds: [dto.targetId] });
     return {
       message: 'Jobs created successfully',
     };
@@ -365,7 +400,7 @@ export class JobsRegistryService {
       const tools = await this.toolsService.getToolByNames(nextTool);
       await this.createJobs({
         tools,
-        targets: [job.asset.target],
+        targetIds: [job.asset.target.id],
         workflow: job.jobHistory.workflow,
       });
     }

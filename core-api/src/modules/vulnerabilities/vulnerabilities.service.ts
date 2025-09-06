@@ -4,7 +4,6 @@ import { Severity } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
-import { Target } from '../targets/entities/target.entity';
 import { ToolsService } from '../tools/tools.service';
 import {
   GetVulnerabilitiesSeverityQueryDto,
@@ -37,7 +36,7 @@ export class VulnerabilitiesService {
     const tools = await this.toolsService.getToolByNames(['nuclei']);
     await this.jobRegistryService.createJobs({
       tools,
-      targets: [{ id: targetId } as Target],
+      targetIds: [targetId],
     });
     return { message: `Scanning target ${targetId}...` };
   }

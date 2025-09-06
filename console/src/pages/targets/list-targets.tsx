@@ -93,7 +93,6 @@ export function ListTargets() {
 
   const { data, isLoading } = useTargetsControllerGetTargetsInWorkspace(
     {
-      workspaceId: selectedWorkspace ?? "",
       limit: pageSize,
       page,
       sortBy,

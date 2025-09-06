@@ -21,11 +21,14 @@ export class ProvidersService {
    * @param userContext
    * @returns
    */
-  async getManyProviders(query: ProvidersQueryDto, userContext: UserContextPayload) {
+  async getManyProviders(
+    query: ProvidersQueryDto,
+    userContext: UserContextPayload,
+  ) {
     const { page = 1, limit = 10, name } = query;
     const skip = (page - 1) * limit;
 
-    const whereConditions: any = {
+    const whereConditions: Record<string, unknown> = {
       owner: { id: userContext.id },
     };
 
@@ -72,6 +75,9 @@ export class ProvidersService {
   async getProviderById(id: string): Promise<ToolProvider> {
     const provider = await this.providersRepository.findOne({
       where: { id },
+      relations: {
+        owner: true,
+      },
     });
 
     if (!provider) {
@@ -102,5 +108,27 @@ export class ProvidersService {
 
     Object.assign(provider, updateProviderDto);
     return this.providersRepository.save(provider);
+  }
+
+  /**
+   * Soft delete a provider by ID
+   * @param id
+   * @param userContext
+   * @returns
+   */
+  async deleteProvider(
+    id: string,
+    userContext: UserContextPayload,
+  ): Promise<{ message: string }> {
+    const provider = await this.getProviderById(id);
+    // Check if user is owner of the provider
+    if (provider.owner.id !== userContext.id) {
+      throw new NotFoundException(`Provider with ID ${id} not found`);
+    }
+
+    // Soft delete the provider
+    await this.providersRepository.softDelete(id);
+
+    return { message: 'Provider deleted successfully' };
   }
 }
