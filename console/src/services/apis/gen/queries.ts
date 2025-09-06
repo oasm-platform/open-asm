@@ -223,6 +223,19 @@ export type CreateJobsDto = {
   targetId: string;
 };
 
+export type PickTypeClass = {
+  id: string;
+  name: string;
+};
+
+export type AssetTag = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  tag: string;
+  tool: PickTypeClass;
+};
+
 export type TlsInfoFingerprintHash = { [key: string]: unknown };
 
 export type TlsInfo = {
@@ -310,6 +323,7 @@ export type GetAssetsResponseDto = {
   isPrimary?: boolean;
   createdAt: string;
   updatedAt: string;
+  tags: AssetTag[];
   dnsRecords?: GetAssetsResponseDtoDnsRecords;
   ipAddresses: string[];
   httpResponses?: HttpResponseDTO;
@@ -416,6 +430,11 @@ export type GetManyGetStatusCodeAssetsDTODto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type UpdateAssetDto = {
+  /** @nullable */
+  tags: string[] | null;
 };
 
 export type WorkerAliveDto = {
@@ -543,6 +562,10 @@ export type CreateToolDto = {
   logoUrl?: string | null;
   /** The ID of the provider */
   providerId: string;
+};
+
+export type RunToolDto = {
+  targetIds?: string[];
 };
 
 export type WorkspaceTool = {
@@ -7191,6 +7214,99 @@ export function useAssetsControllerGetAssetById<
 }
 
 /**
+ * Updates an asset by its ID. Only tags can be updated.
+ * @summary Update asset by ID
+ */
+export const assetsControllerUpdateAssetById = (
+  id: string,
+  updateAssetDto: UpdateAssetDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<GetAssetsResponseDto>(
+    {
+      url: `/api/assets/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAssetDto,
+    },
+    options,
+  );
+};
+
+export const getAssetsControllerUpdateAssetByIdMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+    TError,
+    { id: string; data: UpdateAssetDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+  TError,
+  { id: string; data: UpdateAssetDto },
+  TContext
+> => {
+  const mutationKey = ['assetsControllerUpdateAssetById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+    { id: string; data: UpdateAssetDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetsControllerUpdateAssetById(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetsControllerUpdateAssetByIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>
+>;
+export type AssetsControllerUpdateAssetByIdMutationBody = UpdateAssetDto;
+export type AssetsControllerUpdateAssetByIdMutationError = unknown;
+
+/**
+ * @summary Update asset by ID
+ */
+export const useAssetsControllerUpdateAssetById = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+      TError,
+      { id: string; data: UpdateAssetDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetsControllerUpdateAssetById>>,
+  TError,
+  { id: string; data: UpdateAssetDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetsControllerUpdateAssetByIdMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Retrieves detailed information about a specific technology.
  * @summary Get technology information
  */
@@ -9400,6 +9516,97 @@ export function useToolsControllerGetManyTools<
 
   return query;
 }
+
+/**
+ * Runs a tool with the provided information.
+ * @summary Run a tool
+ */
+export const toolsControllerRunTool = (
+  id: string,
+  runToolDto: RunToolDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/tools/${id}/run`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: runToolDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getToolsControllerRunToolMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toolsControllerRunTool>>,
+    TError,
+    { id: string; data: RunToolDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toolsControllerRunTool>>,
+  TError,
+  { id: string; data: RunToolDto },
+  TContext
+> => {
+  const mutationKey = ['toolsControllerRunTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toolsControllerRunTool>>,
+    { id: string; data: RunToolDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return toolsControllerRunTool(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToolsControllerRunToolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerRunTool>>
+>;
+export type ToolsControllerRunToolMutationBody = RunToolDto;
+export type ToolsControllerRunToolMutationError = unknown;
+
+/**
+ * @summary Run a tool
+ */
+export const useToolsControllerRunTool = <TError = unknown, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof toolsControllerRunTool>>,
+      TError,
+      { id: string; data: RunToolDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof toolsControllerRunTool>>,
+  TError,
+  { id: string; data: RunToolDto },
+  TContext
+> => {
+  const mutationOptions = getToolsControllerRunToolMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * Adds a tool to a specific workspace.

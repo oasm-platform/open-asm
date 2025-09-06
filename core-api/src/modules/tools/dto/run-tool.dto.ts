@@ -4,8 +4,9 @@ import { IsOptional, IsUUID } from 'class-validator';
 
 export class RunToolDto {
   @ApiProperty({
-    required: false,
+    type: String,
     isArray: true,
+    required: false,
   })
   @IsUUID(4, { each: true })
   @IsOptional()

@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type {
   GetAssetsResponseDto,
-  TechnologyDetailDTO,
+  TechnologyDetailDTO
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
@@ -13,6 +13,7 @@ import {
   Globe,
   Lock,
   Network,
+  Tag,
 } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
@@ -29,6 +30,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const ports = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
       const ipAddresses = data.ipAddresses;
+      const tags = data.tags
 
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
@@ -52,7 +54,16 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
                 })
               }
               Icon={Network}
-              maxDisplay={4}
+              maxDisplay={2}
+            />
+          </div>
+          <div className="w-full">
+            <BadgeList
+              list={
+                tags.map(t => t.tag)
+              }
+              Icon={Tag}
+              maxDisplay={2}
             />
           </div>
           {ports && (

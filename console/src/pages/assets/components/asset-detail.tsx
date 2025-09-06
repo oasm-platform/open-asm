@@ -15,30 +15,39 @@ import {
   EthernetPort,
   Globe,
   Layers,
+  Loader2Icon,
   Lock,
   Network,
   ShieldCheck,
+  Tag
 } from 'lucide-react';
 import { toast } from 'sonner';
+import AddTagDialog from './add-tag-dialog';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
 import HTTPXStatusCode from './status-code';
 
 export default function AssetDetail({ id }: { id: string }) {
-  const { data } = useAssetsControllerGetAssetById(id);
-  if (!data) return 'Loading';
+  const { data, refetch } = useAssetsControllerGetAssetById(id, {
+  });
 
-  const { value, httpResponses, ports, ipAddresses } = data;
+  if (!data) {
+    return <div className='h-full w-full flex justify-center items-center'>
+      <Loader2Icon className="animate-spin mr-1 h-10 w-10" />
+    </div>;
+  }
+
+  const { value, httpResponses, ports, ipAddresses, tags } = data;
   const ports_scanner = ports;
   const tls = httpResponses?.tls;
 
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after
     ? Math.round(
-        (new Date(tls.not_after as unknown as Date).getTime() -
-          new Date().getTime()) /
-          (1000 * 60 * 60 * 24),
-      )
+      (new Date(tls.not_after as unknown as Date).getTime() -
+        new Date().getTime()) /
+      (1000 * 60 * 60 * 24),
+    )
     : undefined;
 
   // Calculate certificate age start date and display
@@ -120,7 +129,18 @@ export default function AssetDetail({ id }: { id: string }) {
             )}
           </div>
         </section>
-
+        <div className='flex flex-wrap gap-2 mt-4'>
+          {data.tags.map((tag) => (
+            <Badge
+              key={tag.id}
+              variant="outline"
+              className="flex items-center gap-1 h-8 rounded-md"
+            >
+              <Tag size={16} /> {tag.tag}
+            </Badge>
+          ))}
+          <AddTagDialog id={id} tags={tags} refetch={refetch} />
+        </div>
         <Separator className="my-5" />
 
         <section>
@@ -313,6 +333,6 @@ export default function AssetDetail({ id }: { id: string }) {
           </>
         )}
       </div>
-    </ScrollArea>
+    </ScrollArea >
   );
 }
