@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type {
   GetAssetsResponseDto,
-  TechnologyDetailDTO,
+  TechnologyDetailDTO
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
@@ -13,6 +13,7 @@ import {
   Globe,
   Lock,
   Network,
+  Tag,
 } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
@@ -29,6 +30,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const ports = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
       const ipAddresses = data.ipAddresses;
+      const tags = data.tags
 
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
@@ -52,7 +54,16 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
                 })
               }
               Icon={Network}
-              maxDisplay={4}
+              maxDisplay={2}
+            />
+          </div>
+          <div className="w-full">
+            <BadgeList
+              list={
+                tags.map(t => t.tag)
+              }
+              Icon={Tag}
+              maxDisplay={2}
             />
           </div>
           {ports && (
@@ -107,32 +118,6 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
                 <Boxes className="size-8" />
               )}
               {item.name}
-            </Badge>
-          ))}
-          {remainCount > 0 && (
-            <Badge variant="outline" className="text-xs">
-              +{remainCount}
-            </Badge>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    header: 'Tags',
-    size: 200,
-    cell: ({ row }) => {
-      const data = row.original;
-      const tags = (data as { tags?: string[] }).tags || [];
-      const maxDisplay = 4;
-      const displayList = tags.slice(0, maxDisplay);
-      const remainCount = tags.length - maxDisplay;
-
-      return (
-        <div className="flex flex-wrap gap-1 max-w-[200px] min-h-[60px]">
-          {displayList.map((tag: string) => (
-            <Badge variant="outline" className="h-7" key={tag}>
-              {tag}
             </Badge>
           ))}
           {remainCount > 0 && (
