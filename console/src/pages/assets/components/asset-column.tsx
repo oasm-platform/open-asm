@@ -42,7 +42,18 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
             </p>
           )}
           <div className="w-full">
-            <BadgeList list={ipAddresses} Icon={Network} maxDisplay={4} />
+            <BadgeList
+              list={
+                ipAddresses?.sort((a: string, b: string) => {
+                  const isIPv4 = (ip: string) => /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
+                  if (isIPv4(a) && !isIPv4(b)) return -1;
+                  if (!isIPv4(a) && isIPv4(b)) return 1;
+                  return 0;
+                })
+              }
+              Icon={Network}
+              maxDisplay={4}
+            />
           </div>
           {ports && (
             <div className="w-full">
@@ -119,7 +130,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
         Math.abs(
           (new Date(tls.not_after as unknown as Date).getTime() -
             new Date().getTime()) /
-            (1000 * 60 * 60 * 24),
+          (1000 * 60 * 60 * 24),
         ),
       );
       const color = daysLeft < 30 ? 'red' : daysLeft < 60 ? 'yellow' : 'green';
