@@ -1,4 +1,8 @@
-import { PickType } from '@nestjs/swagger';
-import { Asset } from '../entities/assets.entity';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsArray } from 'class-validator';
 
-export class UpdateAssetDto extends PickType(Asset, ['tags'] as const) {}
+export class UpdateAssetDto {
+  @ApiProperty({ type: [String], nullable: true, default: [] })
+  @IsArray()
+  tags: string[];
+}

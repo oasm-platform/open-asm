@@ -130,32 +130,6 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
-    header: 'Tags',
-    size: 200,
-    cell: ({ row }) => {
-      const data = row.original;
-      const tags = (data as { tags?: string[] }).tags || [];
-      const maxDisplay = 4;
-      const displayList = tags.slice(0, maxDisplay);
-      const remainCount = tags.length - maxDisplay;
-
-      return (
-        <div className="flex flex-wrap gap-1 max-w-[200px] min-h-[60px]">
-          {displayList.map((tag: string) => (
-            <Badge variant="outline" className="h-7" key={tag}>
-              {tag}
-            </Badge>
-          ))}
-          {remainCount > 0 && (
-            <Badge variant="outline" className="text-xs">
-              +{remainCount}
-            </Badge>
-          )}
-        </div>
-      );
-    },
-  },
-  {
     header: 'Certificate',
     size: 200,
     cell: ({ row }) => {
