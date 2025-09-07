@@ -385,11 +385,13 @@ export class JobsRegistryService {
       job,
     });
 
-    await this.getNextStepForJob(job);
-
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
     await this.updateJobStatus(job.id, newStatus);
+
+    if (newStatus === JobStatus.COMPLETED) {
+      await this.getNextStepForJob(job);
+    }
 
     return { workerId, dto };
   }

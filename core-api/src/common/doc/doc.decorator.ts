@@ -35,7 +35,7 @@ function applyCommonDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
  * @param options Documentation options
  * @returns Array of method decorators
  */
-// eslint-disable-next-line complexity
+ 
 function applyParamDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
   const decorators: MethodDecorator[] = [];
 

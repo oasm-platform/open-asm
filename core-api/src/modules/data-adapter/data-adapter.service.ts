@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { JobDataResultType } from 'src/common/types/app.types';
@@ -247,17 +247,17 @@ export class DataAdapterService {
       },
       [ToolCategory.SUBDOMAINS]: {
         handler: (data: DataAdapterInput<Asset[]>) => this.subdomains(data),
-        validationClass: Asset,
+        // validationClass: Asset,
       },
       [ToolCategory.HTTP_PROBE]: {
         handler: (data: DataAdapterInput<HttpResponse>) =>
           this.httpResponses(data),
-        validationClass: HttpResponse,
+        // validationClass: HttpResponse, // no validate for now
       },
       [ToolCategory.VULNERABILITIES]: {
         handler: (data: DataAdapterInput<Vulnerability[]>) =>
           this.vulnerabilities(data),
-        validationClass: Vulnerability,
+        // validationClass: Vulnerability,
       },
       [ToolCategory.CLASSIFIER]: {
         handler: (data: DataAdapterInput<AssetTag[]>) => this.classifier(data),
@@ -288,6 +288,7 @@ export class DataAdapterService {
         syncFunction.validationClass as new () => object,
       );
       if (!isValid) {
+        Logger.error('Invalid data', job.category);
         throw new BadRequestException(
           `Data validation failed for category: ${job.tool.category}`,
         );

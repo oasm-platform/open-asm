@@ -19,7 +19,7 @@ import {
 } from 'src/common/enums/enum';
 import { generateToken } from 'src/utils/genToken';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { DataSource, LessThan, Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -44,8 +44,6 @@ export class WorkersService {
 
     @Inject(forwardRef(() => JobsRegistryService))
     private jobsRegistryService: JobsRegistryService,
-
-    private dataSource: DataSource,
 
     private apiKeyService: ApiKeysService,
   ) {}
