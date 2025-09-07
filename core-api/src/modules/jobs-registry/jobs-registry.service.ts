@@ -12,6 +12,7 @@ import {
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
+import { JobDataResultType } from 'src/common/types/app.types';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
@@ -348,41 +349,49 @@ export class JobsRegistryService {
     dto: UpdateResultDto,
   ): Promise<{ workerId: string; dto: UpdateResultDto }> {
     const { jobId, data } = dto;
-
     const job = await this.findJobForUpdate(workerId, jobId);
 
     if (!job) {
       throw new NotFoundException('Job not found');
     }
 
-    const step = builtInTools.find((tool) => tool.name === job.tool.name);
+    const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
+    let dataForSync: JobDataResultType;
+    if (isBuiltInTools) {
+      const step = builtInTools.find((tool) => tool.name === job.tool.name);
 
-    if (!step) {
-      throw new Error(`Worker step not found for worker: ${job.tool.name}`);
-    }
+      if (!step) {
+        throw new Error(`Worker step not found for worker: ${job.tool.name}`);
+      }
 
-    const builtInStep = builtInTools.find(
-      (tool) => tool.name === job.tool.name,
-    );
+      const builtInStep = builtInTools.find(
+        (tool) => tool.name === job.tool.name,
+      );
 
-    if (!builtInStep) {
-      throw new Error(`Worker step not found for worker: ${job.tool.name}`);
-    }
+      if (!builtInStep) {
+        throw new Error(`Worker step not found for worker: ${job.tool.name}`);
+      }
 
-    if (!data.raw && !builtInStep) {
-      throw new BadGatewayException('Raw data is required');
+      if (!data.raw && !builtInStep) {
+        throw new BadGatewayException('Raw data is required');
+      }
+      dataForSync = builtInStep?.parser?.(data.raw);
+    } else {
+      dataForSync = data.payload;
     }
 
     await this.dataAdapterService.syncData({
-      data: builtInStep?.parser?.(data.raw),
+      data: dataForSync,
       job,
     });
-
-    await this.getNextStepForJob(job);
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
     await this.updateJobStatus(job.id, newStatus);
+
+    if (newStatus === JobStatus.COMPLETED) {
+      await this.getNextStepForJob(job);
+    }
 
     return { workerId, dto };
   }
@@ -393,6 +402,8 @@ export class JobsRegistryService {
    */
   private async getNextStepForJob(job: Job) {
     const workflow = job.jobHistory.workflow;
+    if (!workflow) return;
+
     const currentTool = job.tool.name;
     const nextTool = workflow?.content.jobs[currentTool];
 

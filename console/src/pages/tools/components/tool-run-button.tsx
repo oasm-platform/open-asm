@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { type Tool } from "@/services/apis/gen/queries";
+import { useToolsControllerRunTool, type Tool } from "@/services/apis/gen/queries";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
@@ -10,6 +10,7 @@ interface ToolRunButtonProps {
 }
 
 const ToolRunButton = ({ tool, workspaceId }: ToolRunButtonProps) => {
+  const { mutate } = useToolsControllerRunTool()
   const handleRun = () => {
     // Check if workspaceId exists
     if (!workspaceId) {
@@ -17,10 +18,19 @@ const ToolRunButton = ({ tool, workspaceId }: ToolRunButtonProps) => {
       return;
     }
 
-    // For now, show a message that this feature is not implemented
-    toast.info(`Running tool "${tool.name}" is not yet implemented`, {
-      description: "This feature will be available in a future release."
-    });
+    mutate({
+      id: tool.id,
+      data: {
+
+      }
+    }, {
+      onSuccess: () => {
+        toast.success(`Tool "${tool.name}" is being run`);
+      },
+      onError: () => {
+        toast.error(`Failed to run tool "${tool.name}"`);
+      }
+    })
   };
 
   return (
