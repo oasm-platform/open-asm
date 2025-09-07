@@ -70,30 +70,46 @@ export class GetManyJobsQueryParams extends GetManyBaseQueryParams {
 export class JobTimelineItem {
   @ApiProperty()
   name: string;
-  
+
   @ApiProperty()
   target: string;
-  
+
   @ApiProperty()
   targetId: string;
-  
+
   @ApiProperty()
   startTime: Date;
-  
+
   @ApiProperty()
   endTime: Date;
-  
+
   @ApiProperty()
   status: JobStatus;
-  
+
   @ApiProperty()
   description?: string;
-  
+
   @ApiProperty()
   toolCategory?: ToolCategory;
-  
+
   @ApiProperty()
   duration?: number;
+}
+
+/**
+ * Represents the raw SQL query result for the jobs timeline query.
+ * This interface maps directly to the columns returned by the jobs timeline SQL query.
+ */
+export interface JobTimelineQueryResult {
+  name: string;
+  target: string;
+  target_id: string;
+  start_time: Date;
+  end_time: Date;
+  statuses: string;
+  description: string;
+  tool_category: ToolCategory;
+  duration_seconds: number;
 }
 
 export class JobTimelineResponseDto {

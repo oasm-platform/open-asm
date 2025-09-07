@@ -27,6 +27,7 @@ import {
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
   JobTimelineItem,
+  JobTimelineQueryResult,
   JobTimelineResponseDto,
   UpdateResultDto,
 } from './dto/jobs-registry.dto';
@@ -52,7 +53,7 @@ export class JobsRegistryService {
     if (!(sortBy in Job)) {
       sortBy = 'createdAt';
     }
-    
+
     const qb = this.repo
       .createQueryBuilder('job')
       .leftJoinAndSelect('job.tool', 'tool')
@@ -61,7 +62,7 @@ export class JobsRegistryService {
       .take(query.limit)
       .skip((page - 1) * limit)
       .orderBy(`job.${sortBy}`, sortOrder);
-      
+
     const [data, total] = await qb.getManyAndCount();
 
     return getManyResponse<Job>({ query, data, total });
@@ -416,7 +417,7 @@ export class JobsRegistryService {
    */
   public async getJobsTimeline(): Promise<JobTimelineResponseDto> {
     // Execute the raw SQL query based on the provided example
-    const result = await this.dataSource.query(`
+    const result: JobTimelineQueryResult[] = await this.dataSource.query(`
       with grouped as (
         select
           tools.name,
@@ -429,10 +430,12 @@ export class JobsRegistryService {
           jobs."createdAt",
           jobs."updatedAt",
           jobs."completedAt",
+          jobs."jobHistoryId",
           -- check if a new group should start
           case
             when lag(tools.name) over (order by jobs."createdAt" desc) = tools.name
              and lag(targets.value) over (order by jobs."createdAt" desc) = targets.value
+             and lag(jobs."jobHistoryId") over (order by jobs."createdAt" desc) = jobs."jobHistoryId"
             then 0 else 1
           end as is_new_group
         from jobs
@@ -450,6 +453,7 @@ export class JobsRegistryService {
         name,
         target,
         target_id,
+        "jobHistoryId",
         min("createdAt") as start_time,
         max(COALESCE("completedAt", "updatedAt")) as end_time,
         string_agg(status::text, ', ') as statuses,
@@ -457,35 +461,38 @@ export class JobsRegistryService {
         max(tool_category) as tool_category,
         EXTRACT(EPOCH FROM (max(COALESCE("completedAt", "updatedAt")) - min("createdAt"))) as duration_seconds
       from grouped_with_id
-      group by grp_id, name, target, target_id
+      group by grp_id, name, target, target_id, "jobHistoryId"
       order by end_time desc
       limit 15;
     `);
 
     // Map the raw SQL results to our DTO format
-    const timelineItems: JobTimelineItem[] = result.map(item => {
-      // Determine the overall status based on the statuses string
-      let status = JobStatus.PENDING;
-      if (item.statuses.includes(JobStatus.IN_PROGRESS)) {
-        status = JobStatus.IN_PROGRESS;
-      } else if (item.statuses.includes(JobStatus.FAILED)) {
-        status = JobStatus.FAILED;
-      } else if (item.statuses.includes(JobStatus.COMPLETED)) {
-        status = JobStatus.COMPLETED;
-      }
+    const timelineItems: JobTimelineItem[] = result.map(
+      (item: JobTimelineQueryResult) => {
+        // Determine the overall status based on the statuses string
+        let status = JobStatus.PENDING;
+        if (item.statuses.includes(JobStatus.IN_PROGRESS)) {
+          status = JobStatus.IN_PROGRESS;
+        } else if (item.statuses.includes(JobStatus.FAILED)) {
+          status = JobStatus.FAILED;
+        } else if (item.statuses.includes(JobStatus.COMPLETED)) {
+          status = JobStatus.COMPLETED;
+        }
 
-      return {
-        name: item.name,
-        target: item.target,
-        targetId: item.target_id,
-        startTime: item.start_time,
-        endTime: item.end_time,
-        status: status,
-        description: item.description,
-        toolCategory: item.tool_category,
-        duration: Math.round(item.duration_seconds)
-      };
-    });
+        return {
+          name: item.name,
+          target: item.target,
+          targetId: item.target_id,
+
+          startTime: item.start_time,
+          endTime: item.end_time,
+          status: status,
+          description: item.description,
+          toolCategory: item.tool_category,
+          duration: Math.round(item.duration_seconds),
+        };
+      },
+    );
 
     return { data: timelineItems };
   }

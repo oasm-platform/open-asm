@@ -5,7 +5,7 @@ import { Loader2Icon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 
-type FormData = {
+export type FormData = {
   name: string;
   code: string;
   description: string;
@@ -24,11 +24,11 @@ interface ProviderFormProps {
   submitButtonText: string;
 }
 
-export function ProviderForm({ 
-  onSubmit, 
-  isPending = false, 
+export function ProviderForm({
+  onSubmit,
+  isPending = false,
   initialData = {},
-  submitButtonText 
+  submitButtonText
 }: ProviderFormProps) {
   const navigate = useNavigate();
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
@@ -47,13 +47,12 @@ export function ProviderForm({
 
   const handleFormSubmit = (data: FormData) => {
     // Filter out empty fields to avoid sending them in the request
-    const filteredData: Record<string, any> = {};
-    Object.keys(data).forEach(key => {
-      const value = data[key as keyof FormData];
+    const filteredData = Object.entries(data).reduce<Partial<FormData>>((acc, [key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
-        filteredData[key] = value;
+        acc[key as keyof FormData] = value;
       }
-    });
+      return acc;
+    }, {});
 
     onSubmit(filteredData as FormData);
   };
@@ -78,7 +77,7 @@ export function ProviderForm({
           {errors.code && <p className="text-red-600 text-sm">{errors.code.message}</p>}
         </div>
       </div>
-      
+
       <div className="space-y-2">
         <label className="text-sm font-medium">Description</label>
         <Textarea
@@ -87,7 +86,7 @@ export function ProviderForm({
           rows={4}
         />
       </div>
-      
+
       <div className="space-y-2">
         <label className="text-sm font-medium">Company</label>
         <Input
@@ -95,7 +94,7 @@ export function ProviderForm({
           placeholder="Company Name"
         />
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <label className="text-sm font-medium">Logo URL</label>
@@ -112,7 +111,7 @@ export function ProviderForm({
           />
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <label className="text-sm font-medium">Support Email</label>
@@ -129,7 +128,7 @@ export function ProviderForm({
           />
         </div>
       </div>
-      
+
       <div className="space-y-2">
         <label className="text-sm font-medium">License Info</label>
         <Textarea
@@ -140,9 +139,9 @@ export function ProviderForm({
       </div>
 
       <div className="flex justify-end gap-3 pt-4">
-        <Button 
-          type="button" 
-          variant="outline" 
+        <Button
+          type="button"
+          variant="outline"
           onClick={() => navigate(-1)}
           disabled={isPending}
         >

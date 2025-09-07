@@ -31,7 +31,8 @@ export class JobsRegistryController {
 
   @Doc({
     summary: 'Get Jobs Timeline',
-    description: 'Retrieves a timeline of jobs grouped by tool name and target.',
+    description:
+      'Retrieves a timeline of jobs grouped by tool name and target.',
     response: {
       serialization: JobTimelineResponseDto,
     },
