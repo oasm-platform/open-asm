@@ -1,19 +1,22 @@
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { ToolsControllerGetManyToolsType, useToolsControllerGetManyTools } from "@/services/apis/gen/queries";
+import { ToolsControllerGetManyToolsCategory, ToolsControllerGetManyToolsType, useToolsControllerGetManyTools } from "@/services/apis/gen/queries";
 import { LayoutGrid } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import ToolsList from "../tools-list";
 import ToolInstallButton from "./tool-install-button";
 
 const Marketplace = () => {
   const { selectedWorkspace } = useWorkspaceSelector();
+  const [searchParams] = useSearchParams();
+  const category = searchParams.get("category") ?? "";
   const { data, isLoading } = useToolsControllerGetManyTools({
     type: ToolsControllerGetManyToolsType.provider,
+    category: category as ToolsControllerGetManyToolsCategory,
   }, {
     query: {
-      queryKey: [selectedWorkspace]
+      queryKey: [selectedWorkspace, category]
     }
   });
-
   return (
     <div className="mt-8">
       <ToolsList

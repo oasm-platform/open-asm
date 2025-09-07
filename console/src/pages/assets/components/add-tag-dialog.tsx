@@ -9,8 +9,9 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { useAssetsControllerUpdateAssetById, type AssetTag } from '@/services/apis/gen/queries';
-import { Plus, Tag } from 'lucide-react';
+import { Plus, Sparkles, Tag } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface AddTagDialogProps {
@@ -140,15 +141,25 @@ const AddTagDialog = (props: AddTagDialogProps) => {
                             className="flex-1 border-0 shadow-none  p-0 h-6 bg-transparent focus:outline-none"
                         />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Type tags and press ',' to add</p>
+                    <div className='flex flex-row items-center gap-2'>
+                        <p className="text-xs text-gray-500">Type tags and press ',' to add. Or use</p>
+                        <Link to={`/tools?category=classifier&assetId=${props.id}&stage=marketplace`}  >
+                            <Button variant="ghost" >
+                                <Sparkles />Auto generate
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsOpen(false)}>
-                        Close
-                    </Button>
-                    <Button type="submit" onClick={() => handleSave()}>
-                        Save
-                    </Button>
+                <DialogFooter className="flex justify-between items-center">
+
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setIsOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" onClick={() => handleSave()}>
+                            Save
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
