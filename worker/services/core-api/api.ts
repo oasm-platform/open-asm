@@ -197,9 +197,15 @@ export interface GetNextJobResponseDto {
   command: string;
 }
 
+export interface DataPayloadResult {
+  error: boolean;
+  raw: string;
+  payload: object;
+}
+
 export interface UpdateResultDto {
   jobId: string;
-  data: object;
+  data: DataPayloadResult;
 }
 
 export interface CreateJobsDto {
@@ -754,6 +760,7 @@ export enum ToolCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Classifier = "classifier",
 }
 
 export enum CreateToolDtoCategoryEnum {
@@ -761,6 +768,7 @@ export enum CreateToolDtoCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Classifier = "classifier",
 }
 
 export enum VulnerabilityStatisticsDtoSeverityEnum {
@@ -789,6 +797,7 @@ export enum ToolsControllerGetManyToolsParamsCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Classifier = "classifier",
 }
 
 export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
@@ -796,6 +805,7 @@ export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Classifier = "classifier",
 }
 
 import type {

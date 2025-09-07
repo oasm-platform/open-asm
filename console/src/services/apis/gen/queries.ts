@@ -211,11 +211,17 @@ export type GetNextJobResponseDto = {
   command: string;
 };
 
-export type UpdateResultDtoData = { [key: string]: unknown };
+export type DataPayloadResultPayload = { [key: string]: unknown };
+
+export type DataPayloadResult = {
+  error: boolean;
+  raw: string;
+  payload: DataPayloadResultPayload;
+};
 
 export type UpdateResultDto = {
   jobId: string;
-  data: UpdateResultDtoData;
+  data: DataPayloadResult;
 };
 
 export type CreateJobsDto = {
@@ -522,6 +528,7 @@ export const ToolCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  classifier: 'classifier',
 } as const;
 
 export type Tool = {
@@ -549,6 +556,7 @@ export const CreateToolDtoCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  classifier: 'classifier',
 } as const;
 
 export type CreateToolDto = {
@@ -920,6 +928,7 @@ export const ToolsControllerGetManyToolsCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  classifier: 'classifier',
 } as const;
 
 export type ToolsControllerGetInstalledToolsParams = {
@@ -939,6 +948,7 @@ export const ToolsControllerGetInstalledToolsCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  classifier: 'classifier',
 } as const;
 
 export type VulnerabilitiesControllerGetVulnerabilitiesParams = {

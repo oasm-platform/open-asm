@@ -21,4 +21,7 @@ export class AssetTag extends BaseEntity {
   @ApiProperty({ type: () => PickType(Tool, ['id', 'name']) })
   @ManyToOne(() => Tool, (tool) => tool.assetTags)
   tool: Tool;
+
+  @Column({ nullable: true })
+  toolId: string;
 }

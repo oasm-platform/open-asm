@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { ResultType as JobDataResultType } from 'src/common/types/app.types';
 import { DataSource, InsertResult } from 'typeorm';
 import { JobStatus, ToolCategory } from '../../common/enums/enum';
+import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
@@ -142,6 +144,11 @@ export class DataAdapterService {
     return;
   }
 
+  /**
+   * Vulnerabilities data normalization
+   * @param param0
+   * @returns
+   */
   public async vulnerabilities({
     data,
     job,
@@ -175,14 +182,44 @@ export class DataAdapterService {
   }
 
   /**
+   * Asset tags data normalization
+   * @param param0
+   * @returns
+   * @example
+   * {
+   *   "tags": [
+   *     {
+   *       "key": "tag-key",
+   *       "value": "tag-value"
+   *     }
+   *   ]
+   * }
+   */
+  public async classifier({
+    data,
+    job,
+  }: DataAdapterInput<AssetTag[]>): Promise<void> {
+    await this.dataSource
+      .createQueryBuilder()
+      .insert()
+      .into(AssetTag)
+      .values(
+        data.map((tag) => ({
+          ...tag,
+          assetId: job.asset.id,
+          toolId: job.tool.id,
+        })),
+      )
+      .execute();
+  }
+
+  /**
    * Sync data based on tool category
    * @param data Data to sync
    * @returns
    */
   public async syncData(
-    data: DataAdapterInput<
-      Asset[] | HttpResponse | number[] | Vulnerability[] | undefined
-    >,
+    data: DataAdapterInput<JobDataResultType>,
   ): Promise<void> {
     // Map of tool categories to their corresponding sync functions
     const syncFunctions = {
@@ -197,6 +234,8 @@ export class DataAdapterService {
       ) => {
         return this.vulnerabilities(data);
       },
+      [ToolCategory.CLASSIFIER]: (data: DataAdapterInput<AssetTag[]>) =>
+        this.classifier(data),
     };
 
     // Get the appropriate sync function based on category

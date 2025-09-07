@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsObject, IsUUID } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { Job } from '../entities/job.entity';
@@ -24,16 +24,27 @@ export class WorkerIdParams {
   workerId: string;
 }
 
+export class DataPayloadResult {
+  @ApiProperty()
+  @IsOptional()
+  @IsBoolean()
+  error: boolean;
+
+  @ApiProperty()
+  @IsOptional()
+  @IsOptional()
+  raw: string;
+
+  @ApiProperty()
+  @IsOptional()
+  payload: object | Record<string, unknown>[] | Record<string, unknown>;
+}
 export class UpdateResultDto {
   @ApiProperty()
   @IsUUID()
   jobId: string;
   @ApiProperty()
-  @IsObject()
-  data: {
-    error?: boolean;
-    raw?: string;
-  };
+  data: DataPayloadResult;
 }
 
 export class GetManyJobsQueryParams extends GetManyBaseQueryParams {
