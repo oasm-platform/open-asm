@@ -10,6 +10,10 @@ interface ToolRunButtonProps {
 }
 
 const ToolRunButton = ({ tool, workspaceId }: ToolRunButtonProps) => {
+  const { search } = window.location;
+  const urlParams = new URLSearchParams(search);
+  const assetId = urlParams.get("assetId") || "";
+
   const { mutate } = useToolsControllerRunTool()
   const handleRun = () => {
     // Check if workspaceId exists
@@ -21,7 +25,7 @@ const ToolRunButton = ({ tool, workspaceId }: ToolRunButtonProps) => {
     mutate({
       id: tool.id,
       data: {
-
+        assetIds: [assetId]
       }
     }, {
       onSuccess: () => {

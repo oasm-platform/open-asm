@@ -12,4 +12,14 @@ export class RunToolDto {
   @IsOptional()
   @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   targetIds?: string[];
+
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    required: false,
+  })
+  @IsUUID(4, { each: true })
+  @IsOptional()
+  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
+  assetIds?: string[];
 }

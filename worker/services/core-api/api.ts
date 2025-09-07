@@ -534,6 +534,7 @@ export interface CreateToolDto {
 
 export interface RunToolDto {
   targetIds?: string[];
+  assetIds?: string[];
 }
 
 export interface WorkspaceTool {
