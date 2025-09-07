@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { ResultType as JobDataResultType } from 'src/common/types/app.types';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { JobDataResultType } from 'src/common/types/app.types';
 import { DataSource, InsertResult } from 'typeorm';
 import { JobStatus, ToolCategory } from '../../common/enums/enum';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
@@ -14,6 +16,22 @@ import { DataAdapterInput } from './data-adapter.interface';
 export class DataAdapterService {
   constructor(private readonly dataSource: DataSource) {}
 
+  public async validateData<T extends object>(
+    data: object | object[],
+    cls: new () => T,
+  ): Promise<boolean> {
+    const arr = Array.isArray(data) ? data : [data];
+
+    for (const item of arr) {
+      const instance = plainToInstance(cls, item);
+      const errors = await validate(instance as object);
+      if (errors.length > 0) {
+        return false;
+      }
+    }
+
+    return true;
+  }
   public async subdomains({
     data,
     job,
@@ -215,44 +233,70 @@ export class DataAdapterService {
 
   /**
    * Sync data based on tool category
-   * @param data Data to sync
+   * @param payload Data to sync
    * @returns
    */
-  public async syncData(
-    data: DataAdapterInput<JobDataResultType>,
-  ): Promise<void> {
-    // Map of tool categories to their corresponding sync functions
+  public async syncData({
+    job,
+    data,
+  }: DataAdapterInput<JobDataResultType>): Promise<void> {
+    // Map of tool categories to their corresponding sync functions and validation classes
     const syncFunctions = {
-      [ToolCategory.PORTS_SCANNER]: (data: DataAdapterInput<number[]>) =>
-        this.portsScanner(data),
-      [ToolCategory.SUBDOMAINS]: (data: DataAdapterInput<Asset[]>) =>
-        this.subdomains(data),
-      [ToolCategory.HTTP_PROBE]: (data: DataAdapterInput<HttpResponse>) =>
-        this.httpResponses(data),
-      [ToolCategory.VULNERABILITIES]: (
-        data: DataAdapterInput<Vulnerability[]>,
-      ) => {
-        return this.vulnerabilities(data);
+      [ToolCategory.PORTS_SCANNER]: {
+        handler: (data: DataAdapterInput<number[]>) => this.portsScanner(data),
       },
-      [ToolCategory.CLASSIFIER]: (data: DataAdapterInput<AssetTag[]>) =>
-        this.classifier(data),
+      [ToolCategory.SUBDOMAINS]: {
+        handler: (data: DataAdapterInput<Asset[]>) => this.subdomains(data),
+        validationClass: Asset,
+      },
+      [ToolCategory.HTTP_PROBE]: {
+        handler: (data: DataAdapterInput<HttpResponse>) =>
+          this.httpResponses(data),
+        validationClass: HttpResponse,
+      },
+      [ToolCategory.VULNERABILITIES]: {
+        handler: (data: DataAdapterInput<Vulnerability[]>) =>
+          this.vulnerabilities(data),
+        validationClass: Vulnerability,
+      },
+      [ToolCategory.CLASSIFIER]: {
+        handler: (data: DataAdapterInput<AssetTag[]>) => this.classifier(data),
+        validationClass: AssetTag,
+      },
     };
 
     // Get the appropriate sync function based on category
-    if (!data.job.tool.category) {
-      throw new Error(`Unsupported tool category: ${data.job.tool.category}`);
+    if (!job.tool.category) {
+      throw new Error(`Unsupported tool category: ${job.tool.category}`);
     }
 
-    const syncFunction = syncFunctions[data.job.tool.category];
+    const syncFunction = syncFunctions[job.tool.category];
 
     // Check if we have a function for this category
     if (!syncFunction) {
-      throw new Error(`Unsupported tool category: ${data.job.tool.category}`);
+      throw new Error(`Unsupported tool category: ${job.tool.category}`);
+    }
+
+    // Validate data before syncing
+    if (
+      'validationClass' in syncFunction &&
+      syncFunction.validationClass &&
+      data !== undefined
+    ) {
+      const isValid = await this.validateData(
+        data as object | object[],
+        syncFunction.validationClass as new () => object,
+      );
+      if (!isValid) {
+        throw new BadRequestException(
+          `Data validation failed for category: ${job.tool.category}`,
+        );
+      }
     }
 
     // Call the appropriate sync function
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await syncFunction(data as DataAdapterInput<any>);
+    await syncFunction.handler({ job, data } as DataAdapterInput<any>);
 
     return;
   }
