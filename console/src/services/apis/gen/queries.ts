@@ -520,7 +520,6 @@ export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
 export const ToolCategory = {
   subdomains: 'subdomains',
   http_probe: 'http_probe',
-  http_scraper: 'http_scraper',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
 } as const;
@@ -548,7 +547,6 @@ export type CreateToolDtoCategory =
 export const CreateToolDtoCategory = {
   subdomains: 'subdomains',
   http_probe: 'http_probe',
-  http_scraper: 'http_scraper',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
 } as const;
@@ -920,7 +918,6 @@ export type ToolsControllerGetManyToolsCategory =
 export const ToolsControllerGetManyToolsCategory = {
   subdomains: 'subdomains',
   http_probe: 'http_probe',
-  http_scraper: 'http_scraper',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
 } as const;
@@ -940,7 +937,6 @@ export type ToolsControllerGetInstalledToolsCategory =
 export const ToolsControllerGetInstalledToolsCategory = {
   subdomains: 'subdomains',
   http_probe: 'http_probe',
-  http_scraper: 'http_scraper',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
 } as const;
