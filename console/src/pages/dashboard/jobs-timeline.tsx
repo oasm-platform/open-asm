@@ -1,11 +1,10 @@
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useJobsRegistryControllerGetJobsTimeline } from "@/services/apis/gen/queries";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import utc from "dayjs/plugin/utc";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
 
 dayjs.extend(relativeTime);
@@ -13,12 +12,10 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const JobsTimeline = () => {
-    // Sử dụng API endpoint mới cho timeline
     const { data, isLoading } = useJobsRegistryControllerGetJobsTimeline({
         query: { refetchInterval: 5000 }
     });
 
-    // Nhóm các job theo target để hiển thị liên kết
     const groupedByTarget = data?.data.reduce((acc, item) => {
         if (!acc[item.target]) {
             acc[item.target] = [];
@@ -40,77 +37,61 @@ const JobsTimeline = () => {
         }
     };
 
-    const formatTime = (time: string) => {
-        return dayjs(time).utc().format('YYYY-MM-DD HH:mm:ss');
+    const getTimeDisplay = (item: { status: string; startTime: string; endTime: string }) => {
+        if (item.status === 'pending' || item.status === 'in_progress') {
+            return dayjs(item.startTime).utc().fromNow();
+        }
+        return dayjs(item.endTime).utc().fromNow();
     };
 
+
     return (
-        <Card className="border rounded-lg">
+        <Card className="border rounded-lg h-full flex flex-col">
             <CardHeader className="border-b pb-3">
                 <CardTitle>Jobs Timeline</CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-                <ScrollArea className="h-[800px]">
+            <CardContent className="p-0 flex-grow">
+                <ScrollArea className="h-full">
                     <div className="p-4">
                         {isLoading && (
                             <div className="flex items-center justify-center py-8">
                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                             </div>
                         )}
-
                         {Object.entries(groupedByTarget).map(([target, items]) => (
-                            <div key={target} className="mb-8 last:mb-0">
-                                <div className="font-medium text-lg mb-2">Target: {target}</div>
-                                
+                            <div key={target} className="mb-4">
+                                <div className="font-medium text-lg mb-2 text-end">{target}</div>
                                 {/* Timeline container */}
                                 <div className="relative pl-4">
                                     {items.map((item, index) => (
-                                        <div key={`${item.name}-${index}`} className="relative mb-12 last:mb-0">
+                                        <div key={`${item.name}-${index}`} className="relative">
                                             {/* Timeline dot positioned at the center left of the card */}
                                             <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                                                <div className="w-5 h-5 rounded-full bg-primary border-2 border-primary-foreground flex items-center justify-center">
-                                                    <div className="w-2 h-2 rounded-full bg-primary-foreground"></div>
+                                                <div className="w-5 h-5 rounded-full bg-white border-2 border-primary-foreground flex items-center justify-center">
+                                                    {getStatusIcon(item.status)}
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Vertical line connecting to the next dot (if not the last item) */}
                                             {index < items.length - 1 && (
-                                                <div className="absolute left-0 -translate-x-1/2 w-[2px] bg-primary" style={{
-                                                    top: 'calc(70% + 4px)', // Start 4px below the center of current dot
-                                                    height: 'calc(100% + 4px)', // Extend to 4px above the next dot
-                                                }}></div>
+                                                <div className="absolute left-0 top-1/2 -translate-x-1/2 w-[2px] bg-primary h-full"></div>
                                             )}
-                                            
+
                                             {/* Card with content */}
-                                            <div className="bg-card border rounded-lg p-4 ml-4">
+                                            <div className="bg-card rounded-lg p-2 ml-4">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center">
-                                                        {getStatusIcon(item.status)}
+
                                                         <span className="font-medium ml-2">{item.name}</span>
                                                     </div>
-                                                    <Badge className={
-                                                        item.status === 'completed' ? 'bg-green-500 text-white border-0' : 
-                                                        item.status === 'in_progress' ? 'bg-yellow-500 text-black border-0' :
-                                                        item.status === 'failed' ? 'bg-red-500 text-white border-0' :
-                                                        'bg-gray-400 text-white border-0'
-                                                    }>
-                                                        {item.status === 'in_progress' ? 'in progress' : item.status}
-                                                    </Badge>
                                                 </div>
-                                                
-                                                <div className="text-xs text-muted-foreground mt-2 flex justify-between">
+
+                                                <div className="text-xs text-muted-foreground mt-2">
                                                     <div>
-                                                        <span className="font-medium">Start:</span> {formatTime(item.startTime)}
+                                                        <span className="font-medium">Time:</span> {getTimeDisplay(item)}
                                                     </div>
-                                                    {item.status !== 'pending' && (
-                                                        <div>
-                                                            <span className="font-medium">
-                                                                {item.status === 'in_progress' ? 'Updated:' : 'End:'}
-                                                            </span> {formatTime(item.endTime)}
-                                                        </div>
-                                                    )}
                                                 </div>
-                                                
+
                                                 {item.duration && (
                                                     <div className="text-xs text-muted-foreground mt-1">
                                                         Duration: {item.duration} seconds

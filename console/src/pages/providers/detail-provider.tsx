@@ -156,28 +156,6 @@ export function DetailProvider() {
     navigate(`/providers/${id}/edit`);
   };
 
-  // Handle provider deletion
-  const handleDeleteProvider = () => {
-    deleteProvider(
-      { id: id || '' },
-      {
-        onSuccess: () => {
-          toast.success('Provider deleted successfully');
-          navigate('/providers');
-        },
-        onError: (error) => {
-          toast.error('Failed to delete provider');
-          console.error('Error deleting provider:', error);
-        },
-      }
-    );
-  };
-
-  // Handle provider edit
-  const handleEditProvider = () => {
-    navigate(`/providers/${id}/edit`);
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">

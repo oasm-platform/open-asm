@@ -189,6 +189,24 @@ export interface GetManyJobDto {
   pageCount: number;
 }
 
+export interface JobTimelineItem {
+  name: string;
+  target: string;
+  targetId: string;
+  /** @format date-time */
+  startTime: string;
+  /** @format date-time */
+  endTime: string;
+  status: string;
+  description: string;
+  toolCategory: string;
+  duration: number;
+}
+
+export interface JobTimelineResponseDto {
+  data: JobTimelineItem[];
+}
+
 export interface GetNextJobResponseDto {
   jobId: string;
   value: string;
@@ -1387,6 +1405,22 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a timeline of jobs grouped by tool name and target.
+   *
+   * @tags JobsRegistry
+   * @name JobsRegistryControllerGetJobsTimeline
+   * @summary Get Jobs Timeline
+   * @request GET:/api/jobs-registry/timeline
+   */
+  jobsRegistryControllerGetJobsTimeline = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry/timeline`,
+      method: "GET",
       format: "json",
       ...params,
     });
