@@ -207,6 +207,7 @@ export type JobTimelineItem = {
   name: string;
   target: string;
   targetId: string;
+  jobHistoryId: string;
   startTime: string;
   endTime: string;
   status: string;

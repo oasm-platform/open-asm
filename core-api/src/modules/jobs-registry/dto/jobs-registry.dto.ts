@@ -78,6 +78,9 @@ export class JobTimelineItem {
   targetId: string;
 
   @ApiProperty()
+  jobHistoryId: string;
+
+  @ApiProperty()
   startTime: Date;
 
   @ApiProperty()
@@ -104,6 +107,7 @@ export interface JobTimelineQueryResult {
   name: string;
   target: string;
   target_id: string;
+  jobHistoryId: string;
   start_time: Date;
   end_time: Date;
   statuses: string;

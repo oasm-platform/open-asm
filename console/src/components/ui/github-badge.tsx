@@ -1,7 +1,7 @@
-import { Github, Star } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Github, Star } from "lucide-react";
 
 const REPO_API = "https://api.github.com/repos/oasm-platform/open-asm";
 const REPO_URL = "https://github.com/oasm-platform/open-asm";
@@ -36,7 +36,7 @@ export function GithubBadge() {
       rel="noreferrer noopener"
       className={cn(
         buttonVariants({ variant: "outline", size: "default" }),
-        "gap-2"
+        "gap-2 hidden md:flex"
       )}
       title="Open GitHub repository"
     >

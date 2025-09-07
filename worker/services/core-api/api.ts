@@ -193,6 +193,7 @@ export interface JobTimelineItem {
   name: string;
   target: string;
   targetId: string;
+  jobHistoryId: string;
   /** @format date-time */
   startTime: string;
   /** @format date-time */

@@ -433,9 +433,8 @@ export class JobsRegistryService {
           jobs."jobHistoryId",
           -- check if a new group should start
           case
-            when lag(tools.name) over (order by jobs."createdAt" desc) = tools.name
-             and lag(targets.value) over (order by jobs."createdAt" desc) = targets.value
-             and lag(jobs."jobHistoryId") over (order by jobs."createdAt" desc) = jobs."jobHistoryId"
+            when lag(tools.name) over (partition by jobs."jobHistoryId" order by jobs."createdAt" desc) = tools.name
+             and lag(targets.value) over (partition by jobs."jobHistoryId" order by jobs."createdAt" desc) = targets.value
             then 0 else 1
           end as is_new_group
         from jobs
@@ -446,7 +445,7 @@ export class JobsRegistryService {
       ),
       grouped_with_id as (
         select *,
-               sum(is_new_group) over (order by "createdAt" desc) as grp_id
+               sum(is_new_group) over (partition by "jobHistoryId" order by "createdAt" desc) as grp_id
         from grouped
       )
       select
@@ -462,7 +461,7 @@ export class JobsRegistryService {
         EXTRACT(EPOCH FROM (max(COALESCE("completedAt", "updatedAt")) - min("createdAt"))) as duration_seconds
       from grouped_with_id
       group by grp_id, name, target, target_id, "jobHistoryId"
-      order by end_time desc
+      order by "jobHistoryId", min("createdAt") desc
       limit 15;
     `);
 
@@ -483,7 +482,7 @@ export class JobsRegistryService {
           name: item.name,
           target: item.target,
           targetId: item.target_id,
-
+          jobHistoryId: item?.jobHistoryId,
           startTime: item.start_time,
           endTime: item.end_time,
           status: status,
