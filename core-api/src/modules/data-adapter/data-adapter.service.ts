@@ -192,8 +192,6 @@ export class DataAdapterService {
         this.subdomains(data),
       [ToolCategory.HTTP_PROBE]: (data: DataAdapterInput<HttpResponse>) =>
         this.httpResponses(data),
-      [ToolCategory.HTTP_SCRAPER]: (data: DataAdapterInput<HttpResponse>) =>
-        this.httpResponses(data),
       [ToolCategory.VULNERABILITIES]: (
         data: DataAdapterInput<Vulnerability[]>,
       ) => {

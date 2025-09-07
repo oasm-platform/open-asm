@@ -16,13 +16,6 @@ tasks:
     deps:
       - api:dev
       - console:dev
-      # - |
-      #   echo "Waiting for API to be ready..."
-      #   until curl -s http://localhost:$PORT > /dev/null; do
-      #     sleep 1
-      #   done
-      #   echo "API is up! Starting worker..."
-      # - task worker:dev
 
   build:
     deps:
@@ -37,7 +30,9 @@ tasks:
       - task: console:install
       - task: worker:install
   gen-api:
-    cmd: npx swagger-typescript-api generate -n api.ts -p ./open-api/open-api.json -o ./worker/services/core-api --route-types --axios --extract-enums --unwrap-response-data --default-response any --module-name-index 1000
+    cmds:
+      - npx swagger-typescript-api generate -n api.ts -p ./open-api/open-api.json -o ./worker/services/core-api --route-types --axios --extract-enums --unwrap-response-data --default-response any --module-name-index 1000
+      - cd console && task gen-api
   docker-compose:
     cmds:
       - |

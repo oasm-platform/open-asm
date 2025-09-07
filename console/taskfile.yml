@@ -23,6 +23,6 @@ tasks:
   # API documentation generation
   # Generates API documentation after ensuring API server is ready
   # Waits for API server health check before generating docs
-  gen:api:
+  gen-api:
     cmds:
       - npm run gen:api
