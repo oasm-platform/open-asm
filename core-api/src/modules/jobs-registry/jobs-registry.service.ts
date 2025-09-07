@@ -77,10 +77,12 @@ export class JobsRegistryService {
     tools,
     targetIds,
     workspaceId,
+    assetIds,
     workflow,
   }: {
     tools: Tool[];
     targetIds: string[];
+    assetIds?: string[];
     workspaceId?: string;
     workflow?: Workflow;
   }): Promise<Job[]> {
@@ -98,6 +100,12 @@ export class JobsRegistryService {
     if (targetIds.length > 0) {
       assetsQueryBuilder.andWhere('assets.targetId IN (:...targetIds)', {
         targetIds,
+      });
+    }
+
+    if (assetIds && assetIds.length > 0) {
+      assetsQueryBuilder.andWhere('assets.id IN (:...assetIds)', {
+        assetIds,
       });
     }
 

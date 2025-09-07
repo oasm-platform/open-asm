@@ -572,6 +572,7 @@ export type CreateToolDto = {
 
 export type RunToolDto = {
   targetIds?: string[];
+  assetIds?: string[];
 };
 
 export type WorkspaceTool = {

@@ -3,7 +3,7 @@ import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import type { Tool } from '@/services/apis/gen/queries';
-import { Verified } from 'lucide-react';
+import { LayoutGrid, Verified } from 'lucide-react';
 import React from 'react';
 
 interface ToolCardProps {
@@ -35,7 +35,9 @@ const ToolCard = ({ tool, button }: ToolCardProps) => {
                         className="h-16 object-contain"
                     />
                 ) : (
-                    <span className="text-gray-500 text-lg font-medium">no logo</span>
+                    <span className="text-gray-500 h-16 flex items-center justify-center text-lg font-medium">
+                        <LayoutGrid size={52} />
+                    </span>
                 )}
             </div>
             <CardContent className="flex flex-col gap-4">
