@@ -1,3 +1,5 @@
+import { StudioSidebar } from '@/components/common/layout/studio-sidebar';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { yaml } from '@codemirror/lang-yaml';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror from '@uiw/react-codemirror';
@@ -27,15 +29,29 @@ http:
   const onChange = useCallback((val: string) => setValue(val), []);
 
   return (
-    <div>
-      <CodeMirror
-        value={value}
-        onChange={onChange}
-        height="calc(100svh - var(--header-height) - 1px)"
-        theme={tokyoNight}
-        extensions={[yaml()]}
-        className="text-lg"
-      />
-    </div>
+    <SidebarProvider
+      className="flex flex-col"
+      style={
+        {
+          '--sidebar-width': '20rem',
+        } as React.CSSProperties
+      }
+    >
+      <div className="flex flex-1">
+        <StudioSidebar />
+        <SidebarInset>
+          <div className="flex flex-1 flex-col gap-4">
+            <CodeMirror
+              value={value}
+              onChange={onChange}
+              height="calc(100svh - var(--header-height) - 1px)"
+              theme={tokyoNight}
+              extensions={[yaml()]}
+              className="text-base"
+            />
+          </div>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 }
