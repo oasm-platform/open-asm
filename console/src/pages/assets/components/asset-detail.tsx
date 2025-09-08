@@ -18,7 +18,7 @@ import {
   Lock,
   Network,
   ShieldCheck,
-  Tag
+  Tag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AddTagDialog from './add-tag-dialog';
@@ -28,13 +28,14 @@ import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
 
 export default function AssetDetail({ id }: { id: string }) {
-  const { data, refetch } = useAssetsControllerGetAssetById(id, {
-  });
+  const { data, refetch } = useAssetsControllerGetAssetById(id, {});
 
   if (!data) {
-    return <div className='h-full w-full flex justify-center items-center'>
-      <Loader2Icon className="animate-spin mr-1 h-10 w-10" />
-    </div>;
+    return (
+      <div className="h-full w-full flex justify-center items-center">
+        <Loader2Icon className="animate-spin mr-1 h-10 w-10" />
+      </div>
+    );
   }
 
   const { value, httpResponses, ports, ipAddresses, tags } = data;
@@ -44,10 +45,10 @@ export default function AssetDetail({ id }: { id: string }) {
   // Calculate days left for SSL certificate
   const daysLeft = tls?.not_after
     ? Math.round(
-      (new Date(tls.not_after as unknown as Date).getTime() -
-        new Date().getTime()) /
-      (1000 * 60 * 60 * 24),
-    )
+        (new Date(tls.not_after as unknown as Date).getTime() -
+          new Date().getTime()) /
+          (1000 * 60 * 60 * 24),
+      )
     : undefined;
 
   // Calculate certificate age start date and display
@@ -129,7 +130,7 @@ export default function AssetDetail({ id }: { id: string }) {
             )}
           </div>
         </section>
-        <div className='flex flex-wrap gap-2 mt-4'>
+        <div className="flex flex-wrap gap-2 mt-4">
           {data.tags.map((tag) => (
             <Badge
               key={tag.id}
@@ -277,7 +278,7 @@ export default function AssetDetail({ id }: { id: string }) {
                 {(
                   httpResponses.techList as unknown as TechnologyDetailDTO[]
                 ).map((item) => (
-                  <TechnologyTooltip tech={item} />
+                  <TechnologyTooltip tech={item} key={item.name} />
                 ))}
               </div>
             </section>
@@ -310,6 +311,6 @@ export default function AssetDetail({ id }: { id: string }) {
           </>
         )}
       </div>
-    </ScrollArea >
+    </ScrollArea>
   );
 }

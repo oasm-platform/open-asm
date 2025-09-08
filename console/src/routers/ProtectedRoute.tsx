@@ -8,7 +8,6 @@ const ProtectedRoute = () => {
   const { data, isPending: isLoadingSession } = useSession();
   const location = useLocation();
   const currentPath = location.pathname;
-  console.log(currentPath);
 
   if (!data && !isLoadingSession) {
     return <Navigate to={`/login?redirect=${currentPath}`} />;
