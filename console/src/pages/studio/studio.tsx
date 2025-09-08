@@ -1,4 +1,5 @@
 import { yaml } from '@codemirror/lang-yaml';
+import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror from '@uiw/react-codemirror';
 import { useCallback, useState } from 'react';
 
@@ -26,11 +27,15 @@ http:
   const onChange = useCallback((val: string) => setValue(val), []);
 
   return (
-    <CodeMirror
-      value={value}
-      onChange={onChange}
-      theme={'dark'}
-      extensions={[yaml()]}
-    />
+    <div>
+      <CodeMirror
+        value={value}
+        onChange={onChange}
+        height="calc(100svh - var(--header-height) - 1px)"
+        theme={tokyoNight}
+        extensions={[yaml()]}
+        className="text-lg"
+      />
+    </div>
   );
 }

@@ -1,10 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { GithubBadge } from '@/components/ui/github-badge';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { ArrowLeft } from 'lucide-react';
 import type { JSX } from 'react';
 import { Link } from 'react-router-dom';
 import { StudioSidebar } from './studio-sidebar';
-import { ArrowLeft } from 'lucide-react';
 
 export default function StudioLayout({ children }: { children: JSX.Element }) {
   return (
@@ -26,7 +26,7 @@ export default function StudioLayout({ children }: { children: JSX.Element }) {
         <div className="flex flex-1">
           <StudioSidebar />
           <SidebarInset>
-            <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
+            <div className="flex flex-1 flex-col gap-4">{children}</div>
           </SidebarInset>
         </div>
       </SidebarProvider>
