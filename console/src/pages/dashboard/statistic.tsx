@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetStatistics } from '@/services/apis/gen/queries';
-import { Bug, CloudCheck, Cpu, Target } from 'lucide-react';
+import { Bug, CloudCheck, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Statistic() {
@@ -64,16 +64,16 @@ export default function Statistic() {
             value: statistics?.totalVulnerabilities || 0,
             path: '/vulnerabilities'
         },
-        {
-            title: 'Technologies',
-            icon: <Cpu className="h-5 w-5 text-primary" />,
-            value: statistics?.totalUniqueTechnologies || 0,
-            path: '/assets'
-        }
+        // {
+        //     title: 'Technologies',
+        //     icon: <Cpu className="h-5 w-5 text-primary" />,
+        //     value: statistics?.totalUniqueTechnologies || 0,
+        //     path: '/assets'
+        // }
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {statsCards.map((card, index) => (
                 <Card
                     key={index}

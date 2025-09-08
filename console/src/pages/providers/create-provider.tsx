@@ -1,14 +1,14 @@
 import Page from "@/components/common/page";
 import { useProvidersControllerCreateProvider } from "@/services/apis/gen/queries";
-import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { ProviderForm } from "./provider-form";
+import { toast } from "sonner";
+import { ProviderForm, type FormData } from "./provider-form";
 
 export default function CreateProviderPage() {
   const { mutate, isPending } = useProvidersControllerCreateProvider();
   const navigate = useNavigate();
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: FormData) => {
     mutate({
       data,
     }, {
@@ -34,9 +34,9 @@ export default function CreateProviderPage() {
               Fill in the details below to create a new tool provider.
             </p>
           </div>
-          
-          <ProviderForm 
-            onSubmit={onSubmit} 
+
+          <ProviderForm
+            onSubmit={onSubmit}
             isPending={isPending}
             submitButtonText="Create Provider"
           />

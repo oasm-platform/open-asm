@@ -1,45 +1,90 @@
+/**
+ * Enum representing user roles in the system
+ */
 export enum Role {
+  /** Administrator - has full permissions in the system */
   ADMIN = 'admin',
+  /** Regular user */
   USER = 'user',
 }
 
+/**
+ * Enum representing tool categories used in the system
+ */
 export enum ToolCategory {
+  /** Subdomain discovery tool */
   SUBDOMAINS = 'subdomains',
+  /** HTTP probe checking tool */
   HTTP_PROBE = 'http_probe',
-  HTTP_SCRAPER = 'http_scraper',
+  /** Port scanning tool */
   PORTS_SCANNER = 'ports_scanner',
+  /** Vulnerability detection tool */
   VULNERABILITIES = 'vulnerabilities',
+  /** Data classification tool */
+  CLASSIFIER = 'classifier',
 }
 
+/**
+ * Enum representing job statuses
+ */
 export enum JobStatus {
+  /** Waiting to be executed */
   PENDING = 'pending',
+  /** Currently being executed */
   IN_PROGRESS = 'in_progress',
+  /** Successfully completed */
   COMPLETED = 'completed',
+  /** Failed */
   FAILED = 'failed',
+  /** Cancelled */
   CANCELLED = 'cancelled',
 }
 
+/**
+ * Enum representing scan statuses
+ */
 export enum ScanStatus {
+  /** Running */
   RUNNING = 'RUNNING',
+  /** Completed */
   DONE = 'DONE',
 }
 
+/**
+ * Enum representing worker types
+ */
 export enum WorkerType {
+  /** Built-in worker in the system */
   BUILT_IN = 'built_in',
+  /** Worker from external provider */
   PROVIDER = 'provider',
 }
 
+/**
+ * Enum representing worker scopes
+ */
 export enum WorkerScope {
+  /** Worker operates at the system-wide level (cloud) */
   CLOUD = 'cloud',
+  /** Worker operates within a specific workspace */
   WORKSPACE = 'workspace',
 }
 
+/**
+ * Enum representing cron job schedules
+ */
 export enum CronSchedule {
+  /** Runs weekly on Sunday at 00:00 */
   WEEKLY = '0 0 * * 0',
+  /** Runs bi-weekly on the 1st and 15th of each month at 00:00 */
   BI_WEEKLY = '0 0 */14 * *',
+  /** Runs monthly on the 1st at 00:00 */
   MONTHLY = '0 0 1 * *',
 }
 
+/**
+ * Enum representing severity levels of issues or security vulnerabilities
+ */
 export enum Severity {
   INFO = 'info',
   LOW = 'low',
@@ -48,6 +93,10 @@ export enum Severity {
   CRITICAL = 'critical',
 }
 
+/**
+ * Enum representing job priorities
+ * Lower numeric values indicate higher priority
+ */
 export enum JobPriority {
   CRITICAL = 0,
   HIGH = 1,
@@ -56,7 +105,12 @@ export enum JobPriority {
   BACKGROUND = 4,
 }
 
+/**
+ * Enum representing API key types
+ */
 export enum ApiKeyType {
+  /** API key used for tools */
   TOOL = 'tool',
+  /** API key used for workspaces */
   WORKSPACE = 'workspace',
 }

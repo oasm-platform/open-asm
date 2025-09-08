@@ -429,6 +429,7 @@ export class ToolsService implements OnModuleInit {
     await this.jobRegistryService.createJobs({
       tools: [tool],
       targetIds: targetIds || [],
+      assetIds: dto.assetIds || [],
       workspaceId,
     });
     return;

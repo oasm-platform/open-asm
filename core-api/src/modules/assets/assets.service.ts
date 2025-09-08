@@ -83,7 +83,7 @@ export class AssetsService {
       .leftJoin('assets.httpResponses', 'httpResponses')
       .leftJoin('assets.ports', 'ports')
       .leftJoin('assets.target', 'targets')
-      .leftJoin('assets.tags', 'tags')
+      .leftJoinAndSelect('assets.tags', 'tags')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoin('assets.ipAssets', 'ipAssets')
       .leftJoin('assets.statusCodeAssets', 'statusCodeAssets')
@@ -131,7 +131,7 @@ export class AssetsService {
       'httpResponses.title',
       'httpResponses.tls',
       'ports.ports',
-      'tags.tag',
+      'tags',
       'httpResponses.chain_status_codes',
       'httpResponses.status_code',
     ]);
@@ -155,7 +155,9 @@ export class AssetsService {
       asset.targetId = item.targetId;
       asset.createdAt = item.createdAt;
       asset.dnsRecords = item.dnsRecords;
-      asset.tags = item.tags;
+
+      asset.tags = item.tags || [];
+
       asset.ports = item.ports ? item.ports[0] : undefined;
       asset.ipAddresses = item.ipAssets
         ? item.ipAssets.map((e) => e.ipAddress)

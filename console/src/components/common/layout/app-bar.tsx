@@ -1,10 +1,10 @@
 // src/components/AppBar.tsx
 
+import { GithubBadge } from "@/components/ui/github-badge";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@radix-ui/react-separator";
 import type { JSX } from "react";
 import { CreateTarget } from "../../ui/create-target";
-import { GithubBadge } from "../../ui/github-badge";
 import { SearchForm } from "../../ui/search-form";
 import { WorkspaceSwitcher } from "../../ui/workspace-switcher";
 
