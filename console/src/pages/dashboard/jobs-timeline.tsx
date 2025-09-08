@@ -97,7 +97,7 @@ const JobsTimeline = () => {
                                             {items.map((item, index) => (
                                                 <div key={`${item.name}-${index}`} className="relative py-2">
                                                     {/* Timeline dot positioned at the top left */}
-                                                    <div className="absolute left-0 top-4 -translate-x-1/2 -translate-y-1/2 z-10">
+                                                    <div className="absolute left-0 top-4 -translate-x-1/2 -translate-y-1/2 z-0">
                                                         <div className="w-5 h-5 rounded-full bg-white border-2 border-primary-foreground flex items-center justify-center">
                                                             {getStatusIcon(item.status)}
                                                         </div>
