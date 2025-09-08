@@ -86,18 +86,28 @@ export class JobsRegistryService {
     workspaceId,
     assetIds,
     workflow,
+    jobHistory: existingJobHistory,
   }: {
     tools: Tool[];
     targetIds: string[];
     assetIds?: string[];
     workspaceId?: string;
     workflow?: Workflow;
+    jobHistory?: JobHistory;
   }): Promise<Job[]> {
     // Step 1: create job history
-    const jobHistory = this.jobHistoryRepo.create({
-      workflow,
-    });
-    await this.jobHistoryRepo.save(jobHistory);
+    let jobHistory: JobHistory;
+    
+    if (existingJobHistory) {
+      // Sử dụng jobHistory đã tồn tại nếu được cung cấp
+      jobHistory = existingJobHistory;
+    } else {
+      // Tạo jobHistory mới nếu không có
+      jobHistory = this.jobHistoryRepo.create({
+        workflow,
+      });
+      await this.jobHistoryRepo.save(jobHistory);
+    }
 
     // Step 2: find assets of the given targets
     const assetsQueryBuilder = this.dataSource
@@ -513,6 +523,8 @@ export class JobsRegistryService {
         tools,
         targetIds: [job.asset.target.id],
         workflow: job.jobHistory.workflow,
+        // Đảm bảo các job mới tạo có cùng history id với job vừa hoàn thành
+        jobHistory: job.jobHistory,
       });
     }
   }

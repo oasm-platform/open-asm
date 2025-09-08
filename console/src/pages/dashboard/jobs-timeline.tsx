@@ -6,6 +6,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Define type for timeline item with jobHistoryId
 interface TimelineItemWithJobHistory {
@@ -26,6 +27,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const JobsTimeline = () => {
+    const navigate = useNavigate();
     const { data, isLoading } = useJobsRegistryControllerGetJobsTimeline({
         query: { refetchInterval: 5000 }
     });
@@ -82,7 +84,12 @@ const JobsTimeline = () => {
                                 {/* <div className="font-medium text-lg mb-3">Job History: {jobHistoryId}</div> */}
                                 {Object.entries(targets).map(([target, items]) => (
                                     <div key={`${jobHistoryId}-${target}`} className="mb-2 ml-2">
-                                        <div className="font-medium text-md mb-1">{target}</div>
+                                        <div
+                                            className="font-medium text-md mb-1 hover:text-primary hover:cursor-pointer"
+                                            onClick={() => navigate(`/targets/${items[0]?.targetId}`)}
+                                        >
+                                            {target}
+                                        </div>
                                         {/* Timeline container */}
                                         <div className="relative pl-2">
                                             {/* Extended timeline connecting bar centered with dots */}
