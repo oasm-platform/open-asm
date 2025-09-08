@@ -19,42 +19,16 @@ import {
   SidebarMenuSub,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
 
 const data = {
   changes: [
     {
-      file: 'README.md',
-      state: 'M',
-    },
-    {
-      file: 'api/hello/route.ts',
-      state: 'U',
-    },
-    {
-      file: 'app/layout.tsx',
+      file: 'template-example.yaml',
       state: 'M',
     },
   ],
-  tree: [
-    [
-      'app',
-      [
-        'api',
-        ['hello', ['route.ts']],
-        'page.tsx',
-        'layout.tsx',
-        ['blog', ['page.tsx']],
-      ],
-    ],
-    [
-      'components',
-      ['ui', 'button.tsx', 'card.tsx'],
-      'header.tsx',
-      'footer.tsx',
-    ],
-    ['lib', ['util.ts']],
-    ['public', 'favicon.ico', 'vercel.svg'],
-  ],
+  tree: [['Workspace templates', ['template-example.yaml']]],
 };
 
 export function StudioSidebar({
@@ -66,6 +40,9 @@ export function StudioSidebar({
       {...props}
     >
       <SidebarContent>
+        <SidebarGroup>
+          <Button>Add new template</Button>
+        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Changes</SidebarGroupLabel>
           <SidebarGroupContent>

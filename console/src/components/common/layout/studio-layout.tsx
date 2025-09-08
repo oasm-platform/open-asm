@@ -9,7 +9,14 @@ import { StudioSidebar } from './studio-sidebar';
 export default function StudioLayout({ children }: { children: JSX.Element }) {
   return (
     <div className="[--header-height:calc(--spacing(14))]">
-      <SidebarProvider className="flex flex-col">
+      <SidebarProvider
+        className="flex flex-col"
+        style={
+          {
+            '--sidebar-width': '20rem',
+          } as React.CSSProperties
+        }
+      >
         <header className="sticky top-0 z-50 flex shrink-0 items-center gap-2 border-b bg-background w-full">
           <div className="flex h-(--header-height) w-full items-center gap-2 px-4">
             <div>
