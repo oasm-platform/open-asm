@@ -1,6 +1,7 @@
-import * as React from 'react';
 import { ChevronRight, File, Folder } from 'lucide-react';
+import * as React from 'react';
 
+import { Button } from '@/components/ui/button';
 import {
   Collapsible,
   CollapsibleContent,
@@ -19,7 +20,6 @@ import {
   SidebarMenuSub,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
 
 const data = {
   changes: [

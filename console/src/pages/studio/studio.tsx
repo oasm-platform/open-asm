@@ -29,29 +29,31 @@ http:
   const onChange = useCallback((val: string) => setValue(val), []);
 
   return (
-    <SidebarProvider
-      className="flex flex-col"
-      style={
-        {
-          '--sidebar-width': '20rem',
-        } as React.CSSProperties
-      }
-    >
-      <div className="flex flex-1">
-        <StudioSidebar />
-        <SidebarInset>
-          <div className="flex flex-1 flex-col gap-4">
-            <CodeMirror
-              value={value}
-              onChange={onChange}
-              height="calc(100svh - var(--header-height) - 1px)"
-              theme={tokyoNight}
-              extensions={[yaml()]}
-              className="text-base"
-            />
-          </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    <div>
+      <SidebarProvider
+        className="flex flex-col min-h-0"
+        style={
+          {
+            '--sidebar-width': '20rem',
+          } as React.CSSProperties
+        }
+      >
+        <div className="flex flex-1">
+          <StudioSidebar />
+          <SidebarInset>
+            <div className="flex flex-1 flex-col gap-4">
+              <CodeMirror
+                value={value}
+                onChange={onChange}
+                height="calc(100svh - var(--header-height) - 1px)"
+                theme={tokyoNight}
+                extensions={[yaml()]}
+                className="text-base"
+              />
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    </div>
   );
 }
