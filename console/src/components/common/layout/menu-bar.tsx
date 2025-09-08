@@ -64,9 +64,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: '/vulnerabilities',
         },
         {
-          title: 'Editor',
+          title: 'Studio',
           icon: <BookDashed />,
-          url: '/editor',
+          url: '/studio',
         },
       ],
     },

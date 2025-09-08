@@ -57,7 +57,7 @@ const data = {
   ],
 };
 
-export function EditorSideBar({
+export function StudioSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   return (

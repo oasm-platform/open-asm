@@ -1,4 +1,4 @@
-import EditorLayout from '@/components/common/layout/editor-layout';
+import StudioLayout from '@/components/common/layout/studio-layout';
 import ProtectedLayout from '@/components/common/layout/protect-layout';
 import { authClient } from '@/utils/authClient';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
@@ -13,11 +13,11 @@ const ProtectedRoute = () => {
     return <Navigate to={`/login?redirect=${currentPath}`} />;
   }
 
-  if (currentPath.startsWith('/editor')) {
+  if (currentPath.startsWith('/studio')) {
     return (
-      <EditorLayout>
+      <StudioLayout>
         <Outlet />
-      </EditorLayout>
+      </StudioLayout>
     );
   }
 

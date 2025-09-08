@@ -1,8 +1,8 @@
+import { yaml } from '@codemirror/lang-yaml';
 import CodeMirror from '@uiw/react-codemirror';
 import { useCallback, useState } from 'react';
-import { yaml } from '@codemirror/lang-yaml';
 
-export default function Editor() {
+export default function Studio() {
   const [value, setValue] = useState(`# Welcome to OASM Templates
 
 id: example-template # Unique identifier for the template

@@ -3,10 +3,10 @@ import { GithubBadge } from '@/components/ui/github-badge';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import type { JSX } from 'react';
 import { Link } from 'react-router-dom';
-import { EditorSideBar } from './editor-sidebar';
+import { StudioSidebar } from './studio-sidebar';
 import { ArrowLeft } from 'lucide-react';
 
-export default function EditorLayout({ children }: { children: JSX.Element }) {
+export default function StudioLayout({ children }: { children: JSX.Element }) {
   return (
     <div className="[--header-height:calc(--spacing(14))]">
       <SidebarProvider className="flex flex-col">
@@ -24,7 +24,7 @@ export default function EditorLayout({ children }: { children: JSX.Element }) {
           </div>
         </header>
         <div className="flex flex-1">
-          <EditorSideBar />
+          <StudioSidebar />
           <SidebarInset>
             <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
           </SidebarInset>

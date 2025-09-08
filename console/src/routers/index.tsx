@@ -2,7 +2,7 @@ import Layout from '@/components/common/layout/layout';
 import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
-import Editor from '@/pages/editor/editor';
+import Studio from '@/pages/studio/studio';
 import Login from '@/pages/login/login';
 import CreateProviderPage from '@/pages/providers/create-provider';
 import DetailProvider from '@/pages/providers/detail-provider';
@@ -52,8 +52,8 @@ export const router = createBrowserRouter([
             element: <Dashboard />,
           },
           {
-            path: 'editor',
-            children: [{ path: '', element: <Editor /> }],
+            path: 'studio',
+            children: [{ path: '', element: <Studio /> }],
           },
           {
             path: 'settings',
