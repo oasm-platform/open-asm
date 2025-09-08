@@ -3,6 +3,9 @@
   "workspaces": {
     "": {
       "name": "open-asm",
+      "devDependencies": {
+        "husky": "^9.1.7",
+      },
     },
     "console": {
       "name": "console",
@@ -60,6 +63,7 @@
         "eslint-plugin-react-hooks": "^5.2.0",
         "eslint-plugin-react-refresh": "^0.4.19",
         "globals": "^16.0.0",
+        "husky": "^9.1.7",
         "tw-animate-css": "^1.3.4",
         "typescript": "~5.8.3",
         "typescript-eslint": "^8.30.1",
@@ -79,6 +83,7 @@
         "@nestjs/schedule": "^6.0.0",
         "@nestjs/swagger": "^11.2.0",
         "@nestjs/typeorm": "^11.0.0",
+        "@types/cookie-parser": "^1.4.9",
         "@types/multer": "^2.0.0",
         "better-auth": "^1.2.7",
         "class-transformer": "^0.5.1",
@@ -804,6 +809,8 @@
     "@types/body-parser": ["@types/body-parser@1.19.6", "", { "dependencies": { "@types/connect": "*", "@types/node": "*" } }, ""],
 
     "@types/connect": ["@types/connect@3.4.38", "", { "dependencies": { "@types/node": "*" } }, ""],
+
+    "@types/cookie-parser": ["@types/cookie-parser@1.4.9", "", { "peerDependencies": { "@types/express": "*" } }, "sha512-tGZiZ2Gtc4m3wIdLkZ8mkj1T6CEHb35+VApbL2T14Dew8HA7c+04dmKqsKRNC+8RJPm16JEK0tFSwdZqubfc4g=="],
 
     "@types/cookiejar": ["@types/cookiejar@2.1.5", "", {}, ""],
 
@@ -1566,6 +1573,8 @@
     "http2-wrapper": ["http2-wrapper@2.2.1", "", { "dependencies": { "quick-lru": "^5.1.1", "resolve-alpn": "^1.2.0" } }, ""],
 
     "human-signals": ["human-signals@2.1.0", "", {}, ""],
+
+    "husky": ["husky@9.1.7", "", { "bin": { "husky": "bin.js" } }, "sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA=="],
 
     "iconv-lite": ["iconv-lite@0.6.3", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, ""],
 
