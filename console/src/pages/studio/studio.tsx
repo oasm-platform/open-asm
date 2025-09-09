@@ -4,8 +4,14 @@ import { yaml } from '@codemirror/lang-yaml';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror from '@uiw/react-codemirror';
 import { useCallback, useState } from 'react';
+import { EditorTabs, type Tab } from './components/editor-tabs';
 
 export default function Studio() {
+  const [tabs, setTabs] = useState<Tab[]>([
+    { id: '1', name: 'example-template.yaml' },
+    { id: '2', name: 'example-template.yaml' },
+  ]);
+  const [activeTabId, setActiveTabId] = useState('1');
   const [value, setValue] = useState(`# Welcome to OASM Templates
 
 id: example-template # Unique identifier for the template
@@ -28,6 +34,26 @@ http:
           - 200 # Match if response code is 200 (OK)`);
   const onChange = useCallback((val: string) => setValue(val), []);
 
+  const handleTabClick = (id: string) => {
+    setActiveTabId(id);
+  };
+
+  const handleTabClose = (id: string) => {
+    if (tabs.length <= 1) return; // Prevent closing the last tab
+
+    const newTabs = tabs.filter((tab) => tab.id !== id);
+    setTabs(newTabs);
+
+    // If we're closing the active tab, activate the next one or the previous one
+    if (id === activeTabId) {
+      const currentIndex = tabs.findIndex((tab) => tab.id === id);
+      const newActiveTab = newTabs[currentIndex] || newTabs[newTabs.length - 1];
+      if (newActiveTab) {
+        setActiveTabId(newActiveTab.id);
+      }
+    }
+  };
+
   return (
     <div>
       <SidebarProvider
@@ -41,14 +67,20 @@ http:
         <div className="flex flex-1">
           <StudioSidebar />
           <SidebarInset>
-            <div className="flex flex-1 flex-col gap-4">
+            <div className="flex flex-1 flex-col">
+              <EditorTabs
+                tabs={tabs}
+                activeTabId={activeTabId}
+                onTabClick={handleTabClick}
+                onTabClose={handleTabClose}
+              />
               <CodeMirror
                 value={value}
                 onChange={onChange}
-                height="calc(100svh - var(--header-height) - 1px)"
+                height="calc(100svh - var(--header-height) - 40px)" // 40px accounts for tab bar height
                 theme={tokyoNight}
                 extensions={[yaml()]}
-                className="text-base"
+                className="text-sm"
               />
             </div>
           </SidebarInset>
