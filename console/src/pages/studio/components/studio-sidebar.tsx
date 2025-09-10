@@ -1,4 +1,4 @@
-import { ChevronRight, File, Folder } from 'lucide-react';
+import { ChevronRight, Command, File, Folder, Plus } from 'lucide-react';
 import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -20,8 +20,9 @@ import {
   SidebarMenuSub,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { addTemplateAtom } from '../atoms';
 import { useSetAtom } from 'jotai';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { addTemplateAtom } from '../atoms';
 
 const data = {
   changes: [
@@ -37,6 +38,12 @@ export function StudioSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const addTemplate = useSetAtom(addTemplateAtom);
+
+  useHotkeys('ctrl+i', (e) => {
+    e.preventDefault();
+    addTemplate();
+  });
+
   return (
     <Sidebar
       className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
@@ -44,7 +51,13 @@ export function StudioSidebar({
     >
       <SidebarContent>
         <SidebarGroup>
-          <Button onClick={() => addTemplate()}>Add new template</Button>
+          <Button onClick={() => addTemplate()}>
+            <Plus className="size-4" />
+            Add new template
+            <span className="text-xs bg-muted/40 rounded px-1.5 py-0.5 ml-2">
+              <Command className="size-3 inline-block mr-1" />+ I
+            </span>
+          </Button>
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Changes</SidebarGroupLabel>
