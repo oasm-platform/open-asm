@@ -20,6 +20,8 @@ import {
   SidebarMenuSub,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import { addTemplateAtom } from '../atoms';
+import { useSetAtom } from 'jotai';
 
 const data = {
   changes: [
@@ -34,6 +36,7 @@ const data = {
 export function StudioSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
+  const addTemplate = useSetAtom(addTemplateAtom);
   return (
     <Sidebar
       className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
@@ -41,7 +44,7 @@ export function StudioSidebar({
     >
       <SidebarContent>
         <SidebarGroup>
-          <Button>Add new template</Button>
+          <Button onClick={() => addTemplate()}>Add new template</Button>
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Changes</SidebarGroupLabel>
