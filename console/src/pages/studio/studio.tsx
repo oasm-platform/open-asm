@@ -5,19 +5,19 @@ import { StudioSidebar } from './components/studio-sidebar';
 
 export default function Studio() {
   return (
-    <div>
+    <div className="h-screen flex flex-col">
       <SidebarProvider
-        className="flex flex-col min-h-0"
+        className="flex flex-col flex-1 min-h-0"
         style={
           {
             '--sidebar-width': '20rem',
           } as React.CSSProperties
         }
       >
-        <div className="flex flex-1">
+        <div className="flex flex-1 min-h-0">
           <StudioSidebar />
           <SidebarInset>
-            <div className="flex flex-1 flex-col">
+            <div className="flex flex-1 flex-col min-h-0">
               <EditorTabs />
               <Editor />
             </div>
