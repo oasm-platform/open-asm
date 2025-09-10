@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useAtom, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { FileText, X } from 'lucide-react';
 import {
   activeTemplateIdAtom,
@@ -9,7 +9,7 @@ import {
 } from '../atoms';
 
 export function EditorTabs() {
-  const [templates] = useAtom(templatesAtom);
+  const templates = useAtomValue(templatesAtom);
   const [activeTemplateId, setActiveTemplateId] = useAtom(activeTemplateIdAtom);
   const removeTemplate = useSetAtom(removeTemplateAtom);
 
