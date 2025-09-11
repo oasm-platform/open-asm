@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 export default function StudioLayout({ children }: { children: JSX.Element }) {
   return (
     <div className="[--header-height:calc(--spacing(14))] flex flex-col h-screen overflow-y-hidden">
-      <header className="sticky top-0 z-50 flex shrink-0 items-center gap-2 border-b bg-background w-full">
+      <header className="sticky top-0 z-50 flex shrink-0 items-center gap-2 border-b bg-background">
         <div className="flex h-(--header-height) w-full items-center gap-2 px-4">
           <div>
             <Button variant={'outline'}>

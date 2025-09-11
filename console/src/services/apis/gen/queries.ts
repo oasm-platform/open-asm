@@ -799,6 +799,14 @@ export type UpdateProviderDto = {
   apiDocsUrl?: string;
 };
 
+export type Template = {
+  id: string;
+  fileName: string;
+  path: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   page?: number;
   limit?: number;
@@ -14679,6 +14687,100 @@ export const useProvidersControllerDeleteProvider = <
 > => {
   const mutationOptions =
     getProvidersControllerDeleteProviderMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Create a new template with file stored in the storage
+ * @summary Create a new templates
+ */
+export const templatesControllerCreateTemplate = (
+  template: Template,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Template>(
+    {
+      url: `/api/templates`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: template,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getTemplatesControllerCreateTemplateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+    TError,
+    { data: Template },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+  TError,
+  { data: Template },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerCreateTemplate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+    { data: Template }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return templatesControllerCreateTemplate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TemplatesControllerCreateTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>
+>;
+export type TemplatesControllerCreateTemplateMutationBody = Template;
+export type TemplatesControllerCreateTemplateMutationError = unknown;
+
+/**
+ * @summary Create a new templates
+ */
+export const useTemplatesControllerCreateTemplate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+      TError,
+      { data: Template },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+  TError,
+  { data: Template },
+  TContext
+> => {
+  const mutationOptions =
+    getTemplatesControllerCreateTemplateMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

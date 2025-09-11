@@ -4,14 +4,14 @@ import { v7 as uuidv7 } from 'uuid';
 
 type Template = {
   id: string;
-  name: string;
+  filename: string;
   content: string;
 };
 
-const defaultTemplates = [
+const defaultTemplates: Template[] = [
   {
     id: uuidv7(),
-    name: `example-template`,
+    filename: `example-template`,
     content: `# Welcome to OASM Templates
 
 id: example-template # Unique identifier for the template
@@ -86,7 +86,7 @@ export const addTemplateAtom = atom(null, (get, set) => {
   const id = uuidv7();
   const newTemplate: Template = {
     id,
-    name: `example-template-${id}`,
+    filename: `example-template-${id}`,
     content: `# Welcome to OASM Templates
 
 id: example-template-${id} # Unique identifier for the template

@@ -12,7 +12,7 @@ export function EditorTabs() {
   const templates = useAtomValue(templatesAtom);
   const [activeTemplateId, setActiveTemplateId] = useAtom(activeTemplateIdAtom);
   const removeTemplate = useSetAtom(removeTemplateAtom);
-
+  //FIX: fix horizontal scrollbar when having multiple tabs
   return (
     <div className="flex bg-background w-full border-b">
       <div className="flex overflow-x-auto">
@@ -28,7 +28,9 @@ export function EditorTabs() {
             onClick={() => setActiveTemplateId(tab.id)}
           >
             <FileText className="size-4" />
-            <span className="truncate max-w-[150px] text-xs">{tab.name}</span>
+            <span className="truncate max-w-[150px] text-xs">
+              {tab.filename}
+            </span>
             <Button
               variant="ghost"
               size="icon"
