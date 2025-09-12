@@ -89,7 +89,7 @@ export const addTemplateAtom = atom(null, (get, set) => {
     filename: `example-template-${id}`,
     content: `# Welcome to OASM Templates
 
-id: example-template-${id} # Unique identifier for the template
+id: example-template # Unique identifier for the template
 
 info:
   name: Example HTTP Template # Human-readable name

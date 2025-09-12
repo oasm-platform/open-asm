@@ -9,8 +9,8 @@ import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { Repository } from 'typeorm';
 import { StorageService } from '../storage/storage.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { Template } from './entities/templates.entity';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
+import { Template } from './entities/templates.entity';
 
 @Injectable()
 export class TemplatesService {
@@ -64,7 +64,7 @@ export class TemplatesService {
     );
 
     if (!template.path) {
-      await this.templateRepo.update(template, { path: result.path });
+      await this.templateRepo.update({ id: templateId }, { path: result.path });
     }
 
     return result;

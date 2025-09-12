@@ -1,4 +1,5 @@
 import {
+  useStorageControllerGetFile,
   useTemplatesControllerCreateTemplate,
   useTemplatesControllerGetTemplateById,
   useTemplatesControllerUploadFile,
@@ -7,7 +8,7 @@ import { yaml } from '@codemirror/lang-yaml';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror from '@uiw/react-codemirror';
 import { useAtom, useSetAtom } from 'jotai';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
 import { activeTemplateAtom, activeTemplateIdAtom } from '../atoms';
@@ -24,25 +25,44 @@ export default function Editor() {
     activeTemplate?.id || '',
   );
 
+  let bucket = '';
+  let path = '';
+  if (data && data.path) {
+    bucket = data.path.split('/')[0];
+    path = data.path.split('/')[1];
+  }
+
+  const { data: fileData } = useStorageControllerGetFile(bucket, path);
+  const contentSaved = useRef(activeTemplate?.content);
+
+  useEffect(() => {
+    const readFile = async () => {
+      if (fileData instanceof Blob) {
+        contentSaved.current = await fileData.text();
+      }
+    };
+    readFile();
+  }, [fileData]);
+
   useHotkeys(
     'ctrl+s',
     async (e) => {
       e.preventDefault();
-      if (activeTemplate) {
+      if (activeTemplate && contentSaved.current !== activeTemplate.content) {
         if (!data) {
           const template = await createTemplate({
             data: {
               fileName: activeTemplate.filename,
             },
           });
-          setActiveTemplate({ id: template.id });
-          setActiveTemplateId(template.id);
           uploadTemplate({
             data: {
               fileContent: activeTemplate.content,
               templateId: template.id,
             },
           });
+          setActiveTemplate({ id: template.id });
+          setActiveTemplateId(template.id);
         } else {
           uploadTemplate({
             data: {
@@ -52,7 +72,9 @@ export default function Editor() {
           });
         }
       } else {
-        toast('You have not made any changes');
+        toast.warning('You have not made any changes', {
+          closeButton: true,
+        });
       }
     },
     { enableOnContentEditable: true },

@@ -820,6 +820,17 @@ export type UploadTemplateDTO = {
   fileContent: string;
 };
 
+export type StreamableFile = { [key: string]: unknown };
+
+export type GetTemplateResponseDTO = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  fileName: string;
+  path: string;
+  content: StreamableFile;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   page?: number;
   limit?: number;
@@ -15298,7 +15309,7 @@ export const templatesControllerGetTemplateById = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<Template>(
+  return orvalClient<GetTemplateResponseDTO>(
     { url: `/api/templates/${templateId}`, method: 'GET', signal },
     options,
   );
