@@ -86,6 +86,42 @@ export class StorageService {
   }
 
   /**
+   * Delete a file from the storage directory.
+   * @param filePath The path of the file to delete (relative to bucket).
+   * @param bucket The bucket name where the file is stored (default: 'default').
+   * @throws NotFoundException if the file doesn't exist.
+   */
+  public deleteFile(filePath: string, bucket: string = 'default'): void {
+    // Remove any leading slashes or dots from the file path
+    const cleanPath = filePath.replace(/^[./\s]+/, '');
+
+    const bucketPath = this.getBucketPath(bucket);
+    const fullPath = join(bucketPath, cleanPath);
+
+    // Prevent directory traversal attacks
+    const resolvedPath = resolve(fullPath);
+    const resolvedBucketPath = resolve(bucketPath);
+
+    if (!resolvedPath.startsWith(resolvedBucketPath)) {
+      throw new NotFoundException('File not found');
+    }
+
+    if (!existsSync(resolvedPath)) {
+      throw new NotFoundException('File not found');
+    }
+
+    try {
+      fs.unlinkSync(resolvedPath);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new InternalServerErrorException(
+        `Failed to delete file: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
    * Forward an image from a URL.
    * @param url The URL of the image to forward.
    * @returns A StreamableFile containing the image data.

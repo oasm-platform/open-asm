@@ -1,30 +1,56 @@
-import { useStorageControllerUploadFile } from '@/services/apis/gen/queries';
+import {
+  useTemplatesControllerCreateTemplate,
+  useTemplatesControllerGetTemplateById,
+  useTemplatesControllerUploadFile,
+} from '@/services/apis/gen/queries';
 import { yaml } from '@codemirror/lang-yaml';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror from '@uiw/react-codemirror';
-import { useAtom } from 'jotai';
+import { useAtom, useSetAtom } from 'jotai';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
-import { activeTemplateAtom } from '../atoms';
+import { activeTemplateAtom, activeTemplateIdAtom } from '../atoms';
 import { ScanComponent } from './scan-component';
 
 export default function Editor() {
   const [activeTemplate, setActiveTemplate] = useAtom(activeTemplateAtom);
-  const { mutate } = useStorageControllerUploadFile();
+  const setActiveTemplateId = useSetAtom(activeTemplateIdAtom);
+  const { mutate: uploadTemplate } = useTemplatesControllerUploadFile();
+  const { mutateAsync: createTemplate } =
+    useTemplatesControllerCreateTemplate();
+
+  const { data } = useTemplatesControllerGetTemplateById(
+    activeTemplate?.id || '',
+  );
 
   useHotkeys(
     'ctrl+s',
-    (e) => {
+    async (e) => {
       e.preventDefault();
       if (activeTemplate) {
-        console.log(true);
-        const blob = new Blob([activeTemplate?.content || ''], {
-          type: 'application/yaml',
-        });
-        const file = new File([blob], 'template.yaml');
-
-        mutate({ data: { file: file } });
+        if (!data) {
+          const template = await createTemplate({
+            data: {
+              fileName: activeTemplate.filename,
+            },
+          });
+          setActiveTemplate({ id: template.id });
+          setActiveTemplateId(template.id);
+          uploadTemplate({
+            data: {
+              fileContent: activeTemplate.content,
+              templateId: template.id,
+            },
+          });
+        } else {
+          uploadTemplate({
+            data: {
+              fileContent: activeTemplate.content,
+              templateId: data.id,
+            },
+          });
+        }
       } else {
         toast('You have not made any changes');
       }

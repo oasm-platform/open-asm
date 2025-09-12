@@ -1,35 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsString } from 'class-validator';
+import { BaseEntity } from 'src/common/entities/base.entity';
 import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  ManyToOne,
-  PrimaryColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Column, Entity, ManyToOne } from 'typeorm';
 
 @Entity('templates')
-export class Template {
+export class Template extends BaseEntity {
   @ApiProperty()
-  @PrimaryColumn({ type: 'uuid' })
-  id: string;
-
-  @ApiProperty()
-  @Column({ unique: true })
+  @Column({ nullable: false })
+  @IsString()
   fileName: string;
 
   @ApiProperty()
-  @Column({ unique: true })
+  @Column({ nullable: true })
   path?: string;
-
-  @ApiProperty()
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @ApiProperty()
-  @UpdateDateColumn()
-  updatedAt: Date;
 
   @ManyToOne(() => Workspace, (workspace) => workspace.templates, {
     cascade: true,
