@@ -1,4 +1,12 @@
-import { ChevronRight, Command, File, Folder, Plus } from 'lucide-react';
+import {
+  ChevronRight,
+  Command,
+  File,
+  Folder,
+  MoreVertical,
+  Plus,
+} from 'lucide-react';
+import type { JSX } from 'react';
 import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -7,6 +15,23 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import {
   Sidebar,
   SidebarContent,
@@ -20,11 +45,16 @@ import {
   SidebarMenuSub,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useTemplatesControllerGetAllTemplates } from '@/services/apis/gen/queries';
 import { useSetAtom } from 'jotai';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { addTemplateAtom } from '../atoms';
-import { Input } from '@/components/ui/input';
-import { useTemplatesControllerGetAllTemplates } from '@/services/apis/gen/queries';
 
 const data = {
   changes: [
@@ -93,6 +123,134 @@ export function StudioSidebar({
   );
 }
 
+const RenameDialog = React.memo<{
+  fileName: string;
+  onConfirm: (newName: string) => void;
+  trigger: JSX.Element;
+}>(({ fileName, onConfirm, trigger }) => {
+  const [open, setOpen] = React.useState(false);
+  const [newName, setNewName] = React.useState(fileName);
+
+  React.useEffect(() => {
+    if (open) {
+      setNewName(fileName);
+    }
+  }, [open, fileName]);
+
+  const handleConfirm = () => {
+    if (newName.trim() && newName !== fileName) {
+      onConfirm(newName.trim());
+      setOpen(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setOpen(false);
+  };
+
+  const clonedTrigger = React.cloneElement(trigger, {
+    onClick: (e: React.MouseEvent) => {
+      e.preventDefault();
+      setOpen(true);
+    },
+    onMouseDown: (e: React.MouseEvent) => {
+      e.preventDefault();
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{clonedTrigger}</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rename Template</DialogTitle>
+          <DialogDescription>
+            Enter a new name for "{fileName}".
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="New template name"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleConfirm();
+              } else if (e.key === 'Escape') {
+                handleCancel();
+              }
+            }}
+            autoFocus
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleCancel}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={!newName.trim() || newName === fileName}
+          >
+            Rename
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+});
+
+RenameDialog.displayName = 'RenameDialog';
+
+const FileActionsMenu = React.memo<{
+  fileName: string;
+  onRename: (fileName: string, newName: string) => void;
+  onDelete: (fileName: string) => void;
+}>(({ fileName, onRename, onDelete }) => {
+  const isMobile = useIsMobile();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0 hover:bg-muted"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="size-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side={isMobile ? 'bottom' : 'right'} align="start">
+        <RenameDialog
+          fileName={fileName}
+          onConfirm={(newName) => onRename(fileName, newName)}
+          trigger={
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              Rename Template
+            </DropdownMenuItem>
+          }
+        />
+        <ConfirmDialog
+          title="Delete Template"
+          description={`Are you sure you want to delete "${fileName}"? This action cannot be undone.`}
+          onConfirm={() => onDelete(fileName)}
+          confirmText="Delete"
+          trigger={
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={(e) => e.preventDefault()}
+            >
+              Delete Template
+            </DropdownMenuItem>
+          }
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+FileActionsMenu.displayName = 'FileActionsMenu';
+
 function Tree() {
   const { data } = useTemplatesControllerGetAllTemplates({
     limit: 10,
@@ -101,34 +259,67 @@ function Tree() {
   if (!data) return 'loading';
   console.log(data);
 
-  const [name, items] = [
+  const [folderName, items] = [
     'Workspace templates',
     data.data.map((e) => e.fileName),
   ];
+
+  const truncateName = (name: string, maxLength: number = 20) => {
+    return name.length > maxLength
+      ? name.substring(0, maxLength) + '...'
+      : name;
+  };
+
+  const handleRename = (fileName: string, newName: string) => {
+    // Placeholder for rename functionality
+    console.log('Rename', fileName, 'to', newName);
+  };
+
+  const handleDelete = (fileName: string) => {
+    // Placeholder for delete functionality
+    console.log('Delete', fileName);
+  };
 
   return (
     <SidebarMenuItem>
       <Collapsible
         className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
-        defaultOpen={name === 'components' || name === 'ui'}
+        defaultOpen={folderName === 'components' || folderName === 'ui'}
       >
         <CollapsibleTrigger asChild>
           <SidebarMenuButton>
             <ChevronRight className="transition-transform" />
             <Folder />
-            {name}
+            {folderName}
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub>
             {items.length > 0 ? (
-              items.map((name) => (
+              items.map((fileName) => (
                 <SidebarMenuButton
-                  isActive={name === 'button.tsx'}
-                  className="data-[active=true]:bg-transparent"
+                  key={fileName}
+                  isActive={fileName === 'button.tsx'}
+                  className="data-[active=true]:bg-transparent flex items-center justify-between w-full p-0"
                 >
-                  <File />
-                  {name}
+                  <div className="flex items-center min-w-0 flex-1 px-2 py-1.5">
+                    <File className="size-4 mr-2 flex-shrink-0" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="truncate text-sm">
+                          {truncateName(fileName)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{fileName}</TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="px-2">
+                    <FileActionsMenu
+                      fileName={fileName}
+                      onRename={handleRename}
+                      onDelete={handleDelete}
+                    />
+                  </div>
                 </SidebarMenuButton>
               ))
             ) : (
