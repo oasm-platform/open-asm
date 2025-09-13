@@ -23,6 +23,8 @@ import {
 import { useSetAtom } from 'jotai';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { addTemplateAtom } from '../atoms';
+import { Input } from '@/components/ui/input';
+import { useTemplatesControllerGetAllTemplates } from '@/services/apis/gen/queries';
 
 const data = {
   changes: [
@@ -31,7 +33,6 @@ const data = {
       state: 'M',
     },
   ],
-  tree: [['Workspace templates', ['template-example.yaml']]],
 };
 
 export function StudioSidebar({
@@ -51,13 +52,16 @@ export function StudioSidebar({
     >
       <SidebarContent>
         <SidebarGroup>
-          <Button onClick={() => addTemplate()}>
-            <Plus className="size-4" />
-            Add new template
-            <span className="text-xs bg-muted/40 rounded px-1.5 py-0.5 ml-2">
-              <Command className="size-3 inline-block mr-1" />+ I
-            </span>
-          </Button>
+          <div className="flex flex-col gap-2 p-2">
+            <Button onClick={() => addTemplate()} size="sm">
+              <Plus className="size-4" />
+              Add new template
+              <span className="text-xs bg-muted/40 rounded px-1.5 py-0.5 ml-2">
+                <Command className="size-3 inline-block mr-1" />+ I
+              </span>
+            </Button>
+            <Input placeholder="Search Template..." />
+          </div>
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Changes</SidebarGroupLabel>
@@ -79,9 +83,7 @@ export function StudioSidebar({
           <SidebarGroupLabel>Files</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {data.tree.map((item, index) => (
-                <Tree key={index} item={item} />
-              ))}
+              <Tree />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -91,20 +93,18 @@ export function StudioSidebar({
   );
 }
 
-function Tree({ item }: { item: string | unknown[] }) {
-  const [name, ...items] = Array.isArray(item) ? item : [item];
+function Tree() {
+  const { data } = useTemplatesControllerGetAllTemplates({
+    limit: 10,
+    page: 1,
+  });
+  if (!data) return 'loading';
+  console.log(data);
 
-  if (!items.length) {
-    return (
-      <SidebarMenuButton
-        isActive={name === 'button.tsx'}
-        className="data-[active=true]:bg-transparent"
-      >
-        <File />
-        {name as string}
-      </SidebarMenuButton>
-    );
-  }
+  const [name, items] = [
+    'Workspace templates',
+    data.data.map((e) => e.fileName),
+  ];
 
   return (
     <SidebarMenuItem>
@@ -116,14 +116,24 @@ function Tree({ item }: { item: string | unknown[] }) {
           <SidebarMenuButton>
             <ChevronRight className="transition-transform" />
             <Folder />
-            {name as string}
+            {name}
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub>
-            {items.map((subItem, index) => (
-              <Tree key={index} item={subItem as string[]} />
-            ))}
+            {items.length > 0 ? (
+              items.map((name) => (
+                <SidebarMenuButton
+                  isActive={name === 'button.tsx'}
+                  className="data-[active=true]:bg-transparent"
+                >
+                  <File />
+                  {name}
+                </SidebarMenuButton>
+              ))
+            ) : (
+              <span>No template</span>
+            )}
           </SidebarMenuSub>
         </CollapsibleContent>
       </Collapsible>

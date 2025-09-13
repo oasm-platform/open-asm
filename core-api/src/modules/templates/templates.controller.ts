@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { WorkspaceId } from 'src/common/decorators/workspace-id.decorator';
@@ -18,6 +19,8 @@ import {
 import { Template } from './entities/templates.entity';
 import { TemplatesService } from './templates.service';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
+import { GetManyResponseDto } from 'src/utils/getManyResponse';
+import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 
 @Controller('templates')
 export class TemplatesController {
@@ -100,17 +103,22 @@ export class TemplatesController {
   @Doc({
     summary: 'Get all templates',
     description: 'Retrieve all templates in a workspace',
-    response: { serialization: Template },
+    response: { serialization: GetManyResponseDto(Template) },
     request: {
       getWorkspaceId: true,
     },
   })
   @Get()
   getAllTemplates(
+    @Query() query: GetManyBaseQueryParams,
     @WorkspaceId() workspaceId: string,
     @UserContext() userContext: UserContextPayload,
   ) {
-    return this.templateService.getAllTemplates(workspaceId, userContext);
+    return this.templateService.getAllTemplates(
+      query,
+      workspaceId,
+      userContext,
+    );
   }
 
   @Doc({

@@ -5,7 +5,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import {
+  GetManyBaseQueryParams,
+  GetManyBaseResponseDto,
+} from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { StorageService } from '../storage/storage.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -172,9 +177,10 @@ export class TemplatesService {
   }
 
   async getAllTemplates(
+    query: GetManyBaseQueryParams,
     workspaceId: string,
     userContext: UserContextPayload,
-  ): Promise<Template[]> {
+  ): Promise<GetManyBaseResponseDto<Template>> {
     const workspace = await this.workspacesService.getWorkspaceById(
       workspaceId,
       userContext,
@@ -182,9 +188,13 @@ export class TemplatesService {
 
     if (!workspace) throw new NotFoundException('Cannot find the workspace');
 
-    return this.templateRepo.find({
+    const [data, total] = await this.templateRepo.findAndCount({
       where: { workspace: { id: workspaceId } },
+      take: query.limit,
+      skip: query.limit * (query.page - 1),
       relations: ['workspace'],
     });
+
+    return getManyResponse({ query, data, total });
   }
 }

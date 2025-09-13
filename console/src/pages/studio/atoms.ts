@@ -122,10 +122,7 @@ export const removeTemplateAtom = atom(null, (get, set, id: string) => {
     set(templatesAtom, updatedTemplates);
 
     if (activeId === id) {
-      set(
-        activeTemplateIdAtom,
-        updatedTemplates[updatedTemplates.length - 1].id,
-      );
+      set(activeTemplateIdAtom, updatedTemplates[0].id);
     }
   }
 });

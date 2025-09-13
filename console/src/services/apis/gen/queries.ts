@@ -820,15 +820,13 @@ export type UploadTemplateDTO = {
   fileContent: string;
 };
 
-export type StreamableFile = { [key: string]: unknown };
-
-export type GetTemplateResponseDTO = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  fileName: string;
-  path: string;
-  content: StreamableFile;
+export type GetManyTemplateDto = {
+  data: Template[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
@@ -1033,6 +1031,13 @@ export type ProvidersControllerGetManyProvidersParams = {
   sortBy?: string;
   sortOrder?: string;
   name?: string;
+};
+
+export type TemplatesControllerGetAllTemplatesParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -14814,48 +14819,66 @@ export const useTemplatesControllerCreateTemplate = <
  * @summary Get all templates
  */
 export const templatesControllerGetAllTemplates = (
+  params?: TemplatesControllerGetAllTemplatesParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<Template>(
-    { url: `/api/templates`, method: 'GET', signal },
+  return orvalClient<GetManyTemplateDto>(
+    { url: `/api/templates`, method: 'GET', params, signal },
     options,
   );
 };
 
-export const getTemplatesControllerGetAllTemplatesQueryKey = () => {
-  return [`/api/templates`] as const;
+export const getTemplatesControllerGetAllTemplatesQueryKey = (
+  params?: TemplatesControllerGetAllTemplatesParams,
+) => {
+  return [`/api/templates`, ...(params ? [params] : [])] as const;
 };
 
 export const getTemplatesControllerGetAllTemplatesInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
   >,
   TError = unknown,
->(options?: {
-  query?: Partial<
-    UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getTemplatesControllerGetAllTemplatesQueryKey();
+    queryOptions?.queryKey ??
+    getTemplatesControllerGetAllTemplatesQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
-  > = ({ signal }) =>
-    templatesControllerGetAllTemplates(requestOptions, signal);
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    QueryKey,
+    TemplatesControllerGetAllTemplatesParams['page']
+  > = ({ signal, pageParam }) =>
+    templatesControllerGetAllTemplates(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
     TError,
-    TData
+    TData,
+    QueryKey,
+    TemplatesControllerGetAllTemplatesParams['page']
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -14866,23 +14889,28 @@ export type TemplatesControllerGetAllTemplatesInfiniteQueryError = unknown;
 
 export function useTemplatesControllerGetAllTemplatesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
   >,
   TError = unknown,
 >(
+  params: undefined | TemplatesControllerGetAllTemplatesParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
         TError,
-        TData
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          QueryKey
         >,
         'initialData'
       >;
@@ -14894,23 +14922,28 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 };
 export function useTemplatesControllerGetAllTemplatesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
   >,
   TError = unknown,
 >(
+  params?: TemplatesControllerGetAllTemplatesParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
         TError,
-        TData
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          QueryKey
         >,
         'initialData'
       >;
@@ -14922,16 +14955,20 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 };
 export function useTemplatesControllerGetAllTemplatesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
   >,
   TError = unknown,
 >(
+  params?: TemplatesControllerGetAllTemplatesParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
         TError,
-        TData
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -14946,16 +14983,20 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 
 export function useTemplatesControllerGetAllTemplatesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
   >,
   TError = unknown,
 >(
+  params?: TemplatesControllerGetAllTemplatesParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
         TError,
-        TData
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -14965,7 +15006,7 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions =
-    getTemplatesControllerGetAllTemplatesInfiniteQueryOptions(options);
+    getTemplatesControllerGetAllTemplatesInfiniteQueryOptions(params, options);
 
   const query = useInfiniteQuery(
     queryOptions,
@@ -14982,25 +15023,29 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 export const getTemplatesControllerGetAllTemplatesQueryOptions = <
   TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
   TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getTemplatesControllerGetAllTemplatesQueryKey();
+    queryOptions?.queryKey ??
+    getTemplatesControllerGetAllTemplatesQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
   > = ({ signal }) =>
-    templatesControllerGetAllTemplates(requestOptions, signal);
+    templatesControllerGetAllTemplates(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
@@ -15018,6 +15063,7 @@ export function useTemplatesControllerGetAllTemplates<
   TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
   TError = unknown,
 >(
+  params: undefined | TemplatesControllerGetAllTemplatesParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -15044,6 +15090,7 @@ export function useTemplatesControllerGetAllTemplates<
   TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
   TError = unknown,
 >(
+  params?: TemplatesControllerGetAllTemplatesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15070,6 +15117,7 @@ export function useTemplatesControllerGetAllTemplates<
   TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
   TError = unknown,
 >(
+  params?: TemplatesControllerGetAllTemplatesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15092,6 +15140,7 @@ export function useTemplatesControllerGetAllTemplates<
   TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
   TError = unknown,
 >(
+  params?: TemplatesControllerGetAllTemplatesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15106,8 +15155,10 @@ export function useTemplatesControllerGetAllTemplates<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions =
-    getTemplatesControllerGetAllTemplatesQueryOptions(options);
+  const queryOptions = getTemplatesControllerGetAllTemplatesQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -15309,7 +15360,7 @@ export const templatesControllerGetTemplateById = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetTemplateResponseDTO>(
+  return orvalClient<Template>(
     { url: `/api/templates/${templateId}`, method: 'GET', signal },
     options,
   );
