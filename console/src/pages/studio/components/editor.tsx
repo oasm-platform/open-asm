@@ -11,11 +11,16 @@ import { useAtom, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
-import { activeTemplateAtom, activeTemplateIdAtom } from '../atoms';
+import {
+  activeTemplateAtom,
+  activeTemplateIdAtom,
+  defaultTemplates,
+} from '../atoms';
 import { ScanComponent } from './scan-component';
 import * as prettier from 'prettier/standalone';
 import * as prettierYaml from 'prettier/plugins/yaml';
 
+//TODO: add url params for better ux
 export default function Editor() {
   const [activeTemplate, setActiveTemplate] = useAtom(activeTemplateAtom);
   const setActiveTemplateId = useSetAtom(activeTemplateIdAtom);
@@ -30,7 +35,9 @@ export default function Editor() {
   const [bucket, path] = useMemo(() => data?.path?.split('/') || [], [data]);
 
   const { data: fileData, refetch } = useStorageControllerGetFile(bucket, path);
-  const contentSaved = useRef(activeTemplate?.content);
+  const contentSaved = useRef(
+    activeTemplate?.content || defaultTemplates.content,
+  );
 
   useEffect(() => {
     const readFile = async () => {
@@ -48,7 +55,7 @@ export default function Editor() {
       toast.error('No content to format', { closeButton: true });
       return false;
     }
-    const toastId = toast.loading('Formating template...', {
+    const toastId = toast.loading('Formatting template...', {
       closeButton: true,
     });
     try {
@@ -58,6 +65,7 @@ export default function Editor() {
       });
 
       setActiveTemplate({ ...activeTemplate, content: formatted });
+      contentSaved.current = formatted;
       toast.success('Template formatted successfully', {
         closeButton: true,
         id: toastId,
@@ -88,43 +96,42 @@ export default function Editor() {
     'ctrl+s',
     async (e) => {
       e.preventDefault();
-      const isFormatted = await formatYAML();
-      if (!isFormatted) return;
-      if (activeTemplate && contentSaved.current !== activeTemplate.content) {
-        if (!data) {
-          await createTemplate(
-            {
-              data: {
-                fileName: activeTemplate.filename,
-              },
-            },
-            {
-              onSuccess: (data) => {
-                setActiveTemplate({ id: data.id });
-                setActiveTemplateId(data.id);
-              },
-            },
-          );
-        }
-        uploadTemplate(
-          {
-            data: {
-              fileContent: activeTemplate.content,
-              templateId: activeTemplate.id,
-            },
-          },
-          {
-            onSuccess: () => {
-              refetch();
-            },
-          },
-        );
-        toast.success('Template is saved successfully');
-      } else {
+      if (!activeTemplate) return;
+
+      if (contentSaved.current === activeTemplate.content) {
         toast.warning('You have not made any changes', {
           closeButton: true,
         });
+        return;
       }
+
+      const isFormatted = await formatYAML();
+      if (!isFormatted) return;
+
+      if (!data) {
+        const data = await createTemplate({
+          data: {
+            fileName: activeTemplate.filename,
+          },
+        });
+        setActiveTemplate({ id: data.id });
+        setActiveTemplateId(data.id);
+      }
+
+      uploadTemplate(
+        {
+          data: {
+            fileContent: activeTemplate.content,
+            templateId: activeTemplate.id,
+          },
+        },
+        {
+          onSuccess: () => {
+            refetch();
+          },
+        },
+      );
+      toast.success('Template is saved successfully');
     },
     { enableOnContentEditable: true },
   );

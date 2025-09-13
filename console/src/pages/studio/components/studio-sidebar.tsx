@@ -245,14 +245,9 @@ const FileActionsMenu = React.memo<{
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 w-6 p-0 hover:bg-muted"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="h-6 w-6 p-0 hover:bg-primary/50 flex items-center justify-center hover:cursor-pointer rounded-full">
           <MoreVertical className="size-3" />
-        </Button>
+        </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent side={isMobile ? 'bottom' : 'right'} align="start">
         <RenameDialog

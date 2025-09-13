@@ -8,11 +8,10 @@ type Template = {
   content: string;
 };
 
-const defaultTemplates: Template[] = [
-  {
-    id: uuidv7(),
-    filename: `example-template`,
-    content: `# Welcome to OASM Templates
+export const defaultTemplates: Template = {
+  id: uuidv7(),
+  filename: `example-template`,
+  content: `# Welcome to OASM Templates
 
 id: example-template # Unique identifier for the template
 
@@ -32,13 +31,11 @@ http:
       - type: status # Matcher type: checks HTTP response status code
         status:
           - 200 # Match if response code is 200 (OK)`,
-  },
-];
+};
 
-export const templatesAtom = atomWithStorage<Template[]>(
-  'editorTemplates',
+export const templatesAtom = atomWithStorage<Template[]>('editorTemplates', [
   defaultTemplates,
-);
+]);
 
 export const templatesFamilyAtom = atomFamily((id: string) =>
   atom(
@@ -64,7 +61,7 @@ export const templatesFamilyAtom = atomFamily((id: string) =>
 
 export const activeTemplateIdAtom = atomWithStorage<string>(
   'activeTemplateId',
-  defaultTemplates[0].id,
+  defaultTemplates.id,
 );
 
 export const activeTemplateAtom = atom(
@@ -87,26 +84,7 @@ export const addTemplateAtom = atom(null, (get, set) => {
   const newTemplate: Template = {
     id,
     filename: `example-template-${id}`,
-    content: `# Welcome to OASM Templates
-
-id: example-template # Unique identifier for the template
-
-info:
-  name: Example HTTP Template # Human-readable name
-  author: your-name # Template creator's name or handle
-  severity: info # Severity level: info, low, medium, high, critical
-  description: Simple HTTP GET request with status code matcher # Brief explanation of what this template does.
-  tags: example # Comma-separated tags for filter/search
-
-http:
-  - method: GET # HTTP method to use
-    path:
-      - "{{BaseURL}}/robots.txt" # Request path
-
-    matchers:
-      - type: status # Matcher type: checks HTTP response status code
-        status:
-          - 200 # Match if response code is 200 (OK)`,
+    content: defaultTemplates.content,
   };
   const updatedTemplates = [...templates, newTemplate];
   set(templatesAtom, updatedTemplates);

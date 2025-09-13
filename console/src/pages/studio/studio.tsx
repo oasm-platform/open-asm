@@ -2,8 +2,12 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import Editor from './components/editor';
 import { EditorTabs } from './components/editor-tabs';
 import { StudioSidebar } from './components/studio-sidebar';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 
 export default function Studio() {
+  //Set workspace id to x-header
+  useWorkspaceSelector();
+
   return (
     <div className="h-screen flex flex-col">
       <SidebarProvider
