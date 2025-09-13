@@ -29,7 +29,7 @@ dayjs.extend(timezone);
 const JobsTimeline = () => {
     const navigate = useNavigate();
     const { data, isLoading } = useJobsRegistryControllerGetJobsTimeline({
-        query: { refetchInterval: 5000 }
+        query: { refetchInterval: 5000 },
     });
 
     // Group by jobHistoryId first, then by target
@@ -71,9 +71,9 @@ const JobsTimeline = () => {
             <CardHeader className="border-b pb-3">
                 <CardTitle>Jobs Timeline</CardTitle>
             </CardHeader>
-            <CardContent className="p-0 flex-grow">
-                <ScrollArea className="h-full">
-                    <div className="p-2">
+            <CardContent className="p-0 flex-grow overflow-hidden">
+                <ScrollArea className="h-full w-full">
+                    <div className="p-2 min-h-full">
                         {isLoading && (
                             <div className="flex items-center justify-center py-4">
                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { Public } from 'src/common/decorators/app.decorator';
+import { Public, WorkspaceId } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
@@ -38,8 +38,8 @@ export class JobsRegistryController {
     },
   })
   @Get('/timeline')
-  getJobsTimeline() {
-    return this.jobsRegistryService.getJobsTimeline();
+  getJobsTimeline(@WorkspaceId() workspaceId: string) {
+    return this.jobsRegistryService.getJobsTimeline(workspaceId);
   }
 
   @Doc({

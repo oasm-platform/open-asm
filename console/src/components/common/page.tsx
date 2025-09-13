@@ -19,7 +19,7 @@ const Page = ({
   const navigate = useNavigate();
 
   return (
-    <div className={className}>
+    <div className={className + " h-full flex flex-col"}>
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
           {isShowButtonGoBack && (
@@ -33,7 +33,9 @@ const Page = ({
         </div>
         <div className="flex-grow">{header}</div>
       </div>
-      {children}
+      <div className="flex-grow overflow-hidden">
+        {children}
+      </div>
     </div>
   );
 };
