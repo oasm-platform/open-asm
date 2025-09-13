@@ -51,10 +51,25 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useTemplatesControllerGetAllTemplates } from '@/services/apis/gen/queries';
+import {
+  useTemplatesControllerDeleteTemplate,
+  useTemplatesControllerGetAllTemplates,
+  useTemplatesControllerRenameFile,
+} from '@/services/apis/gen/queries';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useSetAtom } from 'jotai';
+import { useForm } from 'react-hook-form';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { z } from 'zod';
 import { addTemplateAtom } from '../atoms';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 const data = {
   changes: [
@@ -64,6 +79,12 @@ const data = {
     },
   ],
 };
+
+const renameSchema = z.object({
+  fileName: z.string().min(1, 'Name is required'),
+});
+
+type RenameFormData = z.infer<typeof renameSchema>;
 
 export function StudioSidebar({
   ...props
@@ -125,23 +146,31 @@ export function StudioSidebar({
 
 const RenameDialog = React.memo<{
   fileName: string;
-  onConfirm: (newName: string) => void;
   trigger: JSX.Element;
-}>(({ fileName, onConfirm, trigger }) => {
+  templateId: string;
+}>(({ fileName, trigger, templateId }) => {
   const [open, setOpen] = React.useState(false);
-  const [newName, setNewName] = React.useState(fileName);
+
+  const form = useForm<RenameFormData>({
+    resolver: zodResolver(renameSchema),
+    defaultValues: {
+      fileName,
+    },
+  });
 
   React.useEffect(() => {
     if (open) {
-      setNewName(fileName);
+      form.reset({ fileName });
     }
-  }, [open, fileName]);
+  }, [open, fileName, form]);
 
-  const handleConfirm = () => {
-    if (newName.trim() && newName !== fileName) {
-      onConfirm(newName.trim());
-      setOpen(false);
+  const { mutate } = useTemplatesControllerRenameFile();
+
+  const onSubmit = (data: RenameFormData) => {
+    if (data.fileName.trim() && data.fileName !== fileName) {
+      mutate({ templateId, data });
     }
+    setOpen(false);
   };
 
   const handleCancel = () => {
@@ -168,28 +197,32 @@ const RenameDialog = React.memo<{
             Enter a new name for "{fileName}".
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4">
-          <Input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="New template name"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleConfirm();
-              } else if (e.key === 'Escape') {
-                handleCancel();
-              }
-            }}
-            autoFocus
-          />
-        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="py-4">
+            <FormField
+              control={form.control}
+              name="fileName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>File name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter new file name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
           <Button
-            onClick={handleConfirm}
-            disabled={!newName.trim() || newName === fileName}
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={
+              !form.formState.isValid || form.watch('fileName') === fileName
+            }
           >
             Rename
           </Button>
@@ -203,10 +236,11 @@ RenameDialog.displayName = 'RenameDialog';
 
 const FileActionsMenu = React.memo<{
   fileName: string;
-  onRename: (fileName: string, newName: string) => void;
-  onDelete: (fileName: string) => void;
-}>(({ fileName, onRename, onDelete }) => {
+  templateId: string;
+}>(({ fileName, templateId }) => {
   const isMobile = useIsMobile();
+
+  const { mutate } = useTemplatesControllerDeleteTemplate();
 
   return (
     <DropdownMenu>
@@ -222,8 +256,8 @@ const FileActionsMenu = React.memo<{
       </DropdownMenuTrigger>
       <DropdownMenuContent side={isMobile ? 'bottom' : 'right'} align="start">
         <RenameDialog
+          templateId={templateId}
           fileName={fileName}
-          onConfirm={(newName) => onRename(fileName, newName)}
           trigger={
             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
               Rename Template
@@ -233,7 +267,7 @@ const FileActionsMenu = React.memo<{
         <ConfirmDialog
           title="Delete Template"
           description={`Are you sure you want to delete "${fileName}"? This action cannot be undone.`}
-          onConfirm={() => onDelete(fileName)}
+          onConfirm={() => mutate({ templateId })}
           confirmText="Delete"
           trigger={
             <DropdownMenuItem
@@ -256,28 +290,21 @@ function Tree() {
     limit: 10,
     page: 1,
   });
+  //TODO: replace loading with skeleton
   if (!data) return 'loading';
-  console.log(data);
 
   const [folderName, items] = [
     'Workspace templates',
-    data.data.map((e) => e.fileName),
+    data.data.map((e) => ({
+      fileName: e.fileName,
+      templateId: e.id,
+    })),
   ];
 
   const truncateName = (name: string, maxLength: number = 20) => {
     return name.length > maxLength
       ? name.substring(0, maxLength) + '...'
       : name;
-  };
-
-  const handleRename = (fileName: string, newName: string) => {
-    // Placeholder for rename functionality
-    console.log('Rename', fileName, 'to', newName);
-  };
-
-  const handleDelete = (fileName: string) => {
-    // Placeholder for delete functionality
-    console.log('Delete', fileName);
   };
 
   return (
@@ -296,10 +323,9 @@ function Tree() {
         <CollapsibleContent>
           <SidebarMenuSub>
             {items.length > 0 ? (
-              items.map((fileName) => (
+              items.map((e) => (
                 <SidebarMenuButton
-                  key={fileName}
-                  isActive={fileName === 'button.tsx'}
+                  key={e.templateId}
                   className="data-[active=true]:bg-transparent flex items-center justify-between w-full p-0"
                 >
                   <div className="flex items-center min-w-0 flex-1 px-2 py-1.5">
@@ -307,17 +333,16 @@ function Tree() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="truncate text-sm">
-                          {truncateName(fileName)}
+                          {truncateName(e.fileName)}
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>{fileName}</TooltipContent>
+                      <TooltipContent>{e.fileName}</TooltipContent>
                     </Tooltip>
                   </div>
                   <div className="px-2">
                     <FileActionsMenu
-                      fileName={fileName}
-                      onRename={handleRename}
-                      onDelete={handleDelete}
+                      fileName={e.fileName}
+                      templateId={e.templateId}
                     />
                   </div>
                 </SidebarMenuButton>

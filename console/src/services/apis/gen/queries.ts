@@ -820,6 +820,10 @@ export type UploadTemplateDTO = {
   fileContent: string;
 };
 
+export type RenameTemplateDTO = {
+  fileName: string;
+};
+
 export type GetManyTemplateDto = {
   data: Template[];
   total: number;
@@ -15270,10 +15274,16 @@ export const useTemplatesControllerUploadFile = <
  */
 export const templatesControllerRenameFile = (
   templateId: string,
+  renameTemplateDTO: RenameTemplateDTO,
   options?: SecondParameter<typeof orvalClient>,
 ) => {
   return orvalClient<Template>(
-    { url: `/api/templates/${templateId}/rename`, method: 'PATCH' },
+    {
+      url: `/api/templates/${templateId}/rename`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: renameTemplateDTO,
+    },
     options,
   );
 };
@@ -15285,14 +15295,14 @@ export const getTemplatesControllerRenameFileMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof templatesControllerRenameFile>>,
     TError,
-    { templateId: string },
+    { templateId: string; data: RenameTemplateDTO },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof templatesControllerRenameFile>>,
   TError,
-  { templateId: string },
+  { templateId: string; data: RenameTemplateDTO },
   TContext
 > => {
   const mutationKey = ['templatesControllerRenameFile'];
@@ -15306,11 +15316,11 @@ export const getTemplatesControllerRenameFileMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-    { templateId: string }
+    { templateId: string; data: RenameTemplateDTO }
   > = (props) => {
-    const { templateId } = props ?? {};
+    const { templateId, data } = props ?? {};
 
-    return templatesControllerRenameFile(templateId, requestOptions);
+    return templatesControllerRenameFile(templateId, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -15319,7 +15329,7 @@ export const getTemplatesControllerRenameFileMutationOptions = <
 export type TemplatesControllerRenameFileMutationResult = NonNullable<
   Awaited<ReturnType<typeof templatesControllerRenameFile>>
 >;
-
+export type TemplatesControllerRenameFileMutationBody = RenameTemplateDTO;
 export type TemplatesControllerRenameFileMutationError = unknown;
 
 /**
@@ -15333,7 +15343,7 @@ export const useTemplatesControllerRenameFile = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof templatesControllerRenameFile>>,
       TError,
-      { templateId: string },
+      { templateId: string; data: RenameTemplateDTO },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -15342,7 +15352,7 @@ export const useTemplatesControllerRenameFile = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof templatesControllerRenameFile>>,
   TError,
-  { templateId: string },
+  { templateId: string; data: RenameTemplateDTO },
   TContext
 > => {
   const mutationOptions =

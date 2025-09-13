@@ -16,6 +16,7 @@ import { StorageService } from '../storage/storage.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
 import { Template } from './entities/templates.entity';
+import { RenameTemplateDTO } from './dto/renameTemplate.dto';
 
 @Injectable()
 export class TemplatesService {
@@ -79,7 +80,7 @@ export class TemplatesService {
     templateId: string,
     workspaceId: string,
     userContext: UserContextPayload,
-    newFileName: string,
+    dto: RenameTemplateDTO,
   ): Promise<Template> {
     const workspace = await this.workspacesService.getWorkspaceById(
       workspaceId,
@@ -103,21 +104,7 @@ export class TemplatesService {
       );
     }
 
-    // Check if new filename already exists in workspace
-    const existingTemplate = await this.templateRepo.findOne({
-      where: {
-        fileName: newFileName,
-        workspace: { id: workspaceId },
-      },
-    });
-
-    if (existingTemplate && existingTemplate.id !== templateId) {
-      throw new BadRequestException(
-        'A template with this filename already exists',
-      );
-    }
-
-    template.fileName = newFileName;
+    template.fileName = dto.fileName;
     return this.templateRepo.save(template);
   }
 
@@ -162,10 +149,10 @@ export class TemplatesService {
       userContext,
     );
 
-    // Delete file from storage if it exists
     if (template.path) {
+      const [bucket, path] = this.getFileAndBucket(template.path);
       try {
-        this.storageService.deleteFile(template.path, 'templates');
+        this.storageService.deleteFile(path, bucket);
       } catch (error) {
         // Log error but don't fail the operation
         this.logger.warn('Failed to delete file from storage:', error);
@@ -196,5 +183,8 @@ export class TemplatesService {
     });
 
     return getManyResponse({ query, data, total });
+  }
+  private getFileAndBucket(path: string) {
+    return path.split('/');
   }
 }

@@ -10,10 +10,12 @@ export default function StudioLayout({ children }: { children: JSX.Element }) {
       <header className="sticky top-0 z-50 flex shrink-0 items-center gap-2 border-b bg-background">
         <div className="flex h-(--header-height) w-full items-center gap-2 px-4">
           <div>
-            <Button variant={'outline'}>
-              <ArrowLeft size={4} />
-              <Link to="/">Back</Link>
-            </Button>
+            <Link to="/">
+              <Button variant={'outline'}>
+                <ArrowLeft size={4} />
+                Back
+              </Button>
+            </Link>
           </div>
           <div className="ml-auto flex gap-3">
             <GithubBadge />
