@@ -6,12 +6,15 @@ import VulnerabilitySeverityDonutChart from "./vulnerability-severity-donut-char
 export default function Dashboard() {
     return (
         <Page title="Dashboard">
-            <div className="flex w-full gap-4 lg:flex-row flex-col">
-                <div className="flex flex-col w-full lg:w-4/5 gap-4">
+            <div className="flex w-full gap-4 flex-col lg:flex-row h-full">
+                <div className="w-full lg:w-3/4 flex flex-col gap-4">
                     <Statistic />
-                    <VulnerabilitySeverityDonutChart />
+                    <div className="w-full lg:w-1/4">
+
+                    </div>
                 </div>
-                <div className="w-full lg:w-1/5">
+                <div className="w-full lg:w-1/4 gap-3 flex flex-col h-full">
+                    <VulnerabilitySeverityDonutChart />
                     <JobsTimeline />
                 </div>
             </div>

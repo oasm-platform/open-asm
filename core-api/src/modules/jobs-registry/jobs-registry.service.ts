@@ -86,18 +86,26 @@ export class JobsRegistryService {
     workspaceId,
     assetIds,
     workflow,
+    jobHistory: existingJobHistory,
   }: {
     tools: Tool[];
     targetIds: string[];
     assetIds?: string[];
     workspaceId?: string;
     workflow?: Workflow;
+    jobHistory?: JobHistory;
   }): Promise<Job[]> {
     // Step 1: create job history
-    const jobHistory = this.jobHistoryRepo.create({
-      workflow,
-    });
-    await this.jobHistoryRepo.save(jobHistory);
+    let jobHistory: JobHistory;
+
+    if (existingJobHistory) {
+      jobHistory = existingJobHistory;
+    } else {
+      jobHistory = this.jobHistoryRepo.create({
+        workflow,
+      });
+      await this.jobHistoryRepo.save(jobHistory);
+    }
 
     // Step 2: find assets of the given targets
     const assetsQueryBuilder = this.dataSource
@@ -415,9 +423,12 @@ export class JobsRegistryService {
    * Retrieves a timeline of jobs grouped by tool name and target
    * @returns A promise that resolves to a JobTimelineResponseDto containing the timeline data
    */
-  public async getJobsTimeline(): Promise<JobTimelineResponseDto> {
+  public async getJobsTimeline(
+    workspaceId: string,
+  ): Promise<JobTimelineResponseDto> {
     // Execute the raw SQL query based on the provided example
-    const result: JobTimelineQueryResult[] = await this.dataSource.query(`
+    const result: JobTimelineQueryResult[] = await this.dataSource.query(
+      `
       with grouped as (
         select
           tools.name,
@@ -441,6 +452,8 @@ export class JobsRegistryService {
         join assets on jobs."assetId" = assets.id
         join tools on jobs."toolId" = tools.id
         join targets on assets."targetId" = targets.id
+        join "workspace_targets" on targets."id" = "workspace_targets"."targetId"
+        where "workspace_targets"."workspaceId" = $1
         order by jobs."createdAt" desc
       ),
       grouped_with_id as (
@@ -463,7 +476,9 @@ export class JobsRegistryService {
       group by grp_id, name, target, target_id, "jobHistoryId"
       order by "jobHistoryId", min("createdAt") desc
       limit 15;
-    `);
+    `,
+      [workspaceId],
+    );
 
     // Map the raw SQL results to our DTO format
     const timelineItems: JobTimelineItem[] = result.map(
@@ -513,6 +528,8 @@ export class JobsRegistryService {
         tools,
         targetIds: [job.asset.target.id],
         workflow: job.jobHistory.workflow,
+        // Đảm bảo các job mới tạo có cùng history id với job vừa hoàn thành
+        jobHistory: job.jobHistory,
       });
     }
   }

@@ -6,6 +6,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Define type for timeline item with jobHistoryId
 interface TimelineItemWithJobHistory {
@@ -26,8 +27,9 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const JobsTimeline = () => {
+    const navigate = useNavigate();
     const { data, isLoading } = useJobsRegistryControllerGetJobsTimeline({
-        query: { refetchInterval: 5000 }
+        query: { refetchInterval: 5000 },
     });
 
     // Group by jobHistoryId first, then by target
@@ -69,9 +71,9 @@ const JobsTimeline = () => {
             <CardHeader className="border-b pb-3">
                 <CardTitle>Jobs Timeline</CardTitle>
             </CardHeader>
-            <CardContent className="p-0 flex-grow">
-                <ScrollArea className="h-full">
-                    <div className="p-2">
+            <CardContent className="p-0 flex-grow overflow-hidden">
+                <ScrollArea className="h-full w-full">
+                    <div className="p-2 min-h-full">
                         {isLoading && (
                             <div className="flex items-center justify-center py-4">
                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -82,7 +84,12 @@ const JobsTimeline = () => {
                                 {/* <div className="font-medium text-lg mb-3">Job History: {jobHistoryId}</div> */}
                                 {Object.entries(targets).map(([target, items]) => (
                                     <div key={`${jobHistoryId}-${target}`} className="mb-2 ml-2">
-                                        <div className="font-medium text-md mb-1">{target}</div>
+                                        <div
+                                            className="font-medium text-md mb-1 hover:text-primary hover:cursor-pointer"
+                                            onClick={() => navigate(`/targets/${items[0]?.targetId}`)}
+                                        >
+                                            {target}
+                                        </div>
                                         {/* Timeline container */}
                                         <div className="relative pl-2">
                                             {/* Extended timeline connecting bar centered with dots */}
@@ -90,7 +97,7 @@ const JobsTimeline = () => {
                                             {items.map((item, index) => (
                                                 <div key={`${item.name}-${index}`} className="relative py-2">
                                                     {/* Timeline dot positioned at the top left */}
-                                                    <div className="absolute left-0 top-4 -translate-x-1/2 -translate-y-1/2 z-10">
+                                                    <div className="absolute left-0 top-4 -translate-x-1/2 -translate-y-1/2 z-0">
                                                         <div className="w-5 h-5 rounded-full bg-white border-2 border-primary-foreground flex items-center justify-center">
                                                             {getStatusIcon(item.status)}
                                                         </div>

@@ -145,7 +145,7 @@ const AddTagDialog = (props: AddTagDialogProps) => {
                         <p className="text-xs text-gray-500">Type tags and press ',' to add. Or use</p>
                         <Link to={`/tools?category=classifier&assetId=${props.id}&stage=marketplace`}  >
                             <Button variant="ghost" >
-                                <Sparkles />Auto generate
+                                <Sparkles />AI generate
                             </Button>
                         </Link>
                     </div>

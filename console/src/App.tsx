@@ -35,7 +35,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="dark" storageKey="theme">
-        <RouterProvider router={router} />
+        <div className="h-screen">
+          <RouterProvider router={router} />
+        </div>
         <Toaster position="bottom-center" />
       </ThemeProvider>
     </QueryClientProvider>
