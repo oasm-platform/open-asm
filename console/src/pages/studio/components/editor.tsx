@@ -1,4 +1,5 @@
 import {
+  getTemplatesControllerGetAllTemplatesQueryKey,
   useStorageControllerGetFile,
   useTemplatesControllerCreateTemplate,
   useTemplatesControllerGetTemplateById,
@@ -19,9 +20,12 @@ import {
 import { ScanComponent } from './scan-component';
 import * as prettier from 'prettier/standalone';
 import * as prettierYaml from 'prettier/plugins/yaml';
+import { useQueryClient } from '@tanstack/react-query';
 
 //TODO: add url params for better ux
 export default function Editor() {
+  const queryClient = useQueryClient();
+
   const [activeTemplate, setActiveTemplate] = useAtom(activeTemplateAtom);
   const setActiveTemplateId = useSetAtom(activeTemplateIdAtom);
   const { mutate: uploadTemplate } = useTemplatesControllerUploadFile();
@@ -34,7 +38,11 @@ export default function Editor() {
 
   const [bucket, path] = useMemo(() => data?.path?.split('/') || [], [data]);
 
-  const { data: fileData, refetch } = useStorageControllerGetFile(bucket, path);
+  const { data: fileData, refetch } = useStorageControllerGetFile(
+    bucket,
+    path,
+    { query: { enabled: bucket !== undefined && path !== undefined } },
+  );
   const contentSaved = useRef(
     activeTemplate?.content || defaultTemplates.content,
   );
@@ -121,6 +129,9 @@ export default function Editor() {
         setActiveTemplate({ id: data.id });
         setActiveTemplateId(data.id);
         uploadId = data.id;
+        queryClient.invalidateQueries({
+          queryKey: getTemplatesControllerGetAllTemplatesQueryKey(),
+        });
       }
 
       uploadTemplate(

@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
+  getTemplatesControllerGetAllTemplatesQueryKey,
   useTemplatesControllerDeleteTemplate,
   useTemplatesControllerGetAllTemplates,
   useTemplatesControllerRenameFile,
@@ -75,6 +76,7 @@ import {
   removeServerTemplateAtom,
 } from '../atoms';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 const data = {
   changes: [
@@ -155,6 +157,7 @@ const RenameDialog = React.memo<{
   templateId: string;
 }>(({ fileName, trigger, templateId }) => {
   const [open, setOpen] = React.useState(false);
+  const queryClient = useQueryClient();
 
   const form = useForm<RenameFormData>({
     resolver: zodResolver(renameSchema),
@@ -175,7 +178,14 @@ const RenameDialog = React.memo<{
     if (data.fileName.trim() && data.fileName !== fileName) {
       mutate(
         { templateId, data },
-        { onSuccess: () => toast.success('Rename successfully!') },
+        {
+          onSuccess: () => {
+            toast.success('Rename successfully!');
+            queryClient.invalidateQueries({
+              queryKey: getTemplatesControllerGetAllTemplatesQueryKey(),
+            });
+          },
+        },
       );
     }
     setOpen(false);
@@ -250,6 +260,7 @@ const FileActionsMenu = React.memo<{
 
   const { mutate } = useTemplatesControllerDeleteTemplate();
   const removeTemplate = useSetAtom(removeServerTemplateAtom);
+  const queryClient = useQueryClient();
 
   return (
     <DropdownMenu modal={false}>
@@ -278,6 +289,10 @@ const FileActionsMenu = React.memo<{
                 onSuccess: () => {
                   toast.success('Delete successfully!');
                   removeTemplate(templateId);
+
+                  queryClient.invalidateQueries({
+                    queryKey: getTemplatesControllerGetAllTemplatesQueryKey(),
+                  });
                 },
               },
             )
@@ -303,8 +318,7 @@ FileActionsMenu.displayName = 'FileActionsMenu';
 
 function Tree() {
   const { data } = useTemplatesControllerGetAllTemplates({
-    limit: 10,
-    page: 1,
+    limit: 30,
   });
   //TODO: replace loading with skeleton
   //

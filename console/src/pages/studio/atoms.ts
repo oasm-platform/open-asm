@@ -83,7 +83,7 @@ export const addNewTemplateAtom = atom(null, (get, set) => {
   const id = uuidv7();
   const newTemplate: Template = {
     id,
-    filename: `example-template-${id}.yaml`,
+    filename: `example-template.yaml`,
     content: defaultTemplates.content,
   };
   const updatedTemplates = [...templates, newTemplate];
