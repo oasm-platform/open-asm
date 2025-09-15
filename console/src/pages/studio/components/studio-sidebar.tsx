@@ -31,6 +31,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
   Sidebar,
@@ -61,15 +69,12 @@ import { useSetAtom } from 'jotai';
 import { useForm } from 'react-hook-form';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { z } from 'zod';
-import { addTemplateAtom } from '../atoms';
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+  addNewTemplateAtom,
+  addTemplateAtom,
+  removeServerTemplateAtom,
+} from '../atoms';
+import { toast } from 'sonner';
 
 const data = {
   changes: [
@@ -89,7 +94,7 @@ type RenameFormData = z.infer<typeof renameSchema>;
 export function StudioSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
-  const addTemplate = useSetAtom(addTemplateAtom);
+  const addTemplate = useSetAtom(addNewTemplateAtom);
 
   useHotkeys('ctrl+i', (e) => {
     e.preventDefault();
@@ -168,7 +173,10 @@ const RenameDialog = React.memo<{
 
   const onSubmit = (data: RenameFormData) => {
     if (data.fileName.trim() && data.fileName !== fileName) {
-      mutate({ templateId, data });
+      mutate(
+        { templateId, data },
+        { onSuccess: () => toast.success('Rename successfully!') },
+      );
     }
     setOpen(false);
   };
@@ -241,9 +249,10 @@ const FileActionsMenu = React.memo<{
   const isMobile = useIsMobile();
 
   const { mutate } = useTemplatesControllerDeleteTemplate();
+  const removeTemplate = useSetAtom(removeServerTemplateAtom);
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <div className="h-6 w-6 p-0 hover:bg-primary/50 flex items-center justify-center hover:cursor-pointer rounded-full">
           <MoreVertical className="size-3" />
@@ -262,12 +271,24 @@ const FileActionsMenu = React.memo<{
         <ConfirmDialog
           title="Delete Template"
           description={`Are you sure you want to delete "${fileName}"? This action cannot be undone.`}
-          onConfirm={() => mutate({ templateId })}
+          onConfirm={() =>
+            mutate(
+              { templateId },
+              {
+                onSuccess: () => {
+                  toast.success('Delete successfully!');
+                  removeTemplate(templateId);
+                },
+              },
+            )
+          }
           confirmText="Delete"
           trigger={
             <DropdownMenuItem
               variant="destructive"
-              onSelect={(e) => e.preventDefault()}
+              onSelect={(e) => {
+                e.preventDefault();
+              }}
             >
               Delete Template
             </DropdownMenuItem>
@@ -286,6 +307,9 @@ function Tree() {
     page: 1,
   });
   //TODO: replace loading with skeleton
+  //
+  const addTemplate = useSetAtom(addTemplateAtom);
+
   if (!data) return 'loading';
 
   const [folderName, items] = [
@@ -322,6 +346,9 @@ function Tree() {
                 <SidebarMenuButton
                   key={e.templateId}
                   className="data-[active=true]:bg-transparent flex items-center justify-between w-full p-0"
+                  onClick={() => {
+                    addTemplate(e.templateId);
+                  }}
                 >
                   <div className="flex items-center min-w-0 flex-1 px-2 py-1.5">
                     <File className="size-4 mr-2 flex-shrink-0" />

@@ -97,8 +97,12 @@ export default function Editor() {
     async (e) => {
       e.preventDefault();
       if (!activeTemplate) return;
+      let uploadId = activeTemplate.id;
 
-      if (contentSaved.current === activeTemplate.content) {
+      if (
+        contentSaved.current === activeTemplate.content ||
+        activeTemplate.content === defaultTemplates.content
+      ) {
         toast.warning('You have not made any changes', {
           closeButton: true,
         });
@@ -116,13 +120,14 @@ export default function Editor() {
         });
         setActiveTemplate({ id: data.id });
         setActiveTemplateId(data.id);
+        uploadId = data.id;
       }
 
       uploadTemplate(
         {
           data: {
             fileContent: activeTemplate.content,
-            templateId: activeTemplate.id,
+            templateId: uploadId,
           },
         },
         {

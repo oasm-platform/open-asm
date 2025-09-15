@@ -10,7 +10,7 @@ type Template = {
 
 export const defaultTemplates: Template = {
   id: uuidv7(),
-  filename: `example-template`,
+  filename: `example-template.yaml`,
   content: `# Welcome to OASM Templates
 
 id: example-template # Unique identifier for the template
@@ -78,16 +78,27 @@ export const activeTemplateAtom = atom(
   },
 );
 
-export const addTemplateAtom = atom(null, (get, set) => {
+export const addNewTemplateAtom = atom(null, (get, set) => {
   const templates = get(templatesAtom);
   const id = uuidv7();
   const newTemplate: Template = {
     id,
-    filename: `example-template-${id}`,
+    filename: `example-template-${id}.yaml`,
     content: defaultTemplates.content,
   };
   const updatedTemplates = [...templates, newTemplate];
   set(templatesAtom, updatedTemplates);
+  set(activeTemplateIdAtom, id);
+});
+
+export const addTemplateAtom = atom(null, (get, set, id: string) => {
+  const templates = get(templatesAtom);
+  if (templates.findIndex((e) => e.id === id) === -1) {
+    const template = defaultTemplates;
+    template.id = id;
+    const updatedTemplates = [...templates, template];
+    set(templatesAtom, updatedTemplates);
+  }
   set(activeTemplateIdAtom, id);
 });
 
@@ -102,5 +113,22 @@ export const removeTemplateAtom = atom(null, (get, set, id: string) => {
     if (activeId === id) {
       set(activeTemplateIdAtom, updatedTemplates[0].id);
     }
+  }
+});
+
+export const removeServerTemplateAtom = atom(null, (get, set, id: string) => {
+  const templates = get(templatesAtom);
+  const activeId = get(activeTemplateIdAtom);
+
+  if (templates.length > 1) {
+    const updatedTemplates = templates.filter((t) => t.id !== id);
+    set(templatesAtom, updatedTemplates);
+
+    if (activeId === id) {
+      set(activeTemplateIdAtom, updatedTemplates[0].id);
+    }
+  } else {
+    set(templatesAtom, [defaultTemplates]);
+    set(activeTemplateIdAtom, defaultTemplates.id);
   }
 });
