@@ -5,18 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  GetManyBaseQueryParams,
-  GetManyBaseResponseDto,
-} from 'src/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import { StorageService } from '../storage/storage.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
-import { Template } from './entities/templates.entity';
+import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
 import { RenameTemplateDTO } from './dto/renameTemplate.dto';
+import { Template } from './entities/templates.entity';
 
 @Injectable()
 export class TemplatesService {
@@ -164,7 +162,7 @@ export class TemplatesService {
   }
 
   async getAllTemplates(
-    query: GetManyBaseQueryParams,
+    query: GetManyTemplatesQueryDTO,
     workspaceId: string,
     userContext: UserContextPayload,
   ): Promise<GetManyBaseResponseDto<Template>> {
@@ -176,7 +174,10 @@ export class TemplatesService {
     if (!workspace) throw new NotFoundException('Cannot find the workspace');
 
     const [data, total] = await this.templateRepo.findAndCount({
-      where: { workspace: { id: workspaceId } },
+      where: {
+        workspace: { id: workspaceId },
+        fileName: ILike(`%${query.value}%`),
+      },
       take: query.limit,
       skip: query.limit * (query.page - 1),
       relations: ['workspace'],

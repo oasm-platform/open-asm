@@ -11,17 +11,17 @@ import {
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { WorkspaceId } from 'src/common/decorators/workspace-id.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
+import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
+import { RenameTemplateDTO } from './dto/renameTemplate.dto';
 import {
   UploadTemplateDTO,
   UploadTemplateResponseDTO,
 } from './dto/uploadTemplate.dto';
 import { Template } from './entities/templates.entity';
 import { TemplatesService } from './templates.service';
-import { RenameTemplateDTO } from './dto/renameTemplate.dto';
 
 @Controller('templates')
 export class TemplatesController {
@@ -111,7 +111,7 @@ export class TemplatesController {
   })
   @Get()
   getAllTemplates(
-    @Query() query: GetManyBaseQueryParams,
+    @Query() query: GetManyTemplatesQueryDTO,
     @WorkspaceId() workspaceId: string,
     @UserContext() userContext: UserContextPayload,
   ) {

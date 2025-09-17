@@ -6,8 +6,8 @@ import {
   MoreVertical,
   Plus,
 } from 'lucide-react';
-import type { JSX } from 'react';
 import * as React from 'react';
+import { useState, type JSX } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -66,17 +66,18 @@ import {
   useTemplatesControllerRenameFile,
 } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
 import { useForm } from 'react-hook-form';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { toast } from 'sonner';
 import { z } from 'zod';
 import {
   addNewTemplateAtom,
   addTemplateAtom,
   removeServerTemplateAtom,
 } from '../atoms';
-import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import useDebounce from '@/hooks/use-debounce';
 
 const data = {
   changes: [
@@ -97,6 +98,8 @@ export function StudioSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const addTemplate = useSetAtom(addNewTemplateAtom);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
 
   useHotkeys('ctrl+i', (e) => {
     e.preventDefault();
@@ -118,7 +121,11 @@ export function StudioSidebar({
                 <Command className="size-3 inline-block mr-1" />+ I
               </span>
             </Button>
-            <Input placeholder="Search Template..." />
+            <Input
+              placeholder="Search Template..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
         </SidebarGroup>
         <SidebarGroup>
@@ -141,7 +148,7 @@ export function StudioSidebar({
           <SidebarGroupLabel>Files</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <Tree />
+              <Tree search={debouncedSearch} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -316,9 +323,10 @@ const FileActionsMenu = React.memo<{
 
 FileActionsMenu.displayName = 'FileActionsMenu';
 
-function Tree() {
+function Tree({ search }: { search: string }) {
   const { data } = useTemplatesControllerGetAllTemplates({
     limit: 30,
+    value: search,
   });
   //TODO: replace loading with skeleton
   //
@@ -344,7 +352,7 @@ function Tree() {
     <SidebarMenuItem>
       <Collapsible
         className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
-        defaultOpen={folderName === 'components' || folderName === 'ui'}
+        defaultOpen={folderName === 'Workspace templates'}
       >
         <CollapsibleTrigger asChild>
           <SidebarMenuButton>

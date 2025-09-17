@@ -12,7 +12,7 @@ export function EditorTabs() {
   const templates = useAtomValue(templatesAtom);
   const [activeTemplateId, setActiveTemplateId] = useAtom(activeTemplateIdAtom);
   const removeTemplate = useSetAtom(removeTemplateAtom);
-  //FIX: fix horizontal scrollbar when having multiple tabs
+  //FIX: fix horizontal scrollbar when overflow tab
   return (
     <div className="flex bg-background w-full border-b">
       <div className="flex overflow-x-auto">

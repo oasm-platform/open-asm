@@ -1042,6 +1042,7 @@ export type TemplatesControllerGetAllTemplatesParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  value?: string;
 };
 
 export type StorageControllerUploadFileBody = {

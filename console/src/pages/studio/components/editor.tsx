@@ -6,9 +6,12 @@ import {
   useTemplatesControllerUploadFile,
 } from '@/services/apis/gen/queries';
 import { yaml } from '@codemirror/lang-yaml';
+import { useQueryClient } from '@tanstack/react-query';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror from '@uiw/react-codemirror';
 import { useAtom, useSetAtom } from 'jotai';
+import * as prettierYaml from 'prettier/plugins/yaml';
+import * as prettier from 'prettier/standalone';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
@@ -18,11 +21,7 @@ import {
   defaultTemplates,
 } from '../atoms';
 import { ScanComponent } from './scan-component';
-import * as prettier from 'prettier/standalone';
-import * as prettierYaml from 'prettier/plugins/yaml';
-import { useQueryClient } from '@tanstack/react-query';
 
-//TODO: add url params for better ux
 export default function Editor() {
   const queryClient = useQueryClient();
 
