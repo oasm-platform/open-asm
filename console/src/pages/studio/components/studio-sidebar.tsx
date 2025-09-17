@@ -69,7 +69,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useForm } from 'react-hook-form';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
@@ -77,17 +77,9 @@ import { z } from 'zod';
 import {
   addNewTemplateAtom,
   addTemplateAtom,
+  changeTemplatesAtom,
   removeServerTemplateAtom,
 } from '../atoms';
-
-const data = {
-  changes: [
-    {
-      file: 'template-example.yaml',
-      state: 'M',
-    },
-  ],
-};
 
 const renameSchema = z.object({
   fileName: z.string().min(1, 'Name is required'),
@@ -101,6 +93,7 @@ export function StudioSidebar({
   const addTemplate = useSetAtom(addNewTemplateAtom);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
+  const changeTemplates = useAtomValue(changeTemplatesAtom);
 
   useHotkeys('ctrl+i', (e) => {
     e.preventDefault();
@@ -129,22 +122,26 @@ export function StudioSidebar({
             />
           </div>
         </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Changes</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {data.changes.map((item, index) => (
-                <SidebarMenuItem key={index}>
-                  <SidebarMenuButton>
-                    <File />
-                    {item.file}
-                  </SidebarMenuButton>
-                  <SidebarMenuBadge>{item.state}</SidebarMenuBadge>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {changeTemplates.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Changes</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {changeTemplates.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton>
+                      <File />
+                      {item.filename}
+                    </SidebarMenuButton>
+                    <SidebarMenuBadge>
+                      {item.isCreate ? 'C' : 'M'}
+                    </SidebarMenuBadge>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         <SidebarGroup>
           <SidebarGroupLabel>Files</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -215,7 +212,7 @@ const RenameDialog = React.memo<{
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{clonedTrigger}</DialogTrigger>
+      <DialogTrigger>{clonedTrigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Rename Template</DialogTitle>
@@ -281,11 +278,7 @@ const FileActionsMenu = React.memo<{
         <RenameDialog
           templateId={templateId}
           fileName={fileName}
-          trigger={
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              Rename Template
-            </DropdownMenuItem>
-          }
+          trigger={<DropdownMenuItem>Rename Template</DropdownMenuItem>}
         />
         <ConfirmDialog
           title="Delete Template"
@@ -307,12 +300,7 @@ const FileActionsMenu = React.memo<{
           }
           confirmText="Delete"
           trigger={
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={(e) => {
-                e.preventDefault();
-              }}
-            >
+            <DropdownMenuItem variant="destructive">
               Delete Template
             </DropdownMenuItem>
           }
@@ -329,8 +317,6 @@ function Tree({ search }: { search: string }) {
     limit: 30,
     value: search,
   });
-  //TODO: replace loading with skeleton
-  //
   const addTemplate = useSetAtom(addTemplateAtom);
 
   const [folderName, items] = [
@@ -387,7 +373,7 @@ function Tree({ search }: { search: string }) {
                         <TooltipContent>{e.fileName}</TooltipContent>
                       </Tooltip>
                     </div>
-                    <div className="px-2">
+                    <div className="px-2" onClick={(e) => e.stopPropagation()}>
                       <FileActionsMenu
                         fileName={e.fileName}
                         templateId={e.templateId}

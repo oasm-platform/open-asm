@@ -15,11 +15,7 @@ import * as prettier from 'prettier/standalone';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
-import {
-  activeTemplateAtom,
-  activeTemplateIdAtom,
-  defaultTemplates,
-} from '../atoms';
+import { activeTemplateAtom, activeTemplateIdAtom } from '../atoms';
 import { ScanComponent } from './scan-component';
 
 export default function Editor() {
@@ -42,16 +38,15 @@ export default function Editor() {
     path,
     { query: { enabled: bucket !== undefined && path !== undefined } },
   );
-  const contentSaved = useRef(
-    activeTemplate?.content || defaultTemplates.content,
-  );
+
+  const contentSaved = useRef('');
 
   useEffect(() => {
     const readFile = async () => {
       if (fileData instanceof Blob) {
         const content = await fileData.text();
         contentSaved.current = content;
-        setActiveTemplate({ content });
+        setActiveTemplate({ content, isSaved: true });
       }
     };
     readFile();
@@ -106,10 +101,7 @@ export default function Editor() {
       if (!activeTemplate) return;
       let uploadId = activeTemplate.id;
 
-      if (
-        contentSaved.current === activeTemplate.content ||
-        activeTemplate.content === defaultTemplates.content
-      ) {
+      if (activeTemplate.isSaved) {
         toast.warning('You have not made any changes', {
           closeButton: true,
         });
@@ -125,7 +117,7 @@ export default function Editor() {
             fileName: activeTemplate.filename,
           },
         });
-        setActiveTemplate({ id: data.id });
+        setActiveTemplate({ id: data.id, isSaved: true, isCreate: false });
         setActiveTemplateId(data.id);
         uploadId = data.id;
         queryClient.invalidateQueries({
@@ -152,9 +144,14 @@ export default function Editor() {
   );
 
   const onChange = useCallback(
-    (val: string) => setActiveTemplate({ ...activeTemplate, content: val }),
-    [activeTemplate, setActiveTemplate],
+    (val: string) =>
+      setActiveTemplate({
+        content: val,
+        isSaved: contentSaved.current === val,
+      }),
+    [setActiveTemplate],
   );
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <ScanComponent />

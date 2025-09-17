@@ -7,12 +7,14 @@ type Template = {
   filename: string;
   content: string;
   isSaved: boolean;
+  isCreate: boolean;
 };
 
 export const defaultTemplates: Template = {
   id: uuidv7(),
   filename: `example-template.yaml`,
   isSaved: false,
+  isCreate: true,
   content: `# Welcome to OASM Templates
 
 id: example-template # Unique identifier for the template
@@ -81,6 +83,14 @@ export const activeTemplateAtom = atom(
   },
 );
 
+export const changeTemplatesAtom = atom((get) => {
+  const templates = get(templatesAtom);
+  return templates.filter((e) => {
+    if (e.isCreate) return e.content != defaultTemplates.content;
+    return !e.isSaved;
+  });
+});
+
 export const addNewTemplateAtom = atom(null, (get, set) => {
   const templates = get(templatesAtom);
   const id = uuidv7();
@@ -89,6 +99,7 @@ export const addNewTemplateAtom = atom(null, (get, set) => {
     filename: `example-template.yaml`,
     content: defaultTemplates.content,
     isSaved: false,
+    isCreate: true,
   };
   const updatedTemplates = [...templates, newTemplate];
   set(templatesAtom, updatedTemplates);
