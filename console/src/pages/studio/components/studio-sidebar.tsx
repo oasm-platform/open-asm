@@ -53,11 +53,13 @@ import {
   SidebarMenuSub,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import useDebounce from '@/hooks/use-debounce';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   getTemplatesControllerGetAllTemplatesQueryKey,
@@ -77,7 +79,6 @@ import {
   addTemplateAtom,
   removeServerTemplateAtom,
 } from '../atoms';
-import useDebounce from '@/hooks/use-debounce';
 
 const data = {
   changes: [
@@ -324,7 +325,7 @@ const FileActionsMenu = React.memo<{
 FileActionsMenu.displayName = 'FileActionsMenu';
 
 function Tree({ search }: { search: string }) {
-  const { data } = useTemplatesControllerGetAllTemplates({
+  const { data, isLoading } = useTemplatesControllerGetAllTemplates({
     limit: 30,
     value: search,
   });
@@ -332,14 +333,12 @@ function Tree({ search }: { search: string }) {
   //
   const addTemplate = useSetAtom(addTemplateAtom);
 
-  if (!data) return 'loading';
-
   const [folderName, items] = [
     'Workspace templates',
-    data.data.map((e) => ({
+    data?.data.map((e) => ({
       fileName: e.fileName,
       templateId: e.id,
-    })),
+    })) || [],
   ];
 
   const truncateName = (name: string, maxLength: number = 20) => {
@@ -362,39 +361,45 @@ function Tree({ search }: { search: string }) {
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarMenuSub>
-            {items.length > 0 ? (
-              items.map((e) => (
-                <SidebarMenuButton
-                  key={e.templateId}
-                  className="data-[active=true]:bg-transparent flex items-center justify-between w-full p-0"
-                  onClick={() => {
-                    addTemplate(e.templateId);
-                  }}
-                >
-                  <div className="flex items-center min-w-0 flex-1 px-2 py-1.5">
-                    <File className="size-4 mr-2 flex-shrink-0" />
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="truncate text-sm">
-                          {truncateName(e.fileName)}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{e.fileName}</TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="px-2">
-                    <FileActionsMenu
-                      fileName={e.fileName}
-                      templateId={e.templateId}
-                    />
-                  </div>
-                </SidebarMenuButton>
-              ))
-            ) : (
-              <span>No template</span>
-            )}
-          </SidebarMenuSub>
+          {isLoading ? (
+            <SidebarMenuSub>
+              <Skeleton className="h-7 w-full rounded-full" />
+            </SidebarMenuSub>
+          ) : (
+            <SidebarMenuSub>
+              {items.length > 0 ? (
+                items.map((e) => (
+                  <SidebarMenuButton
+                    key={e.templateId}
+                    className="data-[active=true]:bg-transparent flex items-center justify-between w-full p-0"
+                    onClick={() => {
+                      addTemplate(e.templateId);
+                    }}
+                  >
+                    <div className="flex items-center min-w-0 flex-1 px-2 py-1.5">
+                      <File className="size-4 mr-2 flex-shrink-0" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="truncate text-sm">
+                            {truncateName(e.fileName)}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{e.fileName}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <div className="px-2">
+                      <FileActionsMenu
+                        fileName={e.fileName}
+                        templateId={e.templateId}
+                      />
+                    </div>
+                  </SidebarMenuButton>
+                ))
+              ) : (
+                <span>No template</span>
+              )}
+            </SidebarMenuSub>
+          )}
         </CollapsibleContent>
       </Collapsible>
     </SidebarMenuItem>

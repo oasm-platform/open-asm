@@ -98,7 +98,7 @@ export const addNewTemplateAtom = atom(null, (get, set) => {
 export const addTemplateAtom = atom(null, (get, set, id: string) => {
   const templates = get(templatesAtom);
   if (templates.findIndex((e) => e.id === id) === -1) {
-    const template = defaultTemplates;
+    const template = { ...defaultTemplates };
     template.id = id;
     const updatedTemplates = [...templates, template];
     set(templatesAtom, updatedTemplates);
