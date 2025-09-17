@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { ILike, Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { StorageService } from '../storage/storage.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
@@ -173,11 +173,16 @@ export class TemplatesService {
 
     if (!workspace) throw new NotFoundException('Cannot find the workspace');
 
+    const where: FindOptionsWhere<Template> = {
+      workspace: { id: workspaceId },
+    };
+
+    if (query.value) {
+      where.fileName = ILike(`%${query.value}%`);
+    }
+
     const [data, total] = await this.templateRepo.findAndCount({
-      where: {
-        workspace: { id: workspaceId },
-        fileName: ILike(`%${query.value}%`),
-      },
+      where,
       take: query.limit,
       skip: query.limit * (query.page - 1),
       relations: ['workspace'],
@@ -186,6 +191,12 @@ export class TemplatesService {
     return getManyResponse({ query, data, total });
   }
   private getFileAndBucket(path: string) {
-    return path.split('/');
+    const parts = path.split('/', 2);
+    if (parts.length < 2 || !parts[0] || !parts[1]) {
+      throw new BadRequestException(
+        'Invalid path format. Expected "bucket/path".',
+      );
+    }
+    return [parts[0], parts[1]];
   }
 }
