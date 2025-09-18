@@ -87,6 +87,7 @@ export class JobsRegistryService {
     assetIds,
     workflow,
     jobHistory: existingJobHistory,
+    priority,
   }: {
     tools: Tool[];
     targetIds: string[];
@@ -94,6 +95,7 @@ export class JobsRegistryService {
     workspaceId?: string;
     workflow?: Workflow;
     jobHistory?: JobHistory;
+    priority?: number;
   }): Promise<Job[]> {
     // Step 1: create job history
     let jobHistory: JobHistory;
@@ -156,6 +158,7 @@ export class JobsRegistryService {
           status: JobStatus.PENDING,
           category: tool.category,
           tool,
+          priority: priority ?? 4,
           jobHistory,
         } as DeepPartial<Job>);
 
@@ -528,7 +531,6 @@ export class JobsRegistryService {
         tools,
         targetIds: [job.asset.target.id],
         workflow: job.jobHistory.workflow,
-        // Đảm bảo các job mới tạo có cùng history id với job vừa hoàn thành
         jobHistory: job.jobHistory,
       });
     }
