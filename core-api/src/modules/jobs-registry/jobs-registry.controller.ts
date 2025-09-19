@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { Public, WorkspaceId } from 'src/common/decorators/app.decorator';
+import { WorkerTokenAuth } from 'src/common/decorators/worker-token-auth.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
@@ -49,6 +50,7 @@ export class JobsRegistryController {
       serialization: GetNextJobResponseDto,
     },
   })
+  @WorkerTokenAuth()
   @Public()
   @Get('/:workerId/next')
   getNextJob(@Param() { workerId }: WorkerIdParams) {
