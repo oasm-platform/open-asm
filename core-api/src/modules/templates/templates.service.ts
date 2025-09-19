@@ -5,15 +5,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { StorageService } from '../storage/storage.service';
+import { builtInTools } from '../tools/built-in-tools';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
 import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
 import { RenameTemplateDTO } from './dto/renameTemplate.dto';
+import { RunTemplateDto } from './dto/run-template.dto';
 import { Template } from './entities/templates.entity';
 
 @Injectable()
@@ -25,6 +29,7 @@ export class TemplatesService {
     private readonly templateRepo: Repository<Template>,
     private readonly workspacesService: WorkspacesService,
     private readonly storageService: StorageService,
+    private jobService: JobsRegistryService,
   ) {}
 
   public async createTemplate(
@@ -198,5 +203,27 @@ export class TemplatesService {
       );
     }
     return [parts[0], parts[1]];
+  }
+
+  public async runTemplate(
+    dto: RunTemplateDto,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const { assetIds, targetIds } = dto;
+    const nuclei = builtInTools.find((tool) => tool.name === 'nuclei');
+    if (!nuclei) {
+      throw new NotFoundException('Nuclei tool is not available');
+    }
+
+    await this.jobService.createJobs({
+      tools: [nuclei],
+      targetIds: targetIds || [],
+      assetIds: assetIds || [],
+      workspaceId,
+    });
+
+    return {
+      message: 'Template run successfully',
+    };
   }
 }

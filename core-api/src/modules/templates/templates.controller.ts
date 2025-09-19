@@ -11,11 +11,13 @@ import {
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { WorkspaceId } from 'src/common/decorators/workspace-id.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
 import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
 import { RenameTemplateDTO } from './dto/renameTemplate.dto';
+import { RunTemplateDto } from './dto/run-template.dto';
 import {
   UploadTemplateDTO,
   UploadTemplateResponseDTO,
@@ -140,5 +142,18 @@ export class TemplatesController {
       workspaceId,
       userContext,
     );
+  }
+
+  @Doc({
+    summary: 'Run a template',
+    description: 'Run a template and create a job',
+    response: { serialization: DefaultMessageResponseDto },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('run')
+  runTemplate(@Body() dto: RunTemplateDto, @WorkspaceId() workspaceId: string) {
+    return this.templateService.runTemplate(dto, workspaceId);
   }
 }
