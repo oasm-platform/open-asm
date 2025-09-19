@@ -285,4 +285,28 @@ export class WorkersService {
       },
     });
   }
+
+  /**
+   * Validates a worker token by checking its existence in the database
+   * @param token - The worker token to validate
+   * @returns True if the token is valid, false otherwise
+   */
+  public async validateWorkerToken(token: string): Promise<boolean> {
+    if (!token) {
+      return false;
+    }
+    
+    try {
+      const worker = await this.repo.findOne({
+        where: {
+          token: token,
+        },
+      });
+      
+      return !!worker;
+    } catch (error) {
+      this.logger.error('Error validating worker token', error);
+      return false;
+    }
+  }
 }
