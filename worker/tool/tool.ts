@@ -189,7 +189,11 @@ export class Tool {
   private async pullSingleJob(): Promise<Job | null> {
     try {
       const job = (await coreApi.jobsRegistryControllerGetNextJob(
-        Tool.workerId!
+        Tool.workerId!, {
+          headers: {
+            'worker-token': Tool.token
+          }
+        }
       )) as Job;
       return job || null;
     } catch (error) {
@@ -251,6 +255,8 @@ export class Tool {
         jobId: job.jobId,
         data: {
           raw: data,
+          error: false,
+          payload: {}
         },
       });
 
@@ -270,7 +276,12 @@ export class Tool {
           data: {
             raw: `Error: ${e instanceof Error ? e.message : "Unknown error"}`,
             error: true,
+            payload: {}
           },
+        }, {
+          headers: {
+            'worker-token': Tool.token
+          }
         });
       } catch (reportError) {
         logger.error(
