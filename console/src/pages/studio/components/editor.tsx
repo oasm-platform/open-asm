@@ -15,8 +15,38 @@ import * as prettier from 'prettier/standalone';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
-import { activeTemplateAtom, activeTemplateIdAtom } from '../atoms';
+import {
+  activeTemplateAtom,
+  activeTemplateIdAtom,
+  defaultTemplate,
+} from '../atoms';
 import { ScanComponent } from './scan-component';
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import z from 'zod';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+
+const createFileNameSchema = z.object({
+  fileName: z.string().min(1, 'Name is required'),
+});
 
 export default function Editor() {
   const queryClient = useQueryClient();
@@ -24,11 +54,20 @@ export default function Editor() {
   const [activeTemplate, setActiveTemplate] = useAtom(activeTemplateAtom);
   const setActiveTemplateId = useSetAtom(activeTemplateIdAtom);
   const { mutate: uploadTemplate } = useTemplatesControllerUploadFile();
-  const { mutateAsync: createTemplate } =
-    useTemplatesControllerCreateTemplate();
+  const { mutate: createTemplate } = useTemplatesControllerCreateTemplate();
+
+  const [open, setOpen] = React.useState(false);
+
+  const form = useForm({
+    resolver: zodResolver(createFileNameSchema),
+    defaultValues: {
+      fileName: 'example-template.yaml',
+    },
+  });
 
   const { data } = useTemplatesControllerGetTemplateById(
     activeTemplate?.id || '',
+    { query: { enabled: !activeTemplate?.isCreate } },
   );
 
   const [bucket, path] = useMemo(() => data?.path?.split('/') || [], [data]);
@@ -94,14 +133,67 @@ export default function Editor() {
     { enableOnContentEditable: true },
   );
 
+  const handleUpload = useCallback(
+    (content: string, id: string) => {
+      uploadTemplate(
+        {
+          data: {
+            fileContent: content,
+            templateId: id,
+          },
+        },
+        {
+          onSuccess: () => {
+            refetch();
+            toast.success('Template is saved successfully');
+          },
+        },
+      );
+    },
+    [refetch, uploadTemplate],
+  );
+
+  const handleCreate = (formData: z.infer<typeof createFileNameSchema>) => {
+    if (!activeTemplate) return;
+    if (formData.fileName.trim()) {
+      createTemplate(
+        {
+          data: {
+            fileName: formData.fileName,
+          },
+        },
+        {
+          onSuccess: (data) => {
+            setActiveTemplate({
+              id: data.id,
+              filename: data.fileName,
+              isSaved: true,
+              isCreate: false,
+            });
+            handleUpload(activeTemplate.content, data.id);
+            setActiveTemplateId(data.id);
+            queryClient.invalidateQueries({
+              queryKey: getTemplatesControllerGetAllTemplatesQueryKey(),
+            });
+
+            setOpen(false);
+          },
+        },
+      );
+    }
+  };
+
   useHotkeys(
     'ctrl+s',
     async (e) => {
       e.preventDefault();
       if (!activeTemplate) return;
-      let uploadId = activeTemplate.id;
 
-      if (activeTemplate.isSaved) {
+      if (
+        activeTemplate.isSaved ||
+        (activeTemplate.isCreate &&
+          activeTemplate.content === defaultTemplate.content)
+      ) {
         toast.warning('You have not made any changes', {
           closeButton: true,
         });
@@ -111,35 +203,14 @@ export default function Editor() {
       const isFormatted = await formatYAML();
       if (!isFormatted) return;
 
-      if (!data) {
-        const data = await createTemplate({
-          data: {
-            fileName: activeTemplate.filename,
-          },
-        });
-        setActiveTemplate({ id: data.id, isSaved: true, isCreate: false });
-        setActiveTemplateId(data.id);
-        uploadId = data.id;
-        queryClient.invalidateQueries({
-          queryKey: getTemplatesControllerGetAllTemplatesQueryKey(),
-        });
+      if (activeTemplate.isCreate) {
+        setOpen(true);
+        return;
       }
 
-      uploadTemplate(
-        {
-          data: {
-            fileContent: activeTemplate.content,
-            templateId: uploadId,
-          },
-        },
-        {
-          onSuccess: () => {
-            refetch();
-          },
-        },
-      );
-      toast.success('Template is saved successfully');
+      handleUpload(activeTemplate.content, activeTemplate.id);
     },
+
     { enableOnContentEditable: true },
   );
 
@@ -154,17 +225,64 @@ export default function Editor() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <ScanComponent />
-      <div className="flex-1 min-h-0">
-        <CodeMirror
-          value={activeTemplate?.content}
-          onChange={onChange}
-          theme={tokyoNight}
-          extensions={[yaml()]}
-          className="text-sm h-full"
-          height="100%"
-        />
-      </div>
+      {activeTemplate && (
+        <>
+          <ScanComponent />
+          <div className="flex-1 min-h-0">
+            <CodeMirror
+              value={activeTemplate?.content}
+              onChange={onChange}
+              theme={tokyoNight}
+              extensions={[yaml()]}
+              className="text-sm h-full"
+              height="100%"
+            />
+          </div>
+          {activeTemplate.isCreate && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Template</DialogTitle>
+                  <DialogDescription>
+                    Enter a filename for the template to continue
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit(handleCreate)}
+                    className="py-4"
+                  >
+                    <FormField
+                      control={form.control}
+                      name="fileName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>File name</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Enter new file name"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </form>
+                </Form>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={form.handleSubmit(handleCreate)}>
+                    Save
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 import { atomFamily, atomWithStorage } from 'jotai/utils';
-import { v7 as uuidv7 } from 'uuid';
+import { v4 } from 'uuid';
 
 type Template = {
   id: string;
@@ -10,8 +10,8 @@ type Template = {
   isCreate: boolean;
 };
 
-export const defaultTemplates: Template = {
-  id: uuidv7(),
+export const defaultTemplate: Template = {
+  id: v4(),
   filename: `example-template.yaml`,
   isSaved: false,
   isCreate: true,
@@ -38,7 +38,7 @@ http:
 };
 
 export const templatesAtom = atomWithStorage<Template[]>('editorTemplates', [
-  defaultTemplates,
+  defaultTemplate,
 ]);
 
 export const templatesFamilyAtom = atomFamily((id: string) =>
@@ -51,6 +51,7 @@ export const templatesFamilyAtom = atomFamily((id: string) =>
           filename: '',
           content: '',
           isSaved: false,
+          isCreate: true,
         }
       );
     },
@@ -66,7 +67,7 @@ export const templatesFamilyAtom = atomFamily((id: string) =>
 
 export const activeTemplateIdAtom = atomWithStorage<string>(
   'activeTemplateId',
-  defaultTemplates.id,
+  defaultTemplate.id,
 );
 
 export const activeTemplateAtom = atom(
@@ -86,18 +87,18 @@ export const activeTemplateAtom = atom(
 export const changeTemplatesAtom = atom((get) => {
   const templates = get(templatesAtom);
   return templates.filter((e) => {
-    if (e.isCreate) return e.content != defaultTemplates.content;
+    if (e.isCreate) return e.content != defaultTemplate.content;
     return !e.isSaved;
   });
 });
 
 export const addNewTemplateAtom = atom(null, (get, set) => {
   const templates = get(templatesAtom);
-  const id = uuidv7();
+  const id = v4();
   const newTemplate: Template = {
     id,
     filename: `example-template.yaml`,
-    content: defaultTemplates.content,
+    content: defaultTemplate.content,
     isSaved: false,
     isCreate: true,
   };
@@ -109,7 +110,7 @@ export const addNewTemplateAtom = atom(null, (get, set) => {
 export const addTemplateAtom = atom(null, (get, set, id: string) => {
   const templates = get(templatesAtom);
   if (templates.findIndex((e) => e.id === id) === -1) {
-    const template = { ...defaultTemplates };
+    const template = { ...defaultTemplate };
     template.id = id;
     const updatedTemplates = [...templates, template];
     set(templatesAtom, updatedTemplates);
@@ -143,7 +144,7 @@ export const removeServerTemplateAtom = atom(null, (get, set, id: string) => {
       set(activeTemplateIdAtom, updatedTemplates[0].id);
     }
   } else {
-    set(templatesAtom, [defaultTemplates]);
-    set(activeTemplateIdAtom, defaultTemplates.id);
+    set(templatesAtom, [defaultTemplate]);
+    set(activeTemplateIdAtom, defaultTemplate.id);
   }
 });
