@@ -1,30 +1,30 @@
-import { config } from "dotenv";
-import { defineConfig } from "orval";
+import { config } from 'dotenv';
+import { defineConfig } from 'orval';
 config();
 
 export default defineConfig({
   api: {
     output: {
-      target: "src/services/apis/gen/queries.ts",
+      target: 'src/services/apis/gen/queries.ts',
       prettier: true,
       clean: true,
-      client: "react-query",
+      client: 'react-query',
       override: {
         useTypeOverInterfaces: true,
         query: {
           useInfinite: true,
           useQuery: true,
-          useInfiniteQueryParam: "page",
+          useInfiniteQueryParam: 'page',
         },
         mutator: {
-          path: "src/services/apis/axios-client.ts",
-          name: "orvalClient",
+          path: 'src/services/apis/axios-client.ts',
+          name: 'orvalClient',
         },
       },
     },
     input: {
       validation: false,
-      target: "../open-api/open-api.json",
+      target: '../open-api/open-api.json',
     },
   },
 });

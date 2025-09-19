@@ -16,6 +16,7 @@ import {
   OneToOne,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
+import { Template } from 'src/modules/templates/entities/templates.entity';
 
 @Entity('workspaces')
 export class Workspace extends BaseEntity {
@@ -68,4 +69,7 @@ export class Workspace extends BaseEntity {
   @OneToOne(() => ApiKey)
   @JoinColumn({ name: 'apiKeyId', referencedColumnName: 'id' })
   apiKey: ApiKey;
+
+  @OneToMany(() => Template, (template) => template.workspace)
+  templates: Template[];
 }

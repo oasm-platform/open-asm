@@ -1,34 +1,35 @@
-import Layout from "@/components/common/layout/layout";
-import Assets from "@/pages/assets/assets";
-import DetailAsset from "@/pages/assets/detail-asset";
-import Dashboard from "@/pages/dashboard/dashboard";
-import Login from "@/pages/login/login";
-import ProvidersPage from "@/pages/providers/providers";
-import DetailProvider from "@/pages/providers/detail-provider";
-import CreateProviderPage from "@/pages/providers/create-provider";
-import EditProviderPage from "@/pages/providers/edit-provider";
-import Register from "@/pages/register/register";
-import Search from "@/pages/search/search";
-import Settings from "@/pages/settings/settings";
-import DetailTarget from "@/pages/targets/detail-target";
-import Targets from "@/pages/targets/targets";
-import ToolDetail from "@/pages/tools/components/tool-detail";
-import Tools from "@/pages/tools/tools";
-import Vulnerabilities from "@/pages/vulnerabilities/vulnerabilities";
-import Workers from "@/pages/workers/workers";
-import { createBrowserRouter } from "react-router-dom";
-import GuestRoute from "./GuestRoute";
-import NotFound from "./NotFound";
-import ProtectedRoute from "./ProtectedRoute";
-import RegisterRoute from "./RegisterRoute";
+import Layout from '@/components/common/layout/layout';
+import Assets from '@/pages/assets/assets';
+import DetailAsset from '@/pages/assets/detail-asset';
+import Dashboard from '@/pages/dashboard/dashboard';
+import Studio from '@/pages/studio/studio';
+import Login from '@/pages/login/login';
+import CreateProviderPage from '@/pages/providers/create-provider';
+import DetailProvider from '@/pages/providers/detail-provider';
+import EditProviderPage from '@/pages/providers/edit-provider';
+import ProvidersPage from '@/pages/providers/providers';
+import Register from '@/pages/register/register';
+import Search from '@/pages/search/search';
+import Settings from '@/pages/settings/settings';
+import DetailTarget from '@/pages/targets/detail-target';
+import Targets from '@/pages/targets/targets';
+import ToolDetail from '@/pages/tools/components/tool-detail';
+import Tools from '@/pages/tools/tools';
+import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
+import Workers from '@/pages/workers/workers';
+import { createBrowserRouter } from 'react-router-dom';
+import GuestRoute from './GuestRoute';
+import NotFound from './NotFound';
+import ProtectedRoute from './ProtectedRoute';
+import RegisterRoute from './RegisterRoute';
 
 export const router = createBrowserRouter([
   {
-    path: "/",
+    path: '/',
     element: <Layout />,
     children: [
       {
-        path: "login",
+        path: 'login',
         element: (
           <GuestRoute>
             <Login />
@@ -36,7 +37,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "init-admin",
+        path: 'init-admin',
         element: (
           <RegisterRoute>
             <Register />
@@ -47,97 +48,101 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           {
-            path: "",
+            path: '',
             element: <Dashboard />,
           },
           {
-            path: "settings",
+            path: 'studio',
+            children: [{ path: '', element: <Studio /> }],
+          },
+          {
+            path: 'settings',
             children: [
               {
-                path: "",
+                path: '',
                 element: <Settings defaultTab="account" />,
               },
               {
-                path: ":tab",
+                path: ':tab',
                 element: <Settings />,
               },
             ],
           },
           {
-            path: "targets",
+            path: 'targets',
             children: [
               {
-                path: "",
+                path: '',
                 element: <Targets />,
               },
               {
-                path: ":id",
+                path: ':id',
                 element: <DetailTarget />,
               },
             ],
           },
           {
-            path: "vulnerabilities",
+            path: 'vulnerabilities',
             element: <Vulnerabilities />,
           },
           {
             element: <Workers />,
-            path: "workers",
+            path: 'workers',
           },
           {
-            path: "tools",
+            path: 'tools',
             children: [
               {
-                path: "",
+                path: '',
                 element: <Tools />,
               },
               {
-                path: ":id",
+                path: ':id',
                 element: <ToolDetail />,
               },
             ],
           },
           {
             element: <Search />,
-            path: "search",
+            path: 'search',
           },
           {
-            path: "assets",
+            path: 'assets',
             children: [
               {
-                path: "",
+                path: '',
                 element: <Assets />,
               },
               {
-                path: ":id",
+                path: ':id',
                 element: <DetailAsset />,
               },
             ],
           },
           {
-            path: "providers",
+            path: 'providers',
             children: [
               {
-                path: "",
+                path: '',
                 element: <ProvidersPage />,
               },
               {
-                path: "create",
+                path: 'create',
                 element: <CreateProviderPage />,
               },
               {
-                path: ":id",
+                path: ':id',
                 element: <DetailProvider />,
               },
               {
-                path: ":id/edit",
+                path: ':id/edit',
                 element: <EditProviderPage />,
               },
             ],
           },
         ],
       },
-      { path: "*", element: <NotFound /> },
+      { path: '*', element: <NotFound /> },
     ],
   },
 ]);
