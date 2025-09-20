@@ -80,6 +80,7 @@ import {
   changeTemplatesAtom,
   removeServerTemplateAtom,
 } from '../atoms';
+import type { AxiosError } from 'axios';
 
 const renameSchema = z.object({
   fileName: z.string().min(1, 'Name is required'),
@@ -189,11 +190,18 @@ const RenameDialog = React.memo<{
             queryClient.invalidateQueries({
               queryKey: getTemplatesControllerGetAllTemplatesQueryKey(),
             });
+
+            setOpen(false);
+          },
+          onError: (error) => {
+            form.setError('fileName', {
+              message: (error as AxiosError<{ message: string }>).response?.data
+                .message,
+            });
           },
         },
       );
     }
-    setOpen(false);
   };
 
   const handleCancel = () => {

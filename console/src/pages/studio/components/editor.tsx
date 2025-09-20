@@ -43,6 +43,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import type { AxiosError } from 'axios';
 
 const createFileNameSchema = z.object({
   fileName: z.string().min(1, 'Name is required'),
@@ -177,6 +178,12 @@ export default function Editor() {
             });
 
             setOpen(false);
+          },
+          onError: (error) => {
+            form.setError('fileName', {
+              message: (error as AxiosError<{ message: string }>).response?.data
+                .message,
+            });
           },
         },
       );
