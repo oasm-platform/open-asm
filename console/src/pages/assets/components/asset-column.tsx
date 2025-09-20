@@ -86,8 +86,8 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const technologies = data.httpResponses
         ?.techList as unknown as TechnologyDetailDTO[];
       const maxDisplay = 4;
-      const displayList = technologies.slice(0, maxDisplay);
-      const remainCount = technologies.length - maxDisplay;
+      const displayList = technologies?.slice(0, maxDisplay);
+      const remainCount = technologies?.length - maxDisplay;
 
       return (
         <div className="flex flex-wrap gap-1 max-w-[250px] min-h-[60px]">

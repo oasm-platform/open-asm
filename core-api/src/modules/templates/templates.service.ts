@@ -46,7 +46,7 @@ export class TemplatesService {
 
     const template = await this.templateRepo.findOneBy({
       fileName: dto.fileName,
-      workspace,
+      workspace: { id: workspaceId },
     });
 
     if (template) throw new BadRequestException('File name was already taken');
@@ -106,6 +106,14 @@ export class TemplatesService {
         'Template does not belong to this workspace',
       );
     }
+
+    const templateByFileName = await this.templateRepo.findOneBy({
+      fileName: dto.fileName,
+      workspace: { id: workspaceId },
+    });
+
+    if (templateByFileName)
+      throw new BadRequestException('File name was already taken');
 
     template.fileName = dto.fileName;
     return this.templateRepo.save(template);
@@ -188,6 +196,9 @@ export class TemplatesService {
 
     const [data, total] = await this.templateRepo.findAndCount({
       where,
+      order: {
+        createdAt: 'ASC',
+      },
       take: query.limit,
       skip: query.limit * (query.page - 1),
       relations: ['workspace'],
@@ -195,6 +206,7 @@ export class TemplatesService {
 
     return getManyResponse({ query, data, total });
   }
+
   private getFileAndBucket(path: string) {
     const parts = path.split('/', 2);
     if (parts.length < 2 || !parts[0] || !parts[1]) {
