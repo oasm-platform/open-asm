@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullModule } from '@nestjs/bullmq';
 import { Asset } from '../assets/entities/assets.entity';
 import { TriggerWorkflowService } from '../workflows/trigger-workflow.service';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
@@ -12,6 +13,9 @@ import { TargetsService } from './targets.service';
   imports: [
     TypeOrmModule.forFeature([Target, WorkspaceTarget, Asset]),
     WorkspacesModule,
+    BullModule.registerQueue({
+      name: 'scan-schedule',
+    }),
   ],
   controllers: [TargetsController],
   providers: [TargetsService, TriggerWorkflowService],
