@@ -30,7 +30,7 @@ export class TemplatesService {
     private readonly workspacesService: WorkspacesService,
     private readonly storageService: StorageService,
     private jobService: JobsRegistryService,
-  ) {}
+  ) { }
 
   public async createTemplate(
     workspaceId: string,
@@ -232,6 +232,7 @@ export class TemplatesService {
       targetIds: targetIds || [],
       assetIds: assetIds || [],
       workspaceId,
+      priority: 0
     });
 
     return {

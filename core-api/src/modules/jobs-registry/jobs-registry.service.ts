@@ -43,7 +43,7 @@ export class JobsRegistryService {
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
     private toolsService: ToolsService,
-  ) {}
+  ) { }
   public async getManyJobs(
     query: GetManyBaseQueryParams,
   ): Promise<GetManyBaseResponseDto<Job>> {
@@ -97,6 +97,9 @@ export class JobsRegistryService {
     jobHistory?: JobHistory;
     priority?: number;
   }): Promise<Job[]> {
+    if (priority && (priority < 0 || priority > 4)) {
+      priority = 4;
+    }
     // Step 1: create job history
     let jobHistory: JobHistory;
 
