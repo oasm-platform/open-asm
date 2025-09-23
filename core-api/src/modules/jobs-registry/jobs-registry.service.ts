@@ -43,7 +43,7 @@ export class JobsRegistryService {
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
     private toolsService: ToolsService,
-  ) {}
+  ) { }
   public async getManyJobs(
     query: GetManyBaseQueryParams,
   ): Promise<GetManyBaseResponseDto<Job>> {
