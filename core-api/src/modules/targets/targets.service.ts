@@ -1,3 +1,4 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   Injectable,
@@ -5,13 +6,12 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Cron, SchedulerRegistry } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { CronJob } from 'cron';
+import { Queue } from 'bullmq';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus } from 'src/common/enums/enum';
+import { BullMQName, JobStatus } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { RedisService } from 'src/services/redis/redis.service';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
@@ -33,9 +33,8 @@ export class TargetsService implements OnModuleInit {
     private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private readonly workspacesService: WorkspacesService,
     public assetService: AssetsService,
-    private schedulerRegistry: SchedulerRegistry,
     private eventEmitter: EventEmitter2,
-    private redisService: RedisService,
+    @InjectQueue(BullMQName.SCAN_SCHEDULE) private scanScheduleQueue: Queue<Target>
   ) { }
 
   async onModuleInit() {
@@ -271,7 +270,16 @@ export class TargetsService implements OnModuleInit {
     if (!target) {
       throw new NotFoundException('Target not found');
     }
-    return this.repo.update(id, dto);
+
+    // Update the target in the database
+    const result = await this.repo.update(id, dto);
+
+    // If scanSchedule was updated, also update the job in BullMQ
+    if (dto.scanSchedule !== undefined) {
+      await this.updateTargetScanScheduleJob(id, dto.scanSchedule);
+    }
+
+    return result;
   }
 
   /**
@@ -292,8 +300,41 @@ export class TargetsService implements OnModuleInit {
    * Handles scheduling of targets for rescan based on their scan schedules.
    *
    * This function is scheduled to run every day at 00:00.
-   * It retrieves all targets with a scan schedule, and adds a new cron job for each target.
-   * The cron job will trigger a rescan of the target every time it runs.
+   * It retrieves all targets with a scan schedule, and adds a new BullMQ job for each target.
+   * The BullMQ job will trigger a rescan of the target every time it runs according to its cron schedule.
+   */
+
+  /**
+   * Updates the scan schedule job for a specific target in BullMQ.
+   * If the target has a scan schedule, a new job will be added to the queue.
+   * If the target previously had a scan schedule but now doesn't, the job will be removed.
+   *
+   * @param targetId - The ID of the target to update the scan schedule job for
+   * @param scanSchedule - The new scan schedule for the target (can be null/undefined)
+   */
+  private async updateTargetScanScheduleJob(targetId: string, scanSchedule: string | null | undefined): Promise<void> {
+    // Remove any existing jobs for this target
+    await this.scanScheduleQueue.remove(targetId);
+
+    // If there's a new scan schedule, add a new job
+    if (scanSchedule) {
+      await this.scanScheduleQueue.add(
+        targetId, // Job name is the target ID
+        { id: targetId } as Target, // No data needed for this job
+        {
+          repeat: {
+            pattern: scanSchedule,
+          },
+        },
+      );
+    }
+  }
+
+  /**
+   * Updates all scan schedule jobs for all targets.
+   * This function is scheduled to run every day at 00:00.
+   * It retrieves all targets with a scan schedule, and adds a new BullMQ job for each target.
+   * The BullMQ job will trigger a rescan of the target every time it runs according to its cron schedule.
    */
   @Cron('0 0 */1 * * *')
   async handleUpdateScanSchedule(): Promise<void> {
@@ -305,14 +346,20 @@ export class TargetsService implements OnModuleInit {
 
     if (targetSchedules.length === 0) return;
 
-    await Promise.all(
-      targetSchedules.map(({ id, scanSchedule }) => {
-        const newCron = new CronJob(scanSchedule, async () => {
-          await this.assetService.reScan(id);
-        });
-        this.schedulerRegistry.addCronJob(id, newCron);
-        return newCron.start();
-      }),
-    );
+    // Remove existing jobs from the queue before adding new ones
+    await this.scanScheduleQueue.obliterate({ force: true });
+
+    // Add new jobs to the queue with targetId as job name and cron schedule
+    for (const target of targetSchedules) {
+      await this.scanScheduleQueue.add(
+        target.id,
+        target,
+        {
+          repeat: {
+            pattern: target.scanSchedule,
+          },
+        },
+      );
+    }
   }
 }

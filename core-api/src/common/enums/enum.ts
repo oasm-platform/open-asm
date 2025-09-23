@@ -114,3 +114,7 @@ export enum ApiKeyType {
   /** API key used for workspaces */
   WORKSPACE = 'workspace',
 }
+
+export enum BullMQName {
+  SCAN_SCHEDULE = 'scan-schedule',
+}
