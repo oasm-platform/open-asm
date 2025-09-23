@@ -1,4 +1,3 @@
-import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadGatewayException,
   Injectable,
@@ -6,7 +5,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
@@ -45,7 +43,6 @@ export class JobsRegistryService {
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
     private toolsService: ToolsService,
-    @InjectQueue('jobs') private taskQueue: Queue
   ) { }
   public async getManyJobs(
     query: GetManyBaseQueryParams,

@@ -9,9 +9,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { SCAN_SCHEDULE_QUEUE_NAME } from 'src/common/constants/app.constants';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus } from 'src/common/enums/enum';
+import { BullMQName, JobStatus } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
@@ -35,7 +34,7 @@ export class TargetsService implements OnModuleInit {
     private readonly workspacesService: WorkspacesService,
     public assetService: AssetsService,
     private eventEmitter: EventEmitter2,
-    @InjectQueue(SCAN_SCHEDULE_QUEUE_NAME) private scanScheduleQueue: Queue
+    @InjectQueue(BullMQName.SCAN_SCHEDULE) private scanScheduleQueue: Queue<Target>
   ) { }
 
   async onModuleInit() {
@@ -271,15 +270,15 @@ export class TargetsService implements OnModuleInit {
     if (!target) {
       throw new NotFoundException('Target not found');
     }
-    
+
     // Update the target in the database
     const result = await this.repo.update(id, dto);
-    
+
     // If scanSchedule was updated, also update the job in BullMQ
     if (dto.scanSchedule !== undefined) {
       await this.updateTargetScanScheduleJob(id, dto.scanSchedule);
     }
-    
+
     return result;
   }
 
@@ -316,12 +315,12 @@ export class TargetsService implements OnModuleInit {
   private async updateTargetScanScheduleJob(targetId: string, scanSchedule: string | null | undefined): Promise<void> {
     // Remove any existing jobs for this target
     await this.scanScheduleQueue.remove(targetId);
-    
+
     // If there's a new scan schedule, add a new job
     if (scanSchedule) {
       await this.scanScheduleQueue.add(
         targetId, // Job name is the target ID
-        {}, // No data needed for this job
+        { id: targetId } as Target, // No data needed for this job
         {
           repeat: {
             pattern: scanSchedule,
@@ -351,13 +350,13 @@ export class TargetsService implements OnModuleInit {
     await this.scanScheduleQueue.obliterate({ force: true });
 
     // Add new jobs to the queue with targetId as job name and cron schedule
-    for (const { id, scanSchedule } of targetSchedules) {
+    for (const target of targetSchedules) {
       await this.scanScheduleQueue.add(
-        id, // Job name is the target ID
-        {}, // No data needed for this job
+        target.id,
+        target,
         {
           repeat: {
-            pattern: scanSchedule,
+            pattern: target.scanSchedule,
           },
         },
       );
