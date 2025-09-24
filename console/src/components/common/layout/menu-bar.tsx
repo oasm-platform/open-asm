@@ -16,7 +16,6 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import {
-  BookDashed,
   Bug,
   CloudCheck,
   Cpu,
@@ -24,7 +23,7 @@ import {
   MessageSquareCode,
   Radar,
   SquareTerminal,
-  Target,
+  Target
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
 
@@ -63,11 +62,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: <Bug />,
           url: '/vulnerabilities',
         },
-        {
-          title: 'Studio',
-          icon: <BookDashed />,
-          url: '/studio',
-        },
+        // {
+        //   title: 'Studio',
+        //   icon: <BookDashed />,
+        //   url: '/studio',
+        // },
       ],
     },
     {
