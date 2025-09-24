@@ -36,7 +36,7 @@ export class TargetsService implements OnModuleInit {
     private schedulerRegistry: SchedulerRegistry,
     private eventEmitter: EventEmitter2,
     private redisService: RedisService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     await this.handleUpdateScanSchedule();

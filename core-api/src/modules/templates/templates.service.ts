@@ -232,7 +232,8 @@ export class TemplatesService {
       targetIds: targetIds || [],
       assetIds: assetIds || [],
       workspaceId,
-      priority: 0
+      priority: 0,
+      isSaveRawResult: true
     });
 
     return {

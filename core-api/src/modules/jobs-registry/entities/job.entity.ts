@@ -47,4 +47,7 @@ export class Job extends BaseEntity {
     onDelete: 'CASCADE',
   })
   jobHistory: JobHistory;
+
+  @Column({ default: false })
+  isSaveRawResult: boolean;
 }

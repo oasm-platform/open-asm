@@ -18,10 +18,8 @@ import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { builtInTools } from '../tools/built-in-tools';
-import { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
-import { Workflow } from '../workflows/entities/workflow.entity';
 import {
   CreateJobsDto,
   GetManyJobsQueryParams,
@@ -33,6 +31,7 @@ import {
 } from './dto/jobs-registry.dto';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
+import { CreateJobs } from './jobs-registry.interface';
 
 @Injectable()
 export class JobsRegistryService {
@@ -88,15 +87,8 @@ export class JobsRegistryService {
     workflow,
     jobHistory: existingJobHistory,
     priority,
-  }: {
-    tools: Tool[];
-    targetIds: string[];
-    assetIds?: string[];
-    workspaceId?: string;
-    workflow?: Workflow;
-    jobHistory?: JobHistory;
-    priority?: number;
-  }): Promise<Job[]> {
+    isSaveRawResult,
+  }: CreateJobs): Promise<Job[]> {
     if (priority && (priority < 0 || priority > 4)) {
       priority = 4;
     }
@@ -163,6 +155,7 @@ export class JobsRegistryService {
           tool,
           priority: priority ?? 4,
           jobHistory,
+          isSaveRawResult: isSaveRawResult ?? false,
         } as DeepPartial<Job>);
 
         jobsToInsert.push(job);
