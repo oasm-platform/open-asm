@@ -11,7 +11,7 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
+import { JobPriority, JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { JobDataResultType } from 'src/common/types/app.types';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
@@ -91,7 +91,7 @@ export class JobsRegistryService {
     priority,
     isSaveRawResult,
   }: CreateJobs): Promise<Job[]> {
-    if (priority && (priority < 0 || priority > 4)) {
+    if (priority && (priority < JobPriority.CRITICAL || priority > JobPriority.BACKGROUND)) {
       priority = 4;
     }
     // Step 1: create job history
@@ -405,10 +405,13 @@ export class JobsRegistryService {
       dataForSync = data.payload;
     }
 
-    await this.dataAdapterService.syncData({
-      data: dataForSync,
-      job,
-    });
+    if (job.isSaveData) {
+      await this.dataAdapterService.syncData({
+        data: dataForSync,
+        job,
+      });
+
+    }
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;

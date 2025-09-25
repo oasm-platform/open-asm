@@ -26,7 +26,7 @@ export class Job extends BaseEntity {
   pickJobAt?: Date;
 
   @Column({ type: 'enum', enum: JobPriority, default: JobPriority.BACKGROUND })
-  priority: JobPriority;
+  priority?: JobPriority;
 
   @Column({ nullable: true })
   workerId?: string;
@@ -49,11 +49,14 @@ export class Job extends BaseEntity {
   jobHistory: JobHistory;
 
   @Column({ default: false })
-  isSaveRawResult: boolean;
+  isSaveRawResult?: boolean;
+
+  @Column({ default: true })
+  isSaveData?: boolean;
 
   @Column({ nullable: true })
-  pathResult: string;
+  pathResult?: string;
 
   @Column({ nullable: true })
-  command: string;
+  command?: string;
 }
