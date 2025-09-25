@@ -1,5 +1,5 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 type Updater<T> = T | ((prev: T) => T);
 type ReducerMap<T> = {
@@ -23,16 +23,16 @@ export default function createState<T>(
     const queryClient = useQueryClient();
 
     const { data: state = initialValue } = useQuery<T>({
-      queryKey: ["global", key],
+      queryKey: ['global', key],
       queryFn: () => initialValue,
       staleTime: Infinity,
     });
 
     const setState = useCallback(
       (updater: Updater<T>) => {
-        queryClient.setQueryData(["global", key], (prev: T | undefined) => {
+        queryClient.setQueryData(['global', key], (prev: T | undefined) => {
           const prevValue = prev === undefined ? initialValue : prev;
-          return typeof updater === "function"
+          return typeof updater === 'function'
             ? (updater as (prev: T) => T)(prevValue)
             : updater;
         });
@@ -47,11 +47,14 @@ export default function createState<T>(
       ][]
     ).reduce(
       (acc, [name, fn]) => {
-        acc[name] = (...args: unknown[]) =>
+        acc[name] = (...args: Parameters<ReducerMap<T>[keyof ReducerMap<T>]>) =>
           setState((prev) => fn(prev, ...args));
         return acc;
       },
-      {} as Record<keyof ReducerMap<T>, (...args: unknown[]) => void>,
+      {} as Record<
+        keyof ReducerMap<T>,
+        (...args: Parameters<ReducerMap<T>[keyof ReducerMap<T>]>) => void
+      >,
     );
 
     return { state, setState, ...actions } as UseGlobalStateReturn<
