@@ -1,30 +1,4 @@
-import {
-  getTemplatesControllerGetAllTemplatesQueryKey,
-  useStorageControllerGetFile,
-  useTemplatesControllerCreateTemplate,
-  useTemplatesControllerGetTemplateById,
-  useTemplatesControllerUploadFile,
-} from '@/services/apis/gen/queries';
-import { yaml } from '@codemirror/lang-yaml';
-import { useQueryClient } from '@tanstack/react-query';
-import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
-import CodeMirror from '@uiw/react-codemirror';
-import { useAtom, useSetAtom } from 'jotai';
-import * as prettierYaml from 'prettier/plugins/yaml';
-import * as prettier from 'prettier/standalone';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { toast } from 'sonner';
-import {
-  activeTemplateAtom,
-  activeTemplateIdAtom,
-  defaultTemplate,
-} from '../atoms';
-import { ScanComponent } from './scan-component';
-import React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import z from 'zod';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -33,17 +7,42 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import {
   Form,
+  FormControl,
   FormField,
   FormItem,
   FormLabel,
-  FormControl,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import {
+  getTemplatesControllerGetAllTemplatesQueryKey,
+  useStorageControllerGetFile,
+  useTemplatesControllerCreateTemplate,
+  useTemplatesControllerGetTemplateById,
+  useTemplatesControllerUploadFile
+} from '@/services/apis/gen/queries';
+import { yaml } from '@codemirror/lang-yaml';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
+import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
+import CodeMirror from '@uiw/react-codemirror';
 import type { AxiosError } from 'axios';
+import { useAtom, useSetAtom } from 'jotai';
+import * as prettierYaml from 'prettier/plugins/yaml';
+import * as prettier from 'prettier/standalone';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { toast } from 'sonner';
+import z from 'zod';
+import {
+  activeTemplateAtom,
+  activeTemplateIdAtom,
+  defaultTemplate,
+} from '../atoms';
+import { ScanComponent } from './scan-component';
 
 const createFileNameSchema = z.object({
   fileName: z.string().min(1, 'Name is required'),
@@ -234,7 +233,7 @@ export default function Editor() {
     <div className="flex flex-col flex-1 min-h-0">
       {activeTemplate && (
         <>
-          <ScanComponent />
+          {activeTemplate && <ScanComponent template={activeTemplate} />}
           <div className="flex-1 min-h-0">
             <CodeMirror
               value={activeTemplate?.content}

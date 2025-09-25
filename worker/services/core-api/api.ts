@@ -757,6 +757,48 @@ export interface UpdateProviderDto {
   apiDocsUrl?: string;
 }
 
+export interface Template {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  fileName: string;
+  path: string;
+}
+
+export interface CreateTemplateDTO {
+  fileName: string;
+}
+
+export interface UploadTemplateResponseDTO {
+  path: string;
+}
+
+export interface UploadTemplateDTO {
+  templateId: string;
+  fileContent: string;
+}
+
+export interface RenameTemplateDTO {
+  fileName: string;
+}
+
+export interface GetManyTemplateDto {
+  data: Template[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface RunTemplateDto {
+  targetIds?: string[];
+  assetIds?: string[];
+  templateId: string;
+}
+
 export enum GetManyTargetResponseDtoScanScheduleEnum {
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
@@ -2330,6 +2372,159 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/providers/${id}`,
       method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Create a new template with file stored in the storage
+   *
+   * @tags Templates
+   * @name TemplatesControllerCreateTemplate
+   * @summary Create a new templates
+   * @request POST:/api/templates
+   */
+  templatesControllerCreateTemplate = (
+    data: CreateTemplateDTO,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/templates`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieve all templates in a workspace
+   *
+   * @tags Templates
+   * @name TemplatesControllerGetAllTemplates
+   * @summary Get all templates
+   * @request GET:/api/templates
+   */
+  templatesControllerGetAllTemplates = (
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      value?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/templates`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Upload a template to the storage
+   *
+   * @tags Templates
+   * @name TemplatesControllerUploadFile
+   * @summary Template upload
+   * @request POST:/api/templates/upload
+   */
+  templatesControllerUploadFile = (
+    data: UploadTemplateDTO,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/templates/upload`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Rename the display filename of a template
+   *
+   * @tags Templates
+   * @name TemplatesControllerRenameFile
+   * @summary Rename a template file
+   * @request PATCH:/api/templates/{templateId}/rename
+   */
+  templatesControllerRenameFile = (
+    templateId: string,
+    data: RenameTemplateDTO,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/templates/${templateId}/rename`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieve a template by its ID
+   *
+   * @tags Templates
+   * @name TemplatesControllerGetTemplateById
+   * @summary Get a template by ID
+   * @request GET:/api/templates/{templateId}
+   */
+  templatesControllerGetTemplateById = (
+    templateId: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/templates/${templateId}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete a template and its associated file from storage
+   *
+   * @tags Templates
+   * @name TemplatesControllerDeleteTemplate
+   * @summary Delete a template
+   * @request DELETE:/api/templates/{templateId}
+   */
+  templatesControllerDeleteTemplate = (
+    templateId: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/templates/${templateId}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Run a template and create a job
+   *
+   * @tags Templates
+   * @name TemplatesControllerRunTemplate
+   * @summary Run a template
+   * @request POST:/api/templates/run
+   */
+  templatesControllerRunTemplate = (
+    data: RunTemplateDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/templates/run`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });

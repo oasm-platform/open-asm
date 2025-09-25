@@ -12,7 +12,7 @@ import { getManyResponse } from 'src/utils/getManyResponse';
 import { FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { StorageService } from '../storage/storage.service';
-import { builtInTools } from '../tools/built-in-tools';
+import { ToolsService } from '../tools/tools.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
 import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
@@ -30,6 +30,7 @@ export class TemplatesService {
     private readonly workspacesService: WorkspacesService,
     private readonly storageService: StorageService,
     private jobService: JobsRegistryService,
+    private toolService: ToolsService
   ) { }
 
   public async createTemplate(
@@ -222,7 +223,8 @@ export class TemplatesService {
     workspaceId: string,
   ): Promise<DefaultMessageResponseDto> {
     const { assetIds, targetIds } = dto;
-    const nuclei = builtInTools.find((tool) => tool.name === 'nuclei');
+    const [nuclei] = await this.toolService.getToolByNames(['nuclei']);
+
     if (!nuclei) {
       throw new NotFoundException('Nuclei tool is not available');
     }
@@ -233,7 +235,8 @@ export class TemplatesService {
       assetIds: assetIds || [],
       workspaceId,
       priority: 0,
-      isSaveRawResult: true
+      isSaveRawResult: true,
+      isSaveData: false
     });
 
     return {

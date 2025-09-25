@@ -2,7 +2,7 @@ import { atom } from 'jotai';
 import { atomFamily, atomWithStorage } from 'jotai/utils';
 import { v4 } from 'uuid';
 
-type Template = {
+export type Template = {
   id: string;
   filename: string;
   content: string;

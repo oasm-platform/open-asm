@@ -5,7 +5,6 @@
  * Open-source platform for cybersecurity Attack Surface Management (ASM)
  * OpenAPI spec version: 1.0
  */
-import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -24,6 +23,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 
 import { orvalClient } from '../axios-client';
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
@@ -836,6 +836,7 @@ export type GetManyTemplateDto = {
 export type RunTemplateDto = {
   targetIds?: string[];
   assetIds?: string[];
+  templateId: string;
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
@@ -1218,11 +1219,11 @@ export const getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions = <
     QueryKey,
     TargetsControllerGetTargetsInWorkspaceParams['page']
   > = ({ signal, pageParam }) =>
-    targetsControllerGetTargetsInWorkspace(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      targetsControllerGetTargetsInWorkspace(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
@@ -1257,15 +1258,15 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
         TargetsControllerGetTargetsInWorkspaceParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -1290,15 +1291,15 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
         TargetsControllerGetTargetsInWorkspaceParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -1400,7 +1401,7 @@ export const getTargetsControllerGetTargetsInWorkspaceQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
   > = ({ signal }) =>
-    targetsControllerGetTargetsInWorkspace(params, requestOptions, signal);
+      targetsControllerGetTargetsInWorkspace(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
@@ -1427,14 +1428,14 @@ export function useTargetsControllerGetTargetsInWorkspace<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -1454,14 +1455,14 @@ export function useTargetsControllerGetTargetsInWorkspace<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
+        TError,
+        Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -1570,7 +1571,7 @@ export const getTargetsControllerGetTargetByIdInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof targetsControllerGetTargetById>>
   > = ({ signal }) =>
-    targetsControllerGetTargetById(id, requestOptions, signal);
+      targetsControllerGetTargetById(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -1604,14 +1605,14 @@ export function useTargetsControllerGetTargetByIdInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
+        TError,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -1633,14 +1634,14 @@ export function useTargetsControllerGetTargetByIdInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
+        TError,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -1734,7 +1735,7 @@ export const getTargetsControllerGetTargetByIdQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof targetsControllerGetTargetById>>
   > = ({ signal }) =>
-    targetsControllerGetTargetById(id, requestOptions, signal);
+      targetsControllerGetTargetById(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -1766,14 +1767,14 @@ export function useTargetsControllerGetTargetById<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
+        TError,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -1793,14 +1794,14 @@ export function useTargetsControllerGetTargetById<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
-          TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>,
+        TError,
+        Awaited<ReturnType<typeof targetsControllerGetTargetById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -2286,11 +2287,11 @@ export const getWorkspacesControllerGetWorkspacesInfiniteQueryOptions = <
     QueryKey,
     WorkspacesControllerGetWorkspacesParams['page']
   > = ({ signal, pageParam }) =>
-    workspacesControllerGetWorkspaces(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      workspacesControllerGetWorkspaces(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
@@ -2324,15 +2325,15 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
         WorkspacesControllerGetWorkspacesParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -2357,15 +2358,15 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
         WorkspacesControllerGetWorkspacesParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -2466,7 +2467,7 @@ export const getWorkspacesControllerGetWorkspacesQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
   > = ({ signal }) =>
-    workspacesControllerGetWorkspaces(params, requestOptions, signal);
+      workspacesControllerGetWorkspaces(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
@@ -2493,14 +2494,14 @@ export function useWorkspacesControllerGetWorkspaces<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -2520,14 +2521,14 @@ export function useWorkspacesControllerGetWorkspaces<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -2633,7 +2634,7 @@ export const getWorkspacesControllerGetWorkspaceApiKeyInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
   > = ({ signal }) =>
-    workspacesControllerGetWorkspaceApiKey(requestOptions, signal);
+      workspacesControllerGetWorkspaceApiKey(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
@@ -2662,14 +2663,14 @@ export function useWorkspacesControllerGetWorkspaceApiKeyInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -2690,14 +2691,14 @@ export function useWorkspacesControllerGetWorkspaceApiKeyInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -2785,7 +2786,7 @@ export const getWorkspacesControllerGetWorkspaceApiKeyQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
   > = ({ signal }) =>
-    workspacesControllerGetWorkspaceApiKey(requestOptions, signal);
+      workspacesControllerGetWorkspaceApiKey(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
@@ -2811,14 +2812,14 @@ export function useWorkspacesControllerGetWorkspaceApiKey<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -2837,14 +2838,14 @@ export function useWorkspacesControllerGetWorkspaceApiKey<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceApiKey>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -2950,7 +2951,7 @@ export const getWorkspacesControllerGetWorkspaceByIdInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
   > = ({ signal }) =>
-    workspacesControllerGetWorkspaceById(id, requestOptions, signal);
+      workspacesControllerGetWorkspaceById(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -2983,14 +2984,14 @@ export function useWorkspacesControllerGetWorkspaceByIdInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -3012,14 +3013,14 @@ export function useWorkspacesControllerGetWorkspaceByIdInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -3112,7 +3113,7 @@ export const getWorkspacesControllerGetWorkspaceByIdQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
   > = ({ signal }) =>
-    workspacesControllerGetWorkspaceById(id, requestOptions, signal);
+      workspacesControllerGetWorkspaceById(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -3144,14 +3145,14 @@ export function useWorkspacesControllerGetWorkspaceById<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -3171,14 +3172,14 @@ export function useWorkspacesControllerGetWorkspaceById<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>,
-          TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>,
+        TError,
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -3664,14 +3665,14 @@ export function useRootControllerGetHealthInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerGetHealth>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerGetHealth>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof rootControllerGetHealth>>,
+        TError,
+        Awaited<ReturnType<typeof rootControllerGetHealth>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -3690,14 +3691,14 @@ export function useRootControllerGetHealthInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerGetHealth>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerGetHealth>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof rootControllerGetHealth>>,
+        TError,
+        Awaited<ReturnType<typeof rootControllerGetHealth>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -3801,14 +3802,14 @@ export function useRootControllerGetHealth<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerGetHealth>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerGetHealth>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof rootControllerGetHealth>>,
+        TError,
+        Awaited<ReturnType<typeof rootControllerGetHealth>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -3827,14 +3828,14 @@ export function useRootControllerGetHealth<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerGetHealth>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerGetHealth>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof rootControllerGetHealth>>,
+        TError,
+        Awaited<ReturnType<typeof rootControllerGetHealth>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4048,14 +4049,14 @@ export function useRootControllerGetMetadataInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerGetMetadata>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerGetMetadata>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4074,14 +4075,14 @@ export function useRootControllerGetMetadataInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerGetMetadata>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerGetMetadata>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4189,14 +4190,14 @@ export function useRootControllerGetMetadata<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerGetMetadata>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerGetMetadata>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4215,14 +4216,14 @@ export function useRootControllerGetMetadata<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof rootControllerGetMetadata>>,
-          TError,
-          Awaited<ReturnType<typeof rootControllerGetMetadata>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>,
+        TError,
+        Awaited<ReturnType<typeof rootControllerGetMetadata>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4334,11 +4335,11 @@ export const getJobsRegistryControllerGetManyJobsInfiniteQueryOptions = <
     QueryKey,
     JobsRegistryControllerGetManyJobsParams['page']
   > = ({ signal, pageParam }) =>
-    jobsRegistryControllerGetManyJobs(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      jobsRegistryControllerGetManyJobs(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
@@ -4372,15 +4373,15 @@ export function useJobsRegistryControllerGetManyJobsInfinite<
         JobsRegistryControllerGetManyJobsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4405,15 +4406,15 @@ export function useJobsRegistryControllerGetManyJobsInfinite<
         JobsRegistryControllerGetManyJobsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4514,7 +4515,7 @@ export const getJobsRegistryControllerGetManyJobsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
   > = ({ signal }) =>
-    jobsRegistryControllerGetManyJobs(params, requestOptions, signal);
+      jobsRegistryControllerGetManyJobs(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
@@ -4541,14 +4542,14 @@ export function useJobsRegistryControllerGetManyJobs<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4568,14 +4569,14 @@ export function useJobsRegistryControllerGetManyJobs<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4776,7 +4777,7 @@ export const getJobsRegistryControllerGetJobsTimelineInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
   > = ({ signal }) =>
-    jobsRegistryControllerGetJobsTimeline(requestOptions, signal);
+      jobsRegistryControllerGetJobsTimeline(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
@@ -4805,14 +4806,14 @@ export function useJobsRegistryControllerGetJobsTimelineInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4833,14 +4834,14 @@ export function useJobsRegistryControllerGetJobsTimelineInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4928,7 +4929,7 @@ export const getJobsRegistryControllerGetJobsTimelineQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
   > = ({ signal }) =>
-    jobsRegistryControllerGetJobsTimeline(requestOptions, signal);
+      jobsRegistryControllerGetJobsTimeline(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
@@ -4954,14 +4955,14 @@ export function useJobsRegistryControllerGetJobsTimeline<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -4980,14 +4981,14 @@ export function useJobsRegistryControllerGetJobsTimeline<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobsTimeline>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5094,7 +5095,7 @@ export const getJobsRegistryControllerGetNextJobInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
   > = ({ signal }) =>
-    jobsRegistryControllerGetNextJob(workerId, requestOptions, signal);
+      jobsRegistryControllerGetNextJob(workerId, requestOptions, signal);
 
   return {
     queryKey,
@@ -5128,14 +5129,14 @@ export function useJobsRegistryControllerGetNextJobInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5157,14 +5158,14 @@ export function useJobsRegistryControllerGetNextJobInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5259,7 +5260,7 @@ export const getJobsRegistryControllerGetNextJobQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
   > = ({ signal }) =>
-    jobsRegistryControllerGetNextJob(workerId, requestOptions, signal);
+      jobsRegistryControllerGetNextJob(workerId, requestOptions, signal);
 
   return {
     queryKey,
@@ -5291,14 +5292,14 @@ export function useJobsRegistryControllerGetNextJob<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5318,14 +5319,14 @@ export function useJobsRegistryControllerGetNextJob<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>,
-          TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>,
+        TError,
+        Awaited<ReturnType<typeof jobsRegistryControllerGetNextJob>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5536,11 +5537,11 @@ export const getAssetsControllerGetAssetsInWorkspaceInfiniteQueryOptions = <
     QueryKey,
     AssetsControllerGetAssetsInWorkspaceParams['page']
   > = ({ signal, pageParam }) =>
-    assetsControllerGetAssetsInWorkspace(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      assetsControllerGetAssetsInWorkspace(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
@@ -5573,15 +5574,15 @@ export function useAssetsControllerGetAssetsInWorkspaceInfinite<
         AssetsControllerGetAssetsInWorkspaceParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5606,15 +5607,15 @@ export function useAssetsControllerGetAssetsInWorkspaceInfinite<
         AssetsControllerGetAssetsInWorkspaceParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5716,7 +5717,7 @@ export const getAssetsControllerGetAssetsInWorkspaceQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
   > = ({ signal }) =>
-    assetsControllerGetAssetsInWorkspace(params, requestOptions, signal);
+      assetsControllerGetAssetsInWorkspace(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
@@ -5743,14 +5744,14 @@ export function useAssetsControllerGetAssetsInWorkspace<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5770,14 +5771,14 @@ export function useAssetsControllerGetAssetsInWorkspace<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5893,11 +5894,11 @@ export const getAssetsControllerGetIpAssetsInfiniteQueryOptions = <
     QueryKey,
     AssetsControllerGetIpAssetsParams['page']
   > = ({ signal, pageParam }) =>
-    assetsControllerGetIpAssets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      assetsControllerGetIpAssets(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
@@ -5931,15 +5932,15 @@ export function useAssetsControllerGetIpAssetsInfinite<
         AssetsControllerGetIpAssetsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -5964,15 +5965,15 @@ export function useAssetsControllerGetIpAssetsInfinite<
         AssetsControllerGetIpAssetsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6072,7 +6073,7 @@ export const getAssetsControllerGetIpAssetsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
   > = ({ signal }) =>
-    assetsControllerGetIpAssets(params, requestOptions, signal);
+      assetsControllerGetIpAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
@@ -6099,14 +6100,14 @@ export function useAssetsControllerGetIpAssets<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6126,14 +6127,14 @@ export function useAssetsControllerGetIpAssets<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6249,11 +6250,11 @@ export const getAssetsControllerGetPortAssetsInfiniteQueryOptions = <
     QueryKey,
     AssetsControllerGetPortAssetsParams['page']
   > = ({ signal, pageParam }) =>
-    assetsControllerGetPortAssets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      assetsControllerGetPortAssets(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
@@ -6287,15 +6288,15 @@ export function useAssetsControllerGetPortAssetsInfinite<
         AssetsControllerGetPortAssetsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6320,15 +6321,15 @@ export function useAssetsControllerGetPortAssetsInfinite<
         AssetsControllerGetPortAssetsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6428,7 +6429,7 @@ export const getAssetsControllerGetPortAssetsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
   > = ({ signal }) =>
-    assetsControllerGetPortAssets(params, requestOptions, signal);
+      assetsControllerGetPortAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
@@ -6455,14 +6456,14 @@ export function useAssetsControllerGetPortAssets<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6482,14 +6483,14 @@ export function useAssetsControllerGetPortAssets<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6606,11 +6607,11 @@ export const getAssetsControllerGetTechnologyAssetsInfiniteQueryOptions = <
     QueryKey,
     AssetsControllerGetTechnologyAssetsParams['page']
   > = ({ signal, pageParam }) =>
-    assetsControllerGetTechnologyAssets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      assetsControllerGetTechnologyAssets(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
@@ -6643,15 +6644,15 @@ export function useAssetsControllerGetTechnologyAssetsInfinite<
         AssetsControllerGetTechnologyAssetsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6676,15 +6677,15 @@ export function useAssetsControllerGetTechnologyAssetsInfinite<
         AssetsControllerGetTechnologyAssetsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6783,7 +6784,7 @@ export const getAssetsControllerGetTechnologyAssetsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
   > = ({ signal }) =>
-    assetsControllerGetTechnologyAssets(params, requestOptions, signal);
+      assetsControllerGetTechnologyAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
@@ -6810,14 +6811,14 @@ export function useAssetsControllerGetTechnologyAssets<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6837,14 +6838,14 @@ export function useAssetsControllerGetTechnologyAssets<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -6961,11 +6962,11 @@ export const getAssetsControllerGetStatusCodeAssetsInfiniteQueryOptions = <
     QueryKey,
     AssetsControllerGetStatusCodeAssetsParams['page']
   > = ({ signal, pageParam }) =>
-    assetsControllerGetStatusCodeAssets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      assetsControllerGetStatusCodeAssets(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
@@ -6998,15 +6999,15 @@ export function useAssetsControllerGetStatusCodeAssetsInfinite<
         AssetsControllerGetStatusCodeAssetsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7031,15 +7032,15 @@ export function useAssetsControllerGetStatusCodeAssetsInfinite<
         AssetsControllerGetStatusCodeAssetsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7138,7 +7139,7 @@ export const getAssetsControllerGetStatusCodeAssetsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
   > = ({ signal }) =>
-    assetsControllerGetStatusCodeAssets(params, requestOptions, signal);
+      assetsControllerGetStatusCodeAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
@@ -7165,14 +7166,14 @@ export function useAssetsControllerGetStatusCodeAssets<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7192,14 +7193,14 @@ export function useAssetsControllerGetStatusCodeAssets<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7341,14 +7342,14 @@ export function useAssetsControllerGetAssetByIdInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7370,14 +7371,14 @@ export function useAssetsControllerGetAssetByIdInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7502,14 +7503,14 @@ export function useAssetsControllerGetAssetById<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7529,14 +7530,14 @@ export function useAssetsControllerGetAssetById<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
-          TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>,
+        TError,
+        Awaited<ReturnType<typeof assetsControllerGetAssetById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7738,7 +7739,7 @@ export const getTechnologyControllerGetTechnologyInfoInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
   > = ({ signal }) =>
-    technologyControllerGetTechnologyInfo(name, requestOptions, signal);
+      technologyControllerGetTechnologyInfo(name, requestOptions, signal);
 
   return {
     queryKey,
@@ -7773,14 +7774,14 @@ export function useTechnologyControllerGetTechnologyInfoInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-          TError,
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7802,14 +7803,14 @@ export function useTechnologyControllerGetTechnologyInfoInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-          TError,
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7902,7 +7903,7 @@ export const getTechnologyControllerGetTechnologyInfoQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
   > = ({ signal }) =>
-    technologyControllerGetTechnologyInfo(name, requestOptions, signal);
+      technologyControllerGetTechnologyInfo(name, requestOptions, signal);
 
   return {
     queryKey,
@@ -7934,14 +7935,14 @@ export function useTechnologyControllerGetTechnologyInfo<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-          TError,
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -7961,14 +7962,14 @@ export function useTechnologyControllerGetTechnologyInfo<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-          TError,
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
+        TError,
+        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -8263,11 +8264,11 @@ export const getWorkersControllerGetWorkersInfiniteQueryOptions = <
     QueryKey,
     WorkersControllerGetWorkersParams['page']
   > = ({ signal, pageParam }) =>
-    workersControllerGetWorkers(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      workersControllerGetWorkers(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof workersControllerGetWorkers>>,
@@ -8301,15 +8302,15 @@ export function useWorkersControllerGetWorkersInfinite<
         WorkersControllerGetWorkersParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-          TError,
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workersControllerGetWorkers>>,
+        TError,
+        Awaited<ReturnType<typeof workersControllerGetWorkers>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -8334,15 +8335,15 @@ export function useWorkersControllerGetWorkersInfinite<
         WorkersControllerGetWorkersParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-          TError,
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workersControllerGetWorkers>>,
+        TError,
+        Awaited<ReturnType<typeof workersControllerGetWorkers>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -8442,7 +8443,7 @@ export const getWorkersControllerGetWorkersQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof workersControllerGetWorkers>>
   > = ({ signal }) =>
-    workersControllerGetWorkers(params, requestOptions, signal);
+      workersControllerGetWorkers(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof workersControllerGetWorkers>>,
@@ -8469,14 +8470,14 @@ export function useWorkersControllerGetWorkers<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-          TError,
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workersControllerGetWorkers>>,
+        TError,
+        Awaited<ReturnType<typeof workersControllerGetWorkers>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -8496,14 +8497,14 @@ export function useWorkersControllerGetWorkers<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-          TError,
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workersControllerGetWorkers>>,
+        TError,
+        Awaited<ReturnType<typeof workersControllerGetWorkers>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -8620,11 +8621,11 @@ export const getSearchControllerSearchAssetsTargetsInfiniteQueryOptions = <
     QueryKey,
     SearchControllerSearchAssetsTargetsParams['page']
   > = ({ signal, pageParam }) =>
-    searchControllerSearchAssetsTargets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      searchControllerSearchAssetsTargets(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
@@ -8657,15 +8658,15 @@ export function useSearchControllerSearchAssetsTargetsInfinite<
         SearchControllerSearchAssetsTargetsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -8690,15 +8691,15 @@ export function useSearchControllerSearchAssetsTargetsInfinite<
         SearchControllerSearchAssetsTargetsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -8797,7 +8798,7 @@ export const getSearchControllerSearchAssetsTargetsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
   > = ({ signal }) =>
-    searchControllerSearchAssetsTargets(params, requestOptions, signal);
+      searchControllerSearchAssetsTargets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
@@ -8824,14 +8825,14 @@ export function useSearchControllerSearchAssetsTargets<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -8851,14 +8852,14 @@ export function useSearchControllerSearchAssetsTargets<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
+        TError,
+        Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -8975,11 +8976,11 @@ export const getSearchControllerGetSearchHistoryInfiniteQueryOptions = <
     QueryKey,
     SearchControllerGetSearchHistoryParams['page']
   > = ({ signal, pageParam }) =>
-    searchControllerGetSearchHistory(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      searchControllerGetSearchHistory(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
@@ -9013,15 +9014,15 @@ export function useSearchControllerGetSearchHistoryInfinite<
         SearchControllerGetSearchHistoryParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -9046,15 +9047,15 @@ export function useSearchControllerGetSearchHistoryInfinite<
         SearchControllerGetSearchHistoryParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -9155,7 +9156,7 @@ export const getSearchControllerGetSearchHistoryQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
   > = ({ signal }) =>
-    searchControllerGetSearchHistory(params, requestOptions, signal);
+      searchControllerGetSearchHistory(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
@@ -9182,14 +9183,14 @@ export function useSearchControllerGetSearchHistory<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -9209,14 +9210,14 @@ export function useSearchControllerGetSearchHistory<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-          TError,
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
+        TError,
+        Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -9597,11 +9598,11 @@ export const getToolsControllerGetManyToolsInfiniteQueryOptions = <
     QueryKey,
     ToolsControllerGetManyToolsParams['page']
   > = ({ signal, pageParam }) =>
-    toolsControllerGetManyTools(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      toolsControllerGetManyTools(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
@@ -9635,15 +9636,15 @@ export function useToolsControllerGetManyToolsInfinite<
         ToolsControllerGetManyToolsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -9668,15 +9669,15 @@ export function useToolsControllerGetManyToolsInfinite<
         ToolsControllerGetManyToolsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -9776,7 +9777,7 @@ export const getToolsControllerGetManyToolsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof toolsControllerGetManyTools>>
   > = ({ signal }) =>
-    toolsControllerGetManyTools(params, requestOptions, signal);
+      toolsControllerGetManyTools(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
@@ -9803,14 +9804,14 @@ export function useToolsControllerGetManyTools<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -9830,14 +9831,14 @@ export function useToolsControllerGetManyTools<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -10341,14 +10342,14 @@ export function useToolsControllerGetBuiltInToolsInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -10369,14 +10370,14 @@ export function useToolsControllerGetBuiltInToolsInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -10488,14 +10489,14 @@ export function useToolsControllerGetBuiltInTools<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -10514,14 +10515,14 @@ export function useToolsControllerGetBuiltInTools<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetBuiltInTools>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -10633,11 +10634,11 @@ export const getToolsControllerGetInstalledToolsInfiniteQueryOptions = <
     QueryKey,
     ToolsControllerGetInstalledToolsParams['page']
   > = ({ signal, pageParam }) =>
-    toolsControllerGetInstalledTools(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      toolsControllerGetInstalledTools(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
@@ -10671,15 +10672,15 @@ export function useToolsControllerGetInstalledToolsInfinite<
         ToolsControllerGetInstalledToolsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -10704,15 +10705,15 @@ export function useToolsControllerGetInstalledToolsInfinite<
         ToolsControllerGetInstalledToolsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -10813,7 +10814,7 @@ export const getToolsControllerGetInstalledToolsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
   > = ({ signal }) =>
-    toolsControllerGetInstalledTools(params, requestOptions, signal);
+      toolsControllerGetInstalledTools(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
@@ -10840,14 +10841,14 @@ export function useToolsControllerGetInstalledTools<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -10867,14 +10868,14 @@ export function useToolsControllerGetInstalledTools<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11012,14 +11013,14 @@ export function useToolsControllerGetToolByIdInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolById>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetToolById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11039,14 +11040,14 @@ export function useToolsControllerGetToolByIdInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolById>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetToolById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11167,14 +11168,14 @@ export function useToolsControllerGetToolById<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolById>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetToolById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11194,14 +11195,14 @@ export function useToolsControllerGetToolById<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolById>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetToolById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11340,14 +11341,14 @@ export function useToolsControllerGetToolApiKeyInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11369,14 +11370,14 @@ export function useToolsControllerGetToolApiKeyInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11501,14 +11502,14 @@ export function useToolsControllerGetToolApiKey<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11528,14 +11529,14 @@ export function useToolsControllerGetToolApiKey<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>,
+        TError,
+        Awaited<ReturnType<typeof toolsControllerGetToolApiKey>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11827,11 +11828,11 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryOptions 
       QueryKey,
       VulnerabilitiesControllerGetVulnerabilitiesParams['page']
     > = ({ signal, pageParam }) =>
-      vulnerabilitiesControllerGetVulnerabilities(
-        { ...params, page: pageParam || params?.['page'] },
-        requestOptions,
-        signal,
-      );
+        vulnerabilitiesControllerGetVulnerabilities(
+          { ...params, page: pageParam || params?.['page'] },
+          requestOptions,
+          signal,
+        );
 
     return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
       Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
@@ -11867,19 +11868,19 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
         VulnerabilitiesControllerGetVulnerabilitiesParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >,
-          QueryKey
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+        >,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -11904,19 +11905,19 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
         VulnerabilitiesControllerGetVulnerabilitiesParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >,
-          QueryKey
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+        >,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -12020,7 +12021,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
   > = ({ signal }) =>
-    vulnerabilitiesControllerGetVulnerabilities(params, requestOptions, signal);
+      vulnerabilitiesControllerGetVulnerabilities(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
@@ -12050,18 +12051,18 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+        >
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -12083,18 +12084,18 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >,
-          TError,
-          Awaited<
-            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
+        >
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -12224,11 +12225,11 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfiniteQue
       QueryKey,
       VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
     > = ({ signal, pageParam }) =>
-      vulnerabilitiesControllerGetVulnerabilitiesStatistics(
-        { ...params, page: pageParam || params?.['page'] },
-        requestOptions,
-        signal,
-      );
+        vulnerabilitiesControllerGetVulnerabilitiesStatistics(
+          { ...params, page: pageParam || params?.['page'] },
+          requestOptions,
+          signal,
+        );
 
     return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
       Awaited<
@@ -12274,23 +12275,23 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
         VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
-            >
-          >,
-          QueryKey
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
+          >
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
+          >
+        >,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -12321,23 +12322,23 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
         VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
-            >
-          >,
-          QueryKey
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
+          >
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
+          >
+        >,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -12460,11 +12461,11 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesStatisticsQueryOption
         ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics>
       >
     > = ({ signal }) =>
-      vulnerabilitiesControllerGetVulnerabilitiesStatistics(
-        params,
-        requestOptions,
-        signal,
-      );
+        vulnerabilitiesControllerGetVulnerabilitiesStatistics(
+          params,
+          requestOptions,
+          signal,
+        );
 
     return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
       Awaited<
@@ -12503,22 +12504,22 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
-            >
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
           >
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
+          >
+        >
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -12544,22 +12545,22 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
-            >
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
           >
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
+          >
+        >
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -12701,11 +12702,11 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesSeverityInfiniteQuery
       QueryKey,
       VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
     > = ({ signal, pageParam }) =>
-      vulnerabilitiesControllerGetVulnerabilitiesSeverity(
-        { ...params, page: pageParam || params?.['page'] },
-        requestOptions,
-        signal,
-      );
+        vulnerabilitiesControllerGetVulnerabilitiesSeverity(
+          { ...params, page: pageParam || params?.['page'] },
+          requestOptions,
+          signal,
+        );
 
     return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
       Awaited<
@@ -12749,23 +12750,23 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
         VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
-            >
-          >,
-          QueryKey
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+          >
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+          >
+        >,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -12794,23 +12795,23 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
         VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
-            >
-          >,
-          QueryKey
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+          >
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+          >
+        >,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -12929,11 +12930,11 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesSeverityQueryOptions 
         ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
       >
     > = ({ signal }) =>
-      vulnerabilitiesControllerGetVulnerabilitiesSeverity(
-        params,
-        requestOptions,
-        signal,
-      );
+        vulnerabilitiesControllerGetVulnerabilitiesSeverity(
+          params,
+          requestOptions,
+          signal,
+        );
 
     return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
       Awaited<
@@ -12970,22 +12971,22 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverity<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
-            >
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
           >
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+          >
+        >
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13009,22 +13010,22 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverity<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
-            >
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
           >
         >,
-        'initialData'
-      >;
+        TError,
+        Awaited<
+          ReturnType<
+            typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
+          >
+        >
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13165,14 +13166,14 @@ export function useWorkflowsControllerListTemplatesInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13193,14 +13194,14 @@ export function useWorkflowsControllerListTemplatesInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13312,14 +13313,14 @@ export function useWorkflowsControllerListTemplates<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13338,14 +13339,14 @@ export function useWorkflowsControllerListTemplates<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13457,11 +13458,11 @@ export const getStatisticControllerGetStatisticsInfiniteQueryOptions = <
     QueryKey,
     StatisticControllerGetStatisticsParams['page']
   > = ({ signal, pageParam }) =>
-    statisticControllerGetStatistics(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      statisticControllerGetStatistics(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
@@ -13495,15 +13496,15 @@ export function useStatisticControllerGetStatisticsInfinite<
         StatisticControllerGetStatisticsParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13528,15 +13529,15 @@ export function useStatisticControllerGetStatisticsInfinite<
         StatisticControllerGetStatisticsParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13637,7 +13638,7 @@ export const getStatisticControllerGetStatisticsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof statisticControllerGetStatistics>>
   > = ({ signal }) =>
-    statisticControllerGetStatistics(params, requestOptions, signal);
+      statisticControllerGetStatistics(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
@@ -13664,14 +13665,14 @@ export function useStatisticControllerGetStatistics<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13691,14 +13692,14 @@ export function useStatisticControllerGetStatistics<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13815,11 +13816,11 @@ export const getProvidersControllerGetManyProvidersInfiniteQueryOptions = <
     QueryKey,
     ProvidersControllerGetManyProvidersParams['page']
   > = ({ signal, pageParam }) =>
-    providersControllerGetManyProviders(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      providersControllerGetManyProviders(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
@@ -13852,15 +13853,15 @@ export function useProvidersControllerGetManyProvidersInfinite<
         ProvidersControllerGetManyProvidersParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13885,15 +13886,15 @@ export function useProvidersControllerGetManyProvidersInfinite<
         ProvidersControllerGetManyProvidersParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -13992,7 +13993,7 @@ export const getProvidersControllerGetManyProvidersQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof providersControllerGetManyProviders>>
   > = ({ signal }) =>
-    providersControllerGetManyProviders(params, requestOptions, signal);
+      providersControllerGetManyProviders(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
@@ -14019,14 +14020,14 @@ export function useProvidersControllerGetManyProviders<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -14046,14 +14047,14 @@ export function useProvidersControllerGetManyProviders<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
+        TError,
+        Awaited<ReturnType<typeof providersControllerGetManyProviders>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -14256,7 +14257,7 @@ export const getProvidersControllerGetProviderInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof providersControllerGetProvider>>
   > = ({ signal }) =>
-    providersControllerGetProvider(id, requestOptions, signal);
+      providersControllerGetProvider(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -14290,14 +14291,14 @@ export function useProvidersControllerGetProviderInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerGetProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerGetProvider>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        Awaited<ReturnType<typeof providersControllerGetProvider>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -14319,14 +14320,14 @@ export function useProvidersControllerGetProviderInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerGetProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerGetProvider>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        Awaited<ReturnType<typeof providersControllerGetProvider>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -14420,7 +14421,7 @@ export const getProvidersControllerGetProviderQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof providersControllerGetProvider>>
   > = ({ signal }) =>
-    providersControllerGetProvider(id, requestOptions, signal);
+      providersControllerGetProvider(id, requestOptions, signal);
 
   return {
     queryKey,
@@ -14452,14 +14453,14 @@ export function useProvidersControllerGetProvider<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerGetProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerGetProvider>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        Awaited<ReturnType<typeof providersControllerGetProvider>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -14479,14 +14480,14 @@ export function useProvidersControllerGetProvider<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof providersControllerGetProvider>>,
-          TError,
-          Awaited<ReturnType<typeof providersControllerGetProvider>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof providersControllerGetProvider>>,
+        TError,
+        Awaited<ReturnType<typeof providersControllerGetProvider>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -14877,11 +14878,11 @@ export const getTemplatesControllerGetAllTemplatesInfiniteQueryOptions = <
     QueryKey,
     TemplatesControllerGetAllTemplatesParams['page']
   > = ({ signal, pageParam }) =>
-    templatesControllerGetAllTemplates(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      templatesControllerGetAllTemplates(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
@@ -14915,15 +14916,15 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
         TemplatesControllerGetAllTemplatesParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -14948,15 +14949,15 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
         TemplatesControllerGetAllTemplatesParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -15055,7 +15056,7 @@ export const getTemplatesControllerGetAllTemplatesQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
   > = ({ signal }) =>
-    templatesControllerGetAllTemplates(params, requestOptions, signal);
+      templatesControllerGetAllTemplates(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
@@ -15082,14 +15083,14 @@ export function useTemplatesControllerGetAllTemplates<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -15109,14 +15110,14 @@ export function useTemplatesControllerGetAllTemplates<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -15415,7 +15416,7 @@ export const getTemplatesControllerGetTemplateByIdInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
   > = ({ signal }) =>
-    templatesControllerGetTemplateById(templateId, requestOptions, signal);
+      templatesControllerGetTemplateById(templateId, requestOptions, signal);
 
   return {
     queryKey,
@@ -15449,14 +15450,14 @@ export function useTemplatesControllerGetTemplateByIdInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -15478,14 +15479,14 @@ export function useTemplatesControllerGetTemplateByIdInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -15581,7 +15582,7 @@ export const getTemplatesControllerGetTemplateByIdQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
   > = ({ signal }) =>
-    templatesControllerGetTemplateById(templateId, requestOptions, signal);
+      templatesControllerGetTemplateById(templateId, requestOptions, signal);
 
   return {
     queryKey,
@@ -15613,14 +15614,14 @@ export function useTemplatesControllerGetTemplateById<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -15640,14 +15641,14 @@ export function useTemplatesControllerGetTemplateById<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
-          TError,
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -16044,7 +16045,7 @@ export const getStorageControllerGetFileInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof storageControllerGetFile>>
   > = ({ signal }) =>
-    storageControllerGetFile(bucket, path, requestOptions, signal);
+      storageControllerGetFile(bucket, path, requestOptions, signal);
 
   return {
     queryKey,
@@ -16077,14 +16078,14 @@ export function useStorageControllerGetFileInfinite<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerGetFile>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerGetFile>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        Awaited<ReturnType<typeof storageControllerGetFile>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -16105,14 +16106,14 @@ export function useStorageControllerGetFileInfinite<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerGetFile>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerGetFile>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        Awaited<ReturnType<typeof storageControllerGetFile>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -16206,7 +16207,7 @@ export const getStorageControllerGetFileQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof storageControllerGetFile>>
   > = ({ signal }) =>
-    storageControllerGetFile(bucket, path, requestOptions, signal);
+      storageControllerGetFile(bucket, path, requestOptions, signal);
 
   return {
     queryKey,
@@ -16239,14 +16240,14 @@ export function useStorageControllerGetFile<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerGetFile>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerGetFile>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        Awaited<ReturnType<typeof storageControllerGetFile>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -16267,14 +16268,14 @@ export function useStorageControllerGetFile<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerGetFile>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerGetFile>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof storageControllerGetFile>>,
+        TError,
+        Awaited<ReturnType<typeof storageControllerGetFile>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -16398,11 +16399,11 @@ export const getStorageControllerForwardImageInfiniteQueryOptions = <
     QueryKey,
     StorageControllerForwardImageParams['page']
   > = ({ signal, pageParam }) =>
-    storageControllerForwardImage(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+      storageControllerForwardImage(
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof storageControllerForwardImage>>,
@@ -16436,15 +16437,15 @@ export function useStorageControllerForwardImageInfinite<
         StorageControllerForwardImageParams['page']
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -16469,15 +16470,15 @@ export function useStorageControllerForwardImageInfinite<
         StorageControllerForwardImageParams['page']
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        QueryKey
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -16577,7 +16578,7 @@ export const getStorageControllerForwardImageQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof storageControllerForwardImage>>
   > = ({ signal }) =>
-    storageControllerForwardImage(params, requestOptions, signal);
+      storageControllerForwardImage(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof storageControllerForwardImage>>,
@@ -16604,14 +16605,14 @@ export function useStorageControllerForwardImage<
         TData
       >
     > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        Awaited<ReturnType<typeof storageControllerForwardImage>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
@@ -16631,14 +16632,14 @@ export function useStorageControllerForwardImage<
         TData
       >
     > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>
-        >,
-        'initialData'
-      >;
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof storageControllerForwardImage>>,
+        TError,
+        Awaited<ReturnType<typeof storageControllerForwardImage>>
+      >,
+      'initialData'
+    >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,

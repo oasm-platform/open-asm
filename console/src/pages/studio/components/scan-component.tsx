@@ -22,15 +22,19 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { Check, CirclePlus, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Template } from '../atoms';
 
 const assetIdsAtom = atom<string[]>([]);
 
-export function ScanComponent() {
+export interface ScanComponentProps {
+  template: Template;
+}
+export function ScanComponent({ template }: ScanComponentProps) {
   const { mutate } = useTemplatesControllerRunTemplate();
   const assetIds = useAtomValue(assetIdsAtom);
 
   const handleScan = () => {
-    mutate({ data: { assetIds: assetIds } });
+    mutate({ data: { assetIds: assetIds, templateId: template.id } });
   };
 
   const [open, setOpen] = useState(false);

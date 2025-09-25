@@ -22,6 +22,7 @@ import { builtInTools } from '../tools/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import {
+  CreateJobs,
   CreateJobsDto,
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
@@ -32,7 +33,6 @@ import {
 } from './dto/jobs-registry.dto';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
-import { CreateJobs } from './jobs-registry.interface';
 
 @Injectable()
 export class JobsRegistryService {
@@ -137,8 +137,8 @@ export class JobsRegistryService {
 
     // Step 3: iterate tools and create jobs
     for (const tool of tools) {
+      const defaultCommand = builtInTools.find(t => t.name === tool.name)?.command;
       let filteredAssets: Asset[];
-
       if (tool.category === ToolCategory.SUBDOMAINS) {
         filteredAssets = assets.filter((asset) => asset.isPrimary);
       } else if (tool.category === ToolCategory.PORTS_SCANNER) {
@@ -157,7 +157,7 @@ export class JobsRegistryService {
           tool,
           priority: priority ?? 4,
           jobHistory,
-          command: tool.command,
+          command: defaultCommand,
           isSaveRawResult: isSaveRawResult ?? false,
         } as DeepPartial<Job>);
 
