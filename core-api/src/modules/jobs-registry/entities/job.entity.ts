@@ -50,4 +50,10 @@ export class Job extends BaseEntity {
 
   @Column({ default: false })
   isSaveRawResult: boolean;
+
+  @Column({ nullable: true })
+  pathResult: string;
+
+  @Column({ nullable: true })
+  command: string;
 }

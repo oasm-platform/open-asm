@@ -17,6 +17,7 @@ import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
+import { StorageService } from '../storage/storage.service';
 import { builtInTools } from '../tools/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
@@ -42,6 +43,7 @@ export class JobsRegistryService {
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
     private toolsService: ToolsService,
+    private storageService: StorageService
   ) { }
   public async getManyJobs(
     query: GetManyBaseQueryParams,
@@ -155,6 +157,7 @@ export class JobsRegistryService {
           tool,
           priority: priority ?? 4,
           jobHistory,
+          command: tool.command,
           isSaveRawResult: isSaveRawResult ?? false,
         } as DeepPartial<Job>);
 
@@ -183,7 +186,6 @@ export class JobsRegistryService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-
     try {
       const worker = await queryRunner.manager
         .getRepository(WorkerInstance)
@@ -222,6 +224,7 @@ export class JobsRegistryService {
       } else {
         queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
       }
+
       const job = await queryBuilder
         .setLock('pessimistic_write', undefined, ['jobs'])
         .limit(1)
@@ -240,15 +243,11 @@ export class JobsRegistryService {
       let command = '';
 
       if (isBuiltInTools) {
-        const workerStep = builtInTools.find(
-          (tool) => tool.category === job.category,
-        );
-        if (!workerStep) {
+        if (!job.command) {
           await queryRunner.rollbackTransaction();
           return null;
-        } else {
-          command = workerStep?.command || '';
         }
+        command = job.command || '';
       }
 
       await queryRunner.commitTransaction();
@@ -372,13 +371,13 @@ export class JobsRegistryService {
   ): Promise<{ workerId: string; dto: UpdateResultDto }> {
     const { jobId, data } = dto;
     const job = await this.findJobForUpdate(workerId, jobId);
-
     if (!job) {
       throw new NotFoundException('Job not found');
     }
 
     const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
     let dataForSync: JobDataResultType;
+    let pathResult: string | null = null;
     if (isBuiltInTools) {
       const step = builtInTools.find((tool) => tool.name === job.tool.name);
 
@@ -398,6 +397,10 @@ export class JobsRegistryService {
         throw new BadGatewayException('Raw data is required');
       }
       dataForSync = builtInStep?.parser?.(data.raw);
+      if (job.isSaveRawResult) {
+        const uploadResult = this.storageService.uploadFile(`${job.id}.txt`, Buffer.from(data.raw, 'utf-8'), 'jobs-result');
+        pathResult = uploadResult.path;
+      }
     } else {
       dataForSync = data.payload;
     }
@@ -409,7 +412,7 @@ export class JobsRegistryService {
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
-    await this.updateJobStatus(job.id, newStatus);
+    await this.repo.update(jobId, { status: newStatus, completedAt: new Date(), pathResult: pathResult || undefined });
 
     if (newStatus === JobStatus.COMPLETED) {
       await this.getNextStepForJob(job);
@@ -557,15 +560,4 @@ export class JobsRegistryService {
     });
   }
 
-  /**
-   * Updates the status of a job.
-   * @param jobId the ID of the job to update
-   * @param status the new status of the job
-   */
-  private async updateJobStatus(
-    jobId: string,
-    status: JobStatus,
-  ): Promise<void> {
-    await this.repo.update(jobId, { status, completedAt: new Date() });
-  }
 }

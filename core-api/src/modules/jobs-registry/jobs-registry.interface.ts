@@ -1,6 +1,6 @@
-import { Tool } from "../tools/entities/tools.entity";
-import { Workflow } from "../workflows/entities/workflow.entity";
-import { JobHistory } from "./entities/job-history.entity";
+import type { Tool } from '../tools/entities/tools.entity';
+import type { Workflow } from '../workflows/entities/workflow.entity';
+import type { JobHistory } from './entities/job-history.entity';
 
 export interface CreateJobs {
     tools: Tool[];

@@ -43,6 +43,9 @@ export class StorageService {
 
       // Write the file
       fs.writeFileSync(filePath, buffer);
+      return {
+        path: `${bucket}/${fileName}`,
+      };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
@@ -50,10 +53,6 @@ export class StorageService {
         `Failed to save file: ${errorMessage}`,
       );
     }
-
-    return {
-      path: `${bucket}/${fileName}`,
-    };
   }
 
   /**
