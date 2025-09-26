@@ -61,6 +61,7 @@ import {
 } from '@/components/ui/tooltip';
 import useDebounce from '@/hooks/use-debounce';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useStudioTemplate } from '@/hooks/useStudioTemplate';
 import {
   getTemplatesControllerGetAllTemplatesQueryKey,
   useTemplatesControllerDeleteTemplate,
@@ -69,18 +70,11 @@ import {
 } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAtomValue, useSetAtom } from 'jotai';
+import type { AxiosError } from 'axios';
 import { useForm } from 'react-hook-form';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import {
-  addNewTemplateAtom,
-  addTemplateAtom,
-  changeTemplatesAtom,
-  removeServerTemplateAtom,
-} from '../atoms';
-import type { AxiosError } from 'axios';
 
 const renameSchema = z.object({
   fileName: z.string().min(1, 'Name is required'),
@@ -91,14 +85,14 @@ type RenameFormData = z.infer<typeof renameSchema>;
 export function StudioSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
-  const addTemplate = useSetAtom(addNewTemplateAtom);
+  const { addDefaultTemplate, isModifiedTemplates } = useStudioTemplate();
+  // const addTemplate = useSetAtom(addNewTemplateAtom);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
-  const changeTemplates = useAtomValue(changeTemplatesAtom);
 
   useHotkeys('ctrl+i', (e) => {
     e.preventDefault();
-    addTemplate();
+    addDefaultTemplate();
   });
 
   return (
@@ -109,7 +103,7 @@ export function StudioSidebar({
       <SidebarContent>
         <SidebarGroup>
           <div className="flex flex-col gap-2 p-2">
-            <Button onClick={() => addTemplate()} size="sm">
+            <Button onClick={() => addDefaultTemplate()} size="sm">
               <Plus className="size-4" />
               Add new template
               <span className="text-xs bg-muted/40 rounded px-1.5 py-0.5 ml-2">
@@ -123,12 +117,12 @@ export function StudioSidebar({
             />
           </div>
         </SidebarGroup>
-        {changeTemplates.length > 0 && (
+        {isModifiedTemplates.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>Changes</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {changeTemplates.map((item) => (
+                {isModifiedTemplates.map((item) => (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton>
                       <File />
@@ -272,7 +266,8 @@ const FileActionsMenu = React.memo<{
   const isMobile = useIsMobile();
 
   const { mutate } = useTemplatesControllerDeleteTemplate();
-  const removeTemplate = useSetAtom(removeServerTemplateAtom);
+  const { removeSavedTemplate } = useStudioTemplate();
+  // const removeTemplate = useSetAtom(removeServerTemplateAtom);
   const queryClient = useQueryClient();
 
   return (
@@ -297,7 +292,8 @@ const FileActionsMenu = React.memo<{
               {
                 onSuccess: () => {
                   toast.success('Delete successfully!');
-                  removeTemplate(templateId);
+
+                  removeSavedTemplate(templateId);
 
                   queryClient.invalidateQueries({
                     queryKey: getTemplatesControllerGetAllTemplatesQueryKey(),
@@ -325,7 +321,8 @@ function Tree({ search }: { search: string }) {
     limit: 30,
     value: search,
   });
-  const addTemplate = useSetAtom(addTemplateAtom);
+  const { addTemplate } = useStudioTemplate();
+  // const addTemplate = useSetAtom(addTemplateAtom);
 
   const [folderName, items] = [
     'Workspace templates',
@@ -367,7 +364,7 @@ function Tree({ search }: { search: string }) {
                     key={e.templateId}
                     className="data-[active=true]:bg-transparent flex items-center justify-between w-full p-0"
                     onClick={() => {
-                      addTemplate(e.templateId);
+                      addTemplate(e.templateId, e.fileName);
                     }}
                   >
                     <div className="flex items-center min-w-0 flex-1 px-2 py-1.5">

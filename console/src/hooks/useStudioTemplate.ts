@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { v4 } from 'uuid';
 import createState from './createState';
 
@@ -40,10 +41,10 @@ const useStudioTemplatesState = createState<Template[]>(
   'templates',
   [defaultTemplate],
   {
-    createTemplate: (state, template) => [...state, template as Template],
-    removeTemplate: (state, id) =>
+    add: (state, template) => [...state, template as Template],
+    remove: (state, id) =>
       state.filter((template) => template.id !== (id as string)),
-    updateTemplate: (state, template) =>
+    update: (state, template) =>
       state.map((e) =>
         e.id === (template as Template).id
           ? { ...e, ...(template as Template) }
@@ -57,18 +58,75 @@ const useActiveIdState = createState<string>(
   defaultTemplate.id,
 );
 
+//FIX: fix state not sync
 export const useStudioTemplate = () => {
-  const { state, createTemplate, removeTemplate, updateTemplate } =
-    useStudioTemplatesState();
+  const { state: templates, add, remove, update } = useStudioTemplatesState();
 
   const { state: activeId, setState: setActiveId } = useActiveIdState();
+  const activeTemplate = templates.find((e) => e.id === activeId);
+
+  const setActiveTemplate = useCallback(
+    (template: Partial<Template>) => update({ ...activeTemplate, ...template }),
+    [activeTemplate, update],
+  );
+
+  const addTemplate = useCallback(
+    (id: string, fileName: string) => {
+      if (templates.findIndex((e) => e.id === id) === -1) {
+        const template: Template = {
+          ...defaultTemplate,
+          id: id,
+          filename: fileName,
+          isSaved: true,
+          isCreate: false,
+        };
+        add(template);
+      }
+      setActiveId(id);
+    },
+    [add, setActiveId, templates],
+  );
+
+  const addDefaultTemplate = useCallback(() => {
+    const template = { ...defaultTemplate, id: v4() };
+    add(template);
+    setActiveId(template.id);
+  }, [add, setActiveId]);
+
+  const removeTemplate = useCallback(
+    (id: string) => {
+      if (templates.length > 1) {
+        remove(id);
+        setActiveId(templates[0].id);
+      }
+    },
+    [remove, setActiveId, templates],
+  );
+
+  const removeSavedTemplate = useCallback(
+    (id: string) => {
+      remove(id);
+      if (templates.length === 0) {
+        add({ ...defaultTemplate, id: v4() });
+      }
+      setActiveId(templates[0].id);
+    },
+    [add, remove, setActiveId, templates],
+  );
 
   return {
     activeId,
+    isModifiedTemplates: templates.filter((e) => {
+      if (e.isCreate) return e.content != defaultTemplate.content;
+      return !e.isSaved;
+    }),
+    templates,
+    activeTemplate,
     setActiveId,
-    state,
-    createTemplate,
+    setActiveTemplate,
+    addTemplate,
+    addDefaultTemplate,
     removeTemplate,
-    updateTemplate,
+    removeSavedTemplate,
   };
 };

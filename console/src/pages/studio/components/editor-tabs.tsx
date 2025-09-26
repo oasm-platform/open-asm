@@ -1,17 +1,14 @@
 import { Button } from '@/components/ui/button';
+import { useStudioTemplate } from '@/hooks/useStudioTemplate';
 import { cn } from '@/lib/utils';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { FileText, X } from 'lucide-react';
-import {
-  activeTemplateIdAtom,
-  removeTemplateAtom,
-  templatesAtom,
-} from '../atoms';
 
 export function EditorTabs() {
-  const templates = useAtomValue(templatesAtom);
-  const [activeTemplateId, setActiveTemplateId] = useAtom(activeTemplateIdAtom);
-  const removeTemplate = useSetAtom(removeTemplateAtom);
+  const { templates, activeId, setActiveId, removeTemplate } =
+    useStudioTemplate();
+  // const templates = useAtomValue(templatesAtom);
+  // const [activeTemplateId, setActiveTemplateId] = useAtom(activeTemplateIdAtom);
+  // const removeTemplate = useSetAtom(removeTemplateAtom);
 
   return (
     <div className="flex bg-background w-full border-b">
@@ -21,11 +18,11 @@ export function EditorTabs() {
             key={tab.id}
             className={cn(
               'flex items-center gap-1 py-1 px-3 text-sm cursor-pointer whitespace-nowrap border-r',
-              activeTemplateId === tab.id
+              activeId === tab.id
                 ? 'bg-muted'
                 : 'bg-muted/40 hover:bg-muted/80',
             )}
-            onClick={() => setActiveTemplateId(tab.id)}
+            onClick={() => setActiveId(tab.id)}
           >
             <FileText className="size-4" />
             <span className="truncate max-w-[150px] text-xs">
@@ -37,7 +34,9 @@ export function EditorTabs() {
               className="h-5 w-5 p-0.5 rounded-full hover:bg-muted-foreground/20"
               onClick={(e) => {
                 e.stopPropagation();
-                removeTemplate(tab.id);
+                if (templates.length > 1) {
+                  removeTemplate(tab.id);
+                }
               }}
             >
               <X size={14} />
