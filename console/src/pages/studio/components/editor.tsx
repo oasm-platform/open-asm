@@ -16,12 +16,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { useStudioTemplate, defaultTemplate } from '@/hooks/useStudioTemplate';
 import {
   getTemplatesControllerGetAllTemplatesQueryKey,
   useStorageControllerGetFile,
   useTemplatesControllerCreateTemplate,
   useTemplatesControllerGetTemplateById,
-  useTemplatesControllerUploadFile
+  useTemplatesControllerUploadFile,
 } from '@/services/apis/gen/queries';
 import { yaml } from '@codemirror/lang-yaml';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,7 +30,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror from '@uiw/react-codemirror';
 import type { AxiosError } from 'axios';
-import { useAtom, useSetAtom } from 'jotai';
 import * as prettierYaml from 'prettier/plugins/yaml';
 import * as prettier from 'prettier/standalone';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -37,11 +37,6 @@ import { useForm } from 'react-hook-form';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
 import z from 'zod';
-import {
-  activeTemplateAtom,
-  activeTemplateIdAtom,
-  defaultTemplate,
-} from '../atoms';
 import { ScanComponent } from './scan-component';
 
 const createFileNameSchema = z.object({
@@ -51,8 +46,7 @@ const createFileNameSchema = z.object({
 export default function Editor() {
   const queryClient = useQueryClient();
 
-  const [activeTemplate, setActiveTemplate] = useAtom(activeTemplateAtom);
-  const setActiveTemplateId = useSetAtom(activeTemplateIdAtom);
+  const { activeTemplate, setActiveTemplate } = useStudioTemplate();
   const { mutate: uploadTemplate } = useTemplatesControllerUploadFile();
   const { mutate: createTemplate } = useTemplatesControllerCreateTemplate();
 
@@ -164,14 +158,16 @@ export default function Editor() {
         },
         {
           onSuccess: (data) => {
-            setActiveTemplate({
-              id: data.id,
-              filename: data.fileName,
-              isSaved: true,
-              isCreate: false,
-            });
+            setActiveTemplate(
+              {
+                id: data.id,
+                filename: data.fileName,
+                isSaved: true,
+                isCreate: false,
+              },
+              data.id,
+            );
             handleUpload(activeTemplate.content, data.id);
-            setActiveTemplateId(data.id);
             queryClient.invalidateQueries({
               queryKey: getTemplatesControllerGetAllTemplatesQueryKey(),
             });

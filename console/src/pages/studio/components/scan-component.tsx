@@ -13,25 +13,22 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import type { Template } from '@/hooks/useStudioTemplate';
 import { cn } from '@/lib/utils';
 import {
   useAssetsControllerGetAssetsInWorkspaceInfinite,
   useTemplatesControllerRunTemplate,
 } from '@/services/apis/gen/queries';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { atom, useAtom, useAtomValue } from 'jotai';
 import { Check, CirclePlus, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Template } from '../atoms';
-
-const assetIdsAtom = atom<string[]>([]);
 
 export interface ScanComponentProps {
   template: Template;
 }
 export function ScanComponent({ template }: ScanComponentProps) {
   const { mutate } = useTemplatesControllerRunTemplate();
-  const assetIds = useAtomValue(assetIdsAtom);
+  const [assetIds, setAssetIds] = useState<string[]>([]);
 
   const handleScan = () => {
     mutate({ data: { assetIds: assetIds, templateId: template.id } });
@@ -72,6 +69,8 @@ export function ScanComponent({ template }: ScanComponentProps) {
           fetchNextPage={fetchNextPage}
           isFetchingNextPage={isFetchingNextPage}
           isFetching={isFetching}
+          assetIds={assetIds}
+          setAssetIds={setAssetIds}
         />
       </div>
       <Button
@@ -97,6 +96,8 @@ interface FacetedFilterTemplateProps {
   isFetchingNextPage: boolean;
   isFetching: boolean;
   open: boolean;
+  assetIds: string[];
+  setAssetIds: (value: string[]) => void;
   setValue: (value: string) => void;
   setOpen: (value: boolean) => void;
 }
@@ -111,9 +112,10 @@ function FacetedFilterTemplate({
   open,
   setOpen,
   setValue,
+  assetIds,
+  setAssetIds,
 }: FacetedFilterTemplateProps) {
   const parentRef = useRef(null);
-  const [assetIds, setAssetIds] = useAtom(assetIdsAtom);
 
   const rowVirtualizer = useVirtualizer({
     count: hasNextPage ? options.length + 1 : options.length,
