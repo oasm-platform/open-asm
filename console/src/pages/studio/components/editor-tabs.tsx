@@ -6,9 +6,6 @@ import { FileText, X } from 'lucide-react';
 export function EditorTabs() {
   const { templates, activeId, setActiveId, removeTemplate } =
     useStudioTemplate();
-  // const templates = useAtomValue(templatesAtom);
-  // const [activeTemplateId, setActiveTemplateId] = useAtom(activeTemplateIdAtom);
-  // const removeTemplate = useSetAtom(removeTemplateAtom);
 
   return (
     <div className="flex bg-background w-full border-b">

@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import type { Template } from '@/hooks/useStudioTemplate';
 import { cn } from '@/lib/utils';
 import {
   useAssetsControllerGetAssetsInWorkspaceInfinite,
@@ -21,16 +22,12 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Check, CirclePlus, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Template } from '../atoms';
-
-// const assetIdsAtom = atom<string[]>([]);
 
 export interface ScanComponentProps {
   template: Template;
 }
 export function ScanComponent({ template }: ScanComponentProps) {
   const { mutate } = useTemplatesControllerRunTemplate();
-  // const assetIds = useAtomValue(assetIdsAtom);
   const [assetIds, setAssetIds] = useState<string[]>([]);
 
   const handleScan = () => {
@@ -119,8 +116,6 @@ function FacetedFilterTemplate({
   setAssetIds,
 }: FacetedFilterTemplateProps) {
   const parentRef = useRef(null);
-
-  // const [assetIds, setAssetIds] = useAtom(assetIdsAtom);
 
   const rowVirtualizer = useVirtualizer({
     count: hasNextPage ? options.length + 1 : options.length,

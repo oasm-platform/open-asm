@@ -86,7 +86,6 @@ export function StudioSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const { addDefaultTemplate, isModifiedTemplates } = useStudioTemplate();
-  // const addTemplate = useSetAtom(addNewTemplateAtom);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
 
@@ -267,7 +266,6 @@ const FileActionsMenu = React.memo<{
 
   const { mutate } = useTemplatesControllerDeleteTemplate();
   const { removeSavedTemplate } = useStudioTemplate();
-  // const removeTemplate = useSetAtom(removeServerTemplateAtom);
   const queryClient = useQueryClient();
 
   return (
@@ -322,7 +320,6 @@ function Tree({ search }: { search: string }) {
     value: search,
   });
   const { addTemplate } = useStudioTemplate();
-  // const addTemplate = useSetAtom(addTemplateAtom);
 
   const [folderName, items] = [
     'Workspace templates',

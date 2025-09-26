@@ -47,8 +47,6 @@ export default function Editor() {
   const queryClient = useQueryClient();
 
   const { activeTemplate, setActiveTemplate } = useStudioTemplate();
-  // const [activeTemplate, setActiveTemplate] = useAtom(activeTemplateAtom);
-  // const setActiveTemplateId = useSetAtom(activeTemplateIdAtom);
   const { mutate: uploadTemplate } = useTemplatesControllerUploadFile();
   const { mutate: createTemplate } = useTemplatesControllerCreateTemplate();
 
