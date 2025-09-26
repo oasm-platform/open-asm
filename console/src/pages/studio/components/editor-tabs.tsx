@@ -31,9 +31,7 @@ export function EditorTabs() {
               className="h-5 w-5 p-0.5 rounded-full hover:bg-muted-foreground/20"
               onClick={(e) => {
                 e.stopPropagation();
-                if (templates.length > 1) {
-                  removeTemplate(tab.id);
-                }
+                removeTemplate(tab.id);
               }}
             >
               <X size={14} />

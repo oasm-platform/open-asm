@@ -80,7 +80,6 @@ export default function Editor() {
         const content = await fileData.text();
         contentSaved.current = content;
         setActiveTemplate({ content, isSaved: true });
-        console.log('render');
       }
     };
     readFile();
