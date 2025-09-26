@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { v4 } from 'uuid';
 import createState from './createState';
 
@@ -37,42 +37,72 @@ http:
           - 200 # Match if response code is 200 (OK)`,
 };
 
-const useStudioTemplatesState = createState<Template[]>(
+const useStudioTemplatesState = createState<{
+  templates: Template[];
+  activeId: string;
+}>(
   'templates',
-  [defaultTemplate],
   {
-    add: (state, template) => [...state, template as Template],
-    remove: (state, id) =>
-      state.filter((template) => template.id !== (id as string)),
-    update: (state, template) =>
-      state.map((e) =>
-        e.id === (template as Template).id
-          ? { ...e, ...(template as Template) }
+    templates: [defaultTemplate],
+    activeId: defaultTemplate.id,
+  },
+  {
+    add: (state, template) => ({
+      templates: [...state.templates, template as Template],
+      activeId: (template as Template).id,
+    }),
+    remove: (state, id) => {
+      let updatedTemplates = state.templates.filter(
+        (template) => template.id !== (id as string),
+      );
+
+      if (updatedTemplates.length === 0) {
+        updatedTemplates = [{ ...defaultTemplate, id: v4() }];
+      }
+
+      return {
+        templates: updatedTemplates,
+        activeId:
+          state.activeId === id ? updatedTemplates[0].id : state.activeId,
+      };
+    },
+    update: (state, id, template, activeId?: unknown) => ({
+      templates: state.templates.map((e) =>
+        e.id === (id as string)
+          ? { ...e, ...(template as Partial<Template>) }
           : e,
       ),
+      activeId: !activeId ? state.activeId : (activeId as string),
+    }),
+    setActiveId: (state, activeId) => ({
+      ...state,
+      activeId: activeId as string,
+    }),
   },
 );
 
-const useActiveIdState = createState<string>(
-  'template-active-id',
-  defaultTemplate.id,
-);
-
-//FIX: fix state not sync
 export const useStudioTemplate = () => {
-  const { state: templates, add, remove, update } = useStudioTemplatesState();
+  const { state, setState, add, remove, update, setActiveId } =
+    useStudioTemplatesState();
 
-  const { state: activeId, setState: setActiveId } = useActiveIdState();
-  const activeTemplate = templates.find((e) => e.id === activeId);
+  const activeTemplate = useMemo(
+    () => state.templates.find((e) => e.id === state.activeId),
+    [state.activeId, state.templates],
+  );
 
   const setActiveTemplate = useCallback(
-    (template: Partial<Template>) => update({ ...activeTemplate, ...template }),
-    [activeTemplate, update],
+    (template: Partial<Template>, newActiveId?: string) =>
+      update(
+        state.activeId,
+        template,
+        newActiveId ? newActiveId : state.activeId,
+      ),
+    [state.activeId, update],
   );
 
   const addTemplate = useCallback(
     (id: string, fileName: string) => {
-      if (templates.findIndex((e) => e.id === id) === -1) {
+      if (state.templates.findIndex((e) => e.id === id) === -1) {
         const template: Template = {
           ...defaultTemplate,
           id: id,
@@ -84,7 +114,7 @@ export const useStudioTemplate = () => {
       }
       setActiveId(id);
     },
-    [add, setActiveId, templates],
+    [add, setActiveId, state.templates],
   );
 
   const addDefaultTemplate = useCallback(() => {
@@ -95,33 +125,29 @@ export const useStudioTemplate = () => {
 
   const removeTemplate = useCallback(
     (id: string) => {
-      if (templates.length > 1) {
+      if (state.templates.length > 1) {
         remove(id);
-        setActiveId(templates[0].id);
       }
     },
-    [remove, setActiveId, templates],
+    [remove, state.templates.length],
   );
 
   const removeSavedTemplate = useCallback(
     (id: string) => {
       remove(id);
-      if (templates.length === 0) {
-        add({ ...defaultTemplate, id: v4() });
-      }
-      setActiveId(templates[0].id);
     },
-    [add, remove, setActiveId, templates],
+    [remove],
   );
 
   return {
-    activeId,
-    isModifiedTemplates: templates.filter((e) => {
+    activeId: state.activeId,
+    isModifiedTemplates: state.templates.filter((e) => {
       if (e.isCreate) return e.content != defaultTemplate.content;
       return !e.isSaved;
     }),
-    templates,
+    templates: state.templates,
     activeTemplate,
+    setStudioTemplate: setState,
     setActiveId,
     setActiveTemplate,
     addTemplate,

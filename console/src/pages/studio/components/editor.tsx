@@ -46,8 +46,7 @@ const createFileNameSchema = z.object({
 export default function Editor() {
   const queryClient = useQueryClient();
 
-  const { activeTemplate, setActiveTemplate, setActiveId } =
-    useStudioTemplate();
+  const { activeTemplate, setActiveTemplate } = useStudioTemplate();
   // const [activeTemplate, setActiveTemplate] = useAtom(activeTemplateAtom);
   // const setActiveTemplateId = useSetAtom(activeTemplateIdAtom);
   const { mutate: uploadTemplate } = useTemplatesControllerUploadFile();
@@ -162,14 +161,16 @@ export default function Editor() {
         },
         {
           onSuccess: (data) => {
-            setActiveTemplate({
-              id: data.id,
-              filename: data.fileName,
-              isSaved: true,
-              isCreate: false,
-            });
+            setActiveTemplate(
+              {
+                id: data.id,
+                filename: data.fileName,
+                isSaved: true,
+                isCreate: false,
+              },
+              data.id,
+            );
             handleUpload(activeTemplate.content, data.id);
-            setActiveId(data.id);
             queryClient.invalidateQueries({
               queryKey: getTemplatesControllerGetAllTemplatesQueryKey(),
             });

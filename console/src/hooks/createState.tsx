@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 type Updater<T> = T | ((prev: T) => T);
 type ReducerMap<T> = {
@@ -40,21 +40,26 @@ export default function createState<T>(
       [queryClient],
     );
 
-    const actions = (
-      Object.entries(reducers || {}) as [
-        keyof ReducerMap<T>,
-        ReducerMap<T>[keyof ReducerMap<T>],
-      ][]
-    ).reduce(
-      (acc, [name, fn]) => {
-        acc[name] = (...args: Parameters<ReducerMap<T>[keyof ReducerMap<T>]>) =>
-          setState((prev) => fn(prev, ...args));
-        return acc;
-      },
-      {} as Record<
-        keyof ReducerMap<T>,
-        (...args: Parameters<ReducerMap<T>[keyof ReducerMap<T>]>) => void
-      >,
+    const actions = useMemo(
+      () =>
+        (
+          Object.entries(reducers || {}) as [
+            keyof ReducerMap<T>,
+            ReducerMap<T>[keyof ReducerMap<T>],
+          ][]
+        ).reduce(
+          (acc, [name, fn]) => {
+            acc[name] = (
+              ...args: Parameters<ReducerMap<T>[keyof ReducerMap<T>]>
+            ) => setState((prev) => fn(prev, ...args));
+            return acc;
+          },
+          {} as Record<
+            keyof ReducerMap<T>,
+            (...args: Parameters<ReducerMap<T>[keyof ReducerMap<T>]>) => void
+          >,
+        ),
+      [setState],
     );
 
     return { state, setState, ...actions } as UseGlobalStateReturn<
