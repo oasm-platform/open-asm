@@ -133,7 +133,7 @@ export class CreateJobsDto {
   targetId: string;
 }
 
-export class CreateJobs extends PickType(Job, ['priority', 'isSaveRawResult', 'isSaveData'] as const) {
+export class CreateJobs extends PickType(Job, ['priority', 'isSaveRawResult', 'isSaveData', 'command', 'isPublishEvent'] as const) {
   tools: Tool[];
   targetIds: string[];
   assetIds?: string[];

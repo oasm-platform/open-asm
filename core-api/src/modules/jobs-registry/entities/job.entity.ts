@@ -91,6 +91,12 @@ export class Job extends BaseEntity {
   isSaveData?: boolean;
 
   /**
+ * Flag to publish event redis for all system.
+ */
+  @Column({ default: false })
+  isPublishEvent?: boolean;
+
+  /**
    * The path to the result file.
    */
   @Column({ nullable: true })
@@ -101,4 +107,6 @@ export class Job extends BaseEntity {
    */
   @Column({ nullable: true })
   command?: string;
+
+
 }

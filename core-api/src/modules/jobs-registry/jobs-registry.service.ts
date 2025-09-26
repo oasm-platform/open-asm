@@ -90,6 +90,7 @@ export class JobsRegistryService {
     jobHistory: existingJobHistory,
     priority,
     isSaveRawResult,
+    isPublishEvent
   }: CreateJobs): Promise<Job[]> {
     if (priority && (priority < JobPriority.CRITICAL || priority > JobPriority.BACKGROUND)) {
       priority = 4;
@@ -159,6 +160,7 @@ export class JobsRegistryService {
           jobHistory,
           command: defaultCommand,
           isSaveRawResult: isSaveRawResult ?? false,
+          isPublishEvent
         } as DeepPartial<Job>);
 
         jobsToInsert.push(job);
@@ -562,5 +564,4 @@ export class JobsRegistryService {
       },
     });
   }
-
 }
