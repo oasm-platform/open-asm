@@ -13,6 +13,7 @@ import {
 } from 'src/common/dtos/get-many-base.dto';
 import { JobPriority, JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { JobDataResultType } from 'src/common/types/app.types';
+import { RedisService } from 'src/services/redis/redis.service';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
@@ -43,7 +44,8 @@ export class JobsRegistryService {
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
     private toolsService: ToolsService,
-    private storageService: StorageService
+    private storageService: StorageService,
+    private redis: RedisService
   ) { }
   public async getManyJobs(
     query: GetManyBaseQueryParams,
@@ -81,8 +83,8 @@ export class JobsRegistryService {
    * @param targets list of targets to scan
    * @param workflow optional workflow to link
    */
-  public async createJobs({
-    tools,
+  public async createNewJob({
+    tool,
     targetIds,
     workspaceId,
     assetIds,
@@ -137,34 +139,32 @@ export class JobsRegistryService {
     const jobsToInsert: Job[] = [];
 
     // Step 3: iterate tools and create jobs
-    for (const tool of tools) {
-      const defaultCommand = builtInTools.find(t => t.name === tool.name)?.command;
-      let filteredAssets: Asset[];
-      if (tool.category === ToolCategory.SUBDOMAINS) {
-        filteredAssets = assets.filter((asset) => asset.isPrimary);
-      } else if (tool.category === ToolCategory.PORTS_SCANNER) {
-        filteredAssets = assets.filter((asset) => asset.isPrimary);
-      } else {
-        filteredAssets = assets;
-      }
+    const defaultCommand = builtInTools.find(t => t.name === tool.name)?.command;
+    let filteredAssets: Asset[];
+    if (tool.category === ToolCategory.SUBDOMAINS) {
+      filteredAssets = assets.filter((asset) => asset.isPrimary);
+    } else if (tool.category === ToolCategory.PORTS_SCANNER) {
+      filteredAssets = assets.filter((asset) => asset.isPrimary);
+    } else {
+      filteredAssets = assets;
+    }
 
-      for (const asset of filteredAssets) {
-        const job = jobRepo.create({
-          id: randomUUID(),
-          asset,
-          jobName: tool.name,
-          status: JobStatus.PENDING,
-          category: tool.category,
-          tool,
-          priority: priority ?? 4,
-          jobHistory,
-          command: defaultCommand,
-          isSaveRawResult: isSaveRawResult ?? false,
-          isPublishEvent
-        } as DeepPartial<Job>);
+    for (const asset of filteredAssets) {
+      const job = jobRepo.create({
+        id: randomUUID(),
+        asset,
+        jobName: tool.name,
+        status: JobStatus.PENDING,
+        category: tool.category,
+        tool,
+        priority: priority ?? 4,
+        jobHistory,
+        command: defaultCommand,
+        isSaveRawResult: isSaveRawResult ?? false,
+        isPublishEvent
+      } as DeepPartial<Job>);
 
-        jobsToInsert.push(job);
-      }
+      jobsToInsert.push(job);
     }
 
     // Step 4: save all jobs
@@ -355,7 +355,9 @@ export class JobsRegistryService {
     const tools = await this.toolsService.toolsRepository.find({
       where: { id: In(dto.toolIds) },
     });
-    await this.createJobs({ tools, targetIds: [dto.targetId] });
+
+    await Promise.all(tools.map(tool => this.createNewJob({ tool, targetIds: [dto.targetId] })));
+
     return {
       message: 'Jobs created successfully',
     };
@@ -378,8 +380,10 @@ export class JobsRegistryService {
     }
 
     const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
+
     let dataForSync: JobDataResultType;
     let pathResult: string | null = null;
+
     if (isBuiltInTools) {
       const step = builtInTools.find((tool) => tool.name === job.tool.name);
 
@@ -417,10 +421,20 @@ export class JobsRegistryService {
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
-    await this.repo.update(jobId, { status: newStatus, completedAt: new Date(), pathResult: pathResult || undefined });
+
+    const jobForPublish = await this.repo.save({
+      ...job,
+      status: newStatus,
+      completedAt: new Date(),
+      pathResult: pathResult || undefined,
+    });
 
     if (newStatus === JobStatus.COMPLETED) {
       await this.getNextStepForJob(job);
+    }
+
+    if (job.isPublishEvent) {
+      await this.redis.publish(`jobs:${job.id}`, JSON.stringify(jobForPublish));
     }
 
     return { workerId, dto };
@@ -531,12 +545,12 @@ export class JobsRegistryService {
 
     if (nextTool) {
       const tools = await this.toolsService.getToolByNames(nextTool);
-      await this.createJobs({
-        tools,
+      await Promise.all(tools.map(tool => this.createNewJob({
+        tool,
         targetIds: [job.asset.target.id],
         workflow: job.jobHistory.workflow,
         jobHistory: job.jobHistory,
-      });
+      })));
     }
   }
 

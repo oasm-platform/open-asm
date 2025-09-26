@@ -23,7 +23,7 @@ export class VulnerabilitiesService {
     private vulnerabilitiesRepository: Repository<Vulnerability>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
-  ) {}
+  ) { }
 
   /**
    * Initiates a vulnerability scan for a given target.
@@ -34,8 +34,8 @@ export class VulnerabilitiesService {
    */
   public async scan(targetId: string) {
     const tools = await this.toolsService.getToolByNames(['nuclei']);
-    await this.jobRegistryService.createJobs({
-      tools,
+    await this.jobRegistryService.createNewJob({
+      tool: tools[0],
       targetIds: [targetId],
     });
     return { message: `Scanning target ${targetId}...` };
@@ -74,15 +74,15 @@ export class VulnerabilitiesService {
     if (q) {
       queryBuilder.andWhere(
         '(vulnerabilities.name ILIKE :q OR ' +
-          'vulnerabilities.description ILIKE :q OR ' +
-          'vulnerabilities.severity ILIKE :q OR ' +
-          'vulnerabilities.affectedUrl ILIKE :q OR ' +
-          'vulnerabilities.ipAddress ILIKE :q OR ' +
-          'vulnerabilities.host ILIKE :q OR ' +
-          'vulnerabilities.port ILIKE :q OR ' +
-          'vulnerabilities.cveId ILIKE :q OR ' +
-          'vulnerabilities.cweId ILIKE :q OR ' +
-          'vulnerabilities.extractorName ILIKE :q)',
+        'vulnerabilities.description ILIKE :q OR ' +
+        'vulnerabilities.severity ILIKE :q OR ' +
+        'vulnerabilities.affectedUrl ILIKE :q OR ' +
+        'vulnerabilities.ipAddress ILIKE :q OR ' +
+        'vulnerabilities.host ILIKE :q OR ' +
+        'vulnerabilities.port ILIKE :q OR ' +
+        'vulnerabilities.cveId ILIKE :q OR ' +
+        'vulnerabilities.cweId ILIKE :q OR ' +
+        'vulnerabilities.extractorName ILIKE :q)',
         { q: `%${q}%` },
       );
     }

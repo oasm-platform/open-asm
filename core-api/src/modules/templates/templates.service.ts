@@ -229,8 +229,8 @@ export class TemplatesService {
       throw new NotFoundException('Nuclei tool is not available');
     }
 
-    await this.jobService.createJobs({
-      tools: [nuclei],
+    await this.jobService.createNewJob({
+      tool: nuclei,
       targetIds: targetIds || [],
       assetIds: assetIds || [],
       workspaceId,
