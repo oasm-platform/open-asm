@@ -222,7 +222,7 @@ export class TemplatesService {
     dto: RunTemplateDto,
     workspaceId: string,
   ): Promise<DefaultMessageResponseDto> {
-    const { assetIds, targetIds } = dto;
+    const { assetId } = dto;
     const [nuclei] = await this.toolService.getToolByNames(['nuclei']);
 
     if (!nuclei) {
@@ -231,8 +231,7 @@ export class TemplatesService {
 
     await this.jobService.createNewJob({
       tool: nuclei,
-      targetIds: targetIds || [],
-      assetIds: assetIds || [],
+      assetIds: [assetId],
       workspaceId,
       priority: 0,
       isSaveRawResult: true,

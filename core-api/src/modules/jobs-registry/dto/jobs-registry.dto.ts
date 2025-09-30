@@ -135,7 +135,7 @@ export class CreateJobsDto {
 
 export class CreateJobs extends PickType(Job, ['priority', 'isSaveRawResult', 'isSaveData', 'command', 'isPublishEvent'] as const) {
   tool: Tool;
-  targetIds: string[];
+  targetIds?: string[];
   assetIds?: string[];
   workspaceId?: string;
   workflow?: Workflow;

@@ -794,9 +794,8 @@ export interface GetManyTemplateDto {
 }
 
 export interface RunTemplateDto {
-  targetIds?: string[];
-  assetIds?: string[];
   templateId: string;
+  assetId: string;
 }
 
 export enum GetManyTargetResponseDtoScanScheduleEnum {

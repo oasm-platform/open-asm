@@ -31,7 +31,7 @@ export function ScanComponent({ template }: ScanComponentProps) {
   const [assetIds, setAssetIds] = useState<string[]>([]);
 
   const handleScan = () => {
-    mutate({ data: { assetIds: assetIds, templateId: template.id } });
+    mutate({ data: { assetId: assetIds[0], templateId: template.id } });
   };
 
   const [open, setOpen] = useState(false);

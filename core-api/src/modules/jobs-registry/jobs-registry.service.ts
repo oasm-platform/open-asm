@@ -114,7 +114,7 @@ export class JobsRegistryService {
       .getRepository(Asset)
       .createQueryBuilder('assets');
 
-    if (targetIds.length > 0) {
+    if (targetIds && targetIds.length > 0) {
       assetsQueryBuilder.andWhere('assets.targetId IN (:...targetIds)', {
         targetIds,
       });
