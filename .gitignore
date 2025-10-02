@@ -66,3 +66,4 @@ core-api/.storage/*
 
 .roo/*
 AGENTS.md
+.open-api.json

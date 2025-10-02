@@ -24,7 +24,7 @@ export default defineConfig({
     },
     input: {
       validation: false,
-      target: '../open-api/open-api.json',
+      target: '../.open-api/open-api.json',
     },
   },
 });

@@ -15807,7 +15807,7 @@ export const templatesControllerRunTemplate = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<DefaultMessageResponseDto>(
+  return orvalClient<Job>(
     {
       url: `/api/templates/run`,
       method: 'POST',
