@@ -20,6 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.2",
     "@nestjs/bullmq": "^11.0.3",
     "@nestjs/common": "^11.1.0",
     "@nestjs/config": "^4.0.2",
@@ -30,6 +31,7 @@
     "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/typeorm": "^11.0.0",
+    "@rekog/mcp-nest": "^1.8.3",
     "@types/cookie-parser": "^1.4.9",
     "@types/multer": "^2.0.0",
     "better-auth": "^1.2.7",
@@ -48,7 +50,8 @@
     "rxjs": "^7.8.2",
     "swagger-typescript-api": "^13.2.4",
     "swagger-ui-express": "^5.0.1",
-    "typeorm": "^0.3.24"
+    "typeorm": "^0.3.24",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",

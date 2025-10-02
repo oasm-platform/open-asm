@@ -14,7 +14,7 @@ import { UpdateAssetDto } from './dto/update-asset.dto';
 @ApiTags('Assets')
 @Controller('assets')
 export class AssetsController {
-  constructor(private readonly assetsService: AssetsService) {}
+  constructor(private readonly assetsService: AssetsService) { }
 
   @Doc({
     summary: 'Get assets in target',

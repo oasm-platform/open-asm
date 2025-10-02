@@ -32,7 +32,7 @@ export class AssetsService {
     private technologyForwarderService: TechnologyForwarderService,
 
     private dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all assets associated with a specified target.
@@ -188,7 +188,6 @@ export class AssetsService {
     });
 
     const data = await Promise.all(assets);
-
     return getManyResponse({ query, data, total });
   }
 
