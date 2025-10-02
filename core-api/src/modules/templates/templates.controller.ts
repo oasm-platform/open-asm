@@ -11,9 +11,9 @@ import {
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { WorkspaceId } from 'src/common/decorators/workspace-id.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
+import { Job } from '../jobs-registry/entities/job.entity';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
 import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
 import { RenameTemplateDTO } from './dto/renameTemplate.dto';
@@ -27,7 +27,7 @@ import { TemplatesService } from './templates.service';
 
 @Controller('templates')
 export class TemplatesController {
-  constructor(private readonly templateService: TemplatesService) {}
+  constructor(private readonly templateService: TemplatesService) { }
 
   @Doc({
     summary: 'Create a new templates',
@@ -147,7 +147,7 @@ export class TemplatesController {
   @Doc({
     summary: 'Run a template',
     description: 'Run a template and create a job',
-    response: { serialization: DefaultMessageResponseDto },
+    response: { serialization: Job },
     request: {
       getWorkspaceId: true,
     },

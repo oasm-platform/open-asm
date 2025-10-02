@@ -5,11 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { Job } from '../jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolsService } from '../tools/tools.service';
@@ -33,6 +33,15 @@ export class TemplatesService {
     private toolService: ToolsService
   ) { }
 
+  /**
+   * Creates a new template in the specified workspace
+   * @param workspaceId The ID of the workspace where the template will be created
+   * @param userContext User context containing user information
+   * @param dto Data transfer object containing template creation details
+   * @returns Promise<Template> The created template object
+   * @throws NotFoundException if the workspace is not found
+   * @throws BadRequestException if a template with the same filename already exists
+   */
   public async createTemplate(
     workspaceId: string,
     userContext: UserContextPayload,
@@ -58,6 +67,13 @@ export class TemplatesService {
     return this.templateRepo.save(newTemplate);
   }
 
+  /**
+   * Uploads file content for a specific template
+   * @param templateId The ID of the template to upload file for
+   * @param fileContent The content of the file as a string
+   * @returns Promise containing the upload result
+   * @throws BadRequestException if the template is not found
+   */
   public async uploadFile(templateId: string, fileContent: string) {
     const template = await this.templateRepo.findOneBy({ id: templateId });
 
@@ -80,6 +96,16 @@ export class TemplatesService {
     return result;
   }
 
+  /**
+   * Renames an existing template file in the specified workspace
+   * @param templateId The ID of the template to rename
+   * @param workspaceId The ID of the workspace containing the template
+   * @param userContext User context containing user information
+   * @param dto Data transfer object containing the new filename
+   * @returns Promise<Template> The renamed template object
+   * @throws NotFoundException if the workspace or template is not found
+   * @throws BadRequestException if the template doesn't belong to the workspace or filename is already taken
+   */
   public async renameFile(
     templateId: string,
     workspaceId: string,
@@ -120,6 +146,15 @@ export class TemplatesService {
     return this.templateRepo.save(template);
   }
 
+  /**
+   * Retrieves a template by its ID from the specified workspace
+   * @param templateId The ID of the template to retrieve
+   * @param workspaceId The ID of the workspace containing the template
+   * @param userContext User context containing user information
+   * @returns Promise<Template> The requested template object
+   * @throws NotFoundException if the workspace or template is not found
+   * @throws BadRequestException if the template doesn't belong to the workspace
+   */
   async getTemplateById(
     templateId: string,
     workspaceId: string,
@@ -150,6 +185,15 @@ export class TemplatesService {
     return template;
   }
 
+  /**
+   * Deletes a template by its ID from the specified workspace
+   * @param templateId The ID of the template to delete
+   * @param workspaceId The ID of the workspace containing the template
+   * @param userContext User context containing user information
+   * @returns Promise<void> Resolves when deletion is complete
+   * @throws NotFoundException if the template is not found
+   * @throws BadRequestException if the template doesn't belong to the workspace
+   */
   async deleteTemplate(
     templateId: string,
     workspaceId: string,
@@ -175,6 +219,14 @@ export class TemplatesService {
     await this.templateRepo.remove(template);
   }
 
+  /**
+   * Retrieves all templates for the specified workspace with pagination and filtering
+   * @param query Query parameters for pagination and filtering
+   * @param workspaceId The ID of the workspace containing the templates
+   * @param userContext User context containing user information
+   * @returns Promise<GetManyBaseResponseDto<Template>> Paginated response containing templates
+   * @throws NotFoundException if the workspace is not found
+   */
   async getAllTemplates(
     query: GetManyTemplatesQueryDTO,
     workspaceId: string,
@@ -208,6 +260,12 @@ export class TemplatesService {
     return getManyResponse({ query, data, total });
   }
 
+  /**
+   * Extracts bucket name and file path from a full path string
+   * @param path The full path string in format "bucket/file-path"
+   * @returns [bucket, path] An array containing the bucket name and file path
+   * @throws BadRequestException if the path format is invalid
+   */
   private getFileAndBucket(path: string) {
     const parts = path.split('/', 2);
     if (parts.length < 2 || !parts[0] || !parts[1]) {
@@ -218,10 +276,17 @@ export class TemplatesService {
     return [parts[0], parts[1]];
   }
 
+  /**
+   * Runs a template scan on a specified asset
+   * @param dto Data transfer object containing run template details including asset ID
+   * @param workspaceId The ID of the workspace where the scan will run
+   * @returns Promise<Job> The created job object for the scan
+   * @throws NotFoundException if the Nuclei tool is not available
+   */
   public async runTemplate(
     dto: RunTemplateDto,
     workspaceId: string,
-  ): Promise<DefaultMessageResponseDto> {
+  ): Promise<Job> {
     const { assetId } = dto;
     const [nuclei] = await this.toolService.getToolByNames(['nuclei']);
 
@@ -229,7 +294,7 @@ export class TemplatesService {
       throw new NotFoundException('Nuclei tool is not available');
     }
 
-    await this.jobService.createNewJob({
+    const job = await this.jobService.createNewJob({
       tool: nuclei,
       assetIds: [assetId],
       workspaceId,
@@ -238,8 +303,6 @@ export class TemplatesService {
       isSaveData: false
     });
 
-    return {
-      message: 'Template run successfully',
-    };
+    return job[0];
   }
 }
