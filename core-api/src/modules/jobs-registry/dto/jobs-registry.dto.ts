@@ -1,8 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsObject, IsOptional, IsUUID } from 'class-validator';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { JobStatus, ToolCategory } from 'src/common/enums/enum';
 import { JobDataResultType } from 'src/common/types/app.types';
+import { Tool } from 'src/modules/tools/entities/tools.entity';
+import { Workflow } from 'src/modules/workflows/entities/workflow.entity';
+import { JobHistory } from '../entities/job-history.entity';
 import { Job } from '../entities/job.entity';
 
 export class GetNextJobResponseDto {
@@ -128,4 +131,13 @@ export class CreateJobsDto {
   @ApiProperty()
   @IsUUID()
   targetId: string;
+}
+
+export class CreateJobs extends PickType(Job, ['priority', 'isSaveRawResult', 'isSaveData', 'command', 'isPublishEvent'] as const) {
+  tool: Tool;
+  targetIds?: string[];
+  assetIds?: string[];
+  workspaceId?: string;
+  workflow?: Workflow;
+  jobHistory?: JobHistory;
 }

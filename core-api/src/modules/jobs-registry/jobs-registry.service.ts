@@ -11,18 +11,19 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from 'src/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
+import { JobPriority, JobStatus, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { JobDataResultType } from 'src/common/types/app.types';
+import { RedisService } from 'src/services/redis/redis.service';
 import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
+import { StorageService } from '../storage/storage.service';
 import { builtInTools } from '../tools/built-in-tools';
-import { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
-import { Workflow } from '../workflows/entities/workflow.entity';
 import {
+  CreateJobs,
   CreateJobsDto,
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
@@ -43,6 +44,8 @@ export class JobsRegistryService {
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
     private toolsService: ToolsService,
+    private storageService: StorageService,
+    private redis: RedisService
   ) { }
   public async getManyJobs(
     query: GetManyBaseQueryParams,
@@ -80,21 +83,20 @@ export class JobsRegistryService {
    * @param targets list of targets to scan
    * @param workflow optional workflow to link
    */
-  public async createJobs({
-    tools,
+  public async createNewJob({
+    tool,
     targetIds,
     workspaceId,
     assetIds,
     workflow,
     jobHistory: existingJobHistory,
-  }: {
-    tools: Tool[];
-    targetIds: string[];
-    assetIds?: string[];
-    workspaceId?: string;
-    workflow?: Workflow;
-    jobHistory?: JobHistory;
-  }): Promise<Job[]> {
+    priority,
+    isSaveRawResult,
+    isPublishEvent
+  }: CreateJobs): Promise<Job[]> {
+    if (priority && (priority < JobPriority.CRITICAL || priority > JobPriority.BACKGROUND)) {
+      priority = 4;
+    }
     // Step 1: create job history
     let jobHistory: JobHistory;
 
@@ -112,7 +114,7 @@ export class JobsRegistryService {
       .getRepository(Asset)
       .createQueryBuilder('assets');
 
-    if (targetIds.length > 0) {
+    if (targetIds && targetIds.length > 0) {
       assetsQueryBuilder.andWhere('assets.targetId IN (:...targetIds)', {
         targetIds,
       });
@@ -137,30 +139,32 @@ export class JobsRegistryService {
     const jobsToInsert: Job[] = [];
 
     // Step 3: iterate tools and create jobs
-    for (const tool of tools) {
-      let filteredAssets: Asset[];
+    const defaultCommand = builtInTools.find(t => t.name === tool.name)?.command;
+    let filteredAssets: Asset[];
+    if (tool.category === ToolCategory.SUBDOMAINS) {
+      filteredAssets = assets.filter((asset) => asset.isPrimary);
+    } else if (tool.category === ToolCategory.PORTS_SCANNER) {
+      filteredAssets = assets.filter((asset) => asset.isPrimary);
+    } else {
+      filteredAssets = assets;
+    }
 
-      if (tool.category === ToolCategory.SUBDOMAINS) {
-        filteredAssets = assets.filter((asset) => asset.isPrimary);
-      } else if (tool.category === ToolCategory.PORTS_SCANNER) {
-        filteredAssets = assets.filter((asset) => asset.isPrimary);
-      } else {
-        filteredAssets = assets;
-      }
+    for (const asset of filteredAssets) {
+      const job = jobRepo.create({
+        id: randomUUID(),
+        asset,
+        jobName: tool.name,
+        status: JobStatus.PENDING,
+        category: tool.category,
+        tool,
+        priority: priority ?? 4,
+        jobHistory,
+        command: defaultCommand,
+        isSaveRawResult: isSaveRawResult ?? false,
+        isPublishEvent
+      } as DeepPartial<Job>);
 
-      for (const asset of filteredAssets) {
-        const job = jobRepo.create({
-          id: randomUUID(),
-          asset,
-          jobName: tool.name,
-          status: JobStatus.PENDING,
-          category: tool.category,
-          tool,
-          jobHistory,
-        } as DeepPartial<Job>);
-
-        jobsToInsert.push(job);
-      }
+      jobsToInsert.push(job);
     }
 
     // Step 4: save all jobs
@@ -184,7 +188,6 @@ export class JobsRegistryService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-
     try {
       const worker = await queryRunner.manager
         .getRepository(WorkerInstance)
@@ -223,6 +226,7 @@ export class JobsRegistryService {
       } else {
         queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
       }
+
       const job = await queryBuilder
         .setLock('pessimistic_write', undefined, ['jobs'])
         .limit(1)
@@ -241,15 +245,11 @@ export class JobsRegistryService {
       let command = '';
 
       if (isBuiltInTools) {
-        const workerStep = builtInTools.find(
-          (tool) => tool.category === job.category,
-        );
-        if (!workerStep) {
+        if (!job.command) {
           await queryRunner.rollbackTransaction();
           return null;
-        } else {
-          command = workerStep?.command || '';
         }
+        command = job.command || '';
       }
 
       await queryRunner.commitTransaction();
@@ -355,7 +355,9 @@ export class JobsRegistryService {
     const tools = await this.toolsService.toolsRepository.find({
       where: { id: In(dto.toolIds) },
     });
-    await this.createJobs({ tools, targetIds: [dto.targetId] });
+
+    await Promise.all(tools.map(tool => this.createNewJob({ tool, targetIds: [dto.targetId] })));
+
     return {
       message: 'Jobs created successfully',
     };
@@ -373,13 +375,15 @@ export class JobsRegistryService {
   ): Promise<{ workerId: string; dto: UpdateResultDto }> {
     const { jobId, data } = dto;
     const job = await this.findJobForUpdate(workerId, jobId);
-
     if (!job) {
       throw new NotFoundException('Job not found');
     }
 
     const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
+
     let dataForSync: JobDataResultType;
+    let pathResult: string | null = null;
+
     if (isBuiltInTools) {
       const step = builtInTools.find((tool) => tool.name === job.tool.name);
 
@@ -399,21 +403,38 @@ export class JobsRegistryService {
         throw new BadGatewayException('Raw data is required');
       }
       dataForSync = builtInStep?.parser?.(data.raw);
+      if (job.isSaveRawResult) {
+        const uploadResult = this.storageService.uploadFile(`${job.id}.txt`, Buffer.from(data.raw, 'utf-8'), 'jobs-result');
+        pathResult = uploadResult.path;
+      }
     } else {
       dataForSync = data.payload;
     }
 
-    await this.dataAdapterService.syncData({
-      data: dataForSync,
-      job,
-    });
+    if (job.isSaveData) {
+      await this.dataAdapterService.syncData({
+        data: dataForSync,
+        job,
+      });
+
+    }
 
     const hasError = data?.error;
     const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
-    await this.updateJobStatus(job.id, newStatus);
+
+    const jobForPublish = await this.repo.save({
+      ...job,
+      status: newStatus,
+      completedAt: new Date(),
+      pathResult: pathResult || undefined,
+    });
 
     if (newStatus === JobStatus.COMPLETED) {
       await this.getNextStepForJob(job);
+    }
+
+    if (job.isPublishEvent) {
+      await this.redis.publish(`jobs:${job.id}`, JSON.stringify(jobForPublish));
     }
 
     return { workerId, dto };
@@ -524,13 +545,12 @@ export class JobsRegistryService {
 
     if (nextTool) {
       const tools = await this.toolsService.getToolByNames(nextTool);
-      await this.createJobs({
-        tools,
+      await Promise.all(tools.map(tool => this.createNewJob({
+        tool,
         targetIds: [job.asset.target.id],
         workflow: job.jobHistory.workflow,
-        // Đảm bảo các job mới tạo có cùng history id với job vừa hoàn thành
         jobHistory: job.jobHistory,
-      });
+      })));
     }
   }
 
@@ -557,17 +577,5 @@ export class JobsRegistryService {
         tool: true,
       },
     });
-  }
-
-  /**
-   * Updates the status of a job.
-   * @param jobId the ID of the job to update
-   * @param status the new status of the job
-   */
-  private async updateJobStatus(
-    jobId: string,
-    status: JobStatus,
-  ): Promise<void> {
-    await this.repo.update(jobId, { status, completedAt: new Date() });
   }
 }

@@ -43,6 +43,9 @@ export class StorageService {
 
       // Write the file
       fs.writeFileSync(filePath, buffer);
+      return {
+        path: `${bucket}/${fileName}`,
+      };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
@@ -50,10 +53,6 @@ export class StorageService {
         `Failed to save file: ${errorMessage}`,
       );
     }
-
-    return {
-      path: `${bucket}/${fileName}`,
-    };
   }
 
   /**
@@ -83,6 +82,42 @@ export class StorageService {
 
     const file = createReadStream(resolvedPath);
     return new StreamableFile(file);
+  }
+
+  /**
+   * Delete a file from the storage directory.
+   * @param filePath The path of the file to delete (relative to bucket).
+   * @param bucket The bucket name where the file is stored (default: 'default').
+   * @throws NotFoundException if the file doesn't exist.
+   */
+  public deleteFile(filePath: string, bucket: string = 'default'): void {
+    // Remove any leading slashes or dots from the file path
+    const cleanPath = filePath.replace(/^[./\s]+/, '');
+
+    const bucketPath = this.getBucketPath(bucket);
+    const fullPath = join(bucketPath, cleanPath);
+
+    // Prevent directory traversal attacks
+    const resolvedPath = resolve(fullPath);
+    const resolvedBucketPath = resolve(bucketPath);
+
+    if (!resolvedPath.startsWith(resolvedBucketPath)) {
+      throw new NotFoundException('File not found');
+    }
+
+    if (!existsSync(resolvedPath)) {
+      throw new NotFoundException('File not found');
+    }
+
+    try {
+      fs.unlinkSync(resolvedPath);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new InternalServerErrorException(
+        `Failed to delete file: ${errorMessage}`,
+      );
+    }
   }
 
   /**

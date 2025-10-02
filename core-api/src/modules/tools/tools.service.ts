@@ -45,7 +45,7 @@ export class ToolsService implements OnModuleInit {
 
     @Inject(forwardRef(() => JobsRegistryService))
     private jobRegistryService: JobsRegistryService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     try {
@@ -426,8 +426,8 @@ export class ToolsService implements OnModuleInit {
     const { targetIds } = dto;
     const tool = await this.getToolById(id, workspaceId);
 
-    await this.jobRegistryService.createJobs({
-      tools: [tool],
+    await this.jobRegistryService.createNewJob({
+      tool,
       targetIds: targetIds || [],
       assetIds: dto.assetIds || [],
       workspaceId,

@@ -799,6 +799,45 @@ export type UpdateProviderDto = {
   apiDocsUrl?: string;
 };
 
+export type Template = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  fileName: string;
+  path: string;
+};
+
+export type CreateTemplateDTO = {
+  fileName: string;
+};
+
+export type UploadTemplateResponseDTO = {
+  path: string;
+};
+
+export type UploadTemplateDTO = {
+  templateId: string;
+  fileContent: string;
+};
+
+export type RenameTemplateDTO = {
+  fileName: string;
+};
+
+export type GetManyTemplateDto = {
+  data: Template[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type RunTemplateDto = {
+  templateId: string;
+  assetId: string;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   page?: number;
   limit?: number;
@@ -1001,6 +1040,14 @@ export type ProvidersControllerGetManyProvidersParams = {
   sortBy?: string;
   sortOrder?: string;
   name?: string;
+};
+
+export type TemplatesControllerGetAllTemplatesParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  value?: string;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -14679,6 +14726,1168 @@ export const useProvidersControllerDeleteProvider = <
 > => {
   const mutationOptions =
     getProvidersControllerDeleteProviderMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Create a new template with file stored in the storage
+ * @summary Create a new templates
+ */
+export const templatesControllerCreateTemplate = (
+  createTemplateDTO: CreateTemplateDTO,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Template>(
+    {
+      url: `/api/templates`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createTemplateDTO,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getTemplatesControllerCreateTemplateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+    TError,
+    { data: CreateTemplateDTO },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+  TError,
+  { data: CreateTemplateDTO },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerCreateTemplate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+    { data: CreateTemplateDTO }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return templatesControllerCreateTemplate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TemplatesControllerCreateTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>
+>;
+export type TemplatesControllerCreateTemplateMutationBody = CreateTemplateDTO;
+export type TemplatesControllerCreateTemplateMutationError = unknown;
+
+/**
+ * @summary Create a new templates
+ */
+export const useTemplatesControllerCreateTemplate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+      TError,
+      { data: CreateTemplateDTO },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
+  TError,
+  { data: CreateTemplateDTO },
+  TContext
+> => {
+  const mutationOptions =
+    getTemplatesControllerCreateTemplateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieve all templates in a workspace
+ * @summary Get all templates
+ */
+export const templatesControllerGetAllTemplates = (
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyTemplateDto>(
+    { url: `/api/templates`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getTemplatesControllerGetAllTemplatesQueryKey = (
+  params?: TemplatesControllerGetAllTemplatesParams,
+) => {
+  return [`/api/templates`, ...(params ? [params] : [])] as const;
+};
+
+export const getTemplatesControllerGetAllTemplatesInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTemplatesControllerGetAllTemplatesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    QueryKey,
+    TemplatesControllerGetAllTemplatesParams['page']
+  > = ({ signal, pageParam }) =>
+    templatesControllerGetAllTemplates(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TError,
+    TData,
+    QueryKey,
+    TemplatesControllerGetAllTemplatesParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TemplatesControllerGetAllTemplatesInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+>;
+export type TemplatesControllerGetAllTemplatesInfiniteQueryError = unknown;
+
+export function useTemplatesControllerGetAllTemplatesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | TemplatesControllerGetAllTemplatesParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTemplatesControllerGetAllTemplatesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTemplatesControllerGetAllTemplatesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all templates
+ */
+
+export function useTemplatesControllerGetAllTemplatesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TemplatesControllerGetAllTemplatesParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData,
+        QueryKey,
+        TemplatesControllerGetAllTemplatesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getTemplatesControllerGetAllTemplatesInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getTemplatesControllerGetAllTemplatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+  TError = unknown,
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTemplatesControllerGetAllTemplatesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+  > = ({ signal }) =>
+    templatesControllerGetAllTemplates(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TemplatesControllerGetAllTemplatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+>;
+export type TemplatesControllerGetAllTemplatesQueryError = unknown;
+
+export function useTemplatesControllerGetAllTemplates<
+  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+  TError = unknown,
+>(
+  params: undefined | TemplatesControllerGetAllTemplatesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTemplatesControllerGetAllTemplates<
+  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+  TError = unknown,
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTemplatesControllerGetAllTemplates<
+  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+  TError = unknown,
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all templates
+ */
+
+export function useTemplatesControllerGetAllTemplates<
+  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+  TError = unknown,
+>(
+  params?: TemplatesControllerGetAllTemplatesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTemplatesControllerGetAllTemplatesQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Upload a template to the storage
+ * @summary Template upload
+ */
+export const templatesControllerUploadFile = (
+  uploadTemplateDTO: UploadTemplateDTO,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<UploadTemplateResponseDTO>(
+    {
+      url: `/api/templates/upload`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: uploadTemplateDTO,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getTemplatesControllerUploadFileMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+    TError,
+    { data: UploadTemplateDTO },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+  TError,
+  { data: UploadTemplateDTO },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerUploadFile'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+    { data: UploadTemplateDTO }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return templatesControllerUploadFile(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TemplatesControllerUploadFileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerUploadFile>>
+>;
+export type TemplatesControllerUploadFileMutationBody = UploadTemplateDTO;
+export type TemplatesControllerUploadFileMutationError = unknown;
+
+/**
+ * @summary Template upload
+ */
+export const useTemplatesControllerUploadFile = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+      TError,
+      { data: UploadTemplateDTO },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerUploadFile>>,
+  TError,
+  { data: UploadTemplateDTO },
+  TContext
+> => {
+  const mutationOptions =
+    getTemplatesControllerUploadFileMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Rename the display filename of a template
+ * @summary Rename a template file
+ */
+export const templatesControllerRenameFile = (
+  templateId: string,
+  renameTemplateDTO: RenameTemplateDTO,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<Template>(
+    {
+      url: `/api/templates/${templateId}/rename`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: renameTemplateDTO,
+    },
+    options,
+  );
+};
+
+export const getTemplatesControllerRenameFileMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+    TError,
+    { templateId: string; data: RenameTemplateDTO },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+  TError,
+  { templateId: string; data: RenameTemplateDTO },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerRenameFile'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+    { templateId: string; data: RenameTemplateDTO }
+  > = (props) => {
+    const { templateId, data } = props ?? {};
+
+    return templatesControllerRenameFile(templateId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TemplatesControllerRenameFileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerRenameFile>>
+>;
+export type TemplatesControllerRenameFileMutationBody = RenameTemplateDTO;
+export type TemplatesControllerRenameFileMutationError = unknown;
+
+/**
+ * @summary Rename a template file
+ */
+export const useTemplatesControllerRenameFile = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+      TError,
+      { templateId: string; data: RenameTemplateDTO },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+  TError,
+  { templateId: string; data: RenameTemplateDTO },
+  TContext
+> => {
+  const mutationOptions =
+    getTemplatesControllerRenameFileMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieve a template by its ID
+ * @summary Get a template by ID
+ */
+export const templatesControllerGetTemplateById = (
+  templateId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Template>(
+    { url: `/api/templates/${templateId}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getTemplatesControllerGetTemplateByIdQueryKey = (
+  templateId: string,
+) => {
+  return [`/api/templates/${templateId}`] as const;
+};
+
+export const getTemplatesControllerGetTemplateByIdInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+  >,
+  TError = unknown,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTemplatesControllerGetTemplateByIdQueryKey(templateId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+  > = ({ signal }) =>
+    templatesControllerGetTemplateById(templateId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!templateId,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TemplatesControllerGetTemplateByIdInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+>;
+export type TemplatesControllerGetTemplateByIdInfiniteQueryError = unknown;
+
+export function useTemplatesControllerGetTemplateByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+  >,
+  TError = unknown,
+>(
+  templateId: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+          TError,
+          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTemplatesControllerGetTemplateByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+  >,
+  TError = unknown,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+          TError,
+          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTemplatesControllerGetTemplateByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+  >,
+  TError = unknown,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a template by ID
+ */
+
+export function useTemplatesControllerGetTemplateByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+  >,
+  TError = unknown,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getTemplatesControllerGetTemplateByIdInfiniteQueryOptions(
+      templateId,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getTemplatesControllerGetTemplateByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+  TError = unknown,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTemplatesControllerGetTemplateByIdQueryKey(templateId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+  > = ({ signal }) =>
+    templatesControllerGetTemplateById(templateId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!templateId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TemplatesControllerGetTemplateByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+>;
+export type TemplatesControllerGetTemplateByIdQueryError = unknown;
+
+export function useTemplatesControllerGetTemplateById<
+  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+  TError = unknown,
+>(
+  templateId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+          TError,
+          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTemplatesControllerGetTemplateById<
+  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+  TError = unknown,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+          TError,
+          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTemplatesControllerGetTemplateById<
+  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+  TError = unknown,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a template by ID
+ */
+
+export function useTemplatesControllerGetTemplateById<
+  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+  TError = unknown,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTemplatesControllerGetTemplateByIdQueryOptions(
+    templateId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Delete a template and its associated file from storage
+ * @summary Delete a template
+ */
+export const templatesControllerDeleteTemplate = (
+  templateId: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/templates/${templateId}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getTemplatesControllerDeleteTemplateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+    TError,
+    { templateId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+  TError,
+  { templateId: string },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerDeleteTemplate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+    { templateId: string }
+  > = (props) => {
+    const { templateId } = props ?? {};
+
+    return templatesControllerDeleteTemplate(templateId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TemplatesControllerDeleteTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>
+>;
+
+export type TemplatesControllerDeleteTemplateMutationError = unknown;
+
+/**
+ * @summary Delete a template
+ */
+export const useTemplatesControllerDeleteTemplate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+      TError,
+      { templateId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+  TError,
+  { templateId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getTemplatesControllerDeleteTemplateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Run a template and create a job
+ * @summary Run a template
+ */
+export const templatesControllerRunTemplate = (
+  runTemplateDto: RunTemplateDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/templates/run`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: runTemplateDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getTemplatesControllerRunTemplateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
+    TError,
+    { data: RunTemplateDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
+  TError,
+  { data: RunTemplateDto },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerRunTemplate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
+    { data: RunTemplateDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return templatesControllerRunTemplate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TemplatesControllerRunTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerRunTemplate>>
+>;
+export type TemplatesControllerRunTemplateMutationBody = RunTemplateDto;
+export type TemplatesControllerRunTemplateMutationError = unknown;
+
+/**
+ * @summary Run a template
+ */
+export const useTemplatesControllerRunTemplate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
+      TError,
+      { data: RunTemplateDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
+  TError,
+  { data: RunTemplateDto },
+  TContext
+> => {
+  const mutationOptions =
+    getTemplatesControllerRunTemplateMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

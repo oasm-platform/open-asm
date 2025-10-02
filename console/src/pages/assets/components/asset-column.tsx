@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type {
   GetAssetsResponseDto,
-  TechnologyDetailDTO
+  TechnologyDetailDTO,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
@@ -30,7 +30,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const ports = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
       const ipAddresses = data.ipAddresses;
-      const tags = data.tags
+      const tags = data.tags;
 
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
@@ -45,23 +45,20 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
           )}
           <div className="w-full">
             <BadgeList
-              list={
-                ipAddresses?.sort((a: string, b: string) => {
-                  const isIPv4 = (ip: string) => /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
-                  if (isIPv4(a) && !isIPv4(b)) return -1;
-                  if (!isIPv4(a) && isIPv4(b)) return 1;
-                  return 0;
-                })
-              }
+              list={ipAddresses?.sort((a: string, b: string) => {
+                const isIPv4 = (ip: string) =>
+                  /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
+                if (isIPv4(a) && !isIPv4(b)) return -1;
+                if (!isIPv4(a) && isIPv4(b)) return 1;
+                return 0;
+              })}
               Icon={Network}
               maxDisplay={2}
             />
           </div>
           <div className="w-full">
             <BadgeList
-              list={
-                tags.map(t => t.tag)
-              }
+              list={tags.map((t) => t.tag)}
               Icon={Tag}
               maxDisplay={2}
             />
@@ -89,13 +86,13 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const technologies = data.httpResponses
         ?.techList as unknown as TechnologyDetailDTO[];
       const maxDisplay = 4;
-      const displayList = technologies.slice(0, maxDisplay);
-      const remainCount = technologies.length - maxDisplay;
+      const displayList = technologies?.slice(0, maxDisplay);
+      const remainCount = technologies?.length - maxDisplay;
 
       return (
         <div className="flex flex-wrap gap-1 max-w-[250px] min-h-[60px]">
           {displayList?.map((item) => (
-            <TechnologyTooltip tech={item} />
+            <TechnologyTooltip tech={item} key={item.name} />
           ))}
           {remainCount > 0 && (
             <Badge variant="outline" className="text-xs">
@@ -118,7 +115,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
         Math.abs(
           (new Date(tls.not_after as unknown as Date).getTime() -
             new Date().getTime()) /
-          (1000 * 60 * 60 * 24),
+            (1000 * 60 * 60 * 24),
         ),
       );
       const color = daysLeft < 30 ? 'red' : daysLeft < 60 ? 'yellow' : 'green';

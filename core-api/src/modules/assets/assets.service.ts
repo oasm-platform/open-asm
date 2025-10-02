@@ -80,13 +80,13 @@ export class AssetsService {
 
     const queryBuilder = this.assetRepo
       .createQueryBuilder('assets')
-      .innerJoin('assets.httpResponses', 'httpResponses')
-      .innerJoin('assets.ports', 'ports')
+      .leftJoin('assets.httpResponses', 'httpResponses')
+      .leftJoin('assets.ports', 'ports')
       .leftJoin('assets.target', 'targets')
       .leftJoinAndSelect('assets.tags', 'tags')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .innerJoin('assets.ipAssets', 'ipAssets')
-      .innerJoin('assets.statusCodeAssets', 'statusCodeAssets')
+      .leftJoin('assets.ipAssets', 'ipAssets')
+      .leftJoin('assets.statusCodeAssets', 'statusCodeAssets')
       .where('assets."isErrorPage" = false');
 
     for (const [key, value] of Object.entries(whereBuilder)) {
@@ -165,18 +165,24 @@ export class AssetsService {
 
       if (item.httpResponses) {
         asset.httpResponses = item.httpResponses[0];
-        const techList = (
-          await this.technologyForwarderService.enrichTechnologies(
-            asset.httpResponses.tech,
-          )
-        ).map((e) => ({
-          name: e.name,
-          description: e.description,
-          iconUrl: e.iconUrl,
-          categoryNames: e.categoryNames,
-        }));
+        if (asset.httpResponses?.tech) {
+          const techList = (
+            await this.technologyForwarderService.enrichTechnologies(
+              asset.httpResponses.tech,
+            )
+          ).map((e) => {
+            return {
+              name: e.name,
+              description: e.description,
+              iconUrl: e.iconUrl,
+              categoryNames: e.categoryNames,
+            };
+          });
 
-        asset.httpResponses.techList = techList;
+          asset.httpResponses.techList = techList.filter(
+            (e) => e.name !== undefined,
+          );
+        }
       }
       return asset;
     });
@@ -299,18 +305,19 @@ export class AssetsService {
 
     if (item.httpResponses) {
       asset.httpResponses = item.httpResponses[0];
-      const techList = (
-        await this.technologyForwarderService.enrichTechnologies(
-          asset.httpResponses.tech,
-        )
-      ).map((e) => ({
-        name: e.name,
-        description: e.description,
-        iconUrl: e.iconUrl,
-        categoryNames: e.categoryNames,
-      }));
-
-      asset.httpResponses.techList = techList;
+      if (asset.httpResponses?.tech) {
+        const techList = (
+          await this.technologyForwarderService.enrichTechnologies(
+            asset.httpResponses?.tech,
+          )
+        ).map((e) => ({
+          name: e.name,
+          description: e.description,
+          iconUrl: e.iconUrl,
+          categoryNames: e.categoryNames,
+        }));
+        asset.httpResponses.techList = techList;
+      }
     }
 
     return asset;
@@ -499,8 +506,8 @@ export class AssetsService {
         ),
       );
 
-    const data = list.map(
-      (item: { technology: string; assetCount: number }) => {
+    const data = list
+      .map((item: { technology: string; assetCount: number }) => {
         const obj = new GetTechnologyAssetsDTO();
         obj.assetCount = item.assetCount;
 
@@ -513,8 +520,8 @@ export class AssetsService {
         }
 
         return obj;
-      },
-    );
+      })
+      .filter((e) => e.technology !== undefined);
 
     return getManyResponse({ query, data, total });
   }
