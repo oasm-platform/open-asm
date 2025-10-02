@@ -48,7 +48,7 @@ open-asm/
 │   ├── tools/             # Security tools integration
 │   ├── example.env        # Worker environment
 │   └── package.json
-├── open-api/           # Auto-generated API docs
+├── .open-api/           # Auto-generated API docs
 ├── docker-compose.yml  # Container orchestration
 ├── taskfile.yml        # Task automation
 └── README.md           # Documentation

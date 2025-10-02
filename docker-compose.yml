@@ -21,7 +21,7 @@ services:
       redpanda:
         condition: service_healthy
     volumes:
-      - ./open-api:/open-api
+      - ./.open-api:/.open-api
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6276/api/health"]
       interval: 1s

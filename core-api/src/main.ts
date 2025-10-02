@@ -70,7 +70,14 @@ async function bootstrap() {
     },
   });
 
-  const pathOutputOpenApi = '../open-api/open-api.json';
+  const pathOutputOpenApi = '../.open-api/open-api.json';
+
+  // Create directory if it doesn't exist
+  const directoryPath = path.dirname(pathOutputOpenApi);
+  if (!fs.existsSync(directoryPath)) {
+    fs.mkdirSync(directoryPath, { recursive: true });
+  }
+
   fs.writeFileSync(pathOutputOpenApi, JSON.stringify(documentFactory()));
 
   // Start server
