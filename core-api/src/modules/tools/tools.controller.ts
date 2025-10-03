@@ -33,7 +33,7 @@ export class ToolsController {
 
   @Doc({
     summary: 'Create a new tool',
-    description: 'Creates a new tool with the provided information.',
+    description: 'Registers a new security assessment tool in the system with specified configuration and capabilities.',
     response: {
       serialization: Tool,
     },
@@ -45,7 +45,7 @@ export class ToolsController {
 
   @Doc({
     summary: 'Run a tool',
-    description: 'Runs a tool with the provided information.',
+    description: 'Executes a security assessment tool with specified parameters in the designated workspace.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -64,7 +64,7 @@ export class ToolsController {
 
   @Doc({
     summary: 'Add tool to workspace',
-    description: 'Adds a tool to a specific workspace.',
+    description: 'Associates an existing security tool with a specific workspace for targeted assessments.',
     response: {
       serialization: WorkspaceTool,
     },
@@ -77,7 +77,7 @@ export class ToolsController {
   @Doc({
     summary: 'Install tool',
     description:
-      'Installs a tool to a specific workspace, checking for duplicates before insertion.',
+      'Installs a security tool to a specific workspace with duplicate checking to prevent conflicts.',
     response: {
       serialization: WorkspaceTool,
     },
@@ -90,7 +90,7 @@ export class ToolsController {
   @Doc({
     summary: 'Uninstall tool',
     description:
-      'Uninstalls a tool from a specific workspace by removing the record from workspace_tools table.',
+      'Removes a security tool from a specific workspace by deleting its association record.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -113,7 +113,7 @@ export class ToolsController {
 
   @Doc({
     summary: 'Get tools',
-    description: 'Retrieves a list of tools with pagination.',
+    description: 'Fetches a paginated list of available security assessment tools in the system.',
     response: {
       serialization: GetManyResponseDto(Tool),
     },
@@ -137,7 +137,7 @@ export class ToolsController {
   @Doc({
     summary: 'Get installed tools for a workspace',
     description:
-      'Retrieves a list of installed tools for a specific workspace, including built-in tools.',
+      'Fetches all security tools installed in a specific workspace, including built-in tools.',
     response: {
       serialization: GetManyResponseDto(Tool),
     },
@@ -160,7 +160,7 @@ export class ToolsController {
 
   @Doc({
     summary: 'Get tool by ID',
-    description: 'Retrieves a tool by its unique identifier.',
+    description: 'Fetches detailed information about a specific security tool using its unique identifier.',
     response: {
       serialization: Tool,
     },
@@ -178,7 +178,7 @@ export class ToolsController {
 
   @Doc({
     summary: 'Get tool API key',
-    description: 'Retrieves the API key for a tool.',
+    description: 'Retrieves the authentication API key for accessing the specified security tool.',
     response: {
       serialization: GetApiKeyResponseDto,
     },
@@ -193,7 +193,7 @@ export class ToolsController {
 
   @Doc({
     summary: 'Rotate tool API key',
-    description: 'Regenerates the API key for a tool.',
+    description: 'Regenerates a new API key for the specified security tool, invalidating the previous key.',
     response: {
       serialization: GetApiKeyResponseDto,
     },

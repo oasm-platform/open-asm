@@ -51,8 +51,8 @@ export class McpService {
      */
     public async createMcpPermission(userContext: UserContextPayload, dto: CreateMcpPermissionsRequestDto) {
         await this.mcpPermissionRepo.save({
+            ...dto,
             owner: { id: userContext.id },
-            value: dto.value
         });
 
         return {
@@ -64,7 +64,7 @@ export class McpService {
      * Get all tools from all registered MCP modules.
      * @returns A flattened array of all tools from all MCP modules.
      */
-    public getTools(): McpTool[] {
+    public getMcpTools(): McpTool[] {
         const mcpModuleIds = this.mpcRegistryService.getMcpModuleIds();
         return mcpModuleIds.map(id => this.mpcRegistryService.getTools(id).map(tool => ({
             name: tool.metadata.name,

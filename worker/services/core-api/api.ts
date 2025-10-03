@@ -812,6 +812,10 @@ export interface McpPermissionValue {
 }
 
 export interface CreateMcpPermissionsRequestDto {
+  /** @example "MCP Permission" */
+  name: string;
+  /** @example "Allows access to assets in the workspaces" */
+  description?: string;
   value: McpPermissionValue[];
 }
 
@@ -823,6 +827,8 @@ export interface McpPermission {
   updatedAt: string;
   /** @example "MCP Permission" */
   name: string;
+  /** @example "Allows access to assets in the workspaces" */
+  description?: string;
   value: McpPermissionValue[];
 }
 
@@ -1094,7 +1100,7 @@ export class Api<
   SecurityDataType extends unknown,
 > extends HttpClient<SecurityDataType> {
   /**
-   * @description Creates a new target.
+   * @description Registers a new security testing target such as a domain, IP address, or network range for vulnerability assessment and continuous monitoring.
    *
    * @tags Targets
    * @name TargetsControllerCreateTarget
@@ -1115,7 +1121,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves all targets in a workspace.
+   * @description Fetches a comprehensive list of all registered security testing targets within the specified workspace for vulnerability management and assessment tracking.
    *
    * @tags Targets
    * @name TargetsControllerGetTargetsInWorkspace
@@ -1145,7 +1151,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves a target by its ID.
+   * @description Fetches detailed information about a specific security testing target using its unique identifier, including configuration and assessment status.
    *
    * @tags Targets
    * @name TargetsControllerGetTargetById
@@ -1161,7 +1167,7 @@ export class Api<
     });
 
   /**
-   * @description Updates a target.
+   * @description Modifies the configuration and properties of an existing security testing target, allowing for dynamic adjustments to assessment parameters.
    *
    * @tags Targets
    * @name TargetsControllerUpdateTarget
@@ -1183,7 +1189,7 @@ export class Api<
     });
 
   /**
-   * @description Deletes a target from a workspace.
+   * @description Removes a security testing target from the specified workspace, terminating all associated monitoring and assessment activities.
    *
    * @tags Targets
    * @name TargetsControllerDeleteTargetFromWorkspace
@@ -1203,7 +1209,7 @@ export class Api<
     });
 
   /**
-   * @description Rescans a target and triggers a new scan job.
+   * @description Initiates a comprehensive security re-assessment of the specified target, triggering new vulnerability scans to identify potential security risks.
    *
    * @tags Targets
    * @name TargetsControllerReScanTarget
@@ -1219,7 +1225,7 @@ export class Api<
     });
 
   /**
-   * @description Creates a new workspace.
+   * @description Establishes a new isolated security workspace for organizing and managing assets, targets, and vulnerabilities within a dedicated environment.
    *
    * @tags Workspaces
    * @name WorkspacesControllerCreateWorkspace
@@ -1240,7 +1246,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves a list of workspaces that the user is a member of.
+   * @description Fetches a comprehensive list of security workspaces that the authenticated user has access to, providing multi-tenant organization capabilities.
    *
    * @tags Workspaces
    * @name WorkspacesControllerGetWorkspaces
@@ -1274,7 +1280,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves the API key for a workspace.
+   * @description Retrieves the authentication API key for secure access to the specified workspace, enabling programmatic interactions with workspace resources.
    *
    * @tags Workspaces
    * @name WorkspacesControllerGetWorkspaceApiKey
@@ -1290,7 +1296,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves a workspace by its ID.
+   * @description Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration.
    *
    * @tags Workspaces
    * @name WorkspacesControllerGetWorkspaceById
@@ -1309,7 +1315,7 @@ export class Api<
     });
 
   /**
-   * @description Updates a workspace by its ID.
+   * @description Modifies the configuration and metadata of an existing security workspace, allowing for dynamic adjustments to workspace settings and properties.
    *
    * @tags Workspaces
    * @name WorkspacesControllerUpdateWorkspace
@@ -1331,7 +1337,7 @@ export class Api<
     });
 
   /**
-   * @description Deletes a workspace by its ID.
+   * @description Permanently removes a security workspace and all its associated data, including assets, targets, vulnerabilities, and configurations.
    *
    * @tags Workspaces
    * @name WorkspacesControllerDeleteWorkspace
@@ -1350,7 +1356,7 @@ export class Api<
     });
 
   /**
-   * @description Regenerates the API key for a workspace.
+   * @description Generates a new API key for the specified workspace, invalidating the previous key to enhance security and maintain authorized access.
    *
    * @tags Workspaces
    * @name WorkspacesControllerRotateApiKey
@@ -1366,7 +1372,7 @@ export class Api<
     });
 
   /**
-   * @description Sets the archived status of a workspace.
+   * @description Changes the archival status of a workspace, allowing for temporary deactivation or reactivation of workspace resources without permanent deletion.
    *
    * @tags Workspaces
    * @name WorkspacesControllerMakeArchived
@@ -1778,7 +1784,7 @@ export class Api<
     });
 
   /**
-   * @description Worker alive
+   * @description Confirms the operational status of a security assessment worker node in the cluster.
    *
    * @tags Workers
    * @name WorkersControllerAlive
@@ -1796,7 +1802,7 @@ export class Api<
     });
 
   /**
-   * @description Worker join the cluster
+   * @description Registers a new security assessment worker node to the distributed processing cluster.
    *
    * @tags Workers
    * @name WorkersControllerJoin
@@ -1814,11 +1820,11 @@ export class Api<
     });
 
   /**
-   * No description
+   * @description Fetches a paginated list of all active security assessment workers in the cluster.
    *
    * @tags Workers
    * @name WorkersControllerGetWorkers
-   * @summary Gets all workers with pagination and sorting.
+   * @summary Get all workers with pagination and sorting.
    * @request GET:/api/workers
    */
   workersControllerGetWorkers = (
@@ -1942,7 +1948,7 @@ export class Api<
     });
 
   /**
-   * @description Creates a new tool with the provided information.
+   * @description Registers a new security assessment tool in the system with specified configuration and capabilities.
    *
    * @tags Tools
    * @name ToolsControllerCreateTool
@@ -1963,7 +1969,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves a list of tools with pagination.
+   * @description Fetches a paginated list of available security assessment tools in the system.
    *
    * @tags Tools
    * @name ToolsControllerGetManyTools
@@ -1996,7 +2002,7 @@ export class Api<
     });
 
   /**
-   * @description Runs a tool with the provided information.
+   * @description Executes a security assessment tool with specified parameters in the designated workspace.
    *
    * @tags Tools
    * @name ToolsControllerRunTool
@@ -2018,7 +2024,7 @@ export class Api<
     });
 
   /**
-   * @description Adds a tool to a specific workspace.
+   * @description Associates an existing security tool with a specific workspace for targeted assessments.
    *
    * @tags Tools
    * @name ToolsControllerAddToolToWorkspace
@@ -2039,7 +2045,7 @@ export class Api<
     });
 
   /**
-   * @description Installs a tool to a specific workspace, checking for duplicates before insertion.
+   * @description Installs a security tool to a specific workspace with duplicate checking to prevent conflicts.
    *
    * @tags Tools
    * @name ToolsControllerInstallTool
@@ -2060,7 +2066,7 @@ export class Api<
     });
 
   /**
-   * @description Uninstalls a tool from a specific workspace by removing the record from workspace_tools table.
+   * @description Removes a security tool from a specific workspace by deleting its association record.
    *
    * @tags Tools
    * @name ToolsControllerUninstallTool
@@ -2097,7 +2103,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves a list of installed tools for a specific workspace, including built-in tools.
+   * @description Fetches all security tools installed in a specific workspace, including built-in tools.
    *
    * @tags Tools
    * @name ToolsControllerGetInstalledTools
@@ -2121,7 +2127,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves a tool by its unique identifier.
+   * @description Fetches detailed information about a specific security tool using its unique identifier.
    *
    * @tags Tools
    * @name ToolsControllerGetToolById
@@ -2137,7 +2143,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves the API key for a tool.
+   * @description Retrieves the authentication API key for accessing the specified security tool.
    *
    * @tags Tools
    * @name ToolsControllerGetToolApiKey
@@ -2153,7 +2159,7 @@ export class Api<
     });
 
   /**
-   * @description Regenerates the API key for a tool.
+   * @description Regenerates a new API key for the specified security tool, invalidating the previous key.
    *
    * @tags Tools
    * @name ToolsControllerRotateToolApiKey
@@ -2185,7 +2191,7 @@ export class Api<
     });
 
   /**
-   * @description Get vulnerabilities
+   * @description Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.
    *
    * @tags Vulnerabilities
    * @name VulnerabilitiesControllerGetVulnerabilities
@@ -2217,7 +2223,7 @@ export class Api<
     });
 
   /**
-   * @description Get count of vulnerabilities by severity level
+   * @description Provides aggregated statistical analysis of security vulnerabilities categorized by severity levels, enabling risk assessment and prioritization of remediation efforts.
    *
    * @tags Vulnerabilities
    * @name VulnerabilitiesControllerGetVulnerabilitiesStatistics
@@ -2240,7 +2246,7 @@ export class Api<
     });
 
   /**
-   * @description Get count of vulnerabilities by severity level based on workspaceId -> target -> assets -> vuls relation path
+   * @description Provides a detailed breakdown of vulnerability counts by severity level across the workspace hierarchy, following the relationship path from workspace to targets, assets, and vulnerabilities.
    *
    * @tags Vulnerabilities
    * @name VulnerabilitiesControllerGetVulnerabilitiesSeverity
@@ -2650,11 +2656,11 @@ export class Api<
    * @description Returns a flattened array of all tools from all MCP modules.
    *
    * @tags Mcp
-   * @name McpControllerGetTools
+   * @name McpControllerGetMcpTools
    * @summary Get all tools from all registered MCP modules.
    * @request GET:/api/mcp/tools
    */
-  mcpControllerGetTools = (params: RequestParams = {}) =>
+  mcpControllerGetMcpTools = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/mcp/tools`,
       method: "GET",

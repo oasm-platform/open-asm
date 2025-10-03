@@ -12,6 +12,6 @@ export class McpTool {
     moduleId: string;
 }
 
-export class CreateMcpPermissionsRequestDto extends PickType(McpPermission, ['value']) {
+export class CreateMcpPermissionsRequestDto extends PickType(McpPermission, ['value', 'name', 'description']) {
 
 }

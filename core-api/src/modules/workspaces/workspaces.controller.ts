@@ -33,7 +33,7 @@ export class WorkspacesController {
 
   @Doc({
     summary: 'Create Workspace',
-    description: 'Creates a new workspace.',
+    description: 'Establishes a new isolated security workspace for organizing and managing assets, targets, and vulnerabilities within a dedicated environment.',
     response: {
       serialization: Workspace,
     },
@@ -48,7 +48,7 @@ export class WorkspacesController {
 
   @Doc({
     summary: 'Get workspace API key',
-    description: 'Retrieves the API key for a workspace.',
+    description: 'Retrieves the authentication API key for secure access to the specified workspace, enabling programmatic interactions with workspace resources.',
     response: {
       serialization: GetApiKeyResponseDto,
     },
@@ -66,7 +66,7 @@ export class WorkspacesController {
 
   @Doc({
     summary: 'Get Workspaces',
-    description: 'Retrieves a list of workspaces that the user is a member of.',
+    description: 'Fetches a comprehensive list of security workspaces that the authenticated user has access to, providing multi-tenant organization capabilities.',
     response: {
       serialization: GetManyResponseDto(Workspace),
     },
@@ -81,7 +81,7 @@ export class WorkspacesController {
 
   @Doc({
     summary: 'Get Workspace By ID',
-    description: 'Retrieves a workspace by its ID.',
+    description: 'Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration.',
     response: {
       serialization: Workspace,
     },
@@ -105,7 +105,7 @@ export class WorkspacesController {
 
   @Doc({
     summary: 'Update Workspace',
-    description: 'Updates a workspace by its ID.',
+    description: 'Modifies the configuration and metadata of an existing security workspace, allowing for dynamic adjustments to workspace settings and properties.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -121,7 +121,7 @@ export class WorkspacesController {
 
   @Doc({
     summary: 'Delete Workspace',
-    description: 'Deletes a workspace by its ID.',
+    description: 'Permanently removes a security workspace and all its associated data, including assets, targets, vulnerabilities, and configurations.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -136,7 +136,7 @@ export class WorkspacesController {
 
   @Doc({
     summary: 'Rotate API key',
-    description: 'Regenerates the API key for a workspace.',
+    description: 'Generates a new API key for the specified workspace, invalidating the previous key to enhance security and maintain authorized access.',
     response: {
       serialization: GetApiKeyResponseDto,
     },
@@ -151,7 +151,7 @@ export class WorkspacesController {
 
   @Doc({
     summary: 'Archive/Unarchive Workspace',
-    description: 'Sets the archived status of a workspace.',
+    description: 'Changes the archival status of a workspace, allowing for temporary deactivation or reactivation of workspace resources without permanent deletion.',
     response: {
       serialization: DefaultMessageResponseDto,
     },

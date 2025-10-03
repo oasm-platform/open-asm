@@ -27,7 +27,7 @@ export class VulnerabilitiesController {
 
   @Doc({
     summary: 'Get vulnerabilities',
-    description: 'Get vulnerabilities',
+    description: 'Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.',
     response: {
       serialization: GetManyResponseDto(Vulnerability),
     },
@@ -39,7 +39,7 @@ export class VulnerabilitiesController {
 
   @Doc({
     summary: 'Get vulnerabilities statistics',
-    description: 'Get count of vulnerabilities by severity level',
+    description: 'Provides aggregated statistical analysis of security vulnerabilities categorized by severity levels, enabling risk assessment and prioritization of remediation efforts.',
     response: {
       serialization: GetVulnerabilitiesStatisticsResponseDto,
     },
@@ -54,7 +54,7 @@ export class VulnerabilitiesController {
   @Doc({
     summary: 'Get vulnerabilities severity counts',
     description:
-      'Get count of vulnerabilities by severity level based on workspaceId -> target -> assets -> vuls relation path',
+      'Provides a detailed breakdown of vulnerability counts by severity level across the workspace hierarchy, following the relationship path from workspace to targets, assets, and vulnerabilities.',
     response: {
       serialization: GetVulnerabilitiesSeverityResponseDto,
     },

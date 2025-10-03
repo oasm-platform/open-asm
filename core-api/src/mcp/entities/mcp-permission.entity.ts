@@ -20,6 +20,9 @@ export class McpPermission extends BaseEntity {
     @ApiProperty({ example: 'MCP Permission' })
     @Column({ default: 'Unnamed' })
     name: string;
+    @ApiProperty({ example: 'Allows access to assets in the workspaces', required: false })
+    @Column({ nullable: true })
+    description: string;
     @Column({ type: 'json' })
     @ApiProperty({ isArray: true })
     @IsArray()

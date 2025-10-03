@@ -2,7 +2,6 @@ import Layout from '@/components/common/layout/layout';
 import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
-import Studio from '@/pages/studio/studio';
 import Login from '@/pages/login/login';
 import CreateProviderPage from '@/pages/providers/create-provider';
 import DetailProvider from '@/pages/providers/detail-provider';
@@ -10,7 +9,9 @@ import EditProviderPage from '@/pages/providers/edit-provider';
 import ProvidersPage from '@/pages/providers/providers';
 import Register from '@/pages/register/register';
 import Search from '@/pages/search/search';
+import CreateMcpPermission from '@/pages/settings/components/create-mcp-permission';
 import Settings from '@/pages/settings/settings';
+import Studio from '@/pages/studio/studio';
 import DetailTarget from '@/pages/targets/detail-target';
 import Targets from '@/pages/targets/targets';
 import ToolDetail from '@/pages/tools/components/tool-detail';
@@ -59,6 +60,10 @@ export const router = createBrowserRouter([
             path: 'settings',
             children: [
               {
+                path: 'mcp/create',
+                element: <CreateMcpPermission />,
+              },
+              {
                 path: '',
                 element: <Settings defaultTab="account" />,
               },
@@ -66,6 +71,7 @@ export const router = createBrowserRouter([
                 path: ':tab',
                 element: <Settings />,
               },
+
             ],
           },
           {

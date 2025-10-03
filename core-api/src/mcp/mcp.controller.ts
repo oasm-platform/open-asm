@@ -33,8 +33,8 @@ export class McpController {
         }
     })
     @Get('tools')
-    public getTools() {
-        return this.mcpService.getTools();
+    public getMcpTools() {
+        return this.mcpService.getMcpTools();
     }
 
     @Doc({
