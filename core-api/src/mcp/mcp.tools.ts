@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { AssetsService } from 'src/modules/assets/assets.service';
 import z from 'zod';
-import { getManyBaseRequestSchema, getManyBaseResponseSchema } from './mcp.schema';
+import { getAssetsSchema, getManyBaseResponseSchema } from './mcp.schema';
 
 @Injectable()
 export class McpTools {
@@ -10,15 +10,16 @@ export class McpTools {
     @Tool({
         name: 'get_assets',
         description: 'Returns a list of assets in the target workspace.',
-        parameters: getManyBaseRequestSchema,
+        parameters: getAssetsSchema,
         outputSchema: getManyBaseResponseSchema(z.object({
             id: z.string(),
             value: z.string(),
         })),
     })
-    async getAssets({ workspaceId, page, limit }: z.infer<typeof getManyBaseRequestSchema>) {
+    async getAssets(params: z.infer<typeof getAssetsSchema>) {
+        const { workspaceId, page, limit, value } = params;
         const response = await this.assetsService.getAssetsInWorkspace({
-            limit: limit || 10, page: page || 1, sortBy: 'createdAt'
+            limit: limit || 100, page: page || 1, sortBy: 'createdAt', value
         }, workspaceId);
         return {
             ...response, data: response.data.map(i => ({
