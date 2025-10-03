@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { GetApiKeyResponseDto } from 'src/modules/tools/dto/get-apikey-response.dto';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { CreateMcpPermissionsRequestDto, McpTool } from './dto/mcp.dto';
 import { McpPermission } from './entities/mcp-permission.entity';
@@ -69,4 +70,21 @@ export class McpController {
     ) {
         return this.mcpService.getMcpPermissions(queryParams, userContext);
     }
+
+
+    @Doc({
+        summary: 'Get the API key for a specific MCP permission.',
+        description: 'Returns the API key associated with the specified MCP permission ID.',
+        response: {
+            serialization: GetApiKeyResponseDto
+        }
+    })
+    @Get(':id/api-key')
+    getMcpApiKey(
+        @UserContext() userContext: UserContextPayload,
+        @Param('id') id: string,
+    ) {
+        return this.mcpService.getMcpApiKey(userContext, id);
+    }
+
 }

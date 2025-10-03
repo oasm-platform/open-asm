@@ -17493,6 +17493,330 @@ export function useMcpControllerGetMcpPermissions<
   return query;
 }
 
+/**
+ * Returns the API key associated with the specified MCP permission ID.
+ * @summary Get the API key for a specific MCP permission.
+ */
+export const mcpControllerGetMcpApiKey = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetApiKeyResponseDto>(
+    { url: `/api/mcp/${id}/api-key`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getMcpControllerGetMcpApiKeyQueryKey = (id: string) => {
+  return [`/api/mcp/${id}/api-key`] as const;
+};
+
+export const getMcpControllerGetMcpApiKeyInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getMcpControllerGetMcpApiKeyQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>
+  > = ({ signal }) => mcpControllerGetMcpApiKey(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type McpControllerGetMcpApiKeyInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>
+>;
+export type McpControllerGetMcpApiKeyInfiniteQueryError = unknown;
+
+export function useMcpControllerGetMcpApiKeyInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetMcpApiKeyInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetMcpApiKeyInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get the API key for a specific MCP permission.
+ */
+
+export function useMcpControllerGetMcpApiKeyInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getMcpControllerGetMcpApiKeyInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getMcpControllerGetMcpApiKeyQueryOptions = <
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getMcpControllerGetMcpApiKeyQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>
+  > = ({ signal }) => mcpControllerGetMcpApiKey(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type McpControllerGetMcpApiKeyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>
+>;
+export type McpControllerGetMcpApiKeyQueryError = unknown;
+
+export function useMcpControllerGetMcpApiKey<
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetMcpApiKey<
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetMcpApiKey<
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get the API key for a specific MCP permission.
+ */
+
+export function useMcpControllerGetMcpApiKey<
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpApiKey>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getMcpControllerGetMcpApiKeyQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
 export const sseControllerSse = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,

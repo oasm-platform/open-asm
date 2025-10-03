@@ -84,7 +84,7 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
         title: 'MCP Permissions',
         description: 'Manage your MCP permissions',
         action: <Button size={"sm"} variant="outline" onClick={() => navigate('create')}>
-          <Plus size={20} />  Create MCP Permissions
+          <Plus size={20} />  Create
         </Button>,
       },
       component: <ListMcpPermissions />,

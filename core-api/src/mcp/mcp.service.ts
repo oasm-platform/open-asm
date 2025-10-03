@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { McpRegistryService } from '@rekog/mcp-nest';
 import { GetManyBaseQueryParams, GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
+import { ApiKeyType } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
+import { ApiKeysService } from 'src/modules/apikeys/apikeys.service';
+import { GetApiKeyResponseDto } from 'src/modules/tools/dto/get-apikey-response.dto';
 import { Repository } from 'typeorm';
 import { CreateMcpPermissionsRequestDto, McpTool } from './dto/mcp.dto';
 import { McpPermission } from './entities/mcp-permission.entity';
@@ -11,7 +14,8 @@ import { McpPermission } from './entities/mcp-permission.entity';
 export class McpService {
     constructor(
         private mpcRegistryService: McpRegistryService,
-        @InjectRepository(McpPermission) private mcpPermissionRepo: Repository<McpPermission>
+        @InjectRepository(McpPermission) private mcpPermissionRepo: Repository<McpPermission>,
+        private apiKeyService: ApiKeysService
     ) { }
 
     /**
@@ -50,13 +54,19 @@ export class McpService {
      * @returns 
      */
     public async createMcpPermission(userContext: UserContextPayload, dto: CreateMcpPermissionsRequestDto) {
-        await this.mcpPermissionRepo.save({
+        const newMcpPermission = await this.mcpPermissionRepo.save({
             ...dto,
             owner: { id: userContext.id },
         });
 
+        const newApiKey = await this.apiKeyService.create({
+            name: newMcpPermission.name,
+            type: ApiKeyType.MCP,
+            ref: newMcpPermission.id,
+        });
+
         return {
-            message: 'MCP permission created successfully.'
+            apiKey: newApiKey.key,
         };
     }
 
@@ -72,5 +82,30 @@ export class McpService {
             description: tool.metadata.description,
             moduleId: id,
         }))).flat();
+    }
+
+    /**
+     * Get the API key for a specific MCP permission.
+     * @param user 
+     * @param id 
+     * @returns 
+     */
+    public async getMcpApiKey(user: UserContextPayload, id: string): Promise<GetApiKeyResponseDto> {
+        const permissions = await this.mcpPermissionRepo.findOne({
+            where: {
+                id,
+                owner: { id: user.id }
+            }
+        });
+
+        if (!permissions) {
+            throw new NotFoundException('MCP permission not found');
+        }
+
+        const apiKey = await this.apiKeyService.getCurrentApiKey(ApiKeyType.MCP, permissions.id);
+
+        return {
+            apiKey: apiKey?.key || '',
+        };
     }
 }

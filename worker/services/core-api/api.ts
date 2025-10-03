@@ -2719,6 +2719,22 @@ export class Api<
     });
 
   /**
+   * @description Returns the API key associated with the specified MCP permission ID.
+   *
+   * @tags Mcp
+   * @name McpControllerGetMcpApiKey
+   * @summary Get the API key for a specific MCP permission.
+   * @request GET:/api/mcp/{id}/api-key
+   */
+  mcpControllerGetMcpApiKey = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/mcp/${id}/api-key`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * No description
    *
    * @tags Sse

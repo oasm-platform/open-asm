@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { User } from 'src/modules/auth/entities/user.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
@@ -19,9 +19,12 @@ class McpPermissionValue {
 export class McpPermission extends BaseEntity {
     @ApiProperty({ example: 'MCP Permission' })
     @Column({ default: 'Unnamed' })
+    @IsString()
     name: string;
     @ApiProperty({ example: 'Allows access to assets in the workspaces', required: false })
     @Column({ nullable: true })
+    @IsString()
+    @IsOptional()
     description: string;
     @Column({ type: 'json' })
     @ApiProperty({ isArray: true })
