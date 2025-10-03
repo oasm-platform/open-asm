@@ -20,7 +20,7 @@ export const WorkspaceId = createParamDecorator<string | undefined>(
       return rawHeader[0];
     }
 
-    if (typeof rawHeader === 'string' && isUUID(rawHeader)) {
+    if (typeof rawHeader === 'string' && isUUID(rawHeader, 7)) {
       return rawHeader;
     }
 

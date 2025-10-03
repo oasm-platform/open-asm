@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { v7 as uuidv7 } from 'uuid';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { getManyResponse } from 'src/utils/getManyResponse';
@@ -205,7 +205,7 @@ export class AssetsService {
     value: string;
   }): Promise<Asset> {
     return this.assetRepo.save({
-      id: randomUUID(),
+      id: uuidv7(),
       target,
       value,
       isPrimary: true,

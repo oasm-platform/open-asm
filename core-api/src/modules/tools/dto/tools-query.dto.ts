@@ -13,12 +13,12 @@ export class ToolsQueryDto extends GetManyBaseQueryParams {
   category?: ToolCategory;
 
   @ApiProperty({ required: false })
-  @IsUUID()
+  @IsUUID(7)
   @IsOptional()
   workspaceId?: string;
 
   @ApiProperty({ required: false })
-  @IsUUID()
+  @IsUUID(7)
   @IsOptional()
   providerId?: string;
 }

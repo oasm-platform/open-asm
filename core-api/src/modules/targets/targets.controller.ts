@@ -83,7 +83,7 @@ export class TargetsController {
   @Delete(':id/workspace/:workspaceId')
   deleteTargetFromWorkspace(
     @Param() { id }: IdQueryParamDto,
-    @Param('workspaceId', new ParseUUIDPipe({ version: '4' }))
+    @Param('workspaceId', new ParseUUIDPipe({ version: '7' }))
     workspaceId: string,
     @UserContext() userContext: UserContextPayload,
   ) {

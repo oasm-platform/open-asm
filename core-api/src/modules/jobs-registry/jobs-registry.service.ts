@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { v7 as uuidv7 } from 'uuid';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
@@ -151,7 +151,7 @@ export class JobsRegistryService {
 
     for (const asset of filteredAssets) {
       const job = jobRepo.create({
-        id: randomUUID(),
+        id: uuidv7(),
         asset,
         jobName: tool.name,
         status: JobStatus.PENDING,

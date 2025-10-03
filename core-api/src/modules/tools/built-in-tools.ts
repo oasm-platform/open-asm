@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { randomUUID } from 'crypto';
+import { v7 as uuidv7 } from 'uuid';
 import type { Severity } from 'src/common/enums/enum';
 import { ToolCategory } from 'src/common/enums/enum';
 import { Asset } from '../assets/entities/assets.entity';
@@ -31,7 +31,7 @@ export const builtInTools: Tool[] = [
       });
 
       return Object.keys(parsed).map((i) => ({
-        id: randomUUID(),
+        id: uuidv7(),
         value: i,
         dnsRecords: parsed[i],
       })) as Asset[];
@@ -88,7 +88,7 @@ export const builtInTools: Tool[] = [
         .map((line) => {
           try {
             const finding = JSON.parse(line.trim());
-            const vulId = randomUUID();
+            const vulId = uuidv7();
             const filePath = `${vulId}.json`;
             return {
               id: vulId,

@@ -8,7 +8,7 @@ export class GetStatisticQueryDto {
   })
   @IsNotEmpty()
   @IsString()
-  @IsUUID()
+  @IsUUID(7)
   workspaceId: string;
 }
 

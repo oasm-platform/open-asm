@@ -19,7 +19,7 @@ class HttpResponseDTO extends HttpResponse {
 
 export class GetAssetsResponseDto {
   @ApiProperty()
-  @IsUUID()
+  @IsUUID(7)
   id: string;
   @ApiProperty()
   value: string;
@@ -55,7 +55,7 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
     required: false,
     isArray: true,
   })
-  @IsUUID(4, { each: true })
+  @IsUUID(7, { each: true })
   @IsOptional()
   @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   targetIds?: string[];

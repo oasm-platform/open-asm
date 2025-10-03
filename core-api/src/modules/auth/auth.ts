@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { admin, openAPI } from 'better-auth/plugins';
-import { randomUUID } from 'crypto';
+import { v7 as uuidv7 } from 'uuid';
 import 'dotenv/config';
 import { Pool } from 'pg';
 import { AUTH_IGNORE_ROUTERS } from 'src/common/constants/app.constants';
@@ -22,7 +22,7 @@ export const auth = betterAuth({
   trustedOrigins: ['*'],
   advanced: {
     database: {
-      generateId: () => randomUUID(),
+      generateId: () => uuidv7(),
     },
     cookies: {
       session_token: {

@@ -5,12 +5,12 @@ export class AddToolToWorkspaceDto {
   @ApiProperty({
     description: 'The ID of the workspace',
   })
-  @IsUUID()
+  @IsUUID(7)
   workspaceId: string;
 
   @ApiProperty({
     description: 'The ID of the tool',
   })
-  @IsUUID()
+  @IsUUID(7)
   toolId: string;
 }

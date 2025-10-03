@@ -19,7 +19,7 @@ export class ApiKey extends BaseEntity {
   type: ApiKeyType;
 
   @Column({ nullable: true })
-  @IsUUID()
+  @IsUUID(7)
   ref: string;
 
   @ApiProperty()

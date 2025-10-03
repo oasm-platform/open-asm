@@ -8,7 +8,7 @@ export class RunToolDto {
     isArray: true,
     required: false,
   })
-  @IsUUID(4, { each: true })
+  @IsUUID(7, { each: true })
   @IsOptional()
   @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   targetIds?: string[];
@@ -18,7 +18,7 @@ export class RunToolDto {
     isArray: true,
     required: false,
   })
-  @IsUUID(4, { each: true })
+  @IsUUID(7, { each: true })
   @IsOptional()
   @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   assetIds?: string[];

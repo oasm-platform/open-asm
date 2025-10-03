@@ -3,10 +3,10 @@ import { IsUUID } from 'class-validator';
 
 export class RunTemplateDto {
     @ApiProperty({ required: true })
-    @IsUUID()
+    @IsUUID(7)
     templateId: string;
 
     @ApiProperty({ required: true })
-    @IsUUID()
+    @IsUUID(7)
     assetId: string;
 }

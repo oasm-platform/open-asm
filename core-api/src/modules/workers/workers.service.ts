@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { v7 as uuidv7 } from 'uuid';
 import { WORKER_TIMEOUT } from 'src/common/constants/app.constants';
 import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import {
@@ -259,7 +259,7 @@ export class WorkersService {
     }
 
     // Generate a unique ID for the new worker instance
-    const workerId = randomUUID();
+    const workerId = uuidv7();
     const TOKEN_LENGTH = 48;
 
     const { type, scope } = this.determineWorkerTypeAndScope(apiKeyRecord.type);

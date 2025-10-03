@@ -19,7 +19,7 @@ export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   value: string;
 
   @ApiProperty()
-  @IsUUID(4)
+  @IsUUID(7)
   workspaceId: string;
 
   @ApiProperty({ required: false, example: 10 })
@@ -66,7 +66,7 @@ export class SearchResponseDto {
 
 export class GetManySearchHistoryDto extends GetManyBaseQueryParams {
   @ApiProperty({ required: true })
-  @IsUUID(4)
+  @IsUUID(7)
   workspaceId: string;
 
   @ApiProperty({ required: false, example: 10 })

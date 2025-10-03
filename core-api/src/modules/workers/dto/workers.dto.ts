@@ -16,7 +16,7 @@ export class WorkerAliveDto {
 
 export class GetManyWorkersDto extends GetManyBaseQueryParams {
   @ApiProperty({ required: false })
-  @IsUUID('4')
+  @IsUUID(7)
   @IsOptional()
   workspaceId?: string;
 }

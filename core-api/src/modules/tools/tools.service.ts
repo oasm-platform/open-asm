@@ -8,7 +8,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { v7 as uuidv7 } from 'uuid';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { ApiKeyType, ToolCategory, WorkerType } from 'src/common/enums/enum';
 import { getManyResponse } from 'src/utils/getManyResponse';
@@ -51,7 +51,7 @@ export class ToolsService implements OnModuleInit {
     try {
       // Convert builtInTools to Tool entities
       const toolsToInsert = builtInTools.map((tool) => ({
-        id: randomUUID(),
+        id: uuidv7(),
         name: tool.name,
         category: tool.category,
         description: tool.description,

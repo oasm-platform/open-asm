@@ -12,7 +12,7 @@ export class CreateToolDto extends PickType(Tool, [
   @ApiProperty({
     description: 'The ID of the provider',
   })
-  @IsUUID()
+  @IsUUID(7)
   @IsOptional()
   providerId: string;
 }

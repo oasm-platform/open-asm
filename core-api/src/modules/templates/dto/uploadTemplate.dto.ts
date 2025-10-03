@@ -3,7 +3,7 @@ import { IsString, IsUUID } from 'class-validator';
 
 export class UploadTemplateDTO {
   @ApiProperty()
-  @IsUUID()
+  @IsUUID(7)
   templateId: string;
   @ApiProperty()
   @IsString()

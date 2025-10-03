@@ -24,7 +24,7 @@ export class GetNextJobResponseDto {
 
 export class WorkerIdParams {
   @ApiProperty()
-  @IsUUID()
+  @IsUUID(7)
   workerId: string;
 }
 
@@ -45,7 +45,7 @@ export class DataPayloadResult {
 }
 export class UpdateResultDto {
   @ApiProperty()
-  @IsUUID()
+  @IsUUID(7)
   jobId: string;
   @ApiProperty()
   @IsObject()
@@ -125,11 +125,11 @@ export class JobTimelineResponseDto {
 }
 export class CreateJobsDto {
   @ApiProperty()
-  @IsUUID('all', { each: true })
+  @IsUUID(7, { each: true })
   toolIds: string[];
 
   @ApiProperty()
-  @IsUUID()
+  @IsUUID(7)
   targetId: string;
 }
 

@@ -9,13 +9,13 @@ export class CreateTargetDto extends PickType(Target, ['value'] as const) {
     example: 'xxxxxxxx',
     description: 'The id of the workspace',
   })
-  @IsUUID('4')
+  @IsUUID(7)
   workspaceId: string;
 }
 
 export class GetManyTargetResponseDto {
   @ApiProperty()
-  @IsUUID('4')
+  @IsUUID(7)
   id: string;
 
   @ApiProperty()
