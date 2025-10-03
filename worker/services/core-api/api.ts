@@ -798,6 +798,43 @@ export interface RunTemplateDto {
   assetId: string;
 }
 
+export interface McpTool {
+  name: string;
+  type: string;
+  description: string;
+  moduleId: string;
+}
+
+export interface McpPermissionValue {
+  workspaceId: string;
+  /** @example ["get_assets"] */
+  permissions: string[];
+}
+
+export interface CreateMcpPermissionsRequestDto {
+  value: McpPermissionValue[];
+}
+
+export interface McpPermission {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  /** @example "MCP Permission" */
+  name: string;
+  value: McpPermissionValue[];
+}
+
+export interface GetManyMcpPermissionDto {
+  data: McpPermission[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export enum GetManyTargetResponseDtoScanScheduleEnum {
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
@@ -2606,6 +2643,100 @@ export class Api<
       method: "GET",
       query: query,
       format: "blob",
+      ...params,
+    });
+
+  /**
+   * @description Returns a flattened array of all tools from all MCP modules.
+   *
+   * @tags Mcp
+   * @name McpControllerGetTools
+   * @summary Get all tools from all registered MCP modules.
+   * @request GET:/api/mcp/tools
+   */
+  mcpControllerGetTools = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/mcp/tools`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Creates new MCP permissions based on the provided values.
+   *
+   * @tags Mcp
+   * @name McpControllerCreateMcpPermission
+   * @summary Create MCP permissions for a user.
+   * @request POST:/api/mcp/permissions
+   */
+  mcpControllerCreateMcpPermission = (
+    data: CreateMcpPermissionsRequestDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/mcp/permissions`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Returns the MCP permissions associated with the current user.
+   *
+   * @tags Mcp
+   * @name McpControllerGetMcpPermissions
+   * @summary Get MCP permissions for a user.
+   * @request GET:/api/mcp/permissions
+   */
+  mcpControllerGetMcpPermissions = (
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/mcp/permissions`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Sse
+   * @name SseControllerSse
+   * @request GET:/api/mcp
+   */
+  sseControllerSse = (params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/api/mcp`,
+      method: "GET",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Sse
+   * @name SseControllerMessages
+   * @request POST:/api/messages
+   */
+  sseControllerMessages = (params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/api/messages`,
+      method: "POST",
       ...params,
     });
 }

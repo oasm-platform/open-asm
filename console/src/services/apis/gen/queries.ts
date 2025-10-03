@@ -838,6 +838,39 @@ export type RunTemplateDto = {
   assetId: string;
 };
 
+export type McpTool = {
+  name: string;
+  type: string;
+  description: string;
+  moduleId: string;
+};
+
+export type McpPermissionValue = {
+  workspaceId: string;
+  permissions: string[];
+};
+
+export type CreateMcpPermissionsRequestDto = {
+  value: McpPermissionValue[];
+};
+
+export type McpPermission = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  value: McpPermissionValue[];
+};
+
+export type GetManyMcpPermissionDto = {
+  data: McpPermission[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   page?: number;
   limit?: number;
@@ -1067,6 +1100,13 @@ export type StorageControllerForwardImageParams = {
    * The URL of the image to forward
    */
   url: string;
+};
+
+export type McpControllerGetMcpPermissionsParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -16701,3 +16741,1099 @@ export function useStorageControllerForwardImage<
 
   return query;
 }
+
+/**
+ * Returns a flattened array of all tools from all MCP modules.
+ * @summary Get all tools from all registered MCP modules.
+ */
+export const mcpControllerGetTools = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<McpTool[]>(
+    { url: `/api/mcp/tools`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getMcpControllerGetToolsQueryKey = () => {
+  return [`/api/mcp/tools`] as const;
+};
+
+export const getMcpControllerGetToolsInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetTools>>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof mcpControllerGetTools>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getMcpControllerGetToolsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof mcpControllerGetTools>>
+  > = ({ signal }) => mcpControllerGetTools(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof mcpControllerGetTools>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type McpControllerGetToolsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerGetTools>>
+>;
+export type McpControllerGetToolsInfiniteQueryError = unknown;
+
+export function useMcpControllerGetToolsInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetTools>>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetTools>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetTools>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetToolsInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetTools>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetTools>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetTools>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetToolsInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetTools>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all tools from all registered MCP modules.
+ */
+
+export function useMcpControllerGetToolsInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof mcpControllerGetTools>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getMcpControllerGetToolsInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getMcpControllerGetToolsQueryOptions = <
+  TData = Awaited<ReturnType<typeof mcpControllerGetTools>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof mcpControllerGetTools>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getMcpControllerGetToolsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof mcpControllerGetTools>>
+  > = ({ signal }) => mcpControllerGetTools(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof mcpControllerGetTools>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type McpControllerGetToolsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerGetTools>>
+>;
+export type McpControllerGetToolsQueryError = unknown;
+
+export function useMcpControllerGetTools<
+  TData = Awaited<ReturnType<typeof mcpControllerGetTools>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetTools>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetTools>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetTools<
+  TData = Awaited<ReturnType<typeof mcpControllerGetTools>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetTools>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetTools>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetTools<
+  TData = Awaited<ReturnType<typeof mcpControllerGetTools>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all tools from all registered MCP modules.
+ */
+
+export function useMcpControllerGetTools<
+  TData = Awaited<ReturnType<typeof mcpControllerGetTools>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getMcpControllerGetToolsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Creates new MCP permissions based on the provided values.
+ * @summary Create MCP permissions for a user.
+ */
+export const mcpControllerCreateMcpPermission = (
+  createMcpPermissionsRequestDto: CreateMcpPermissionsRequestDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/mcp/permissions`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createMcpPermissionsRequestDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getMcpControllerCreateMcpPermissionMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof mcpControllerCreateMcpPermission>>,
+    TError,
+    { data: CreateMcpPermissionsRequestDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof mcpControllerCreateMcpPermission>>,
+  TError,
+  { data: CreateMcpPermissionsRequestDto },
+  TContext
+> => {
+  const mutationKey = ['mcpControllerCreateMcpPermission'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof mcpControllerCreateMcpPermission>>,
+    { data: CreateMcpPermissionsRequestDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return mcpControllerCreateMcpPermission(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type McpControllerCreateMcpPermissionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerCreateMcpPermission>>
+>;
+export type McpControllerCreateMcpPermissionMutationBody =
+  CreateMcpPermissionsRequestDto;
+export type McpControllerCreateMcpPermissionMutationError = unknown;
+
+/**
+ * @summary Create MCP permissions for a user.
+ */
+export const useMcpControllerCreateMcpPermission = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof mcpControllerCreateMcpPermission>>,
+      TError,
+      { data: CreateMcpPermissionsRequestDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof mcpControllerCreateMcpPermission>>,
+  TError,
+  { data: CreateMcpPermissionsRequestDto },
+  TContext
+> => {
+  const mutationOptions =
+    getMcpControllerCreateMcpPermissionMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Returns the MCP permissions associated with the current user.
+ * @summary Get MCP permissions for a user.
+ */
+export const mcpControllerGetMcpPermissions = (
+  params?: McpControllerGetMcpPermissionsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyMcpPermissionDto>(
+    { url: `/api/mcp/permissions`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getMcpControllerGetMcpPermissionsQueryKey = (
+  params?: McpControllerGetMcpPermissionsParams,
+) => {
+  return [`/api/mcp/permissions`, ...(params ? [params] : [])] as const;
+};
+
+export const getMcpControllerGetMcpPermissionsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+    McpControllerGetMcpPermissionsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: McpControllerGetMcpPermissionsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData,
+        QueryKey,
+        McpControllerGetMcpPermissionsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getMcpControllerGetMcpPermissionsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+    QueryKey,
+    McpControllerGetMcpPermissionsParams['page']
+  > = ({ signal, pageParam }) =>
+    mcpControllerGetMcpPermissions(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+    TError,
+    TData,
+    QueryKey,
+    McpControllerGetMcpPermissionsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type McpControllerGetMcpPermissionsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
+>;
+export type McpControllerGetMcpPermissionsInfiniteQueryError = unknown;
+
+export function useMcpControllerGetMcpPermissionsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+    McpControllerGetMcpPermissionsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | McpControllerGetMcpPermissionsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData,
+        QueryKey,
+        McpControllerGetMcpPermissionsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetMcpPermissionsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+    McpControllerGetMcpPermissionsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: McpControllerGetMcpPermissionsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData,
+        QueryKey,
+        McpControllerGetMcpPermissionsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetMcpPermissionsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+    McpControllerGetMcpPermissionsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: McpControllerGetMcpPermissionsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData,
+        QueryKey,
+        McpControllerGetMcpPermissionsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get MCP permissions for a user.
+ */
+
+export function useMcpControllerGetMcpPermissionsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+    McpControllerGetMcpPermissionsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: McpControllerGetMcpPermissionsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData,
+        QueryKey,
+        McpControllerGetMcpPermissionsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getMcpControllerGetMcpPermissionsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getMcpControllerGetMcpPermissionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+  TError = unknown,
+>(
+  params?: McpControllerGetMcpPermissionsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getMcpControllerGetMcpPermissionsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
+  > = ({ signal }) =>
+    mcpControllerGetMcpPermissions(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type McpControllerGetMcpPermissionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
+>;
+export type McpControllerGetMcpPermissionsQueryError = unknown;
+
+export function useMcpControllerGetMcpPermissions<
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+  TError = unknown,
+>(
+  params: undefined | McpControllerGetMcpPermissionsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetMcpPermissions<
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+  TError = unknown,
+>(
+  params?: McpControllerGetMcpPermissionsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+          TError,
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useMcpControllerGetMcpPermissions<
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+  TError = unknown,
+>(
+  params?: McpControllerGetMcpPermissionsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get MCP permissions for a user.
+ */
+
+export function useMcpControllerGetMcpPermissions<
+  TData = Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+  TError = unknown,
+>(
+  params?: McpControllerGetMcpPermissionsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getMcpControllerGetMcpPermissionsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const sseControllerSse = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>({ url: `/api/mcp`, method: 'GET', signal }, options);
+};
+
+export const getSseControllerSseQueryKey = () => {
+  return [`/api/mcp`] as const;
+};
+
+export const getSseControllerSseInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof sseControllerSse>>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof sseControllerSse>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSseControllerSseQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof sseControllerSse>>
+  > = ({ signal }) => sseControllerSse(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof sseControllerSse>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SseControllerSseInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof sseControllerSse>>
+>;
+export type SseControllerSseInfiniteQueryError = unknown;
+
+export function useSseControllerSseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof sseControllerSse>>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof sseControllerSse>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof sseControllerSse>>,
+          TError,
+          Awaited<ReturnType<typeof sseControllerSse>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSseControllerSseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof sseControllerSse>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof sseControllerSse>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof sseControllerSse>>,
+          TError,
+          Awaited<ReturnType<typeof sseControllerSse>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSseControllerSseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof sseControllerSse>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof sseControllerSse>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useSseControllerSseInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof sseControllerSse>>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof sseControllerSse>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSseControllerSseInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getSseControllerSseQueryOptions = <
+  TData = Awaited<ReturnType<typeof sseControllerSse>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof sseControllerSse>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSseControllerSseQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof sseControllerSse>>
+  > = ({ signal }) => sseControllerSse(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof sseControllerSse>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SseControllerSseQueryResult = NonNullable<
+  Awaited<ReturnType<typeof sseControllerSse>>
+>;
+export type SseControllerSseQueryError = unknown;
+
+export function useSseControllerSse<
+  TData = Awaited<ReturnType<typeof sseControllerSse>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof sseControllerSse>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof sseControllerSse>>,
+          TError,
+          Awaited<ReturnType<typeof sseControllerSse>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSseControllerSse<
+  TData = Awaited<ReturnType<typeof sseControllerSse>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof sseControllerSse>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof sseControllerSse>>,
+          TError,
+          Awaited<ReturnType<typeof sseControllerSse>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSseControllerSse<
+  TData = Awaited<ReturnType<typeof sseControllerSse>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof sseControllerSse>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useSseControllerSse<
+  TData = Awaited<ReturnType<typeof sseControllerSse>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof sseControllerSse>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSseControllerSseQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const sseControllerMessages = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>(
+    { url: `/api/messages`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getSseControllerMessagesMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sseControllerMessages>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sseControllerMessages>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['sseControllerMessages'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sseControllerMessages>>,
+    void
+  > = () => {
+    return sseControllerMessages(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SseControllerMessagesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sseControllerMessages>>
+>;
+
+export type SseControllerMessagesMutationError = unknown;
+
+export const useSseControllerMessages = <TError = unknown, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof sseControllerMessages>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof sseControllerMessages>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions = getSseControllerMessagesMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
