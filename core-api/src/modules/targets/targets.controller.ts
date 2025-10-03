@@ -30,7 +30,7 @@ export class TargetsController {
 
   @Doc({
     summary: 'Create a target',
-    description: 'Creates a new target.',
+    description: 'Registers a new security testing target such as a domain, IP address, or network range for vulnerability assessment and continuous monitoring.',
     response: {
       serialization: Target,
     },
@@ -45,7 +45,7 @@ export class TargetsController {
 
   @Doc({
     summary: 'Get all targets in a workspace',
-    description: 'Retrieves all targets in a workspace.',
+    description: 'Fetches a comprehensive list of all registered security testing targets within the specified workspace for vulnerability management and assessment tracking.',
     response: {
       serialization: GetManyResponseDto(GetManyTargetResponseDto),
     },
@@ -63,7 +63,7 @@ export class TargetsController {
 
   @Doc({
     summary: 'Get a target by ID',
-    description: 'Retrieves a target by its ID.',
+    description: 'Fetches detailed information about a specific security testing target using its unique identifier, including configuration and assessment status.',
     response: {
       serialization: Target,
     },
@@ -75,7 +75,7 @@ export class TargetsController {
 
   @Doc({
     summary: 'Delete a target from a workspace',
-    description: 'Deletes a target from a workspace.',
+    description: 'Removes a security testing target from the specified workspace, terminating all associated monitoring and assessment activities.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -96,7 +96,7 @@ export class TargetsController {
 
   @Doc({
     summary: 'Rescan a target',
-    description: 'Rescans a target and triggers a new scan job.',
+    description: 'Initiates a comprehensive security re-assessment of the specified target, triggering new vulnerability scans to identify potential security risks.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -108,7 +108,7 @@ export class TargetsController {
 
   @Doc({
     summary: 'Update a target',
-    description: 'Updates a target.',
+    description: 'Modifies the configuration and properties of an existing security testing target, allowing for dynamic adjustments to assessment parameters.',
     response: {
       serialization: Target,
     },

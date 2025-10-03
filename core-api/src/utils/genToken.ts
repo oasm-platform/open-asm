@@ -12,5 +12,6 @@ export function generateToken(length: number): string {
     throw new Error('Length must be greater than 0');
   }
   const generateCustomId = customAlphabet(alphabet, length);
+
   return generateCustomId();
 }

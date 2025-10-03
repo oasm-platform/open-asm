@@ -17,7 +17,7 @@ export class ApiKeysService {
   constructor(
     @InjectRepository(ApiKey)
     public apiKeysRepository: Repository<ApiKey>,
-  ) {}
+  ) { }
 
   /**
    * Retrieves the current API key by type and reference ID
@@ -34,6 +34,10 @@ export class ApiKeysService {
       where: { type, ref, isRevoked: false },
     });
 
+    if (!apiKey) {
+      throw new NotFoundException('API key not found');
+    }
+
     return apiKey;
   }
 
@@ -42,11 +46,11 @@ export class ApiKeysService {
    * @param createApiKeyDto - Data transfer object containing API key creation data
    * @returns The created API key entity
    */
-  async create(createApiKeyDto: CreateApiKeyDto): Promise<ApiKey> {
+  async create(createApiKeyDto: CreateApiKeyDto, length = API_KEY_LENGTH): Promise<ApiKey> {
     const apiKey = new ApiKey();
     apiKey.name = createApiKeyDto.name;
     apiKey.type = createApiKeyDto.type;
-    apiKey.key = generateToken(API_KEY_LENGTH);
+    apiKey.key = generateToken(length);
     apiKey.isRevoked = false;
     apiKey.ref = createApiKeyDto.ref;
     await this.apiKeysRepository

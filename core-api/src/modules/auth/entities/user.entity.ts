@@ -1,5 +1,6 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { Role } from 'src/common/enums/enum';
+import { McpPermission } from 'src/mcp/entities/mcp-permission.entity';
 import { ToolProvider } from 'src/modules/providers/entities/provider.entity';
 import { SearchHistory } from 'src/modules/search/entities/search-history.entity';
 import { WorkspaceMembers } from 'src/modules/workspaces/entities/workspace-members.entity';
@@ -54,4 +55,7 @@ export class User extends BaseEntity {
 
   @OneToMany(() => ToolProvider, (toolProvider) => toolProvider.owner)
   toolProviders: ToolProvider[];
+
+  @OneToMany(() => McpPermission, (mcpPermission) => mcpPermission.owner)
+  mcpPermissions: McpPermission[];
 }

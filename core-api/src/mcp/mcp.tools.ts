@@ -6,10 +6,13 @@ import { getAssetsSchema, getManyBaseResponseSchema } from './mcp.schema';
 
 @Injectable()
 export class McpTools {
-    constructor(private assetsService: AssetsService) { }
+    constructor(
+        private assetsService: AssetsService,
+    ) { }
+
     @Tool({
         name: 'get_assets',
-        description: 'Returns a list of assets in the target workspace.',
+        description: 'Fetches a list of assets in the workspace with basic details.',
         parameters: getAssetsSchema,
         outputSchema: getManyBaseResponseSchema(z.object({
             id: z.string(),
@@ -27,5 +30,53 @@ export class McpTools {
                 value: i.value
             }))
         };
+    }
+
+    @Tool({
+        name: 'get_workspaces',
+        description: 'Returns available workspaces and their metadata.',
+    })
+    getWorkspaces() {
+        return;
+    }
+
+    @Tool({
+        name: 'get_vulnerabilities',
+        description: 'Lists security vulnerabilities with severity and remediation info.',
+    })
+    getVulnerabilities() {
+        return;
+    }
+
+    @Tool({
+        name: 'get_targets',
+        description: 'Lists security testing targets such as hosts, networks, apps.',
+    })
+    getTargets() {
+        return;
+    }
+
+    @Tool({
+        name: 'get_statistics',
+        description: 'Provides metrics and insights on vulnerabilities and risks.',
+    })
+    getStatistics() {
+        return;
+    }
+
+    @Tool({
+        name: 'start_discovery',
+        description: 'Starts asset discovery to find and catalog new targets.',
+    })
+    startDiscovery() {
+        return;
+    }
+
+    @Tool({
+        name: 'get_tickets',
+        description: 'Fetches security tickets and tasks for tracking issues.',
+    })
+    getTickets() {
+        return;
     }
 }

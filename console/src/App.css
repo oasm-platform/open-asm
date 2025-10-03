@@ -41,3 +41,15 @@
   color: #888;
 }
 
+/* Hide scrollbar but keep scrolling functionality */
+.hide-scrollbar {
+  /* For Chrome, Safari, and newer Edge versions */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  /* For Firefox */
+  scrollbar-width: none;
+  /* For older Edge versions */
+  -ms-overflow-style: none;
+}
+

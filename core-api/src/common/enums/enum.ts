@@ -109,10 +109,9 @@ export enum JobPriority {
  * Enum representing API key types
  */
 export enum ApiKeyType {
-  /** API key used for tools */
   TOOL = 'tool',
-  /** API key used for workspaces */
   WORKSPACE = 'workspace',
+  MCP = 'mcp',
 }
 
 export enum BullMQName {

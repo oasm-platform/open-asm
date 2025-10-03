@@ -19,7 +19,7 @@ export class WorkersController {
 
   @Doc({
     summary: 'Worker alive',
-    description: 'Worker alive',
+    description: 'Confirms the operational status of a security assessment worker node in the cluster.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -32,7 +32,7 @@ export class WorkersController {
 
   @Doc({
     summary: 'Worker join',
-    description: 'Worker join the cluster',
+    description: 'Registers a new security assessment worker node to the distributed processing cluster.',
     response: {
       serialization: WorkerInstance,
     },
@@ -44,7 +44,8 @@ export class WorkersController {
   }
 
   @Doc({
-    summary: 'Gets all workers with pagination and sorting.',
+    summary: 'Get all workers with pagination and sorting.',
+    description: 'Fetches a paginated list of all active security assessment workers in the cluster.',
     response: {
       serialization: GetManyResponseDto(WorkerInstance),
     },

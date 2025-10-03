@@ -1,11 +1,14 @@
 import Page from '@/components/common/page';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus } from 'lucide-react';
 import { useEffect, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import CreateWorkspaceDialog from '../workspaces/create-workspace-dialog';
+import AccountSettings from './components/account-settings';
+import ListMcpPermissions from './components/list-mcp-permissions';
 import ListWorkspaces from './components/list-workspaces';
 import { ThemeSwitcher } from './components/theme-switcher';
-import AccountSettings from './components/account-settings';
 
 interface TabContentProps {
   title: string;
@@ -74,6 +77,18 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
       },
       component: <ListWorkspaces />,
     },
+    {
+      id: 'mcp',
+      label: 'Mcp',
+      content: {
+        title: 'MCP Permissions',
+        description: 'Manage your MCP permissions',
+        action: <Button size={"sm"} variant="outline" onClick={() => navigate('create')}>
+          <Plus size={20} />  Create
+        </Button>,
+      },
+      component: <ListMcpPermissions />,
+    },
   ];
 
   const currentTab = tab || defaultTab;
@@ -86,7 +101,7 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
           onValueChange={handleTabChange}
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-3 max-w-lg mb-4">
+          <TabsList className="grid w-full grid-cols-4 max-w-lg mb-4">
             {settingsTabs.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id}>
                 {tab.label}
