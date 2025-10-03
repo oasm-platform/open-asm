@@ -47,7 +47,7 @@ services:
 
   postgres:
     container_name: oasm-postgres
-    image: postgres:17
+    image: postgres:18
     restart: always
     env_file:
       - ./core-api/.env
