@@ -17,7 +17,7 @@ export class ApiKeysService {
   constructor(
     @InjectRepository(ApiKey)
     public apiKeysRepository: Repository<ApiKey>,
-  ) {}
+  ) { }
 
   /**
    * Retrieves the current API key by type and reference ID

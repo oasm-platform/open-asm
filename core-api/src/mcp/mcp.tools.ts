@@ -6,7 +6,9 @@ import { getAssetsSchema, getManyBaseResponseSchema } from './mcp.schema';
 
 @Injectable()
 export class McpTools {
-    constructor(private assetsService: AssetsService) { }
+    constructor(private assetsService: AssetsService,
+    ) { }
+
     @Tool({
         name: 'get_assets',
         description: 'Returns a list of assets in the target workspace.',
