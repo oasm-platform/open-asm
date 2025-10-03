@@ -1,13 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useMcpControllerGetMcpApiKey } from '@/services/apis/gen/queries';
-import { Plug } from "lucide-react";
+import { Copy, Plug } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
-interface ConnectButtonProps {
+interface ConnectMcpButtonProps {
   id: string
 }
-const ConnectButton = (props: ConnectButtonProps) => {
+const ConnectMcpButton = (props: ConnectMcpButtonProps) => {
   const [open, setOpen] = useState(false);
 
   // Use the hook with enabled option to control when the API call is made
@@ -17,9 +18,10 @@ const ConnectButton = (props: ConnectButtonProps) => {
     }
   });
 
-  const jsonContent = `{
+  const jsonContent =
+    `{
   "mcpServers": {
-    "oasm": {
+    "oasm-platform": {
       "url": "${window.location.origin}/api/mcp",
       "headers": {
         "apikey": "${data?.apiKey}"
@@ -29,7 +31,12 @@ const ConnectButton = (props: ConnectButtonProps) => {
 }`;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(jsonContent);
+    navigator.clipboard.writeText(jsonContent).then(() => {
+      toast.success("Configuration copied to clipboard");
+    }).catch((err) => {
+      console.error('Failed to copy: ', err);
+      toast.error("Failed to copy configuration");
+    });
   };
 
   return (
@@ -50,8 +57,8 @@ const ConnectButton = (props: ConnectButtonProps) => {
               {jsonContent}
             </pre>
           </div>
-          <Button onClick={handleCopy} className="w-full">
-            Copy Configuration
+          <Button variant={"outline"} onClick={handleCopy} className="w-full">
+            <Copy /> Copy
           </Button>
         </div>
       </DialogContent>
@@ -59,4 +66,4 @@ const ConnectButton = (props: ConnectButtonProps) => {
   );
 };
 
-export default ConnectButton;
+export default ConnectMcpButton;

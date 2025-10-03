@@ -104,6 +104,11 @@ const CreateMcpPermission = () => {
     };
 
     const onSubmit = (data: FormData) => {
+        // Check if at least one workspace has selected permissions
+        if (selectedPermissions.length === 0 || selectedPermissions.every(permission => permission.permissions.length === 0)) {
+            toast.error("At least one workspace must be selected with at least one tool");
+            return;
+        }
         // Log the selected permissions to see the structure
         console.log("Selected permissions:", selectedPermissions);
         // Create workspace first, then assign permissions

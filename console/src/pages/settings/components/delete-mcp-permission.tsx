@@ -35,11 +35,11 @@ export const DeleteMcpPermission = ({ id, onDeleted }: DeleteMcpPermissionProps)
 
   return (
     <ConfirmDialog
-      title="Xác nhận xóa quyền MCP"
-      description="Bạn có chắc chắn muốn xóa quyền MCP này? Hành động này không thể hoàn tác."
+      title="Confirm MCP Permission Deletion"
+      description="Are you sure you want to delete this MCP permission? This action cannot be undone."
       onConfirm={handleDelete}
-      confirmText="Xóa"
-      cancelText="Hủy"
+      confirmText="Delete"
+      cancelText="Cancel"
       disabled={isPending}
       trigger={
         <Button variant="ghost" size="icon" disabled={isPending}>

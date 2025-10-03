@@ -1,6 +1,6 @@
 import { type McpPermission } from "@/services/apis/gen/queries";
 import { type ColumnDef } from "@tanstack/react-table";
-import ConnectButton from "./connect-button";
+import ConnectMcpButton from "./connect-button";
 import { DeleteMcpPermission } from "./delete-mcp-permission";
 
 export const mcpPermissionColumns: ColumnDef<McpPermission, unknown>[] = [
@@ -31,7 +31,7 @@ export const mcpPermissionColumns: ColumnDef<McpPermission, unknown>[] = [
     id: "connect",
     header: "",
     cell: ({ row }) => (
-      <ConnectButton id={row.original.id} />
+      <ConnectMcpButton id={row.original.id} />
     ),
   },
   {
