@@ -6,7 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { McpModule, McpTransportType } from '@rekog/mcp-nest';
 import { DatabaseModule } from './database/database.module';
 import { CombineModule } from './modules/combine.module';
-import { StorageModule } from './modules/storage/storage.module'; // assuming this is the correct import path
+import { StorageModule } from './modules/storage/storage.module';
 import { ServicesModule } from './services/services.module';
 
 @Module({
@@ -18,6 +18,7 @@ import { ServicesModule } from './services/services.module';
     McpModule.forRoot({
       name: 'oasm-server',
       instructions: 'OpenASM Server',
+      sseEndpoint: '/mcp',
       version: '1.0.0',
       transport: McpTransportType.SSE,
     }),

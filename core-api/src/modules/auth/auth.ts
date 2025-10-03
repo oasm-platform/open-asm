@@ -3,6 +3,7 @@ import { admin, openAPI } from 'better-auth/plugins';
 import { randomUUID } from 'crypto';
 import 'dotenv/config';
 import { Pool } from 'pg';
+import { AUTH_IGNORE_ROUTERS } from 'src/common/constants/app.constants';
 import { Role } from 'src/common/enums/enum';
 import { databaseConnectionConfig } from 'src/database/database-config';
 
@@ -48,6 +49,7 @@ export const auth = betterAuth({
     freshAge: 10,
     modelName: 'sessions',
   },
+  disabledPaths: AUTH_IGNORE_ROUTERS,
   user: {
     modelName: 'users',
     additionalFields: {

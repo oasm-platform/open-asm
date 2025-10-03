@@ -1,8 +1,6 @@
 import type { ExecutionContext } from '@nestjs/common';
 import { createParamDecorator, SetMetadata } from '@nestjs/common';
 import type { Session } from 'src/modules/auth/entities/session.entity';
-import type { User } from 'src/modules/auth/entities/user.entity';
-import { WorkspaceId } from './workspace-id.decorator';
 import {
   AFTER_HOOK_KEY,
   BEFORE_HOOK_KEY,
@@ -10,6 +8,8 @@ import {
   ROLE_METADATA_KEY,
 } from '../constants/app.constants';
 import type { Role } from '../enums/enum';
+import type { RequestWithMetadata } from '../interfaces/app.interface';
+import { WorkspaceId } from './workspace-id.decorator';
 /**
  * Marks a route as public, allowing unauthenticated access.
  * When applied to a controller method, the AuthGuard will skip authentication checks.
@@ -31,9 +31,9 @@ export const UserContext = createParamDecorator(
   (_data: unknown, context: ExecutionContext) => {
     const request = context
       .switchToHttp()
-      .getRequest<Request & { session: { user: User | null } }>();
+      .getRequest<RequestWithMetadata>();
 
-    return request.session.user;
+    return request.user;
   },
 );
 

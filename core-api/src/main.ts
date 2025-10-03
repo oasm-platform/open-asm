@@ -10,6 +10,7 @@ import * as path from 'path';
 import 'reflect-metadata';
 import { AppModule } from './app.module';
 import {
+  API_GLOBAL_PREFIX,
   APP_NAME,
   AUTH_INSTANCE_KEY,
   DEFAULT_PORT,
@@ -52,7 +53,7 @@ async function bootstrap() {
   );
 
   // Configure global prefix
-  app.setGlobalPrefix('api', { exclude: ['/api/auth/{*path}', '/'] });
+  app.setGlobalPrefix(API_GLOBAL_PREFIX, { exclude: [`/${API_GLOBAL_PREFIX}/auth/{*path}`, '/'] });
 
   // Show Swagger UI in development: http://localhost:3000/api/docs
   const config = new DocumentBuilder()
@@ -64,7 +65,7 @@ async function bootstrap() {
     .setExternalDoc('Authentication Docs', 'auth/docs')
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, documentFactory, {
+  SwaggerModule.setup(`${API_GLOBAL_PREFIX}/docs`, app, documentFactory, {
     swaggerOptions: {
       persistAuthorization: true,
     },

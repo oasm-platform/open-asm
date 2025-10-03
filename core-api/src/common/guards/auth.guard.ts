@@ -1,16 +1,17 @@
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 import type { getSession } from 'better-auth/api';
-import { APIError } from 'better-auth/api';
 import type { Auth } from 'better-auth/auth';
 import { fromNodeHeaders } from 'better-auth/node';
 import {
+  API_GLOBAL_PREFIX,
   AUTH_INSTANCE_KEY,
   ROLE_METADATA_KEY,
 } from '../constants/app.constants';
 import { Role } from '../enums/enum';
+import { RequestWithMetadata, UserContextPayload } from '../interfaces/app.interface';
 
 /**
  * Type representing a valid user session after authentication
@@ -31,7 +32,7 @@ export class AuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     @Inject(AUTH_INSTANCE_KEY)
     private readonly auth: Auth,
-  ) {}
+  ) { }
 
   /**
    * Validates if the current request is authenticated
@@ -46,30 +47,25 @@ export class AuthGuard implements CanActivate {
    * @returns True if the request is authorized to proceed, throws an error otherwise
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const request = context.switchToHttp().getRequest();
-    const session = await this.auth.api.getSession({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const request: RequestWithMetadata = context.switchToHttp().getRequest();
+    const currentSession = await this.auth.api.getSession({
       headers: fromNodeHeaders(request.headers),
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    request.session = session;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    request.user = session?.user ?? null; // useful for observability tools like Sentry
-
+    const isDisabledAuth = this.auth.options.disabledPaths?.map(path => `/${API_GLOBAL_PREFIX}/${path}`)?.includes(request.path);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const isPublic = this.reflector.get('PUBLIC', context.getHandler());
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const isOptional = this.reflector.get('OPTIONAL', context.getHandler());
+    if (isPublic || isDisabledAuth || (isOptional && !currentSession)) return true;
 
-    if (isPublic || (isOptional && !session)) return true;
+    if (!currentSession) {
+      throw new UnauthorizedException();
+    }
 
-    if (!session) {
-      throw new APIError(401, {
-        code: 'UNAUTHORIZED',
-        message: 'Unauthorized',
-      });
+    request.session = currentSession.session;
+    if (currentSession.user) {
+      request.user = currentSession.user as UserContextPayload;
     }
 
     const rolesAccepted = this.reflector.get<Role[]>(
@@ -77,9 +73,10 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const userRole = request.user?.role;
-    this.validateUserRole(rolesAccepted, userRole);
+    if (userRole) {
+      this.validateUserRole(rolesAccepted, userRole);
+    }
     return true;
   }
 
