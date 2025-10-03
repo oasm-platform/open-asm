@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { McpRegistryService } from '@rekog/mcp-nest';
+import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams, GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { ApiKeyType } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
@@ -106,6 +107,37 @@ export class McpService {
 
         return {
             apiKey: apiKey?.key || '',
+        };
+    }
+
+    /**
+     * Delete an MCP permission by ID and its associated API key.
+     * @param userContext The current user context
+     * @param id The ID of the MCP permission to delete
+     * @returns A confirmation message
+     */
+    public async deleteMcpPermissionById(userContext: UserContextPayload, id: string): Promise<DefaultMessageResponseDto> {
+        // Find the permission to delete, ensuring it belongs to the current user
+        const permission = await this.mcpPermissionRepo.findOne({
+            where: {
+                id,
+                owner: { id: userContext.id }
+            }
+        });
+
+        if (!permission) {
+            throw new NotFoundException('MCP permission not found or does not belong to the current user');
+        }
+
+        const apiKey = await this.apiKeyService.getCurrentApiKey(ApiKeyType.MCP, permission.id);
+        if (apiKey) {
+            await this.apiKeyService.revoke(apiKey.id); // Revoke the API key
+        }
+        // Delete the MCP permission
+        await this.mcpPermissionRepo.delete(id);
+
+        return {
+            message: 'MCP permission and its associated API key deleted successfully'
         };
     }
 }

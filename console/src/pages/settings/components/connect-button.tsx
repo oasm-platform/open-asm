@@ -9,14 +9,14 @@ interface ConnectButtonProps {
 }
 const ConnectButton = (props: ConnectButtonProps) => {
   const [open, setOpen] = useState(false);
-  
+
   // Use the hook with enabled option to control when the API call is made
   const { data } = useMcpControllerGetMcpApiKey(props.id, {
     query: {
       enabled: open // Only fetch when dialog is open
     }
   });
-  
+
   const jsonContent = `{
   "mcpServers": {
     "oasm": {

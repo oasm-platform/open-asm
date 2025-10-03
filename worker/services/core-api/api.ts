@@ -2735,6 +2735,25 @@ export class Api<
     });
 
   /**
+   * @description Deletes the MCP permission associated with the current user by ID and also deletes the related API key.
+   *
+   * @tags Mcp
+   * @name McpControllerDeleteMcpPermissionById
+   * @summary Delete MCP permission by ID.
+   * @request DELETE:/api/mcp/permissions/{id}
+   */
+  mcpControllerDeleteMcpPermissionById = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/mcp/permissions/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * No description
    *
    * @tags Sse

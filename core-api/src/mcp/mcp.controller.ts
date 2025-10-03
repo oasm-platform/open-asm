@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { UserContext } from 'src/common/decorators/app.decorator';
 import { Doc } from 'src/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
+import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { GetApiKeyResponseDto } from 'src/modules/tools/dto/get-apikey-response.dto';
 import { GetManyResponseDto } from 'src/utils/getManyResponse';
@@ -82,9 +83,24 @@ export class McpController {
     @Get(':id/api-key')
     getMcpApiKey(
         @UserContext() userContext: UserContextPayload,
-        @Param('id') id: string,
+        @Param() params: IdQueryParamDto,
     ) {
-        return this.mcpService.getMcpApiKey(userContext, id);
+        return this.mcpService.getMcpApiKey(userContext, params.id);
+    }
+
+    @Doc({
+        summary: 'Delete MCP permission by ID.',
+        description: 'Deletes the MCP permission associated with the current user by ID and also deletes the related API key.',
+        response: {
+            serialization: DefaultMessageResponseDto
+        }
+    })
+    @Delete('permissions/:id')
+    deleteMcpPermissionById(
+        @UserContext() userContext: UserContextPayload,
+        @Param() params: IdQueryParamDto,
+    ) {
+        return this.mcpService.deleteMcpPermissionById(userContext, params.id);
     }
 
 }

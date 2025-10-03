@@ -17817,6 +17817,93 @@ export function useMcpControllerGetMcpApiKey<
   return query;
 }
 
+/**
+ * Deletes the MCP permission associated with the current user by ID and also deletes the related API key.
+ * @summary Delete MCP permission by ID.
+ */
+export const mcpControllerDeleteMcpPermissionById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/mcp/permissions/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getMcpControllerDeleteMcpPermissionByIdMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof mcpControllerDeleteMcpPermissionById>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof mcpControllerDeleteMcpPermissionById>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['mcpControllerDeleteMcpPermissionById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof mcpControllerDeleteMcpPermissionById>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return mcpControllerDeleteMcpPermissionById(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type McpControllerDeleteMcpPermissionByIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof mcpControllerDeleteMcpPermissionById>>
+>;
+
+export type McpControllerDeleteMcpPermissionByIdMutationError = unknown;
+
+/**
+ * @summary Delete MCP permission by ID.
+ */
+export const useMcpControllerDeleteMcpPermissionById = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof mcpControllerDeleteMcpPermissionById>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof mcpControllerDeleteMcpPermissionById>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getMcpControllerDeleteMcpPermissionByIdMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
 export const sseControllerSse = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
