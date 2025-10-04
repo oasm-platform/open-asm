@@ -1,18 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useMcpControllerGetMcpApiKey } from '@/services/apis/gen/queries';
+import { useMcpControllerGetMcpApiKey, type McpPermission } from '@/services/apis/gen/queries';
 import { Copy, Plug } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 interface ConnectMcpButtonProps {
-  id: string
+  permission: McpPermission
 }
 const ConnectMcpButton = (props: ConnectMcpButtonProps) => {
   const [open, setOpen] = useState(false);
+  const { permission } = props;
 
   // Use the hook with enabled option to control when the API call is made
-  const { data } = useMcpControllerGetMcpApiKey(props.id, {
+  const { data } = useMcpControllerGetMcpApiKey(permission.id, {
     query: {
       enabled: open // Only fetch when dialog is open
     }
@@ -42,12 +43,12 @@ const ConnectMcpButton = (props: ConnectMcpButtonProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline">
           <Plug className="w-4 h-4 mr-2" />
           Connect
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Connect to MCP Server</DialogTitle>
         </DialogHeader>
