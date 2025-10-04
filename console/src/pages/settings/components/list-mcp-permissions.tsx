@@ -43,10 +43,10 @@ const ListMcpPermissions = () => {
         <div
           key={permission.id}
           className={`p-4 ${index === 0
-              ? 'rounded-t-lg'
-              : index === data.data.length - 1
-                ? 'rounded-b-lg'
-                : ''
+            ? 'rounded-t-lg'
+            : index === data.data.length - 1
+              ? 'rounded-b-lg'
+              : ''
             }`}
         >
           <WorkspacePermissionDetails permission={permission} />

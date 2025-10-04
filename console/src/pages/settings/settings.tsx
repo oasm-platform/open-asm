@@ -53,6 +53,18 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
       component: <AccountSettings />,
     },
     {
+      id: 'mcp',
+      label: 'Mcp',
+      content: {
+        title: 'MCP Permissions',
+        description: 'Manage your MCP permissions',
+        action: <Button size={"sm"} variant="outline" onClick={() => navigate('create')}>
+          <Plus size={20} />  Create
+        </Button>,
+      },
+      component: <ListMcpPermissions />,
+    },
+    {
       id: 'appearance',
       label: 'Appearance',
       content: {
@@ -76,19 +88,7 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
         action: <CreateWorkspaceDialog />,
       },
       component: <ListWorkspaces />,
-    },
-    {
-      id: 'mcp',
-      label: 'Mcp',
-      content: {
-        title: 'MCP Permissions',
-        description: 'Manage your MCP permissions',
-        action: <Button size={"sm"} variant="outline" onClick={() => navigate('create')}>
-          <Plus size={20} />  Create
-        </Button>,
-      },
-      component: <ListMcpPermissions />,
-    },
+    }
   ];
 
   const currentTab = tab || defaultTab;
