@@ -11,7 +11,9 @@ export const DEFAULT_ADMIN_ID = '00bd7b24-2f88-4e2f-84e0-835bf28e7905';
 export const WORKER_TIMEOUT = 10000; // milliseconds
 export const LIMIT_WORKSPACE_CREATE = 5;
 export const API_KEY_LENGTH = 36;
+export const MCP_API_KEY_HEADER = 'mcp-api-key';
 export const WORKER_TOKEN_HEADER = 'worker-token';
 export const AUTH_IGNORE_ROUTERS = ['mcp', 'messages'];
 export const WEBAPP_ANALYZER_SRC_URL =
   'https://raw.githubusercontent.com/oasm-platform/webappanalyzer/main/src';
+export const GET_WORKSPACE_MCP_TOOL_NAME = 'get_workspaces';

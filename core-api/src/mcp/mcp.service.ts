@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { McpRegistryService } from '@rekog/mcp-nest';
+import { GET_WORKSPACE_MCP_TOOL_NAME } from 'src/common/constants/app.constants';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams, GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { ApiKeyType } from 'src/common/enums/enum';
@@ -19,6 +20,24 @@ export class McpService {
         private apiKeyService: ApiKeysService
     ) { }
 
+    /**
+     * Check if the API key is valid and return the permission.
+     * @param key 
+     * @returns 
+     */
+    public async checkApiKey(key: string): Promise<McpPermission> {
+        const apiKey = await this.apiKeyService.findByKey(key);
+        const permission = await this.mcpPermissionRepo.findOne({
+            where: {
+                id: apiKey.ref
+            },
+            relations: ['owner']
+        });
+        if (!permission) {
+            throw new UnauthorizedException('API key not found');
+        }
+        return permission;
+    }
     /**
      * Get MCP permissions for a user.
      * @param queryParams 
@@ -59,7 +78,6 @@ export class McpService {
             ...dto,
             owner: { id: userContext.id },
         });
-
         const newApiKey = await this.apiKeyService.create({
             name: newMcpPermission.name,
             type: ApiKeyType.MCP,
@@ -82,7 +100,7 @@ export class McpService {
             type: tool.type,
             description: tool.metadata.description,
             moduleId: id,
-        }))).flat();
+        }))).flat().filter(tool => tool.name !== GET_WORKSPACE_MCP_TOOL_NAME);
     }
 
     /**

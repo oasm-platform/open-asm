@@ -1,8 +1,8 @@
 import { DataTable } from "@/components/ui/data-table";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
-import { 
-  useMcpControllerGetMcpPermissions, 
-  type McpPermission 
+import {
+  useMcpControllerGetMcpPermissions,
+  type McpPermission
 } from "@/services/apis/gen/queries";
 import { mcpPermissionColumns } from "./mcp-permission-columns";
 
@@ -37,6 +37,7 @@ const ListMcpPermissions = () => {
         columns={mcpPermissionColumns}
         data={data?.data || []}
         isLoading={isLoading}
+        isShowHeader={false}
         page={page + 1}
         pageSize={pageSize}
         totalItems={data?.total || 0}
