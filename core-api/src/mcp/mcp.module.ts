@@ -18,7 +18,7 @@ import { McpTools } from './mcp.tools';
             sseEndpoint: '/mcp',
             version: '1.0.0',
             transport: McpTransportType.SSE,
-            guards: [McpGuard]
+            guards: [McpGuard],
         })
     ],
     providers: [McpTools, McpService],

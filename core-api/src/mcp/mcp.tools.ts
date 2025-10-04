@@ -3,7 +3,6 @@ import { Tool } from '@rekog/mcp-nest';
 import { AssetsService } from 'src/modules/assets/assets.service';
 import z from 'zod';
 import { getAssetsSchema, getManyBaseResponseSchema } from './mcp.schema';
-
 @Injectable()
 export class McpTools {
     constructor(
@@ -37,7 +36,7 @@ export class McpTools {
         description: 'Returns available workspaces and their metadata.',
     })
     getWorkspaces() {
-        return;
+        return 'hello';
     }
 
     @Tool({

@@ -1,8 +1,10 @@
+/* eslint-disable */
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { Request } from 'express';
+import { McpPermission } from 'src/mcp/entities/mcp-permission.entity';
 import { McpService } from 'src/mcp/mcp.service';
 import { MCP_API_KEY_HEADER } from '../constants/app.constants';
+import { RequestWithMetadata } from '../interfaces/app.interface';
 
 /**
  * Guard to validate the presence of an MCP API key in the request headers
@@ -20,17 +22,32 @@ export class McpGuard implements CanActivate {
    * @returns True if the MCP API key is present and valid, throws an error otherwise
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request: Request = context.switchToHttp().getRequest();
-    
+    const request: RequestWithMetadata = context.switchToHttp().getRequest();
     // Extract the MCP API key from headers
     const mcpApiKey = request.headers[MCP_API_KEY_HEADER] as string;
-    
+
     // Validate the API key format and existence
     this.validateApiKey(mcpApiKey);
-    
+
     // Validate the API key with the service
-    await this.validateApiKeyWithService(mcpApiKey);
-    
+    const permissions = await this.validateApiKeyWithService(mcpApiKey);
+
+    request.mcp = {
+      permissions
+    }
+
+    const { body } = request
+    if (body?.method === 'tools/call' && body.params.arguments.workspaceId) {
+      const { workspaceId } = body.params.arguments
+      const workspacePermission = permissions.value.find(permission => permission.workspaceId === workspaceId)
+      if (!workspacePermission) {
+        throw new UnauthorizedException('Workspace ID not found in MCP permissions');
+      }
+      const method = body.params.name
+      if (!workspacePermission.permissions.includes(method)) {
+        throw new UnauthorizedException(`Cannot access method ${method}`);
+      }
+    }
     return true;
   }
 
@@ -57,14 +74,13 @@ export class McpGuard implements CanActivate {
    * @returns The MCP permissions if the key is valid
    * @throws UnauthorizedException if the API key is invalid or not found
    */
-  private async validateApiKeyWithService(apiKey: string): Promise<unknown> {
+  private async validateApiKeyWithService(apiKey: string): Promise<McpPermission> {
     try {
       const permissions = await this.mcpService.checkApiKey(apiKey);
-      
       if (!permissions) {
         throw new UnauthorizedException('MCP API key is invalid');
       }
-      
+
       return permissions;
     } catch (error) {
       // If the service throws an UnauthorizedException, re-throw it

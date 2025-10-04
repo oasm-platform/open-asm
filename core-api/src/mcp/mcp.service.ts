@@ -29,7 +29,8 @@ export class McpService {
         const permission = await this.mcpPermissionRepo.findOne({
             where: {
                 id: apiKey.ref
-            }
+            },
+            relations: ['owner']
         });
         if (!permission) {
             throw new UnauthorizedException('API key not found');
