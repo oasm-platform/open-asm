@@ -5,10 +5,11 @@ import { Copy, Plug } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-interface ConnectMcpButtonProps {
+interface ConnectMcpIconButtonProps {
   id: string
 }
-const ConnectMcpButton = (props: ConnectMcpButtonProps) => {
+
+const ConnectMcpIconButton = (props: ConnectMcpIconButtonProps) => {
   const [open, setOpen] = useState(false);
 
   // Use the hook with enabled option to control when the API call is made
@@ -42,9 +43,8 @@ const ConnectMcpButton = (props: ConnectMcpButtonProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Plug className="w-4 h-4 mr-2" />
-          Connect
+        <Button variant="outline" size="icon">
+          <Plug className="w-4 h-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
@@ -66,4 +66,4 @@ const ConnectMcpButton = (props: ConnectMcpButtonProps) => {
   );
 };
 
-export default ConnectMcpButton;
+export default ConnectMcpIconButton;

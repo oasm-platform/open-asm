@@ -19,6 +19,7 @@ import { AuthGuard } from './common/guards/auth.guard';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
+    logger: ['log', 'error', 'warn', 'verbose'],
   });
   app.set('query parser', 'extended');
 

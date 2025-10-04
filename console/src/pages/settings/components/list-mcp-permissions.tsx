@@ -1,8 +1,8 @@
 import { DataTable } from "@/components/ui/data-table";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
-import { 
-  useMcpControllerGetMcpPermissions, 
-  type McpPermission 
+import {
+  useMcpControllerGetMcpPermissions,
+  type McpPermission
 } from "@/services/apis/gen/queries";
 import { mcpPermissionColumns } from "./mcp-permission-columns";
 
