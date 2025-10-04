@@ -20,6 +20,20 @@ export class ApiKeysService {
   ) { }
 
   /**
+   * Finds an API key by its key value
+   * @param key - The key value of the API key
+   * @returns The API key entity
+   * @throws NotFoundException if the API key with the given key value is not found
+   */
+  async findByKey(key: string): Promise<ApiKey> {
+    const apiKey = await this.apiKeysRepository.findOne({ where: { key, isRevoked: false } });
+    if (!apiKey) {
+      throw new NotFoundException(`API key with key ${key} not found`);
+    }
+    return apiKey;
+  }
+
+  /**
    * Retrieves the current API key by type and reference ID
    * @param type - The type of the API key
    * @param refId - The reference ID of the API key

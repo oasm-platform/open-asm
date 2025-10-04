@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { McpRegistryService } from '@rekog/mcp-nest';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
@@ -19,6 +19,23 @@ export class McpService {
         private apiKeyService: ApiKeysService
     ) { }
 
+    /**
+     * Check if the API key is valid and return the permission.
+     * @param key 
+     * @returns 
+     */
+    public async checkApiKey(key: string): Promise<McpPermission> {
+        const apiKey = await this.apiKeyService.findByKey(key);
+        const permission = await this.mcpPermissionRepo.findOne({
+            where: {
+                id: apiKey.ref
+            }
+        });
+        if (!permission) {
+            throw new UnauthorizedException('API key not found');
+        }
+        return permission;
+    }
     /**
      * Get MCP permissions for a user.
      * @param queryParams 
