@@ -78,7 +78,6 @@ export class McpService {
             ...dto,
             owner: { id: userContext.id },
         });
-
         const newApiKey = await this.apiKeyService.create({
             name: newMcpPermission.name,
             type: ApiKeyType.MCP,

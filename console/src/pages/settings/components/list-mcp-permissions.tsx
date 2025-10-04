@@ -37,6 +37,7 @@ const ListMcpPermissions = () => {
         columns={mcpPermissionColumns}
         data={data?.data || []}
         isLoading={isLoading}
+        isShowHeader={false}
         page={page + 1}
         pageSize={pageSize}
         totalItems={data?.total || 0}

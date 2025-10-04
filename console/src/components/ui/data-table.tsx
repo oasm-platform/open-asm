@@ -160,7 +160,7 @@ export function DataTable<TData, TValue>({
       {filterComponents}
 
       {/* Table */}
-      <div className={cn(isShowHeader && "rounded-md border")}>
+      <div className="rounded-md border">
         <Table>
           {isShowHeader && (
             <TableHeader>

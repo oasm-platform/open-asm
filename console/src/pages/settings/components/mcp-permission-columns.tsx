@@ -55,7 +55,7 @@ const DeleteMcpPermissionOutlined = ({ id, onDeleted }: DeleteMcpPermissionProps
 const WorkspacePermissionDetails = ({ permission }: { permission: McpPermission }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { workspaces } = useWorkspaceSelector()
-  
+
   return (
     <div className="space-y-2">
       <button
@@ -69,7 +69,7 @@ const WorkspacePermissionDetails = ({ permission }: { permission: McpPermission 
         </span>
       </button>
       {isExpanded && (
-        <div className="ml-4 space-y-2 border-l-2 border-gray-200 dark:border-gray-700 pl-4 py-2">
+        <div className="ml-4 space-y-2 py-2">
           {permission.value.map((permValue, index) => {
             const workspace = workspaces.find((ws) => ws.id === permValue.workspaceId);
             return (
@@ -108,8 +108,8 @@ export const mcpPermissionColumns: ColumnDef<McpPermission, unknown>[] = [
     enableSorting: false, // Disable sorting for this column
     cell: ({ row }) => (
       <div>
-        <div className="font-medium">{row.getValue("name") || "Unnamed"}</div>
-        <div className="text-gray-500 text-sm">{row.getValue("description") || "No description"}</div>
+        <div className="font-medium">{row.original.name || "Unnamed"}</div>
+        <div className="text-gray-500 text-sm">{row?.original?.description}</div>
       </div>
     ),
   },
