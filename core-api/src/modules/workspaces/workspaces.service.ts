@@ -11,7 +11,7 @@ import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { ApiKeyType } from 'src/common/enums/enum';
 import { UserContextPayload } from 'src/common/interfaces/app.interface';
 import { getManyResponse } from 'src/utils/getManyResponse';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import {
   CreateWorkspaceDto,
@@ -30,7 +30,7 @@ export class WorkspacesService {
     @InjectRepository(WorkspaceMembers)
     private readonly workspaceMembersRepository: Repository<WorkspaceMembers>,
     private apiKeyService: ApiKeysService,
-  ) {}
+  ) { }
 
   /**
    * Creates a new workspace, and adds the requesting user as a member.
@@ -67,6 +67,21 @@ export class WorkspacesService {
     });
 
     return newWorkspace;
+  }
+
+  /**
+   * Retrieves a list of workspaces by their IDs.
+   * @param workspaceIds - An array of workspace IDs to filter.
+   * @returns A promise that resolves to an array of Workspace entities.
+   */
+  public async getWorkspacesByIds(
+    workspaceIds: string[],
+  ): Promise<Workspace[]> {
+    return this.repo.find({
+      where: {
+        id: In(workspaceIds)
+      }
+    });
   }
 
   /**

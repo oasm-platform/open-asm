@@ -16,3 +16,4 @@ export const WORKER_TOKEN_HEADER = 'worker-token';
 export const AUTH_IGNORE_ROUTERS = ['mcp', 'messages'];
 export const WEBAPP_ANALYZER_SRC_URL =
   'https://raw.githubusercontent.com/oasm-platform/webappanalyzer/main/src';
+export const GET_WORKSPACE_MCP_TOOL_NAME = 'get_workspaces';

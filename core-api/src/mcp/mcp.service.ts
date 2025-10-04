@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { McpRegistryService } from '@rekog/mcp-nest';
+import { GET_WORKSPACE_MCP_TOOL_NAME } from 'src/common/constants/app.constants';
 import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams, GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
 import { ApiKeyType } from 'src/common/enums/enum';
@@ -100,7 +101,7 @@ export class McpService {
             type: tool.type,
             description: tool.metadata.description,
             moduleId: id,
-        }))).flat();
+        }))).flat().filter(tool => tool.name !== GET_WORKSPACE_MCP_TOOL_NAME);
     }
 
     /**

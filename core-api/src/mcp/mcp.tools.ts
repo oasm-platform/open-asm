@@ -1,13 +1,41 @@
 import { Injectable } from '@nestjs/common';
-import { Tool } from '@rekog/mcp-nest';
+import { Context, Tool } from '@rekog/mcp-nest';
+import { GET_WORKSPACE_MCP_TOOL_NAME } from 'src/common/constants/app.constants';
+import { RequestWithMetadata } from 'src/common/interfaces/app.interface';
 import { AssetsService } from 'src/modules/assets/assets.service';
+import { WorkspacesService } from 'src/modules/workspaces/workspaces.service';
 import z from 'zod';
 import { getAssetsSchema, getManyBaseResponseSchema } from './mcp.schema';
 @Injectable()
 export class McpTools {
     constructor(
         private assetsService: AssetsService,
+        private workspaceService: WorkspacesService
     ) { }
+
+
+    @Tool({
+        name: GET_WORKSPACE_MCP_TOOL_NAME,
+        description: 'Returns available workspaces and their metadata.',
+        outputSchema: z.object({
+            workspaces: z.array(z.object({
+                id: z.string(),
+                name: z.string(),
+            }))
+        }),
+    })
+    async getWorkspaces(_, context: Context, req: RequestWithMetadata) {
+        const workspaceIds = req.mcp?.permissions.value.map(p => p.workspaceId);
+        if (!workspaceIds) {
+            return [];
+        }
+        const workspaces = await this.workspaceService.getWorkspacesByIds(workspaceIds).then(res => res.map(i => ({
+            id: i.id,
+            name: i.name
+        })));
+
+        return { workspaces };
+    }
 
     @Tool({
         name: 'get_assets',
@@ -29,14 +57,6 @@ export class McpTools {
                 value: i.value
             }))
         };
-    }
-
-    @Tool({
-        name: 'get_workspaces',
-        description: 'Returns available workspaces and their metadata.',
-    })
-    getWorkspaces() {
-        return 'hello';
     }
 
     @Tool({
