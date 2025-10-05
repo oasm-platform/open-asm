@@ -3,16 +3,18 @@ import { Context, Tool } from '@rekog/mcp-nest';
 import { GET_WORKSPACE_MCP_TOOL_NAME } from 'src/common/constants/app.constants';
 import { RequestWithMetadata } from 'src/common/interfaces/app.interface';
 import { AssetsService } from 'src/modules/assets/assets.service';
+import { StatisticService } from 'src/modules/statistic/statistic.service';
 import { TargetsService } from 'src/modules/targets/targets.service';
 import { WorkspacesService } from 'src/modules/workspaces/workspaces.service';
 import z from 'zod';
-import { getAssetsSchema, getManyBaseResponseSchema, getTargetsSchema } from './mcp.schema';
+import { getAssetsSchema, getManyBaseResponseSchema, getTargetsSchema, getVulnerabilitiesOutPutSchema, workspaceParamSchema } from './mcp.schema';
 @Injectable()
 export class McpTools {
     constructor(
         private assetsService: AssetsService,
         private workspaceService: WorkspacesService,
-        private targetsService: TargetsService
+        private targetsService: TargetsService,
+        private statisticService: StatisticService
     ) { }
 
 
@@ -88,9 +90,11 @@ export class McpTools {
     @Tool({
         name: 'get_statistics',
         description: 'Provides metrics and insights on vulnerabilities and risks.',
+        parameters: workspaceParamSchema,
+        outputSchema: getVulnerabilitiesOutPutSchema,
     })
-    getStatistics() {
-        return;
+    getStatistics({ workspaceId }: z.infer<typeof workspaceParamSchema>) {
+        return this.statisticService.getStatistics({ workspaceId });
     }
 
     @Tool({
