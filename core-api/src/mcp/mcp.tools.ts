@@ -3,14 +3,16 @@ import { Context, Tool } from '@rekog/mcp-nest';
 import { GET_WORKSPACE_MCP_TOOL_NAME } from 'src/common/constants/app.constants';
 import { RequestWithMetadata } from 'src/common/interfaces/app.interface';
 import { AssetsService } from 'src/modules/assets/assets.service';
+import { TargetsService } from 'src/modules/targets/targets.service';
 import { WorkspacesService } from 'src/modules/workspaces/workspaces.service';
 import z from 'zod';
-import { getAssetsSchema, getManyBaseResponseSchema } from './mcp.schema';
+import { getAssetsSchema, getManyBaseResponseSchema, getTargetsSchema } from './mcp.schema';
 @Injectable()
 export class McpTools {
     constructor(
         private assetsService: AssetsService,
-        private workspaceService: WorkspacesService
+        private workspaceService: WorkspacesService,
+        private targetsService: TargetsService
     ) { }
 
 
@@ -70,9 +72,17 @@ export class McpTools {
     @Tool({
         name: 'get_targets',
         description: 'Lists security testing targets such as hosts, networks, apps.',
+        parameters: getTargetsSchema,
+        outputSchema: getManyBaseResponseSchema(z.object({
+            id: z.string(),
+            value: z.string(),
+        })),
     })
-    getTargets() {
-        return;
+    getTargets(params: z.infer<typeof getTargetsSchema>) {
+        const { workspaceId, page, limit, value } = params;
+        return this.targetsService.getTargetsInWorkspace({
+            limit: limit || 100, page: page || 1, sortBy: 'createdAt', value
+        }, workspaceId);
     }
 
     @Tool({

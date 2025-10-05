@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { McpModule, McpTransportType } from '@rekog/mcp-nest';
 import { McpGuard } from 'src/common/guards/mcp.guard';
+import { TargetsModule } from 'src/modules/targets/targets.module';
 import { WorkspacesModule } from 'src/modules/workspaces/workspaces.module';
 import { McpPermission } from './entities/mcp-permission.entity';
 import { McpController } from './mcp.controller';
@@ -13,6 +14,7 @@ import { McpTools } from './mcp.tools';
     controllers: [McpController],
     imports: [
         WorkspacesModule,
+        TargetsModule,
         TypeOrmModule.forFeature([McpPermission]),
         McpModule.forRoot({
             name: 'oasm-server',

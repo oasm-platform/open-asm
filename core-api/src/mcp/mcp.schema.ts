@@ -28,3 +28,8 @@ export const getManyBaseResponseSchema = (dataShape: z.ZodSchema) => z.object({
 export const getAssetsSchema = z.object({
     value: z.string().optional().describe('Search assets by value'),
 }).extend(getManyBaseRequestSchema.shape);
+
+
+export const getTargetsSchema = z.object({
+    value: z.string().optional().describe('Search targets by value'),
+}).extend(getManyBaseRequestSchema.shape);
