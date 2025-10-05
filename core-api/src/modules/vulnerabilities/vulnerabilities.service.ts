@@ -73,17 +73,11 @@ export class VulnerabilitiesService {
     // Add search query if provided
     if (q) {
       queryBuilder.andWhere(
-        '(vulnerabilities.name ILIKE :q OR ' +
-        'vulnerabilities.description ILIKE :q OR ' +
-        'vulnerabilities.severity ILIKE :q OR ' +
-        'vulnerabilities.affectedUrl ILIKE :q OR ' +
-        'vulnerabilities.ipAddress ILIKE :q OR ' +
-        'vulnerabilities.host ILIKE :q OR ' +
-        'vulnerabilities.port ILIKE :q OR ' +
-        'vulnerabilities.cveId ILIKE :q OR ' +
-        'vulnerabilities.cweId ILIKE :q OR ' +
-        'vulnerabilities.extractorName ILIKE :q)',
-        { q: `%${q}%` },
+        '"vulnerabilities"."name" ILIKE :q   ',
+        {
+          q: `%${q}%`,
+          qArray: `%${q}%`
+        },
       );
     }
 

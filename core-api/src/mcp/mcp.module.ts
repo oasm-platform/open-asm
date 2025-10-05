@@ -4,6 +4,7 @@ import { McpModule, McpTransportType } from '@rekog/mcp-nest';
 import { McpGuard } from 'src/common/guards/mcp.guard';
 import { StatisticModule } from 'src/modules/statistic/statistic.module';
 import { TargetsModule } from 'src/modules/targets/targets.module';
+import { VulnerabilitiesModule } from 'src/modules/vulnerabilities/vulnerabilities.module';
 import { WorkspacesModule } from 'src/modules/workspaces/workspaces.module';
 import { McpPermission } from './entities/mcp-permission.entity';
 import { McpController } from './mcp.controller';
@@ -19,6 +20,7 @@ import { McpTools } from './mcp.tools';
         WorkspacesModule,
         TargetsModule,
         StatisticModule,
+        VulnerabilitiesModule,
         TypeOrmModule.forFeature([McpPermission]),
         McpModule.forRoot({
             name: 'oasm-server',

@@ -12,7 +12,6 @@ export const WorkspacePermissionDetails = ({ permission }: { permission: McpPerm
     const [isExpanded, setIsExpanded] = useState(false);
     const { workspaces } = useWorkspaceSelector()
     const { data: tools } = useMcpControllerGetMcpTools()
-    console.log(tools);
     return (
         <div className="space-y-2">
             <div className='flex justify-between items-center'>

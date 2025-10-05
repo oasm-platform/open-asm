@@ -5,16 +5,18 @@ import { RequestWithMetadata } from 'src/common/interfaces/app.interface';
 import { AssetsService } from 'src/modules/assets/assets.service';
 import { StatisticService } from 'src/modules/statistic/statistic.service';
 import { TargetsService } from 'src/modules/targets/targets.service';
+import { VulnerabilitiesService } from 'src/modules/vulnerabilities/vulnerabilities.service';
 import { WorkspacesService } from 'src/modules/workspaces/workspaces.service';
 import z from 'zod';
-import { getAssetsSchema, getManyBaseResponseSchema, getTargetsSchema, getVulnerabilitiesOutPutSchema, workspaceParamSchema } from './mcp.schema';
+import { getAssetsSchema, getManyBaseResponseSchema, getStatisticOutPutSchema, getTargetsSchema, getVulnerabilitiesSchema, workspaceParamSchema } from './mcp.schema';
 @Injectable()
 export class McpTools {
     constructor(
         private assetsService: AssetsService,
         private workspaceService: WorkspacesService,
         private targetsService: TargetsService,
-        private statisticService: StatisticService
+        private statisticService: StatisticService,
+        private vulnerabilitiesService: VulnerabilitiesService
     ) { }
 
 
@@ -66,9 +68,18 @@ export class McpTools {
     @Tool({
         name: 'get_vulnerabilities',
         description: 'Lists security vulnerabilities with severity and remediation info.',
+        parameters: getVulnerabilitiesSchema,
+        outputSchema: getManyBaseResponseSchema(z.object({
+            id: z.string(),
+            name: z.string(),
+            severity: z.string(),
+        })),
     })
-    getVulnerabilities() {
-        return;
+    async getVulnerabilities(params: z.infer<typeof getVulnerabilitiesSchema>) {
+        const { workspaceId, page, limit, q } = params;
+        return this.vulnerabilitiesService.getVulnerabilities({
+            limit, page, q, workspaceId, sortBy: 'createdAt'
+        });
     }
 
     @Tool({
@@ -91,25 +102,17 @@ export class McpTools {
         name: 'get_statistics',
         description: 'Provides metrics and insights on vulnerabilities and risks.',
         parameters: workspaceParamSchema,
-        outputSchema: getVulnerabilitiesOutPutSchema,
+        outputSchema: getStatisticOutPutSchema,
     })
     getStatistics({ workspaceId }: z.infer<typeof workspaceParamSchema>) {
         return this.statisticService.getStatistics({ workspaceId });
     }
 
-    @Tool({
-        name: 'start_discovery',
-        description: 'Starts asset discovery to find and catalog new targets.',
-    })
-    startDiscovery() {
-        return;
-    }
-
-    @Tool({
-        name: 'get_tickets',
-        description: 'Fetches security tickets and tasks for tracking issues.',
-    })
-    getTickets() {
-        return;
-    }
+    // @Tool({
+    //     name: 'start_discovery',
+    //     description: 'Starts asset discovery to find and catalog new targets.',
+    // })
+    // startDiscovery() {
+    //     return;
+    // }
 }
