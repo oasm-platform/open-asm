@@ -1,8 +1,8 @@
+import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useMcpControllerDeleteMcpPermissionById } from "@/services/apis/gen/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 /**
  * Component to handle deletion of MCP permission with confirmation dialog
@@ -24,7 +24,7 @@ export const DeleteMcpPermission = ({ id, onDeleted }: DeleteMcpPermissionProps)
         onSuccess: () => {
           // Invalidate and refetch MCP permissions query to update the table
           queryClient.invalidateQueries({ queryKey: ["mcp-permissions"] });
-          
+
           if (onDeleted) {
             onDeleted();
           }
@@ -42,7 +42,7 @@ export const DeleteMcpPermission = ({ id, onDeleted }: DeleteMcpPermissionProps)
       cancelText="Cancel"
       disabled={isPending}
       trigger={
-        <Button variant="ghost" size="icon" disabled={isPending}>
+        <Button size="icon" variant={"outline"} disabled={isPending}>
           <Trash2 className="h-4 w-4 text-destructive" />
         </Button>
       }

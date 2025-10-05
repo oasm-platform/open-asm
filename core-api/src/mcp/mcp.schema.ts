@@ -1,7 +1,7 @@
 import z from 'zod';
 
 export const workspaceParamSchema = z.object({
-    workspaceId: z.string().describe('The ID of the workspace to get many resource'),
+    workspaceId: z.string().describe('The ID of the workspace to get resource'),
 });
 
 /**
@@ -28,3 +28,18 @@ export const getManyBaseResponseSchema = (dataShape: z.ZodSchema) => z.object({
 export const getAssetsSchema = z.object({
     value: z.string().optional().describe('Search assets by value'),
 }).extend(getManyBaseRequestSchema.shape);
+
+export const getVulnerabilitiesSchema = z.object({
+    q: z.string().optional().describe('Search vulnerabilities by name'),
+}).extend(getManyBaseRequestSchema.shape);
+
+export const getTargetsSchema = z.object({
+    value: z.string().optional().describe('Search targets by value'),
+}).extend(getManyBaseRequestSchema.shape);
+
+export const getStatisticOutPutSchema = z.object({
+    totalTargets: z.number().describe('The total number of targets'),
+    totalAssets: z.number().describe('The total number of assets'),
+    totalVulnerabilities: z.number().describe('The total number of vulnerabilities'),
+    totalUniqueTechnologies: z.number().describe('The total number of unique technologies')
+});

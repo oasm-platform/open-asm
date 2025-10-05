@@ -68,7 +68,6 @@ export const builtInTools: Tool[] = [
         .filter((i) => i.includes(':'))
         .map((i) => Number(i.split(':')[1].replace('\r', '')))
         .sort();
-      console.log(parsed, 'parsed');
       return parsed;
     },
     version: '2.3.5',

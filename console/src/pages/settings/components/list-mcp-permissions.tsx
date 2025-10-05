@@ -1,10 +1,8 @@
-import { DataTable } from "@/components/ui/data-table";
 import { useServerDataTable } from "@/hooks/useServerDataTable";
 import {
-  useMcpControllerGetMcpPermissions,
-  type McpPermission
+  useMcpControllerGetMcpPermissions
 } from "@/services/apis/gen/queries";
-import { mcpPermissionColumns } from "./mcp-permission-columns";
+import { WorkspacePermissionDetails } from './mcp-permission-detail';
 
 /**
  * Component to display a list of MCP permissions in a data table
@@ -13,11 +11,10 @@ import { mcpPermissionColumns } from "./mcp-permission-columns";
 const ListMcpPermissions = () => {
   const {
     tableParams: { page, pageSize, sortBy, sortOrder },
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
   } = useServerDataTable();
 
   // Fetch MCP permissions data from the API
-  const { data, isLoading } = useMcpControllerGetMcpPermissions(
+  const { data } = useMcpControllerGetMcpPermissions(
     {
       limit: pageSize,
       page,
@@ -31,25 +28,30 @@ const ListMcpPermissions = () => {
     }
   );
 
+  if (data?.data.length === 0) {
+    return (
+      <div className="p-4 bg-card rounded-lg">
+        <div className="text-center text-gray-500 dark:text-gray-400">
+          No permissions found
+        </div>
+      </div>
+    );
+  }
   return (
-    <div className="space-y-4">
-      <DataTable<McpPermission, unknown>
-        columns={mcpPermissionColumns}
-        data={data?.data || []}
-        isLoading={isLoading}
-        isShowHeader={false}
-        page={page + 1}
-        pageSize={pageSize}
-        totalItems={data?.total || 0}
-        onPageChange={(newPage) => setPage(newPage - 1)}
-        onPageSizeChange={setPageSize}
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSortChange={(newSortBy, newSortOrder) => {
-          setSortBy(newSortBy);
-          setSortOrder(newSortOrder);
-        }}
-      />
+    <div className="divide-y rounded-lg overflow-hidden border">
+      {data?.data.map((permission, index) => (
+        <div
+          key={permission.id}
+          className={`p-4 ${index === 0
+            ? 'rounded-t-lg'
+            : index === data.data.length - 1
+              ? 'rounded-b-lg'
+              : ''
+            }`}
+        >
+          <WorkspacePermissionDetails permission={permission} />
+        </div>
+      ))}
     </div>
   );
 };

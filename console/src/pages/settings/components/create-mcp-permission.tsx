@@ -109,8 +109,6 @@ const CreateMcpPermission = () => {
             toast.error("At least one workspace must be selected with at least one tool");
             return;
         }
-        // Log the selected permissions to see the structure
-        console.log("Selected permissions:", selectedPermissions);
         // Create workspace first, then assign permissions
         mutate({
             data: {
