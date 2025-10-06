@@ -188,16 +188,6 @@ export class TargetsService implements OnModuleInit {
         ELSE '${JobStatus.COMPLETED}'
       END AS status`,
       ])
-      .addSelect((subQuery) => {
-        return subQuery
-          .select(
-            'COALESCE(CAST(EXTRACT(EPOCH FROM MAX(j."completedAt") - targets."lastDiscoveredAt") AS INTEGER), 0)',
-          )
-          .from('jobs', 'j')
-          .innerJoin('assets', 'a', 'a.id = j."assetId"')
-          .where('a."targetId" = targets.id')
-          .andWhere('j."completedAt" IS NOT NULL');
-      }, 'duration')
       .groupBy('targets.id');
 
     if (value) {
