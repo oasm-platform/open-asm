@@ -107,15 +107,15 @@ export class VulnerabilitiesService {
       .leftJoin('workspace_targets.workspace', 'workspaces')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
       .where('workspaces.id = :workspaceId', { workspaceId })
-      .andWhere(
-        `(
-          SELECT MAX(jh."createdAt") 
-          FROM job_histories jh 
-          INNER JOIN vulnerabilities v2 ON v2."jobHistoryId" = jh.id
-          INNER JOIN assets a2 ON v2."assetId" = a2.id
-          WHERE a2."targetId" = targets.id
-        ) = "jobHistory"."createdAt"`,
-      )
+      // .andWhere(
+      //   `(
+      //     SELECT MAX(jh."createdAt") 
+      //     FROM job_histories jh 
+      //     INNER JOIN vulnerabilities v2 ON v2."jobHistoryId" = jh.id
+      //     INNER JOIN assets a2 ON v2."assetId" = a2.id
+      //     WHERE a2."targetId" = targets.id
+      //   ) = "jobHistory"."createdAt"`,
+      // )
       .groupBy('vulnerabilities.severity');
 
     if (targetIds) {

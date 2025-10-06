@@ -258,6 +258,7 @@ export class AssetsService {
     return this.assetRepo.count({
       where: {
         target: { workspaceTargets: { workspace: { id: workspaceId } } },
+        isErrorPage: false
       },
     });
   }
