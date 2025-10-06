@@ -26,6 +26,7 @@ tasks:
       - api:prod
   install:
     cmds:
+      - npm install -D husky
       - task: api:install
       - task: console:install
       - task: worker:install
