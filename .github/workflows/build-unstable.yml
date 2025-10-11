@@ -35,14 +35,14 @@ jobs:
       - name: Build and push
         run: |
           docker buildx build \
-            --platform linux/amd64,linux/arm64 \
+            --platform linux/amd64 \
             --push \
             --tag ${{ env.IMAGE_NAME }}-core-api:latest \
             --tag ${{ env.IMAGE_NAME }}-core-api:${GITHUB_SHA::7} \
             --file ./Dockerfile ./core-api
 
           docker buildx build \
-            --platform linux/amd64,linux/arm64 \
+            --platform linux/amd64 \
             --push \
             --tag ${{ env.IMAGE_NAME }}-worker:latest \
             --tag ${{ env.IMAGE_NAME }}-worker:${GITHUB_SHA::7} \
