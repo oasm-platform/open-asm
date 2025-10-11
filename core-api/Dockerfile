@@ -8,10 +8,10 @@ FROM base AS builder
 
 WORKDIR /app
 
-COPY ./core-api/package*.json ./
+COPY ./package*.json ./
 RUN npm install
 
-COPY ./core-api ./
+COPY ./ ./
 RUN npm run build
 
 # Production stage
@@ -19,7 +19,7 @@ FROM base
 
 WORKDIR /app
 
-COPY ./core-api/package*.json ./
+COPY ./package*.json ./
 RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist

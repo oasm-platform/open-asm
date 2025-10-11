@@ -1,4 +1,4 @@
-FROM golang:1.24 AS tools-base
+FROM golang:1.25 AS tools-base
 
 WORKDIR /app
 
@@ -13,9 +13,8 @@ COPY taskfile.yml .
 
 RUN task tools
 
-FROM oven/bun:1.2 AS base
-RUN apt-get update && apt-get install -y \
-    curl nmap
+FROM oven/bun:1.3 AS base
+RUN apt-get update && apt-get install -y curl nmap
 
 FROM base AS builder
 

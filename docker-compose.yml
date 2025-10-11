@@ -4,8 +4,8 @@ services:
   core-api:
     container_name: oasm-api
     build:
-      context: .
-      dockerfile: ./core-api/Dockerfile
+      context: ./core-api
+      dockerfile: Dockerfile
     networks:
       - oasm
     env_file:
