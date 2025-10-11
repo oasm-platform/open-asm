@@ -1,7 +1,7 @@
 ## https://dawchihliou.github.io/articles/the-last-dockerfile-you-need-for-nestjs
 
-FROM oven/bun:1.3 AS base
-RUN apt-get update && apt-get install -y curl
+FROM node:22-alpine AS base
+RUN apk add --no-cache curl && npm install -g bun@1.3
 
 # Build stage
 FROM base AS builder

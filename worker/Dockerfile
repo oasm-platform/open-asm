@@ -13,8 +13,8 @@ COPY taskfile.yml .
 
 RUN task tools
 
-FROM oven/bun:1.3 AS base
-RUN apt-get update && apt-get install -y curl nmap
+FROM node:22-alpine AS base
+RUN apk add --no-cache curl nmap && npm install -g bun@1.3
 
 FROM base AS builder
 
