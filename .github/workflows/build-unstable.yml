@@ -35,13 +35,11 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --push \
-            --tag ${{ env.IMAGE_NAME }}-api:latest \
-            --tag ${{ env.IMAGE_NAME }}-api:${GITHUB_SHA::7} \
+            --tag ${{ env.IMAGE_NAME }}-api:dev \
             --file ./core-api/Dockerfile ./core-api
 
           docker buildx build \
             --platform linux/amd64 \
             --push \
-            --tag ${{ env.IMAGE_NAME }}-worker:latest \
-            --tag ${{ env.IMAGE_NAME }}-worker:${GITHUB_SHA::7} \
+            --tag ${{ env.IMAGE_NAME }}-worker:dev \
             --file ./worker/Dockerfile ./worker
