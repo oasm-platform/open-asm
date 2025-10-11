@@ -1,26 +1,23 @@
 ## https://dawchihliou.github.io/articles/the-last-dockerfile-you-need-for-nestjs
-FROM node:22-alpine AS base
-# add the missing shared libraries from alpine base image
-RUN apk add --no-cache libc6-compat curl
+
+FROM oven/bun:1.3 AS base
+RUN apt-get update && apt-get install -y curl
 
 # Build stage
 FROM base AS builder
 
 WORKDIR /app
 
-COPY ./package*.json ./
-RUN npm install
-
-COPY ./ ./
-RUN npm run build
+COPY . .
+RUN bun install
+RUN bun run build
+# Clean bun cache and remove unused files
+RUN bun pm cache clean && rm -rf src test
 
 # Production stage
 FROM base
 
 WORKDIR /app
-
-COPY ./package*.json ./
-RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 
