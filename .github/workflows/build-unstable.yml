@@ -41,6 +41,8 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --push \
+            --cache-from=type=registry,ref=${{ env.IMAGE_NAME }}-${{ matrix.service }}:buildcache \
+            --cache-to=type=registry,ref=${{ env.IMAGE_NAME }}-${{ matrix.service }}:buildcache,mode=max \
             --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:dev \
             --file ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}/Dockerfile \
             ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}
