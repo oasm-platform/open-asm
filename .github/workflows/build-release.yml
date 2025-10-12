@@ -59,11 +59,11 @@ jobs:
         with:
           image-ref: '${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.ref_name }}'
           format: 'sarif'
-          output: 'trivy-results.${{ env.IMAGE_NAME }}-${{ matrix.service }}.sarif'
+          output: 'trivy-results.${{ matrix.service }}.sarif'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-results.${{ env.IMAGE_NAME }}-${{ matrix.service }}.sarif'
+          sarif_file: 'trivy-results.${{ matrix.service }}.sarif'
