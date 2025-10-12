@@ -1,9 +1,9 @@
+import { Public, WorkspaceId } from '@/common/decorators/app.decorator';
+import { WorkerTokenAuth } from '@/common/decorators/worker-token-auth.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { Public, WorkspaceId } from 'src/common/decorators/app.decorator';
-import { WorkerTokenAuth } from 'src/common/decorators/worker-token-auth.decorator';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   CreateJobsDto,
   GetNextJobResponseDto,
@@ -16,7 +16,7 @@ import { JobsRegistryService } from './jobs-registry.service';
 
 @Controller('jobs-registry')
 export class JobsRegistryController {
-  constructor(private readonly jobsRegistryService: JobsRegistryService) {}
+  constructor(private readonly jobsRegistryService: JobsRegistryService) { }
 
   @Doc({
     summary: 'Get Jobs',

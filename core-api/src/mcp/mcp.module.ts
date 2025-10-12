@@ -1,18 +1,17 @@
+import { McpGuard } from '@/common/guards/mcp.guard';
+import { StatisticModule } from '@/modules/statistic/statistic.module';
+import { TargetsModule } from '@/modules/targets/targets.module';
+import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
+import { WorkspacesModule } from '@/modules/workspaces/workspaces.module';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { McpModule, McpTransportType } from '@rekog/mcp-nest';
-import { McpGuard } from 'src/common/guards/mcp.guard';
-import { StatisticModule } from 'src/modules/statistic/statistic.module';
-import { TargetsModule } from 'src/modules/targets/targets.module';
-import { VulnerabilitiesModule } from 'src/modules/vulnerabilities/vulnerabilities.module';
-import { WorkspacesModule } from 'src/modules/workspaces/workspaces.module';
 import { McpPermission } from './entities/mcp-permission.entity';
 import { McpController } from './mcp.controller';
 import { McpPrompts } from './mcp.prompt';
 import { McpResources } from './mcp.resource';
 import { McpService } from './mcp.service';
 import { McpTools } from './mcp.tools';
-
 @Global()
 @Module({
     controllers: [McpController],
