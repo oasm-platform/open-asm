@@ -382,6 +382,26 @@ export class AssetsService {
   }
 
   /**
+   * Counts the number of unique ports in a workspace.
+   *
+   * @param workspaceId - The ID of the workspace.
+   * @returns The count of unique ports in the workspace.
+   */
+  public async countUniquePortsInWorkspace(workspaceId: string) {
+    const queryBuilder = this.assetRepo
+      .createQueryBuilder('assets')
+      .leftJoin('assets.target', 'targets')
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .leftJoin('assets.ports', 'ports')
+      .where('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .select('unnest(ports.ports)', 'port')
+      .distinct(true);
+
+    const result = await queryBuilder.getRawMany();
+    return result.length;
+  }
+
+  /**
    * Retrieves a list of Port with number of asset
    *
    * @returns A promise that resolves to the list of port.
