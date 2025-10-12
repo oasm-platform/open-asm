@@ -55,7 +55,7 @@ jobs:
             ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.33
+        uses: aquasecurity/trivy-action@0.33.0
         with:
           image-ref: '${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.ref_name }}'
           format: 'sarif'
