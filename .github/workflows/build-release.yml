@@ -23,6 +23,7 @@ jobs:
     permissions:
       packages: write
       contents: read
+      security-events: write
 
     strategy:
       matrix:
