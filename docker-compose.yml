@@ -3,7 +3,7 @@ version: "3.8"
 services:
   core-api:
     container_name: oasm-api
-    image: oasm/oasm-api:latest
+    image: oasm/oasm-api:v0.1.0
     build:
       context: ./core-api
       dockerfile: Dockerfile
@@ -29,7 +29,7 @@ services:
       timeout: 5s
       retries: 10
 
-  worker:
+  oasm-worker:
     image: oasm/oasm-worker:latest
     build:
       context: ./worker
