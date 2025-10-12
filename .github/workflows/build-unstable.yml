@@ -21,6 +21,7 @@ jobs:
     permissions:
       packages: write
       contents: read
+      security-events: write
 
     strategy:
       matrix:
@@ -51,3 +52,26 @@ jobs:
             --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:dev \
             --file ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}/Dockerfile \
             ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: ${{ runner.os }}-trivy-db
+          restore-keys: |
+            ${{ runner.os }}-trivy-db
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.33.0
+        with:
+          image-ref: '${{ env.IMAGE_NAME }}-${{ matrix.service }}:dev'
+          format: 'sarif'
+          output: 'trivy-results.${{ matrix.service }}.sarif'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.${{ matrix.service }}.sarif'
+
