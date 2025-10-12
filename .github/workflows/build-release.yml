@@ -19,9 +19,15 @@ jobs:
   build:
 #    runs-on: self-hosted
     runs-on: ubuntu-latest
+
     permissions:
       packages: write
       contents: read
+
+    strategy:
+      matrix:
+        service: [api, worker]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -37,13 +43,21 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --push \
-            --tag ${{ env.IMAGE_NAME }}-api:latest \
-            --tag ${{ env.IMAGE_NAME }}-api:${{ github.ref_name }} \
-            --file ./core-api/Dockerfile ./core-api
+            --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:latest \
+            --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.ref_name }} \
+            --file ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}/Dockerfile \
+            ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}
 
-          docker buildx build \
-            --platform linux/amd64 \
-            --push \
-            --tag ${{ env.IMAGE_NAME }}-worker:latest \
-            --tag ${{ env.IMAGE_NAME }}-worker:${{ github.ref_name }} \
-            --file ./worker/Dockerfile ./worker
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.33
+        with:
+          image-ref: '${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.ref_name }}'
+          format: 'sarif'
+          output: 'trivy-results.${{ env.IMAGE_NAME }}-${{ matrix.service }}.sarif'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.${{ env.IMAGE_NAME }}-${{ matrix.service }}.sarif'
