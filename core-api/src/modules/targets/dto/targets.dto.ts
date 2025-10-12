@@ -1,7 +1,7 @@
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { CronSchedule, ScanStatus } from '@/common/enums/enum';
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
-import { CronSchedule, ScanStatus } from 'src/common/enums/enum';
 import { Target } from '../entities/target.entity';
 
 export class CreateTargetDto extends PickType(Target, ['value'] as const) {

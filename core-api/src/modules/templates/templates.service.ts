@@ -1,3 +1,6 @@
+import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import { UserContextPayload } from '@/common/interfaces/app.interface';
+import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
   Injectable,
@@ -5,9 +8,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
-import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { getManyResponse } from 'src/utils/getManyResponse';
 import { FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';

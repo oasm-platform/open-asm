@@ -1,7 +1,7 @@
+import { JobDataResultType } from '@/common/types/app.types';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { JobDataResultType } from 'src/common/types/app.types';
 import { DataSource, InsertResult } from 'typeorm';
 import { JobStatus, ToolCategory } from '../../common/enums/enum';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
@@ -14,7 +14,7 @@ import { DataAdapterInput } from './data-adapter.interface';
 
 @Injectable()
 export class DataAdapterService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(private readonly dataSource: DataSource) { }
 
   public async validateData<T extends object>(
     data: object | object[],

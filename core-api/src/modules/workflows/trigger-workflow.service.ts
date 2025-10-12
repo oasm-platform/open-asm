@@ -1,7 +1,7 @@
+import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
+import { Target } from '@/modules/targets/entities/target.entity';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { JobsRegistryService } from 'src/modules/jobs-registry/jobs-registry.service';
-import { Target } from 'src/modules/targets/entities/target.entity';
 import { DataSource } from 'typeorm';
 import { ToolsService } from '../tools/tools.service';
 import { Workflow } from './entities/workflow.entity';

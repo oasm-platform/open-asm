@@ -1,13 +1,13 @@
+import { Doc } from '@/common/doc/doc.decorator';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Controller, Get } from '@nestjs/common';
-import { WorkflowsService } from './workflows.service';
 import { ApiTags } from '@nestjs/swagger';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
+import { WorkflowsService } from './workflows.service';
 
 @ApiTags('workflows')
 @Controller('workflows')
 export class WorkflowsController {
-  constructor(private readonly workflowsService: WorkflowsService) {}
+  constructor(private readonly workflowsService: WorkflowsService) { }
 
   @Doc({
     summary: 'Get all workflow templates',

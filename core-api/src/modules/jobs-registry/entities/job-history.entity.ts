@@ -1,8 +1,8 @@
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { HttpResponse } from 'src/modules/assets/entities/http-response.entity';
-import { Port } from 'src/modules/assets/entities/ports.entity';
-import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
-import { Workflow } from 'src/modules/workflows/entities/workflow.entity';
+import { BaseEntity } from '@/common/entities/base.entity';
+import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
+import { Port } from '@/modules/assets/entities/ports.entity';
+import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
+import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { Entity, ManyToOne, OneToMany } from 'typeorm';
 import { Job } from './job.entity';
 

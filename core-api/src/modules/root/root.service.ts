@@ -1,11 +1,11 @@
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Injectable } from '@nestjs/common';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { UsersService } from '../users/users.service';
 import { CreateFirstAdminDto, GetMetadataDto } from './dto/root.dto';
 
 @Injectable()
 export class RootService {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   public getHealth(): string {
     return 'OK';

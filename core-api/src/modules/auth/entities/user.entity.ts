@@ -1,10 +1,10 @@
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { Role } from 'src/common/enums/enum';
-import { McpPermission } from 'src/mcp/entities/mcp-permission.entity';
-import { ToolProvider } from 'src/modules/providers/entities/provider.entity';
-import { SearchHistory } from 'src/modules/search/entities/search-history.entity';
-import { WorkspaceMembers } from 'src/modules/workspaces/entities/workspace-members.entity';
-import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
+import { BaseEntity } from '@/common/entities/base.entity';
+import { Role } from '@/common/enums/enum';
+import { McpPermission } from '@/mcp/entities/mcp-permission.entity';
+import { ToolProvider } from '@/modules/providers/entities/provider.entity';
+import { SearchHistory } from '@/modules/search/entities/search-history.entity';
+import { WorkspaceMembers } from '@/modules/workspaces/entities/workspace-members.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { Account } from './account.entity';
 import { Session } from './session.entity';

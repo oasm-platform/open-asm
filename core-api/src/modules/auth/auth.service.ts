@@ -1,6 +1,6 @@
+import { AUTH_INSTANCE_KEY } from '@/common/constants/app.constants';
 import { Inject } from '@nestjs/common';
 import type { Auth } from 'better-auth/auth';
-import { AUTH_INSTANCE_KEY } from 'src/common/constants/app.constants';
 
 /**
  * NestJS service that provides access to the Better Auth instance
@@ -10,7 +10,7 @@ export class AuthService<T extends { api: T['api'] } = Auth> {
   constructor(
     @Inject(AUTH_INSTANCE_KEY)
     private readonly auth: T,
-  ) {}
+  ) { }
 
   /**
    * Returns the API endpoints provided by the auth instance

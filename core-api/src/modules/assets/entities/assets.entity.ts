@@ -1,8 +1,8 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { Job } from '@/modules/jobs-registry/entities/job.entity';
+import { Target } from '@/modules/targets/entities/target.entity';
+import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { Job } from 'src/modules/jobs-registry/entities/job.entity';
-import { Target } from 'src/modules/targets/entities/target.entity';
-import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
 import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { AssetTag } from './asset-tags.entity';
 import { HttpResponse } from './http-response.entity';

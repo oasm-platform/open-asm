@@ -1,7 +1,7 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsNotEmpty, IsString } from 'class-validator';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { Tool } from 'src/modules/tools/entities/tools.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
 import { Asset } from './assets.entity';
 

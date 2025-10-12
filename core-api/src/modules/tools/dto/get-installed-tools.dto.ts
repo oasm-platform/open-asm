@@ -1,6 +1,6 @@
+import { ToolCategory } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { ToolCategory } from 'src/common/enums/enum';
 export class GetInstalledToolsDto {
   @ApiProperty({
     description: 'The ID of the workspace',

@@ -1,7 +1,7 @@
+import { UserContextPayload } from '@/common/interfaces/app.interface';
+import { getManyResponse } from '@/utils/getManyResponse';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { getManyResponse } from 'src/utils/getManyResponse';
 import { ILike, Repository } from 'typeorm';
 import { CreateProviderDto } from './dto/create-provider.dto';
 import { ProvidersQueryDto } from './dto/providers-query.dto';
@@ -13,7 +13,7 @@ export class ProvidersService {
   constructor(
     @InjectRepository(ToolProvider)
     private readonly providersRepository: Repository<ToolProvider>,
-  ) {}
+  ) { }
 
   /**
    * Get all providers with pagination, filtered by owner

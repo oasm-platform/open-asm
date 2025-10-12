@@ -1,3 +1,6 @@
+import { WorkspaceId } from '@/common/decorators/app.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   BadRequestException,
   Body,
@@ -8,12 +11,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { WorkspaceId } from 'src/common/decorators/app.decorator';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
@@ -29,7 +29,7 @@ import { ToolsService } from './tools.service';
 @ApiTags('Tools')
 @Controller('tools')
 export class ToolsController {
-  constructor(private readonly toolsService: ToolsService) {}
+  constructor(private readonly toolsService: ToolsService) { }
 
   @Doc({
     summary: 'Create a new tool',

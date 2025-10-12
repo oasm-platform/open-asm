@@ -1,6 +1,6 @@
+import type { Session } from '@/modules/auth/entities/session.entity';
 import type { ExecutionContext } from '@nestjs/common';
 import { createParamDecorator, SetMetadata } from '@nestjs/common';
-import type { Session } from 'src/modules/auth/entities/session.entity';
 import {
   AFTER_HOOK_KEY,
   BEFORE_HOOK_KEY,
@@ -77,3 +77,4 @@ export const Roles = (...roles: Role[]) => {
 };
 
 export { WorkspaceId };
+

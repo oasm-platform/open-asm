@@ -1,8 +1,8 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { WorkerScope, WorkerType } from '@/common/enums/enum';
+import { Tool } from '@/modules/tools/entities/tools.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { WorkerScope, WorkerType } from 'src/common/enums/enum';
-import { Tool } from 'src/modules/tools/entities/tools.entity';
-import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
 
 @Entity('workers')

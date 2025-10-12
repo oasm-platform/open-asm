@@ -1,5 +1,5 @@
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { JobHistory } from 'src/modules/jobs-registry/entities/job-history.entity';
+import { BaseEntity } from '@/common/entities/base.entity';
+import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Column, Entity, Index, OneToMany } from 'typeorm';
 
 export interface WorkflowContent {

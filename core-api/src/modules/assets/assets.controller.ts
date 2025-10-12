@@ -1,8 +1,8 @@
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { WorkspaceId } from 'src/common/decorators/workspace-id.decorator';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';

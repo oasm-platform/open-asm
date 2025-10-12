@@ -1,7 +1,7 @@
-import { BaseEntity } from 'src/common/entities/base.entity';
+import { BaseEntity } from '@/common/entities/base.entity';
+import { User } from '@/modules/auth/entities/user.entity';
 import { Entity, ManyToOne } from 'typeorm';
 import { Workspace } from './workspace.entity';
-import { User } from 'src/modules/auth/entities/user.entity';
 
 @Entity('workspace_members')
 export class WorkspaceMembers extends BaseEntity {

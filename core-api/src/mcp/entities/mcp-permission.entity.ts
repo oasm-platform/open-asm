@@ -1,7 +1,7 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { User } from '@/modules/auth/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsArray, IsOptional, IsString } from 'class-validator';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { User } from 'src/modules/auth/entities/user.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
 
 

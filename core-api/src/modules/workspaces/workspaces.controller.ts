@@ -1,3 +1,9 @@
+import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { UserContextPayload } from '@/common/interfaces/app.interface';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
   Controller,
@@ -10,12 +16,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { UserContext, WorkspaceId } from 'src/common/decorators/app.decorator';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
-import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   ArchiveWorkspaceDto,
   CreateWorkspaceDto,
@@ -29,7 +29,7 @@ import { WorkspacesService } from './workspaces.service';
 @ApiTags('Workspaces')
 @Controller('workspaces')
 export class WorkspacesController {
-  constructor(private readonly workspacesService: WorkspacesService) {}
+  constructor(private readonly workspacesService: WorkspacesService) { }
 
   @Doc({
     summary: 'Create Workspace',

@@ -1,3 +1,6 @@
+import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
   Controller,
@@ -8,9 +11,6 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { UserContext } from '../../common/decorators/app.decorator';
 import { UserContextPayload } from '../../common/interfaces/app.interface';
 import { CreateProviderDto, ProvidersQueryDto, UpdateProviderDto } from './dto';
@@ -19,7 +19,7 @@ import { ProvidersService } from './providers.service';
 
 @Controller('providers')
 export class ProvidersController {
-  constructor(private readonly providersService: ProvidersService) {}
+  constructor(private readonly providersService: ProvidersService) { }
 
   @Doc({
     summary: 'Get all providers',

@@ -1,6 +1,6 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { User } from '@/modules/auth/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { User } from 'src/modules/auth/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 @Entity('search_histories')

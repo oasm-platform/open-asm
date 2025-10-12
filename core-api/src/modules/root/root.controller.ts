@@ -1,15 +1,15 @@
+import { Public } from '@/common/decorators/app.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Public } from 'src/common/decorators/app.decorator';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
 import { CreateFirstAdminDto, GetMetadataDto } from './dto/root.dto';
 import { RootService } from './root.service';
 
 @ApiTags('Root')
 @Controller()
 export class RootController {
-  constructor(private readonly rootService: RootService) {}
+  constructor(private readonly rootService: RootService) { }
 
   @Public()
   @Get('health')

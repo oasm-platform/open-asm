@@ -1,6 +1,6 @@
+import type { McpPermission } from '@/mcp/entities/mcp-permission.entity';
+import type { Job } from '@/modules/jobs-registry/entities/job.entity';
 import type { Request } from 'express';
-import type { McpPermission } from 'src/mcp/entities/mcp-permission.entity';
-import type { Job } from 'src/modules/jobs-registry/entities/job.entity';
 import type { DataSource } from 'typeorm';
 import type { Role } from '../enums/enum';
 

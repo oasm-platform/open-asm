@@ -1,13 +1,13 @@
+import { ToolCategory, WorkerType } from '@/common/enums/enum';
+import { JobDataResultType } from '@/common/types/app.types';
+import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
+import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
+import { Job } from '@/modules/jobs-registry/entities/job.entity';
+import { ToolProvider } from '@/modules/providers/entities/provider.entity';
+import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
+import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { ToolCategory, WorkerType } from 'src/common/enums/enum';
-import { JobDataResultType } from 'src/common/types/app.types';
-import { ApiKey } from 'src/modules/apikeys/entities/apikey.entity';
-import { AssetTag } from 'src/modules/assets/entities/asset-tags.entity';
-import { Job } from 'src/modules/jobs-registry/entities/job.entity';
-import { ToolProvider } from 'src/modules/providers/entities/provider.entity';
-import { Vulnerability } from 'src/modules/vulnerabilities/entities/vulnerability.entity';
-import { WorkerInstance } from 'src/modules/workers/entities/worker.entity';
 import {
   Column,
   Entity,

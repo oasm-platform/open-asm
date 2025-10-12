@@ -1,6 +1,6 @@
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsUUID } from 'class-validator';
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 
 export class WorkerJoinDto {
   @ApiProperty()

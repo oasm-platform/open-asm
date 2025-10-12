@@ -1,8 +1,8 @@
+import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Controller, Delete, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { UserContext, WorkspaceId } from 'src/common/decorators/app.decorator';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { User } from '../auth/entities/user.entity';
 import { DeleteResponseDto } from './dto/delete-response.dto';
 import {
@@ -16,7 +16,7 @@ import { SearchService } from './search.service';
 @ApiTags('Search')
 @Controller('search')
 export class SearchController {
-  constructor(private readonly searchService: SearchService) {}
+  constructor(private readonly searchService: SearchService) { }
 
   @Doc({
     summary: 'Search assets and targets',

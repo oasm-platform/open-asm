@@ -1,9 +1,9 @@
+import { Public } from '@/common/decorators/app.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Public } from 'src/common/decorators/app.decorator';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   GetManyWorkersDto,
   WorkerAliveDto,
@@ -15,7 +15,7 @@ import { WorkersService } from './workers.service';
 @ApiTags('Workers')
 @Controller('workers')
 export class WorkersController {
-  constructor(private readonly workersService: WorkersService) {}
+  constructor(private readonly workersService: WorkersService) { }
 
   @Doc({
     summary: 'Worker alive',

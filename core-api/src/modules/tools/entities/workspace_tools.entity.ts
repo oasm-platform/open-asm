@@ -1,5 +1,5 @@
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
+import { BaseEntity } from '@/common/entities/base.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Tool } from './tools.entity';
 

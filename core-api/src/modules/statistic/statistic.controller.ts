@@ -1,6 +1,6 @@
+import { Doc } from '@/common/doc/doc.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Doc } from 'src/common/doc/doc.decorator';
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
 import { StatisticService } from './statistic.service';
 

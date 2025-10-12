@@ -1,12 +1,12 @@
+import { GET_WORKSPACE_MCP_TOOL_NAME } from '@/common/constants/app.constants';
+import { RequestWithMetadata } from '@/common/interfaces/app.interface';
+import { AssetsService } from '@/modules/assets/assets.service';
+import { StatisticService } from '@/modules/statistic/statistic.service';
+import { TargetsService } from '@/modules/targets/targets.service';
+import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
+import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { Injectable } from '@nestjs/common';
 import { Context, Tool } from '@rekog/mcp-nest';
-import { GET_WORKSPACE_MCP_TOOL_NAME } from 'src/common/constants/app.constants';
-import { RequestWithMetadata } from 'src/common/interfaces/app.interface';
-import { AssetsService } from 'src/modules/assets/assets.service';
-import { StatisticService } from 'src/modules/statistic/statistic.service';
-import { TargetsService } from 'src/modules/targets/targets.service';
-import { VulnerabilitiesService } from 'src/modules/vulnerabilities/vulnerabilities.service';
-import { WorkspacesService } from 'src/modules/workspaces/workspaces.service';
 import z from 'zod';
 import { getAssetsSchema, getManyBaseResponseSchema, getStatisticOutPutSchema, getTargetsSchema, getVulnerabilitiesSchema, workspaceParamSchema } from './mcp.schema';
 @Injectable()

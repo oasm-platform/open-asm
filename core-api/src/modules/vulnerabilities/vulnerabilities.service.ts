@@ -1,7 +1,7 @@
+import { Severity } from '@/common/enums/enum';
+import { getManyResponse } from '@/utils/getManyResponse';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Severity } from 'src/common/enums/enum';
-import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { ToolsService } from '../tools/tools.service';
