@@ -8,7 +8,7 @@ import { Job } from './job.entity';
 
 @Entity('job_histories')
 export class JobHistory extends BaseEntity {
-  @OneToMany(() => Job, (job) => job.asset, {
+  @OneToMany(() => Job, (job) => job.jobHistory, {
     onDelete: 'CASCADE',
   })
   jobs?: Job[];

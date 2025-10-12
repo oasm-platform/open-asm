@@ -192,6 +192,7 @@ export type Job = {
   status: string;
   pickJobAt: string;
   completedAt: string;
+  command: string;
 };
 
 export type GetManyJobDto = {
@@ -221,10 +222,11 @@ export type JobTimelineResponseDto = {
 };
 
 export type GetNextJobResponseDto = {
-  jobId: string;
-  value: string;
+  id: string;
+  createdAt: string;
+  updatedAt: string;
   category: string;
-  /** Command to run */
+  status: string;
   command: string;
 };
 
@@ -845,15 +847,10 @@ export type McpTool = {
   moduleId: string;
 };
 
-export type McpPermissionValue = {
-  workspaceId: string;
-  permissions: string[];
-};
-
 export type CreateMcpPermissionsRequestDto = {
   name: string;
   description?: string;
-  value: McpPermissionValue[];
+  value: string[];
 };
 
 export type McpPermission = {
@@ -862,7 +859,7 @@ export type McpPermission = {
   updatedAt: string;
   name: string;
   description?: string;
-  value: McpPermissionValue[];
+  value: string[];
 };
 
 export type GetManyMcpPermissionDto = {

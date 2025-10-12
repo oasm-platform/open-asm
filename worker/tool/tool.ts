@@ -1,13 +1,7 @@
 import logger from "node-color-log";
 import coreApi from "../services/core-api";
+import type { Job } from '../services/core-api/api';
 import runCommand from "./runCommand";
-
-interface Job {
-  jobId: string;
-  value: string;
-  category: string;
-  command: string;
-}
 
 export class Tool {
   private queue: Job[] = [];
@@ -190,10 +184,10 @@ export class Tool {
     try {
       const job = (await coreApi.jobsRegistryControllerGetNextJob(
         Tool.workerId!, {
-          headers: {
-            'worker-token': Tool.token
-          }
+        headers: {
+          'worker-token': Tool.token
         }
+      }
       )) as Job;
       return job || null;
     } catch (error) {
@@ -231,14 +225,14 @@ export class Tool {
    * Processes a single job concurrently.
    */
   private async processJobConcurrently(job: Job) {
-    this.processingJobs.add(job.jobId);
+    this.processingJobs.add(job.id);
 
     try {
       await this.jobHandler(job);
     } catch (error) {
-      logger.error(`Job ${job.jobId} failed:`, error);
+      logger.error(`Job ${job.id} failed:`, error);
     } finally {
-      this.processingJobs.delete(job.jobId);
+      this.processingJobs.delete(job.id);
     }
   }
 
@@ -249,10 +243,10 @@ export class Tool {
     const startTime = Date.now();
 
     try {
-      const data = await this.commandExecution(job.command, job.value);
+      const data = await this.commandExecution(job.command);
 
       await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
-        jobId: job.jobId,
+        jobId: job.id,
         data: {
           raw: data,
           error: false,
@@ -267,12 +261,12 @@ export class Tool {
           `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split("-")[0]} - Time: ${executionTime}ms`
         );
     } catch (e) {
-      logger.error(`Failed to handle job ${job.jobId}:`, e);
+      logger.error(`Failed to handle job ${job.id}:`, e);
 
       // Optionally report failure to core
       try {
         await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
-          jobId: job.jobId,
+          jobId: job.id,
           data: {
             raw: `Error: ${e instanceof Error ? e.message : "Unknown error"}`,
             error: true,
@@ -285,7 +279,7 @@ export class Tool {
         });
       } catch (reportError) {
         logger.error(
-          `Failed to report job failure for ${job.jobId}:`,
+          `Failed to report job failure for ${job.id}:`,
           reportError
         );
       }
@@ -293,12 +287,9 @@ export class Tool {
   }
 
   private async commandExecution(
-    commandPattern: string,
-    value: string
+    command: string
   ): Promise<string> {
-    const command = commandPattern
-      .replace(/{{value}}/g, value)
-      .replace(/{{workerId}}/g, Tool.workerId!);
+    console.log(command);
 
     logger.color("blue").log(`[RUNNING]: ${command}`);
 

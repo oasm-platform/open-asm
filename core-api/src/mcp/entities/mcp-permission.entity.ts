@@ -27,7 +27,7 @@ export class McpPermission extends BaseEntity {
     @IsOptional()
     description: string;
     @Column({ type: 'json' })
-    @ApiProperty({ isArray: true })
+    @ApiProperty()
     @IsArray()
     value: McpPermissionValue[];
     @ManyToOne(() => User)

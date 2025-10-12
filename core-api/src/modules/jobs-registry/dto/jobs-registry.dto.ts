@@ -8,19 +8,7 @@ import { IsBoolean, IsIn, IsObject, IsOptional, IsUUID } from 'class-validator';
 import { JobHistory } from '../entities/job-history.entity';
 import { Job } from '../entities/job.entity';
 
-export class GetNextJobResponseDto {
-  @ApiProperty()
-  jobId: string;
-  @ApiProperty()
-  value: string;
-  @ApiProperty()
-  category: ToolCategory;
-  @ApiProperty({
-    description: 'Command to run',
-  })
-  command?: string;
-  job: Job;
-}
+export class GetNextJobResponseDto extends PickType(Job, ['id', 'category', 'status', 'priority', 'createdAt', 'updatedAt', 'command']) { }
 
 export class WorkerIdParams {
   @ApiProperty()
