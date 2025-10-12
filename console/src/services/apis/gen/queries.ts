@@ -41,6 +41,8 @@ export type CronSchedule = (typeof CronSchedule)[keyof typeof CronSchedule];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const CronSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
   '0_0_*_*_0': '0 0 * * 0',
   '0_0_*/14_*_*': '0 0 */14 * *',
   '0_0_1_*_*': '0 0 1 * *',
@@ -72,6 +74,8 @@ export type GetManyTargetResponseDtoScanSchedule =
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const GetManyTargetResponseDtoScanSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
   '0_0_*_*_0': '0 0 * * 0',
   '0_0_*/14_*_*': '0 0 */14 * *',
   '0_0_1_*_*': '0 0 1 * *',
@@ -115,6 +119,8 @@ export type UpdateTargetDtoScanSchedule =
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const UpdateTargetDtoScanSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
   '0_0_*_*_0': '0 0 * * 0',
   '0_0_*/14_*_*': '0 0 */14 * *',
   '0_0_1_*_*': '0 0 1 * *',

@@ -74,6 +74,10 @@ export enum WorkerScope {
  * Enum representing cron job schedules
  */
 export enum CronSchedule {
+  /** Runs daily at 00:00 */
+  DAILY = '0 0 * * *',
+  /** Runs every 3 days at 00:00 */
+  EVERY_3_DAYS = '0 0 */3 * *',
   /** Runs weekly on Sunday at 00:00 */
   WEEKLY = '0 0 * * 0',
   /** Runs bi-weekly on the 1st and 15th of each month at 00:00 */

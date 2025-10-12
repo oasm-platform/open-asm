@@ -11,6 +11,8 @@
  */
 
 export enum CronSchedule {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
   Value001 = "0 0 1 * *",
@@ -840,6 +842,8 @@ export interface GetManyMcpPermissionDto {
 }
 
 export enum GetManyTargetResponseDtoScanScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
   Value001 = "0 0 1 * *",
@@ -852,6 +856,8 @@ export enum GetManyTargetResponseDtoStatusEnum {
 }
 
 export enum UpdateTargetDtoScanScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
   Value001 = "0 0 1 * *",

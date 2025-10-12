@@ -70,6 +70,12 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
     });
 
     const scheduleOptions = [{
+        value: UpdateTargetDtoScanSchedule['0_0_*_*_*'],
+        label: "Daily"
+    }, {
+        value: UpdateTargetDtoScanSchedule['0_0_*/3_*_*'],
+        label: "Every 3 days"
+    }, {
         value: UpdateTargetDtoScanSchedule['0_0_*_*_0'],
         label: "Weekly"
     }, {

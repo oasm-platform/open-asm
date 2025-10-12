@@ -56,6 +56,6 @@ export class Target extends BaseEntity {
   status: JobStatus;
 
   @ApiProperty({ enum: CronSchedule, enumName: 'CronSchedule' })
-  @Column({ type: 'enum', enum: CronSchedule, default: CronSchedule.BI_WEEKLY })
+  @Column({ type: 'enum', enum: CronSchedule, default: CronSchedule.DAILY })
   scanSchedule: CronSchedule;
 }
