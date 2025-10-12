@@ -261,6 +261,7 @@ export class JobsRegistryService {
         updatedAt: job.updatedAt,
         priority: job.priority,
         command: job.command,
+        asset: job.asset.value,
       };
 
       return response;
