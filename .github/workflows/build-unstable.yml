@@ -53,14 +53,6 @@ jobs:
             --file ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}/Dockerfile \
             ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}
 
-      - name: Cache Trivy DB
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/trivy
-          key: ${{ runner.os }}-trivy-db
-          restore-keys: |
-            ${{ runner.os }}-trivy-db
-
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.33.0
         with:
