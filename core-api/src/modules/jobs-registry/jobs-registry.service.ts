@@ -6,6 +6,7 @@ import {
 import { JobPriority, JobStatus, ToolCategory, WorkerType } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { RedisService } from '@/services/redis/redis.service';
+import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadGatewayException,
@@ -159,7 +160,9 @@ export class JobsRegistryService {
         tool,
         priority: priority ?? 4,
         jobHistory,
-        command: defaultCommand,
+        command: bindingCommand(defaultCommand!, {
+          value: asset.value,
+        }),
         isSaveRawResult: isSaveRawResult ?? false,
         isPublishEvent
       } as DeepPartial<Job>);
@@ -242,25 +245,26 @@ export class JobsRegistryService {
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
 
-      let command = '';
-
       if (isBuiltInTools) {
         if (!job.command) {
           await queryRunner.rollbackTransaction();
           return null;
         }
-        command = job.command || '';
       }
 
       await queryRunner.commitTransaction();
 
-      return {
-        jobId: job.id,
-        value: job.asset.value,
-        job,
+      const response: GetNextJobResponseDto = {
+        id: job.id,
         category: job.category,
-        command,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+        priority: job.priority,
+        command: job.command,
       };
+
+      return response;
+
     } catch (error) {
       Logger.error('Error in getNextJob', error);
       await queryRunner.rollbackTransaction();

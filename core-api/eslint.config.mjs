@@ -17,7 +17,7 @@ export default tseslint.config(
       },
       sourceType: 'commonjs',
       parserOptions: {
-        project: ['./tsconfig.json'], // ✅ Bắt buộc để alias @ hoạt động
+        project: ['./tsconfig.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },

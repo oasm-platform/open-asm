@@ -178,6 +178,7 @@ export interface Job {
   pickJobAt: string;
   /** @format date-time */
   completedAt: string;
+  command: string;
 }
 
 export interface GetManyJobDto {
@@ -209,10 +210,13 @@ export interface JobTimelineResponseDto {
 }
 
 export interface GetNextJobResponseDto {
-  jobId: string;
-  value: string;
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
   category: string;
-  /** Command to run */
+  status: string;
   command: string;
 }
 
@@ -805,18 +809,12 @@ export interface McpTool {
   moduleId: string;
 }
 
-export interface McpPermissionValue {
-  workspaceId: string;
-  /** @example ["get_assets"] */
-  permissions: string[];
-}
-
 export interface CreateMcpPermissionsRequestDto {
   /** @example "MCP Permission" */
   name: string;
   /** @example "Allows access to assets in the workspaces" */
   description?: string;
-  value: McpPermissionValue[];
+  value: string[];
 }
 
 export interface McpPermission {
@@ -829,7 +827,7 @@ export interface McpPermission {
   name: string;
   /** @example "Allows access to assets in the workspaces" */
   description?: string;
-  value: McpPermissionValue[];
+  value: string[];
 }
 
 export interface GetManyMcpPermissionDto {

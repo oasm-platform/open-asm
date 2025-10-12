@@ -105,8 +105,8 @@ export class Job extends BaseEntity {
   /**
    * The command executed for this job.
    */
+  @ApiProperty()
   @Column({ nullable: true })
   command?: string;
-
 
 }
