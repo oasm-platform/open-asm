@@ -1,3 +1,8 @@
+import { UserContext } from '@/common/decorators/app.decorator';
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { UserContextPayload } from '@/common/interfaces/app.interface';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
   Controller,
@@ -8,11 +13,6 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { UserContext } from 'src/common/decorators/app.decorator';
-import { WorkspaceId } from 'src/common/decorators/workspace-id.decorator';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
 import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';

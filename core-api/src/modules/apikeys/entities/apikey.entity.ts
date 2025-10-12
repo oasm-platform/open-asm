@@ -1,7 +1,7 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { ApiKeyType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { ApiKeyType } from 'src/common/enums/enum';
 import { Column, Entity } from 'typeorm';
 
 @Entity('api_keys')

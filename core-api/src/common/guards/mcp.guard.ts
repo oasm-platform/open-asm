@@ -1,8 +1,8 @@
 /* eslint-disable */
+import { McpPermission } from '@/mcp/entities/mcp-permission.entity';
+import { McpService } from '@/mcp/mcp.service';
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { McpPermission } from 'src/mcp/entities/mcp-permission.entity';
-import { McpService } from 'src/mcp/mcp.service';
 import { MCP_API_KEY_HEADER } from '../constants/app.constants';
 import { RequestWithMetadata } from '../interfaces/app.interface';
 

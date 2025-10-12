@@ -1,5 +1,5 @@
+import { TechnologyDetailDTO } from '@/modules/technology/dto/technology-detail.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { TechnologyDetailDTO } from 'src/modules/technology/dto/technology-detail.dto';
 
 export class GetTechnologyAssetsDTO {
   @ApiProperty()

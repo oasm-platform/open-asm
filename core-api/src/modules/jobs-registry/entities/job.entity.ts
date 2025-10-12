@@ -1,8 +1,8 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { JobPriority, JobStatus, ToolCategory } from '@/common/enums/enum';
+import { Asset } from '@/modules/assets/entities/assets.entity';
+import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { JobPriority, JobStatus, ToolCategory } from 'src/common/enums/enum';
-import { Asset } from 'src/modules/assets/entities/assets.entity';
-import { Tool } from 'src/modules/tools/entities/tools.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
 import { JobHistory } from './job-history.entity';
 

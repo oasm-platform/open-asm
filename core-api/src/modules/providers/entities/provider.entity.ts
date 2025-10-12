@@ -1,8 +1,8 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { User } from '@/modules/auth/entities/user.entity';
+import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString, IsUrl } from 'class-validator';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { User } from 'src/modules/auth/entities/user.entity';
-import { Tool } from 'src/modules/tools/entities/tools.entity';
 import {
   Column,
   DeleteDateColumn,

@@ -1,6 +1,6 @@
+import { getManyResponse } from '@/utils/getManyResponse';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { getManyResponse } from 'src/utils/getManyResponse';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import { User } from '../auth/entities/user.entity';
@@ -25,7 +25,7 @@ export class SearchService {
 
     private readonly assetService: AssetsService,
     private readonly targetService: TargetsService,
-  ) {}
+  ) { }
 
   /**
    * Searches for assets and targets in a workspace based on the provided query.
@@ -55,21 +55,21 @@ export class SearchService {
     const [assets, targets] = await Promise.all([
       assetsLimit > 0
         ? this.assetService.getAssetsInWorkspace(
-            {
-              ...query,
-              limit: assetsLimit,
-            },
-            workspaceId,
-          )
+          {
+            ...query,
+            limit: assetsLimit,
+          },
+          workspaceId,
+        )
         : { data: [], total: 0, page: 1, pageCount: 0 },
       targetsLimit > 0
         ? this.targetService.getTargetsInWorkspace(
-            {
-              ...query,
-              limit: targetsLimit,
-            },
-            workspaceId,
-          )
+          {
+            ...query,
+            limit: targetsLimit,
+          },
+          workspaceId,
+        )
         : { data: [], total: 0, page: 1, pageCount: 0 },
     ]);
 

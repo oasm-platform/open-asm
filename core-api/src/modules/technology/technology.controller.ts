@@ -1,6 +1,6 @@
+import { Doc } from '@/common/doc/doc.decorator';
 import { Controller, Get, Param } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Doc } from 'src/common/doc/doc.decorator';
 import { TechnologyDetailDTO } from './dto/technology-detail.dto';
 import { TechnologyForwarderService } from './technology-forwarder.service';
 
@@ -13,7 +13,7 @@ interface TechnologyWithCategory extends TechnologyDetailDTO {
 export class TechnologyController {
   constructor(
     private readonly technologyForwarderService: TechnologyForwarderService,
-  ) {}
+  ) { }
 
   @Doc({
     summary: 'Get technology information',

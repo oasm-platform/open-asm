@@ -1,7 +1,7 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { JobHistory } from 'src/modules/jobs-registry/entities/job-history.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Asset } from './assets.entity';
 

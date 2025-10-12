@@ -1,3 +1,6 @@
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { Asset } from '@/modules/assets/entities/assets.entity';
+import { Target } from '@/modules/targets/entities/target.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
@@ -9,9 +12,6 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
-import { Asset } from 'src/modules/assets/entities/assets.entity';
-import { Target } from 'src/modules/targets/entities/target.entity';
 
 export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   @ApiProperty({ required: true })

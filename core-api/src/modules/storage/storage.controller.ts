@@ -1,3 +1,5 @@
+import { Public, Roles } from '@/common/decorators/app.decorator';
+import { Role } from '@/common/enums/enum';
 import {
   BadRequestException,
   Body,
@@ -23,8 +25,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
-import { Public, Roles } from 'src/common/decorators/app.decorator';
-import { Role } from 'src/common/enums/enum';
 import { StorageService } from './storage.service';
 
 @Controller('storage')
@@ -43,7 +43,7 @@ export class StorageController {
     'jar',
   ];
 
-  constructor(private readonly storageService: StorageService) {}
+  constructor(private readonly storageService: StorageService) { }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))

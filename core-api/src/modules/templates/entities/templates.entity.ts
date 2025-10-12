@@ -1,7 +1,7 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, ManyToOne } from 'typeorm';
 
 @Entity('templates')

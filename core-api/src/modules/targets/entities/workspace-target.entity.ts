@@ -1,6 +1,6 @@
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Target } from './target.entity';
-import { Workspace } from 'src/modules/workspaces/entities/workspace.entity';
 
 @Entity('workspace_targets')
 export class WorkspaceTarget {

@@ -1,9 +1,9 @@
-import { Type } from '@nestjs/common';
-import { ApiExtraModels, ApiProperty } from '@nestjs/swagger';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
-} from 'src/common/dtos/get-many-base.dto';
+} from '@/common/dtos/get-many-base.dto';
+import { Type } from '@nestjs/common';
+import { ApiExtraModels, ApiProperty } from '@nestjs/swagger';
 /**
  * Returns a `GetManyResponseDto` object, which is a standardized response
  * object for GET many endpoints.

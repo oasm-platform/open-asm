@@ -1,4 +1,4 @@
-/* eslint-disable no-magic-numbers */
+ 
 import { Injectable, Logger } from '@nestjs/common';
 import { WEBAPP_ANALYZER_SRC_URL } from '../../common/constants/app.constants';
 import { RedisService } from '../../services/redis/redis.service';

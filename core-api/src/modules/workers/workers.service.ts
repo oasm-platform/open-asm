@@ -1,3 +1,13 @@
+import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
+import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import {
+  ApiKeyType,
+  JobStatus,
+  WorkerScope,
+  WorkerType,
+} from '@/common/enums/enum';
+import { generateToken } from '@/utils/genToken';
+import { getManyResponse } from '@/utils/getManyResponse';
 import {
   forwardRef,
   Inject,
@@ -9,16 +19,6 @@ import {
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { WORKER_TIMEOUT } from 'src/common/constants/app.constants';
-import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
-import {
-  ApiKeyType,
-  JobStatus,
-  WorkerScope,
-  WorkerType,
-} from 'src/common/enums/enum';
-import { generateToken } from 'src/utils/genToken';
-import { getManyResponse } from 'src/utils/getManyResponse';
 import { LessThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
@@ -46,7 +46,7 @@ export class WorkersService {
     private jobsRegistryService: JobsRegistryService,
 
     private apiKeyService: ApiKeysService,
-  ) {}
+  ) { }
 
   /**
    * Handles a worker's "alive" signal, which is sent
@@ -295,14 +295,14 @@ export class WorkersService {
     if (!token) {
       return false;
     }
-    
+
     try {
       const worker = await this.repo.findOne({
         where: {
           token: token,
         },
       });
-      
+
       return !!worker;
     } catch (error) {
       this.logger.error('Error validating worker token', error);

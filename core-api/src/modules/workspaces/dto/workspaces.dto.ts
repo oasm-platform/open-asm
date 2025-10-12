@@ -1,16 +1,16 @@
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty, PartialType, PickType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional } from 'class-validator';
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
 import { Workspace } from '../entities/workspace.entity';
 
 export class CreateWorkspaceDto extends PickType(Workspace, [
   'name',
   'description',
   'archivedAt',
-] as const) {}
+] as const) { }
 
-export class UpdateWorkspaceDto extends PartialType(CreateWorkspaceDto) {}
+export class UpdateWorkspaceDto extends PartialType(CreateWorkspaceDto) { }
 
 export class WorkspaceStatisticsResponseDto {
   totalTargets: number;

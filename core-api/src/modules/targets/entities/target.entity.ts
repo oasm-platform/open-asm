@@ -1,10 +1,10 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { CronSchedule, JobStatus } from '@/common/enums/enum';
+import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsString, Matches } from 'class-validator';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { CronSchedule, JobStatus } from 'src/common/enums/enum';
-import { Asset } from 'src/modules/assets/entities/assets.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
 

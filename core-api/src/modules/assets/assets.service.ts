@@ -1,10 +1,10 @@
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import { getManyResponse } from '@/utils/getManyResponse';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { GetManyBaseResponseDto } from 'src/common/dtos/get-many-base.dto';
-import { getManyResponse } from 'src/utils/getManyResponse';
 import { DataSource, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';

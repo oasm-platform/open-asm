@@ -1,6 +1,6 @@
+import { WorkersService } from '@/modules/workers/workers.service';
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { WorkersService } from 'src/modules/workers/workers.service';
 import { WORKER_TOKEN_HEADER } from '../constants/app.constants';
 
 /**
@@ -11,7 +11,7 @@ import { WORKER_TOKEN_HEADER } from '../constants/app.constants';
 export class WorkerTokenGuard implements CanActivate {
   constructor(
     @Inject(WorkersService) private readonly workersService: WorkersService,
-  ) {}
+  ) { }
 
   /**
    * Validates if the current request has a valid worker token
@@ -20,18 +20,18 @@ export class WorkerTokenGuard implements CanActivate {
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request: Request = context.switchToHttp().getRequest();
-    
+
     // Get the worker token from headers
     const workerToken = request.headers[WORKER_TOKEN_HEADER] as string;
-    
+
     // Check if worker token exists
     if (!workerToken) {
       throw new UnauthorizedException('Worker token is missing');
     }
-    
+
     // Validate the worker token against the database
     const isValidToken = await this.workersService.validateWorkerToken(workerToken);
-    
+
     if (!isValidToken) {
       throw new UnauthorizedException('Invalid worker token');
     }

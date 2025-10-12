@@ -1,3 +1,9 @@
+import { UserContext, WorkspaceId } from '@/common/decorators/app.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { UserContextPayload } from '@/common/interfaces/app.interface';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
   Controller,
@@ -9,12 +15,6 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { UserContext, WorkspaceId } from 'src/common/decorators/app.decorator';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { DefaultMessageResponseDto } from 'src/common/dtos/default-message-response.dto';
-import { IdQueryParamDto } from 'src/common/dtos/id-query-param.dto';
-import { UserContextPayload } from 'src/common/interfaces/app.interface';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   CreateTargetDto,
   GetManyTargetResponseDto,
@@ -26,7 +26,7 @@ import { TargetsService } from './targets.service';
 
 @Controller('targets')
 export class TargetsController {
-  constructor(private readonly targetsService: TargetsService) {}
+  constructor(private readonly targetsService: TargetsService) { }
 
   @Doc({
     summary: 'Create a target',

@@ -1,8 +1,8 @@
 /* eslint-disable */
 
+import type { Severity } from '@/common/enums/enum';
+import { ToolCategory } from '@/common/enums/enum';
 import { randomUUID } from 'crypto';
-import type { Severity } from 'src/common/enums/enum';
-import { ToolCategory } from 'src/common/enums/enum';
 import { Asset } from '../assets/entities/assets.entity';
 import type { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { Tool } from './entities/tools.entity';

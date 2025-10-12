@@ -1,6 +1,6 @@
+import { Role } from '@/common/enums/enum';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Role } from 'src/common/enums/enum';
 import { Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
 import { AuthService } from './../auth/auth.service';
@@ -11,7 +11,7 @@ export class UsersService {
     @InjectRepository(User)
     public usersRepository: Repository<User>,
     private authService: AuthService,
-  ) {}
+  ) { }
 
   /**
    * Creates the first admin user in the system.

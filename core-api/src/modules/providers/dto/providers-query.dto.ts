@@ -1,6 +1,6 @@
-import { GetManyBaseQueryParams } from 'src/common/dtos/get-many-base.dto';
-import { IsOptional, IsString } from 'class-validator';
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 
 export class ProvidersQueryDto extends GetManyBaseQueryParams {
   @IsOptional()

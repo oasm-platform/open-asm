@@ -1,11 +1,12 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
+import { User } from '@/modules/auth/entities/user.entity';
+import { WorkspaceTarget } from '@/modules/targets/entities/workspace-target.entity';
+import { Template } from '@/modules/templates/entities/templates.entity';
+import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
+import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsDateString, IsOptional, IsString } from 'class-validator';
-import { BaseEntity } from 'src/common/entities/base.entity';
-import { ApiKey } from 'src/modules/apikeys/entities/apikey.entity';
-import { User } from 'src/modules/auth/entities/user.entity';
-import { WorkspaceTarget } from 'src/modules/targets/entities/workspace-target.entity';
-import { WorkspaceTool } from 'src/modules/tools/entities/workspace_tools.entity';
-import { WorkerInstance } from 'src/modules/workers/entities/worker.entity';
 import {
   Column,
   DeleteDateColumn,
@@ -16,7 +17,6 @@ import {
   OneToOne,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
-import { Template } from 'src/modules/templates/entities/templates.entity';
 
 @Entity('workspaces')
 export class Workspace extends BaseEntity {

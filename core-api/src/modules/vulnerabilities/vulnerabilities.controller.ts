@@ -1,6 +1,6 @@
+import { Doc } from '@/common/doc/doc.decorator';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { Doc } from 'src/common/doc/doc.decorator';
-import { GetManyResponseDto } from 'src/utils/getManyResponse';
 import {
   GetVulnerabilitiesSeverityQueryDto,
   GetVulnerabilitiesSeverityResponseDto,
@@ -18,7 +18,7 @@ import { VulnerabilitiesService } from './vulnerabilities.service';
 export class VulnerabilitiesController {
   constructor(
     private readonly vulnerabilitiesService: VulnerabilitiesService,
-  ) {}
+  ) { }
 
   @Post('scan')
   scan(@Body() scanDto: ScanDto) {

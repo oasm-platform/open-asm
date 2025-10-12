@@ -1,6 +1,6 @@
+import { Role } from '@/common/enums/enum';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
-import { Role } from 'src/common/enums/enum';
 import type { CreateProviderDto } from './dto/create-provider.dto';
 import type { ToolProvider } from './entities/provider.entity';
 import { ProvidersController } from './providers.controller';
@@ -44,7 +44,7 @@ describe('ProvidersController', () => {
     code: 'test-provider-code',
     ownerId: 'user-id',
     isActive: true,
-     
+
     owner: mockUserContext as any,
     tools: [],
     createdAt: new Date(),
@@ -76,7 +76,7 @@ describe('ProvidersController', () => {
     it('should create a provider', async () => {
       const result = await controller.createProvider(
         mockCreateProviderDto,
-         
+
         mockUserContext as any,
       );
       expect(result).toEqual(mockProvider);
