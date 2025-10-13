@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, MoreThanOrEqual } from 'typeorm';
 
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
+import { TimelineResponseDto } from './dto/timeline.dto';
 import { Statistic } from './entities/statistic.entity';
 
 @Injectable()
@@ -75,6 +76,32 @@ export class StatisticService {
       totalAssets: stats?.assets ?? 0,
       totalVulnerabilities: stats?.vuls ?? 0,
       totalUniqueTechnologies: stats?.techs ?? 0,
+    };
+  }
+
+  /**
+   * Retrieves timeline statistics for a workspace within the last 3 months
+   *
+   * @param query - The query parameters containing workspaceId
+   * @returns A promise that resolves to timeline statistics
+   */
+  async getTimelineStatistics(workspaceId: string): Promise<TimelineResponseDto> {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    const statistics = await this.dataSource.getRepository(Statistic).find({
+      where: {
+        workspace: { id: workspaceId },
+        createdAt: MoreThanOrEqual(threeMonthsAgo),
+      },
+      order: {
+        createdAt: 'ASC',
+      },
+    });
+
+    return {
+      data: statistics,
+      total: statistics.length,
     };
   }
 }

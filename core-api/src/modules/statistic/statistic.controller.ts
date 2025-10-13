@@ -1,7 +1,9 @@
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
+import { TimelineResponseDto } from './dto/timeline.dto';
 import { StatisticService } from './statistic.service';
 
 @ApiTags('Statistic')
@@ -19,5 +21,20 @@ export class StatisticController {
   @Get()
   getStatistics(@Query() query: GetStatisticQueryDto) {
     return this.statisticService.getStatistics(query);
+  }
+
+  @Doc({
+    summary: 'Get timeline statistics for a workspace',
+    description: 'Retrieves statistics for a workspace over the last 3 months, showing trends and changes over time.',
+    response: {
+      serialization: TimelineResponseDto,
+    },
+    request: {
+      getWorkspaceId: true
+    }
+  })
+  @Get('timeline')
+  getTimelineStatistics(@WorkspaceId() workspaceId: string) {
+    return this.statisticService.getTimelineStatistics(workspaceId);
   }
 }
