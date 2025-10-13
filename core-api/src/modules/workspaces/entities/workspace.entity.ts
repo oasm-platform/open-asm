@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
 import { User } from '@/modules/auth/entities/user.entity';
+import { Statistic } from '@/modules/statistic/entities/statistic.entity';
 import { WorkspaceTarget } from '@/modules/targets/entities/workspace-target.entity';
 import { Template } from '@/modules/templates/entities/templates.entity';
 import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
@@ -72,4 +73,7 @@ export class Workspace extends BaseEntity {
 
   @OneToMany(() => Template, (template) => template.workspace)
   templates: Template[];
+
+  @OneToMany(() => Statistic, (statistic) => statistic.workspace)
+  statistics: Statistic[];
 }

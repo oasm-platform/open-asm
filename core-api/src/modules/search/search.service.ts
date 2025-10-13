@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import { User } from '../auth/entities/user.entity';
+import { StatisticService } from '../statistic/statistic.service';
 import { TargetsService } from '../targets/targets.service';
 import {
   GetManySearchHistoryDto,
@@ -25,6 +26,7 @@ export class SearchService {
 
     private readonly assetService: AssetsService,
     private readonly targetService: TargetsService,
+    private readonly statisticService: StatisticService,
   ) { }
 
   /**
@@ -40,8 +42,8 @@ export class SearchService {
   ): Promise<SearchResponseDto> {
     // First, get the total count for both assets and targets
     const [assetsCount, targetsCount] = await Promise.all([
-      this.assetService.countAssetsInWorkspace(query.workspaceId),
-      this.targetService.countTargetsInWorkspace(query.workspaceId),
+      this.statisticService.getTotalAssets(query),
+      this.statisticService.getTotalTargets(query),
     ]);
 
     const totalItems = assetsCount + targetsCount;

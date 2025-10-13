@@ -220,6 +220,7 @@ export interface GetNextJobResponseDto {
   category: string;
   status: string;
   command: string;
+  asset: string;
 }
 
 export interface DataPayloadResult {
@@ -530,6 +531,102 @@ export interface DeleteResponseDto {
   success: boolean;
 }
 
+export interface StatisticResponseDto {
+  /**
+   * Total number of targets in the workspace
+   * @example 10
+   */
+  totalTargets: number;
+  /**
+   * Total number of assets in the workspace
+   * @example 42
+   */
+  totalAssets: number;
+  /**
+   * Total number of vulnerabilities in the workspace
+   * @example 5
+   */
+  totalVulnerabilities: number;
+  /**
+   * Total number of unique technologies in the workspace
+   * @example 15
+   */
+  totalUniqueTechnologies: number;
+}
+
+export interface Statistic {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  /**
+   * Number of assets
+   * @default 0
+   */
+  assets: number;
+  /**
+   * Number of targets
+   * @default 0
+   */
+  targets: number;
+  /**
+   * Number of vulnerabilities
+   * @default 0
+   */
+  vuls: number;
+  /**
+   * Number of critical vulnerabilities
+   * @default 0
+   */
+  criticalVuls: number;
+  /**
+   * Number of high severity vulnerabilities
+   * @default 0
+   */
+  highVuls: number;
+  /**
+   * Number of medium severity vulnerabilities
+   * @default 0
+   */
+  mediumVuls: number;
+  /**
+   * Number of low severity vulnerabilities
+   * @default 0
+   */
+  lowVuls: number;
+  /**
+   * Number of info severity vulnerabilities
+   * @default 0
+   */
+  infoVuls: number;
+  /**
+   * Number of technologies detected
+   * @default 0
+   */
+  techs: number;
+  /**
+   * Number of ports
+   * @default 0
+   */
+  ports: number;
+}
+
+export interface TimelineResponseDto {
+  /** List of statistics over time */
+  data: Statistic[];
+  /**
+   * Total count of timeline records
+   * @example 5
+   */
+  total: number;
+}
+
+export interface ScanDto {
+  /** Target ID */
+  targetId: string;
+}
+
 export interface Tool {
   id: string;
   /** @format date-time */
@@ -545,57 +642,6 @@ export interface Tool {
   isOfficialSupport: boolean;
   type: string;
   providerId: string;
-}
-
-export interface CreateToolDto {
-  name: string;
-  description: string;
-  category: CreateToolDtoCategoryEnum;
-  version: string;
-  logoUrl?: string | null;
-  /** The ID of the provider */
-  providerId: string;
-}
-
-export interface RunToolDto {
-  targetIds?: string[];
-  assetIds?: string[];
-}
-
-export interface WorkspaceTool {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-}
-
-export interface AddToolToWorkspaceDto {
-  /** The ID of the workspace */
-  workspaceId: string;
-  /** The ID of the tool */
-  toolId: string;
-}
-
-export interface InstallToolDto {
-  /** The ID of the workspace */
-  workspaceId: string;
-  /** The ID of the tool */
-  toolId: string;
-}
-
-export interface GetManyToolDto {
-  data: Tool[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
-}
-
-export interface ScanDto {
-  /** Target ID */
-  targetId: string;
 }
 
 export interface Vulnerability {
@@ -650,6 +696,52 @@ export interface GetVulnerabilitiesSeverityResponseDto {
   data: VulnerabilitySeverityDto[];
 }
 
+export interface CreateToolDto {
+  name: string;
+  description: string;
+  category: CreateToolDtoCategoryEnum;
+  version: string;
+  logoUrl?: string | null;
+  /** The ID of the provider */
+  providerId: string;
+}
+
+export interface RunToolDto {
+  targetIds?: string[];
+  assetIds?: string[];
+}
+
+export interface WorkspaceTool {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface AddToolToWorkspaceDto {
+  /** The ID of the workspace */
+  workspaceId: string;
+  /** The ID of the tool */
+  toolId: string;
+}
+
+export interface InstallToolDto {
+  /** The ID of the workspace */
+  workspaceId: string;
+  /** The ID of the tool */
+  toolId: string;
+}
+
+export interface GetManyToolDto {
+  data: Tool[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export type String = object;
 
 export interface GetManyStringDto {
@@ -659,29 +751,6 @@ export interface GetManyStringDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-}
-
-export interface StatisticResponseDto {
-  /**
-   * Total number of targets in the workspace
-   * @example 10
-   */
-  totalTargets: number;
-  /**
-   * Total number of assets in the workspace
-   * @example 42
-   */
-  totalAssets: number;
-  /**
-   * Total number of vulnerabilities in the workspace
-   * @example 5
-   */
-  totalVulnerabilities: number;
-  /**
-   * Total number of unique technologies in the workspace
-   * @example 15
-   */
-  totalUniqueTechnologies: number;
 }
 
 export interface ToolProvider {
@@ -871,14 +940,6 @@ export enum ToolCategoryEnum {
   Classifier = "classifier",
 }
 
-export enum CreateToolDtoCategoryEnum {
-  Subdomains = "subdomains",
-  HttpProbe = "http_probe",
-  PortsScanner = "ports_scanner",
-  Vulnerabilities = "vulnerabilities",
-  Classifier = "classifier",
-}
-
 export enum VulnerabilityStatisticsDtoSeverityEnum {
   Info = "info",
   Low = "low",
@@ -893,6 +954,14 @@ export enum VulnerabilitySeverityDtoSeverityEnum {
   Medium = "medium",
   High = "high",
   Critical = "critical",
+}
+
+export enum CreateToolDtoCategoryEnum {
+  Subdomains = "subdomains",
+  HttpProbe = "http_probe",
+  PortsScanner = "ports_scanner",
+  Vulnerabilities = "vulnerabilities",
+  Classifier = "classifier",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -1952,6 +2021,141 @@ export class Api<
     });
 
   /**
+   * @description Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
+   *
+   * @tags Statistic
+   * @name StatisticControllerGetStatistics
+   * @summary Get workspace statistics
+   * @request GET:/api/statistic
+   */
+  statisticControllerGetStatistics = (
+    query: {
+      /**
+       * The ID of the workspace to get statistics for
+       * @example "123e4567-e89b-12d3-a456-426614174000"
+       */
+      workspaceId: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/statistic`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves statistics for a workspace over the last 3 months, showing trends and changes over time.
+   *
+   * @tags Statistic
+   * @name StatisticControllerGetTimelineStatistics
+   * @summary Get timeline statistics for a workspace
+   * @request GET:/api/statistic/timeline
+   */
+  statisticControllerGetTimelineStatistics = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/statistic/timeline`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerScan
+   * @request POST:/api/vulnerabilities/scan
+   */
+  vulnerabilitiesControllerScan = (data: ScanDto, params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/api/vulnerabilities/scan`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerGetVulnerabilities
+   * @summary Get vulnerabilities
+   * @request GET:/api/vulnerabilities
+   */
+  vulnerabilitiesControllerGetVulnerabilities = (
+    query: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      workspaceId: string;
+      targetIds?: string[];
+      q?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Provides aggregated statistical analysis of security vulnerabilities categorized by severity levels, enabling risk assessment and prioritization of remediation efforts.
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerGetVulnerabilitiesStatistics
+   * @summary Get vulnerabilities statistics
+   * @request GET:/api/vulnerabilities/statistics
+   */
+  vulnerabilitiesControllerGetVulnerabilitiesStatistics = (
+    query: {
+      workspaceId: string;
+      targetIds?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities/statistics`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Provides a detailed breakdown of vulnerability counts by severity level across the workspace hierarchy, following the relationship path from workspace to targets, assets, and vulnerabilities.
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerGetVulnerabilitiesSeverity
+   * @summary Get vulnerabilities severity counts
+   * @request GET:/api/vulnerabilities/severity
+   */
+  vulnerabilitiesControllerGetVulnerabilitiesSeverity = (
+    query: {
+      workspaceId: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities/severity`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Registers a new security assessment tool in the system with specified configuration and capabilities.
    *
    * @tags Tools
@@ -2179,99 +2383,6 @@ export class Api<
     });
 
   /**
-   * No description
-   *
-   * @tags Vulnerabilities
-   * @name VulnerabilitiesControllerScan
-   * @request POST:/api/vulnerabilities/scan
-   */
-  vulnerabilitiesControllerScan = (data: ScanDto, params: RequestParams = {}) =>
-    this.request<any, any>({
-      path: `/api/vulnerabilities/scan`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      ...params,
-    });
-
-  /**
-   * @description Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.
-   *
-   * @tags Vulnerabilities
-   * @name VulnerabilitiesControllerGetVulnerabilities
-   * @summary Get vulnerabilities
-   * @request GET:/api/vulnerabilities
-   */
-  vulnerabilitiesControllerGetVulnerabilities = (
-    query: {
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-      workspaceId: string;
-      targetIds?: string[];
-      q?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/vulnerabilities`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Provides aggregated statistical analysis of security vulnerabilities categorized by severity levels, enabling risk assessment and prioritization of remediation efforts.
-   *
-   * @tags Vulnerabilities
-   * @name VulnerabilitiesControllerGetVulnerabilitiesStatistics
-   * @summary Get vulnerabilities statistics
-   * @request GET:/api/vulnerabilities/statistics
-   */
-  vulnerabilitiesControllerGetVulnerabilitiesStatistics = (
-    query: {
-      workspaceId: string;
-      targetIds?: string[];
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/vulnerabilities/statistics`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Provides a detailed breakdown of vulnerability counts by severity level across the workspace hierarchy, following the relationship path from workspace to targets, assets, and vulnerabilities.
-   *
-   * @tags Vulnerabilities
-   * @name VulnerabilitiesControllerGetVulnerabilitiesSeverity
-   * @summary Get vulnerabilities severity counts
-   * @request GET:/api/vulnerabilities/severity
-   */
-  vulnerabilitiesControllerGetVulnerabilitiesSeverity = (
-    query: {
-      workspaceId: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/vulnerabilities/severity`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
    * @description Retrieves a list of all available workflow templates in YAML format.
    *
    * @tags workflows
@@ -2283,32 +2394,6 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows/templates`,
       method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
-   *
-   * @tags Statistic
-   * @name StatisticControllerGetStatistics
-   * @summary Get workspace statistics
-   * @request GET:/api/statistic
-   */
-  statisticControllerGetStatistics = (
-    query: {
-      /**
-       * The ID of the workspace to get statistics for
-       * @example "123e4567-e89b-12d3-a456-426614174000"
-       */
-      workspaceId: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/statistic`,
-      method: "GET",
-      query: query,
       format: "json",
       ...params,
     });

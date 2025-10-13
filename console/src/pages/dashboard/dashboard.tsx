@@ -1,7 +1,6 @@
 import Page from "@/components/common/page";
-import JobsTimeline from "./jobs-timeline";
-import Statistic from "./statistic";
-import VulnerabilitySeverityDonutChart from "./vulnerability-severity-donut-chart";
+import Statistic from "./components/statistic";
+import VulnerabilitySeverityDonutChart from "./components/vulnerabilities-statistic";
 
 export default function Dashboard() {
     return (
@@ -15,10 +14,8 @@ export default function Dashboard() {
                 </div>
                 <div className="w-full lg:w-1/4 gap-3 flex flex-col h-full">
                     <VulnerabilitySeverityDonutChart />
-                    <JobsTimeline />
                 </div>
             </div>
-
         </Page>
     );
 }

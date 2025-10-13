@@ -2,8 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetStatistics } from '@/services/apis/gen/queries';
-import { Bug, CloudCheck, Target } from 'lucide-react';
+import { CloudCheck, Cpu, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 
 export default function Statistic() {
     const { selectedWorkspace } = useWorkspaceSelector();
@@ -17,6 +18,8 @@ export default function Statistic() {
             refetchInterval: 5000, // Auto refresh every 5 seconds
         }
     });
+
+    const { calculateTrend } = useTimelineTrend();
 
     // Loading state - show skeleton cards
     if (isLoading) {
@@ -50,26 +53,23 @@ export default function Statistic() {
             title: 'Targets',
             icon: <Target className="h-5 w-5 text-primary" />,
             value: statistics?.totalTargets || 0,
-            path: '/targets'
+            path: '/targets',
+            trend: calculateTrend('targets')
         },
         {
             title: 'Assets',
             icon: <CloudCheck className="h-5 w-5 text-primary" />,
             value: statistics?.totalAssets || 0,
-            path: '/assets'
+            path: '/assets',
+            trend: calculateTrend('assets')
         },
         {
-            title: 'Vulnerabilities',
-            icon: <Bug className="h-5 w-5 text-primary" />,
-            value: statistics?.totalVulnerabilities || 0,
-            path: '/vulnerabilities'
+            title: 'Technologies',
+            icon: <Cpu className="h-5 w-5 text-primary" />,
+            value: statistics?.totalUniqueTechnologies || 0,
+            path: '/assets',
+            trend: calculateTrend('techs')
         },
-        // {
-        //     title: 'Technologies',
-        //     icon: <Cpu className="h-5 w-5 text-primary" />,
-        //     value: statistics?.totalUniqueTechnologies || 0,
-        //     path: '/assets'
-        // }
     ];
 
     return (
@@ -85,9 +85,23 @@ export default function Statistic() {
                         {card.icon}
                     </CardHeader>
                     <CardContent>
-                        <p className="text-4xl font-bold">
-                            <NumberAnimate value={card.value} />
-                        </p>
+                        <div className="flex items-baseline justify-between">
+                            <p className="text-4xl font-bold font-mono">
+                                <NumberAnimate value={card.value} />
+                            </p>
+                            {card.trend && (
+                                <div className={`flex items-center ${card.trend.isIncreasing ? 'text-green-500' : card.trend.isDecreasing ? 'text-red-500' : 'text-gray-500'}`}>
+                                    {card.trend.isIncreasing ? (
+                                        <TrendingUp className="h-5 w-5 mr-1" />
+                                    ) : card.trend.isDecreasing ? (
+                                        <TrendingDown className="h-5 w-5 mr-1" />
+                                    ) : null}
+                                    <span className="font-medium font-mono">
+                                        {Math.abs(card.trend.difference)}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
             ))}
