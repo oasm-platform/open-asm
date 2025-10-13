@@ -150,29 +150,6 @@ export class VulnerabilitiesService {
   }
 
   /**
-   * Counts the number of vulnerabilities in a workspace.
-   *
-   * @param workspaceId - The ID of the workspace.
-   * @param severity - The severity of the vulnerabilities to count.
-   * @returns The count of vulnerabilities in the workspace.
-   */
-  public async countVulnerabilitiesInWorkspace(workspaceId: string, severity?: string) {
-    const queryBuilder = this.vulnerabilitiesRepository
-      .createQueryBuilder('vulnerabilities')
-      .leftJoin('vulnerabilities.asset', 'assets')
-      .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspaceTargets', 'workspace_targets')
-      .leftJoin('workspace_targets.workspace', 'workspaces')
-      .where('workspaces.id = :workspaceId', { workspaceId });
-
-    if (severity) {
-      queryBuilder.andWhere('vulnerabilities.severity = :severity', { severity });
-    }
-
-    return queryBuilder.getCount();
-  }
-
-  /**
    * Retrieves counts of vulnerabilities by severity level for a specified workspace.
    * This method follows the relation path: workspaceId -> target -> assets -> vuls
    *

@@ -273,20 +273,6 @@ export class TargetsService implements OnModuleInit {
   }
 
   /**
-   * Counts the number of targets in a workspace.
-   *
-   * @param workspaceId - The ID of the workspace.
-   * @returns The count of targets in the workspace.
-   */
-  public async countTargetsInWorkspace(workspaceId: string) {
-    return this.repo.count({
-      where: {
-        workspaceTargets: { workspace: { id: workspaceId } },
-      },
-    });
-  }
-
-  /**
    * Handles scheduling of targets for rescan based on their scan schedules.
    *
    * This function is scheduled to run every day at 00:00.

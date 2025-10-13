@@ -249,21 +249,6 @@ export class AssetsService {
   }
 
   /**
-   * Counts the number of assets in a workspace.
-   *
-   * @param workspaceId - The ID of the workspace.
-   * @returns The count of assets in the workspace.
-   */
-  public async countAssetsInWorkspace(workspaceId: string) {
-    return this.assetRepo.count({
-      where: {
-        target: { workspaceTargets: { workspace: { id: workspaceId } } },
-        isErrorPage: false
-      },
-    });
-  }
-
-  /**
    * Retrieves a single asset by its ID.
    *
    * @param id - The ID of the asset to retrieve.
@@ -379,26 +364,6 @@ export class AssetsService {
     });
 
     return getManyResponse({ query, data, total });
-  }
-
-  /**
-   * Counts the number of unique ports in a workspace.
-   *
-   * @param workspaceId - The ID of the workspace.
-   * @returns The count of unique ports in the workspace.
-   */
-  public async countUniquePortsInWorkspace(workspaceId: string) {
-    const queryBuilder = this.assetRepo
-      .createQueryBuilder('assets')
-      .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .leftJoin('assets.ports', 'ports')
-      .where('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
-      .select('unnest(ports.ports)', 'port')
-      .distinct(true);
-
-    const result = await queryBuilder.getRawMany();
-    return result.length;
   }
 
   /**
@@ -605,37 +570,6 @@ export class AssetsService {
     });
 
     return getManyResponse({ query, data, total });
-  }
-
-  /**
-   * Counts the number of unique technologies in a workspace.
-   *
-   * @param workspaceId - The ID of the workspace.
-   * @returns The count of unique technologies in the workspace.
-   */
-  public async countUniqueTechnologiesInWorkspace(
-    workspaceId: string,
-  ): Promise<number> {
-    const result = await this.assetRepo
-      .createQueryBuilder('assets')
-      .leftJoin(
-        (subQuery) =>
-          subQuery
-            .select('httpResponses.assetId', 'assetId')
-            .addSelect('unnest(httpResponses.tech)', 'tech')
-            .from(HttpResponse, 'httpResponses'),
-        'techUnnested',
-        '"techUnnested"."assetId" = "assets"."id"',
-      )
-      .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .select(`"techUnnested"."tech"`, 'technology')
-      .distinct(true)
-      .where(`"techUnnested"."tech" is not null`)
-      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
-      .getRawMany();
-
-    return result.length;
   }
 
   /**
