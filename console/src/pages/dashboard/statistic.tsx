@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { useStatisticControllerGetStatistics } from '@/services/apis/gen/queries';
-import { Bug, CloudCheck, Target } from 'lucide-react';
+import { useStatisticControllerGetStatistics, useStatisticControllerGetTimelineStatistics } from '@/services/apis/gen/queries';
+import { Bug, CloudCheck, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Statistic() {
@@ -17,6 +17,56 @@ export default function Statistic() {
             refetchInterval: 5000, // Auto refresh every 5 seconds
         }
     });
+
+    const { data: timeline } = useStatisticControllerGetTimelineStatistics();
+
+    // Define type for timeline statistic data
+    type TimelineStatistic = {
+        id: string;
+        assets: number;
+        targets: number;
+        vuls: number;
+        criticalVuls: number;
+        highVuls: number;
+        mediumVuls: number;
+        lowVuls: number;
+        infoVuls: number;
+        techs: number;
+        ports: number;
+        createdAt: string;
+        updatedAt: string;
+    };
+
+    // Function to calculate trend based on the latest two records with different values
+    const calculateTrend = (field: keyof TimelineStatistic) => {
+        if (!timeline?.data || timeline.data.length < 2) return null;
+
+        // Sort by createdAt to get the latest records
+        const sortedData = [...timeline.data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        // Find the latest value
+        const latest = sortedData[0][field] as number;
+        // Find the previous value that is different from the latest value
+        const previousDifferent = sortedData.find(item => (item[field] as number) !== latest);
+
+        // If no different value found, return no change
+        if (!previousDifferent) {
+            return {
+                difference: 0,
+                isIncreasing: false,
+                isDecreasing: false
+            };
+        }
+
+        const previous = previousDifferent[field] as number;
+        const difference = latest - previous;
+
+        return {
+            difference,
+            isIncreasing: difference > 0,
+            isDecreasing: difference < 0
+        };
+    };
 
     // Loading state - show skeleton cards
     if (isLoading) {
@@ -50,19 +100,22 @@ export default function Statistic() {
             title: 'Targets',
             icon: <Target className="h-5 w-5 text-primary" />,
             value: statistics?.totalTargets || 0,
-            path: '/targets'
+            path: '/targets',
+            trend: calculateTrend('targets')
         },
         {
             title: 'Assets',
             icon: <CloudCheck className="h-5 w-5 text-primary" />,
             value: statistics?.totalAssets || 0,
-            path: '/assets'
+            path: '/assets',
+            trend: calculateTrend('assets')
         },
         {
             title: 'Vulnerabilities',
             icon: <Bug className="h-5 w-5 text-primary" />,
             value: statistics?.totalVulnerabilities || 0,
-            path: '/vulnerabilities'
+            path: '/vulnerabilities',
+            trend: calculateTrend('vuls')
         },
         // {
         //     title: 'Technologies',
@@ -85,9 +138,23 @@ export default function Statistic() {
                         {card.icon}
                     </CardHeader>
                     <CardContent>
-                        <p className="text-4xl font-bold">
-                            <NumberAnimate value={card.value} />
-                        </p>
+                        <div className="flex items-baseline justify-between">
+                            <p className="text-4xl font-bold">
+                                <NumberAnimate value={card.value} />
+                            </p>
+                            {card.trend && (
+                                <div className={`flex items-center ${card.trend.isIncreasing ? 'text-green-500' : card.trend.isDecreasing ? 'text-red-500' : 'text-gray-500'}`}>
+                                    {card.trend.isIncreasing ? (
+                                        <TrendingUp className="h-5 w-5 mr-1" />
+                                    ) : card.trend.isDecreasing ? (
+                                        <TrendingDown className="h-5 w-5 mr-1" />
+                                    ) : null}
+                                    <span className="font-medium">
+                                        {Math.abs(card.trend.difference)}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
             ))}
