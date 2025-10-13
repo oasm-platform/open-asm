@@ -1,5 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { NumberAnimate } from '@/components/ui/number-animate';
 import { useTimelineTrend } from "@/hooks/useTimelineTrend";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { useVulnerabilitiesControllerGetVulnerabilitiesSeverity } from "@/services/apis/gen/queries";
@@ -87,7 +88,7 @@ export default function VulnerabilitySeverityDonutChart() {
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
                 <div className="flex items-baseline justify-center gap-1">
                   <p className={`text-2xl font-bold font-mono min-w-[3rem] ${stat.colorClass}`}>
-                    {stat.count}
+                    <NumberAnimate value={stat.count} />
                   </p>
                 </div>
               </div>
