@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetStatistics, useStatisticControllerGetTimelineStatistics } from '@/services/apis/gen/queries';
-import { Bug, CloudCheck, Target, TrendingDown, TrendingUp } from 'lucide-react';
+import { CloudCheck, Cpu, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Statistic() {
@@ -111,18 +111,12 @@ export default function Statistic() {
             trend: calculateTrend('assets')
         },
         {
-            title: 'Vulnerabilities',
-            icon: <Bug className="h-5 w-5 text-primary" />,
-            value: statistics?.totalVulnerabilities || 0,
-            path: '/vulnerabilities',
-            trend: calculateTrend('vuls')
+            title: 'Technologies',
+            icon: <Cpu className="h-5 w-5 text-primary" />,
+            value: statistics?.totalUniqueTechnologies || 0,
+            path: '/assets',
+            trend: calculateTrend('techs')
         },
-        // {
-        //     title: 'Technologies',
-        //     icon: <Cpu className="h-5 w-5 text-primary" />,
-        //     value: statistics?.totalUniqueTechnologies || 0,
-        //     path: '/assets'
-        // }
     ];
 
     return (
@@ -139,7 +133,7 @@ export default function Statistic() {
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-baseline justify-between">
-                            <p className="text-4xl font-bold">
+                            <p className="text-4xl font-bold font-mono">
                                 <NumberAnimate value={card.value} />
                             </p>
                             {card.trend && (
@@ -149,7 +143,7 @@ export default function Statistic() {
                                     ) : card.trend.isDecreasing ? (
                                         <TrendingDown className="h-5 w-5 mr-1" />
                                     ) : null}
-                                    <span className="font-medium">
+                                    <span className="font-medium font-mono">
                                         {Math.abs(card.trend.difference)}
                                     </span>
                                 </div>
