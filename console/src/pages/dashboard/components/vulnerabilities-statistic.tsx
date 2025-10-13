@@ -1,8 +1,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTimelineTrend } from "@/hooks/useTimelineTrend";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { useVulnerabilitiesControllerGetVulnerabilitiesSeverity } from "@/services/apis/gen/queries";
-import { Bug } from 'lucide-react';
+import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function VulnerabilitySeverityDonutChart() {
   const { selectedWorkspace } = useWorkspaceSelector();
@@ -10,14 +12,9 @@ export default function VulnerabilitySeverityDonutChart() {
     workspaceId: selectedWorkspace ?? "",
   });
   const data = response?.data;
+  const { calculateTrend } = useTimelineTrend();
+
   if (!data || data.length === 0) return null;
-
-  const totalSeverityCount = data.reduce((sum, item) => sum + item.count, 0);
-
-  const getSeverityCount = (severity: string) => {
-    const item = data.find(item => item.severity === severity);
-    return item ? item.count : 0;
-  };
 
   const getSeverityColorClass = (severity: string) => {
     switch (severity) {
@@ -36,49 +33,68 @@ export default function VulnerabilitySeverityDonutChart() {
     }
   };
 
+  const vulnerabilityStats = [
+    { severity: 'total', label: 'Total', colorClass: '', count: 0 },
+    { severity: 'critical', label: 'Critical', colorClass: getSeverityColorClass('critical'), count: 0 },
+    { severity: 'high', label: 'High', colorClass: getSeverityColorClass('high'), count: 0 },
+    { severity: 'medium', label: 'Medium', colorClass: getSeverityColorClass('medium'), count: 0 },
+    { severity: 'low', label: 'Low', colorClass: getSeverityColorClass('low'), count: 0 },
+    { severity: 'info', label: 'Info', colorClass: getSeverityColorClass('info'), count: 0 },
+  ];
+
+  if (data && data.length > 0) {
+    vulnerabilityStats.forEach(stat => {
+      const item = data.find(d => d.severity === stat.severity);
+      if (item) {
+        stat.count = item.count;
+      }
+    });
+    vulnerabilityStats[0].count = data.reduce((sum, item) => sum + item.count, 0); // Total count
+  }
+
+  const totalVulsTrend = calculateTrend('vuls');
+
+  const renderTrend = (trend: ReturnType<typeof calculateTrend>) => {
+    if (!trend) return null;
+    return (
+      <div className={`flex items-center text-sm ${trend.isIncreasing ? 'text-green-500' : trend.isDecreasing ? 'text-red-500' : 'text-gray-500'}`}>
+        {trend.isIncreasing ? (
+          <TrendingUp className="h-4 w-4 mr-1" />
+        ) : trend.isDecreasing ? (
+          <TrendingDown className="h-4 w-4 mr-1" />
+        ) : null}
+        <span className="font-medium font-mono">
+          {Math.abs(trend.difference)}
+        </span>
+      </div>
+    );
+  };
+
   return (
-    <Card className="w-full">
-      <CardHeader className='flex justify-between items-center'>
-        <CardTitle className="">Vulnerabilities Issues</CardTitle>
-        <Bug />
-      </CardHeader>
-      <CardContent className="grid grid-cols-3 gap-4">
-        <div className="text-center border-r pr-4">
-          <p className="text-sm text-muted-foreground">Total</p>
-          <p className="text-2xl font-bold font-mono min-w-[3rem]">{totalSeverityCount}</p>
-        </div>
-        <div className="text-center border-r px-4">
-          <p className="text-sm text-muted-foreground">Critical</p>
-          <p className={`text-2xl font-bold font-mono min-w-[3rem] ${getSeverityColorClass('critical')}`}>
-            {getSeverityCount('critical')}
-          </p>
-        </div>
-        <div className="text-center pl-4">
-          <p className="text-sm text-muted-foreground">High</p>
-          <p className={`text-2xl font-bold font-mono min-w-[3rem] ${getSeverityColorClass('high')}`}>
-            {getSeverityCount('high')}
-          </p>
-        </div>
-        <div className="col-span-3 border-b pb-2 mb-2"></div>
-        <div className="text-center border-r pr-4">
-          <p className="text-sm text-muted-foreground">Medium</p>
-          <p className={`text-2xl font-bold font-mono min-w-[3rem] ${getSeverityColorClass('medium')}`}>
-            {getSeverityCount('medium')}
-          </p>
-        </div>
-        <div className="text-center border-r px-4">
-          <p className="text-sm text-muted-foreground">Low</p>
-          <p className={`text-2xl font-bold font-mono min-w-[3rem] ${getSeverityColorClass('low')}`}>
-            {getSeverityCount('low')}
-          </p>
-        </div>
-        <div className="text-center pl-4">
-          <p className="text-sm text-muted-foreground">Info</p>
-          <p className={`text-2xl font-bold font-mono min-w-[3rem] ${getSeverityColorClass('info')}`}>
-            {getSeverityCount('info')}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+    <Link to="/vulnerabilities">
+      <Card className="w-full hover:bg-accent/70 cursor-pointer">
+        <CardHeader className='flex justify-between items-center'>
+          <div className="flex items-center gap-2">
+            <CardTitle className="">Vulnerabilities Issues</CardTitle>
+            {totalVulsTrend?.difference !== 0 && renderTrend(totalVulsTrend)}
+          </div>
+          <Bug />
+        </CardHeader>
+        <CardContent className="grid grid-cols-3 gap-4">
+          {vulnerabilityStats.map((stat, index) => (
+            <>
+              <div key={stat.severity} className={`text-center ${index % 3 === 2 ? 'pl-4' : index % 3 === 0 ? 'pr-4 border-r' : 'px-4 border-r'}`}>
+                <p className="text-sm text-muted-foreground">{stat.label}</p>
+                <div className="flex items-baseline justify-center gap-1">
+                  <p className={`text-2xl font-bold font-mono min-w-[3rem] ${stat.colorClass}`}>
+                    {stat.count}
+                  </p>
+                </div>
+              </div>
+              {index === 2 && <div className="col-span-3 border-b pb-2 mb-2"></div>}
+            </>
+          ))}
+        </CardContent>
+      </Card></Link>
   );
 }

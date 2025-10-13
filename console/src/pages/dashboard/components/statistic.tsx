@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { useStatisticControllerGetStatistics, useStatisticControllerGetTimelineStatistics } from '@/services/apis/gen/queries';
+import { useStatisticControllerGetStatistics } from '@/services/apis/gen/queries';
 import { CloudCheck, Cpu, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 
 export default function Statistic() {
     const { selectedWorkspace } = useWorkspaceSelector();
@@ -18,55 +19,7 @@ export default function Statistic() {
         }
     });
 
-    const { data: timeline } = useStatisticControllerGetTimelineStatistics();
-
-    // Define type for timeline statistic data
-    type TimelineStatistic = {
-        id: string;
-        assets: number;
-        targets: number;
-        vuls: number;
-        criticalVuls: number;
-        highVuls: number;
-        mediumVuls: number;
-        lowVuls: number;
-        infoVuls: number;
-        techs: number;
-        ports: number;
-        createdAt: string;
-        updatedAt: string;
-    };
-
-    // Function to calculate trend based on the latest two records with different values
-    const calculateTrend = (field: keyof TimelineStatistic) => {
-        if (!timeline?.data || timeline.data.length < 2) return null;
-
-        // Sort by createdAt to get the latest records
-        const sortedData = [...timeline.data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        // Find the latest value
-        const latest = sortedData[0][field] as number;
-        // Find the previous value that is different from the latest value
-        const previousDifferent = sortedData.find(item => (item[field] as number) !== latest);
-
-        // If no different value found, return no change
-        if (!previousDifferent) {
-            return {
-                difference: 0,
-                isIncreasing: false,
-                isDecreasing: false
-            };
-        }
-
-        const previous = previousDifferent[field] as number;
-        const difference = latest - previous;
-
-        return {
-            difference,
-            isIncreasing: difference > 0,
-            isDecreasing: difference < 0
-        };
-    };
+    const { calculateTrend } = useTimelineTrend();
 
     // Loading state - show skeleton cards
     if (isLoading) {
