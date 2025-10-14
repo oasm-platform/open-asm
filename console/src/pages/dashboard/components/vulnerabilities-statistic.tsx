@@ -7,7 +7,7 @@ import { useVulnerabilitiesControllerGetVulnerabilitiesSeverity } from "@/servic
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export default function VulnerabilitySeverityDonutChart() {
+export default function VulnerabilityStatistic() {
   const { selectedWorkspace } = useWorkspaceSelector();
   const { data: response } = useVulnerabilitiesControllerGetVulnerabilitiesSeverity({
     workspaceId: selectedWorkspace ?? "",

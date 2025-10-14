@@ -590,6 +590,20 @@ export type TimelineResponseDto = {
   total: number;
 };
 
+export type IssuesTimelineItem = {
+  /** Number of vulnerabilities */
+  vuls: number;
+  /** Creation timestamp */
+  createdAt: string;
+};
+
+export type IssuesTimelineResponseDto = {
+  /** List of issues over time */
+  data: IssuesTimelineItem[];
+  /** Total count of issues timeline records */
+  total: number;
+};
+
 export type TopTagAsset = {
   /** The name of the tag */
   tag: string;
@@ -10201,6 +10215,315 @@ export function useStatisticControllerGetTimelineStatistics<
 } {
   const queryOptions =
     getStatisticControllerGetTimelineStatisticsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves issues timeline statistics for a workspace, showing the number of vulnerabilities over time.
+ * @summary Get issues timeline statistics for a workspace
+ */
+export const statisticControllerGetIssuesTimeline = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<IssuesTimelineResponseDto>(
+    { url: `/api/statistic/issues-timeline`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetIssuesTimelineQueryKey = () => {
+  return [`/api/statistic/issues-timeline`] as const;
+};
+
+export const getStatisticControllerGetIssuesTimelineInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetIssuesTimelineQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+  > = ({ signal }) =>
+    statisticControllerGetIssuesTimeline(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetIssuesTimelineInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>>;
+export type StatisticControllerGetIssuesTimelineInfiniteQueryError = unknown;
+
+export function useStatisticControllerGetIssuesTimelineInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetIssuesTimelineInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetIssuesTimelineInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get issues timeline statistics for a workspace
+ */
+
+export function useStatisticControllerGetIssuesTimelineInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetIssuesTimelineInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStatisticControllerGetIssuesTimelineQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetIssuesTimelineQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+  > = ({ signal }) =>
+    statisticControllerGetIssuesTimeline(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetIssuesTimelineQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+>;
+export type StatisticControllerGetIssuesTimelineQueryError = unknown;
+
+export function useStatisticControllerGetIssuesTimeline<
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetIssuesTimeline<
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetIssuesTimeline<
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get issues timeline statistics for a workspace
+ */
+
+export function useStatisticControllerGetIssuesTimeline<
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetIssuesTimelineQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

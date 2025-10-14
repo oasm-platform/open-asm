@@ -622,6 +622,30 @@ export interface TimelineResponseDto {
   total: number;
 }
 
+export interface IssuesTimelineItem {
+  /**
+   * Number of vulnerabilities
+   * @example 10
+   */
+  vuls: number;
+  /**
+   * Creation timestamp
+   * @format date-time
+   * @example "2023-10-27T10:00:00Z"
+   */
+  createdAt: string;
+}
+
+export interface IssuesTimelineResponseDto {
+  /** List of issues over time */
+  data: IssuesTimelineItem[];
+  /**
+   * Total count of issues timeline records
+   * @example 5
+   */
+  total: number;
+}
+
 export interface TopTagAsset {
   /**
    * The name of the tag
@@ -2070,6 +2094,22 @@ export class Api<
   statisticControllerGetTimelineStatistics = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic/timeline`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves issues timeline statistics for a workspace, showing the number of vulnerabilities over time.
+   *
+   * @tags Statistic
+   * @name StatisticControllerGetIssuesTimeline
+   * @summary Get issues timeline statistics for a workspace
+   * @request GET:/api/statistic/issues-timeline
+   */
+  statisticControllerGetIssuesTimeline = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/statistic/issues-timeline`,
       method: "GET",
       format: "json",
       ...params,

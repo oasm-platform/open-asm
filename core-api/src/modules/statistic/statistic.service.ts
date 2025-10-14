@@ -8,6 +8,7 @@ import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
+import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { Statistic } from './entities/statistic.entity';
 
@@ -200,6 +201,27 @@ export class StatisticService {
     return {
       data: statistics,
       total: statistics.length,
+    };
+  }
+
+  /**
+   * Retrieves issues timeline statistics for a workspace.
+   *
+   * @param workspaceId - The ID of the workspace.
+   * @returns A promise that resolves to issues timeline statistics.
+   */
+  async getIssuesTimeline(workspaceId: string): Promise<IssuesTimelineResponseDto> {
+    const rawResults: { vuls: number; createdAt: Date }[] = await this.dataSource
+      .getRepository(Statistic)
+      .createQueryBuilder('workspace_statistics')
+      .select('vuls, "createdAt"')
+      .where('"workspaceId" = :workspaceId', { workspaceId })
+      .andWhere('"createdAt" >= :threeMonthsAgo', { threeMonthsAgo: new Date(new Date().setMonth(new Date().getMonth() - 3)) })
+      .getRawMany();
+
+    return {
+      data: rawResults,
+      total: rawResults.length,
     };
   }
 

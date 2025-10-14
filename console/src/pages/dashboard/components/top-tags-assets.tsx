@@ -42,6 +42,11 @@ export default function TopTagsAssets() {
         <CardTitle className="font-medium text-base">Top Tags Assets</CardTitle>
         <Tag className="h-5 w-5 text-primary" />
       </CardHeader>
+      {!topTags || topTags.length === 0 && (
+        <CardContent className="text-center text-sm text-muted-foreground">
+          No tags assets found
+        </CardContent>
+      )}
       <CardContent>
         <div className="flex flex-col gap-2">
           {topTags &&
