@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, MoreThanOrEqual } from 'typeorm';
 
+import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
+import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { Statistic } from './entities/statistic.entity';
 
 @Injectable()
@@ -103,5 +105,28 @@ export class StatisticService {
       data: statistics,
       total: statistics.length,
     };
+  }
+
+  async getTopTagsAssets(
+    workspaceId: string,
+  ): Promise<TopTagAsset[]> {
+    const rawResults: { tag: string; count: string }[] = await this.dataSource
+      .getRepository(AssetTag)
+      .createQueryBuilder('asset_tag')
+      .select('asset_tag.tag', 'tag')
+      .addSelect('COUNT(asset_tag.id)', 'count')
+      .innerJoin('asset_tag.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .innerJoin('target.workspaceTargets', 'workspaceTarget')
+      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
+      .groupBy('asset_tag.tag')
+      .orderBy('count', 'DESC')
+      .limit(10)
+      .getRawMany();
+
+    return rawResults.map((result) => ({
+      tag: result.tag,
+      count: parseInt(result.count, 10),
+    }));
   }
 }

@@ -590,6 +590,13 @@ export type TimelineResponseDto = {
   total: number;
 };
 
+export type TopTagAsset = {
+  /** The name of the tag */
+  tag: string;
+  /** The number of assets associated with the tag */
+  count: number;
+};
+
 export type ScanDto = {
   /** Target ID */
   targetId: string;
@@ -10194,6 +10201,315 @@ export function useStatisticControllerGetTimelineStatistics<
 } {
   const queryOptions =
     getStatisticControllerGetTimelineStatisticsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves the top 10 tags with the most assets in a workspace.
+ * @summary Get top 10 tags with the most assets in a workspace
+ */
+export const statisticControllerGetTopTagsAssets = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TopTagAsset[]>(
+    { url: `/api/statistic/top-tags-assets`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTopTagsAssetsQueryKey = () => {
+  return [`/api/statistic/top-tags-assets`] as const;
+};
+
+export const getStatisticControllerGetTopTagsAssetsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetTopTagsAssetsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+  > = ({ signal }) =>
+    statisticControllerGetTopTagsAssets(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTopTagsAssetsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>>;
+export type StatisticControllerGetTopTagsAssetsInfiniteQueryError = unknown;
+
+export function useStatisticControllerGetTopTagsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTagsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTagsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top 10 tags with the most assets in a workspace
+ */
+
+export function useStatisticControllerGetTopTagsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopTagsAssetsInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStatisticControllerGetTopTagsAssetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetTopTagsAssetsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+  > = ({ signal }) =>
+    statisticControllerGetTopTagsAssets(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTopTagsAssetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+>;
+export type StatisticControllerGetTopTagsAssetsQueryError = unknown;
+
+export function useStatisticControllerGetTopTagsAssets<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTagsAssets<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTagsAssets<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top 10 tags with the most assets in a workspace
+ */
+
+export function useStatisticControllerGetTopTagsAssets<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopTagsAssetsQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

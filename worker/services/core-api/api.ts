@@ -622,6 +622,19 @@ export interface TimelineResponseDto {
   total: number;
 }
 
+export interface TopTagAsset {
+  /**
+   * The name of the tag
+   * @example "example-tag"
+   */
+  tag: string;
+  /**
+   * The number of assets associated with the tag
+   * @example 10
+   */
+  count: number;
+}
+
 export interface ScanDto {
   /** Target ID */
   targetId: string;
@@ -2057,6 +2070,22 @@ export class Api<
   statisticControllerGetTimelineStatistics = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic/timeline`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves the top 10 tags with the most assets in a workspace.
+   *
+   * @tags Statistic
+   * @name StatisticControllerGetTopTagsAssets
+   * @summary Get top 10 tags with the most assets in a workspace
+   * @request GET:/api/statistic/top-tags-assets
+   */
+  statisticControllerGetTopTagsAssets = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/statistic/top-tags-assets`,
       method: "GET",
       format: "json",
       ...params,

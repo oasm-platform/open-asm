@@ -1,9 +1,10 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
+import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { StatisticService } from './statistic.service';
 
 @ApiTags('Statistic')
@@ -36,5 +37,26 @@ export class StatisticController {
   @Get('timeline')
   getTimelineStatistics(@WorkspaceId() workspaceId: string) {
     return this.statisticService.getTimelineStatistics(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get top 10 tags with the most assets in a workspace',
+    description: 'Retrieves the top 10 tags with the most assets in a workspace.',
+    response: {
+      extraModels: [TopTagAsset],
+      dataSchema: {
+        type: 'array',
+        items: { $ref: getSchemaPath(TopTagAsset) },
+      }
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('top-tags-assets')
+  getTopTagsAssets(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<TopTagAsset[]> {
+    return this.statisticService.getTopTagsAssets(workspaceId);
   }
 }
