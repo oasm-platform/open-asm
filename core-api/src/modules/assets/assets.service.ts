@@ -6,7 +6,6 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
@@ -27,7 +26,6 @@ export class AssetsService {
 
     @InjectRepository(Target)
     public readonly targetRepo: Repository<Target>,
-    private jobRegistryService: JobsRegistryService,
     private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
 

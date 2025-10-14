@@ -3,6 +3,7 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
+import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { StatisticService } from './statistic.service';
@@ -35,8 +36,23 @@ export class StatisticController {
     }
   })
   @Get('timeline')
-  getTimelineStatistics(@WorkspaceId() workspaceId: string) {
+  getTimelineStatistics(@WorkspaceId() workspaceId: string): Promise<TimelineResponseDto> {
     return this.statisticService.getTimelineStatistics(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get issues timeline statistics for a workspace',
+    description: 'Retrieves issues timeline statistics for a workspace, showing the number of vulnerabilities over time.',
+    response: {
+      serialization: IssuesTimelineResponseDto,
+    },
+    request: {
+      getWorkspaceId: true
+    }
+  })
+  @Get('issues-timeline')
+  getIssuesTimeline(@WorkspaceId() workspaceId: string): Promise<IssuesTimelineResponseDto> {
+    return this.statisticService.getIssuesTimeline(workspaceId);
   }
 
   @Doc({

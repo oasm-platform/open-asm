@@ -3,7 +3,7 @@ import { NumberAnimate } from '@/components/ui/number-animate';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetStatistics } from '@/services/apis/gen/queries';
-import { CloudCheck, Cpu, Target, TrendingDown, TrendingUp } from 'lucide-react';
+import { CloudCheck, Cpu, EthernetPort, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Statistic() {
@@ -72,7 +72,7 @@ export default function Statistic() {
         },
         {
             title: 'Ports',
-            icon: <Cpu className="h-5 w-5 text-primary" />,
+            icon: <EthernetPort className="h-5 w-5 text-primary" />,
             value: statistics?.totalUniquePorts || 0,
             path: '/assets',
             trend: calculateTrend('ports')
