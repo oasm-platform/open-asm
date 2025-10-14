@@ -25,15 +25,16 @@ export class StatisticResponseDto {
   })
   totalAssets: number;
 
-  @ApiProperty({
-    description: 'Total number of vulnerabilities in the workspace',
-    example: 5,
-  })
-  totalVulnerabilities: number;
 
   @ApiProperty({
     description: 'Total number of unique technologies in the workspace',
     example: 15,
   })
   totalUniqueTechnologies: number;
+
+  @ApiProperty({
+    description: 'Total number of unique ports in the workspace',
+    example: 80,
+  })
+  totalUniquePorts: number;
 }

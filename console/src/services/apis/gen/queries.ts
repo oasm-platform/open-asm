@@ -551,10 +551,10 @@ export type StatisticResponseDto = {
   totalTargets: number;
   /** Total number of assets in the workspace */
   totalAssets: number;
-  /** Total number of vulnerabilities in the workspace */
-  totalVulnerabilities: number;
   /** Total number of unique technologies in the workspace */
   totalUniqueTechnologies: number;
+  /** Total number of unique ports in the workspace */
+  totalUniquePorts: number;
 };
 
 export type Statistic = {

@@ -1,10 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
+import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetStatistics } from '@/services/apis/gen/queries';
 import { CloudCheck, Cpu, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 
 export default function Statistic() {
     const { selectedWorkspace } = useWorkspaceSelector();
@@ -70,10 +70,17 @@ export default function Statistic() {
             path: '/assets',
             trend: calculateTrend('techs')
         },
+        {
+            title: 'Ports',
+            icon: <Cpu className="h-5 w-5 text-primary" />,
+            value: statistics?.totalUniquePorts || 0,
+            path: '/assets',
+            trend: calculateTrend('ports')
+        },
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
             {statsCards.map((card, index) => (
                 <Card
                     key={index}

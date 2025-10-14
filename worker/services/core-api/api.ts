@@ -543,15 +543,15 @@ export interface StatisticResponseDto {
    */
   totalAssets: number;
   /**
-   * Total number of vulnerabilities in the workspace
-   * @example 5
-   */
-  totalVulnerabilities: number;
-  /**
    * Total number of unique technologies in the workspace
    * @example 15
    */
   totalUniqueTechnologies: number;
+  /**
+   * Total number of unique ports in the workspace
+   * @example 80
+   */
+  totalUniquePorts: number;
 }
 
 export interface Statistic {

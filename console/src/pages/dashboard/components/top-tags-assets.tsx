@@ -7,7 +7,7 @@ import { Tag } from 'lucide-react';
 export default function TopTagsAssets() {
   const { selectedWorkspace } = useWorkspaceSelector();
 
-  const { data: topTags, isLoading, isError } = useStatisticControllerGetTopTagsAssets(
+  const { data: topTags, isLoading } = useStatisticControllerGetTopTagsAssets(
     {
       query: {
         enabled: !!selectedWorkspace,
@@ -15,6 +15,7 @@ export default function TopTagsAssets() {
       },
     },
   );
+
   if (isLoading) {
     return (
       <Card className="animate-pulse">
@@ -28,21 +29,6 @@ export default function TopTagsAssets() {
               <div key={index} className="h-6 bg-muted rounded w-20"></div>
             ))}
           </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (isError || !selectedWorkspace) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Tags Assets</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-red-500">
-            {isError ? 'Error loading top tags' : 'Please select a workspace'}
-          </p>
         </CardContent>
       </Card>
     );
