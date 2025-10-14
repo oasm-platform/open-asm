@@ -13,7 +13,7 @@
 # ci(scope): for CI related changes
 
 commit_msg="$1"
-if ! grep -qE "^((feat|fix|chore|docs|style|refactor|test|ci)\(.+\): )|^(Merge branch|Merged)" "$commit_msg"; then
+if ! grep -qE "^((feat|fix|hot-fix|perf|chore|docs|style|refactor|test|ci)\(.+\): )|^(Merge branch|Merged)" "$commit_msg"; then
   echo "Commit message format error!"
   echo "Commit messages must start with one of: feat(scope):, fix(scope):, chore(scope):, docs(scope):, style(scope):, refactor(scope):, test(scope):, ci(scope):"
   echo "Example: feat(husky): add husky integration"

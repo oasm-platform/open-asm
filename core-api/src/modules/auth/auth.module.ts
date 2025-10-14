@@ -126,7 +126,6 @@ export class AuthModule implements NestModule, OnModuleInit {
       // for now i'll just not support a global prefix
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       .use(`${basePath}/*splat`, (req: Request, res: Response) => {
-        req.url = req.originalUrl;
         return handler(req, res);
       });
     this.logger.log(
