@@ -16,6 +16,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
+import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
 import {
   ArchiveWorkspaceDto,
   CreateWorkspaceDto,
@@ -62,6 +64,40 @@ export class WorkspacesController {
     @UserContext() userContext: UserContextPayload,
   ) {
     return this.workspacesService.getWorkspaceApiKey(workspaceId, userContext);
+  }
+
+  @Doc({
+    summary: 'Get workspace configs',
+    description: 'Retrieves the configuration settings for a specified workspace, including asset discovery and auto-enablement settings.',
+    response: {
+      serialization: GetWorkspaceConfigsDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('configs')
+  getWorkspaceConfigs(@WorkspaceId() workspaceId: string, @UserContext() userContext: UserContextPayload,) {
+    return this.workspacesService.getWorkspaceConfigs(workspaceId, userContext);
+  }
+
+  @Doc({
+    summary: 'Update workspace configs',
+    description: 'Updates the configuration settings for a specified workspace, including asset discovery and auto-enablement options.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Patch('configs')
+  updateWorkspaceConfigs(
+    @WorkspaceId() workspaceId: string,
+    @Body() dto: UpdateWorkspaceConfigsDto,
+    @UserContext() userContext: UserContextPayload,
+  ) {
+    return this.workspacesService.updateWorkspaceConfigs(workspaceId, dto, userContext);
   }
 
   @Doc({

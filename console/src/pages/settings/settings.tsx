@@ -9,6 +9,7 @@ import AccountSettings from './components/account-settings';
 import ListMcpPermissions from './components/list-mcp-permissions';
 import ListWorkspaces from './components/list-workspaces';
 import { ThemeSwitcher } from './components/theme-switcher';
+import { WorkspaceConfigs } from './components/workspace-configs';
 
 interface TabContentProps {
   title: string;
@@ -88,6 +89,15 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
         action: <CreateWorkspaceDialog />,
       },
       component: <ListWorkspaces />,
+    },
+    {
+      id: 'configs',
+      label: 'Configs',
+      content: {
+        title: 'Configs',
+        description: 'Manage your workspace configs',
+      },
+      component: <WorkspaceConfigs />,
     }
   ];
 
@@ -101,7 +111,7 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
           onValueChange={handleTabChange}
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-4 max-w-lg mb-4">
+          <TabsList className="grid w-full grid-cols-5 max-w-lg mb-4">
             {settingsTabs.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id}>
                 {tab.label}
