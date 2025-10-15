@@ -124,6 +124,7 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(query, workspaceId).select([
       'assets.value',
       'assets.id',
+      'assets."isEnabled"',
       'assets.targetId',
       'assets.createdAt',
       'ipAssets.ipAddress',
@@ -155,6 +156,7 @@ export class AssetsService {
       asset.targetId = item.targetId;
       asset.createdAt = item.createdAt;
       asset.dnsRecords = item.dnsRecords;
+      asset.isEnabled = item.isEnabled;
 
       asset.tags = item.tags || [];
 
@@ -188,6 +190,7 @@ export class AssetsService {
     });
 
     const data = await Promise.all(assets);
+
     return getManyResponse({ query, data, total });
   }
 

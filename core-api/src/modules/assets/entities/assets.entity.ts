@@ -74,6 +74,6 @@ export class Asset extends BaseEntity {
   statusCodeAssets?: StatusCodeAssetsView[];
 
   @ApiProperty()
-  @Column({ default: false })
+  @Column({ default: true })
   isEnabled: boolean;
 }
