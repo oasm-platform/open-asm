@@ -1,7 +1,11 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -32,7 +36,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all assets associated with a specified target.
@@ -124,7 +128,7 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(query, workspaceId).select([
       'assets.value',
       'assets.id',
-      'assets."isEnabled"',
+      'assets.isEnabled',
       'assets.targetId',
       'assets.createdAt',
       'ipAssets.ipAddress',
@@ -244,10 +248,13 @@ export class AssetsService {
       throw new NotFoundException('Workspace not found');
     }
 
-    const workspaceConfigs = await this.workspaceService.getWorkspaceConfigValue(workspaceId);
+    const workspaceConfigs =
+      await this.workspaceService.getWorkspaceConfigValue(workspaceId);
 
     if (!workspaceConfigs.isAssetsDiscovery) {
-      throw new BadRequestException('Asset discovery is disabled for this workspace');
+      throw new BadRequestException(
+        'Asset discovery is disabled for this workspace',
+      );
     }
 
     if (!target) {
@@ -641,3 +648,4 @@ export class AssetsService {
     return this.assetRepo.save(asset);
   }
 }
+
