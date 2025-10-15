@@ -231,6 +231,26 @@ export class WorkspacesService implements OnModuleInit {
   }
 
   /**
+   * Retrieves the configuration settings for a specific workspace.
+   * @param workspaceId 
+   * @returns 
+   */
+  public async getWorkspaceConfigValue(workspaceId: string): Promise<Workspace> {
+
+    const workspace = await this.repo.findOne({
+      where: {
+        id: workspaceId,
+      }
+    });
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    return workspace;
+  }
+
+  /**
    * Updates the configuration settings for a specific workspace.
    * @param workspaceId 
    * @param dto 

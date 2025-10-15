@@ -28,7 +28,9 @@ type FormValues = {
 
 export function CreateTarget() {
   const [open, setOpen] = useState(false);
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const { selectedWorkspace, workspaces, } = useWorkspaceSelector();
+  const workspaceData = workspaces.find(w => w.id === selectedWorkspace);
+  const isAssetsDiscovery = workspaceData?.isAssetsDiscovery ?? false;
   const {
     register,
     handleSubmit,
@@ -64,17 +66,19 @@ export function CreateTarget() {
       );
   }
 
+  const title = isAssetsDiscovery ? 'Start discovery' : 'Create target';
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Target className="shrink-0" />
-          <span className="hidden lg:inline">Start discovery</span>
+          <span className="hidden lg:inline">{title}</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="w-full md:w-3/4 lg:w-[425px]">
         <DialogHeader>
-          <DialogTitle>Start discovery</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
             Enter the domain you want to scan.
           </DialogDescription>

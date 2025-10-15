@@ -121,7 +121,12 @@ export class TargetsService implements OnModuleInit {
         value,
       });
 
-      this.eventEmitter.emit('target.create', target);
+      // Trigger workflow run assets discovery
+      const workspaceConfigs = await this.workspacesService.getWorkspaceConfigValue(workspaceId);
+
+      if (workspaceConfigs.isAssetsDiscovery) {
+        this.eventEmitter.emit('target.create', target);
+      }
     }
     // If the target exists, check if it is already associated with the workspace
     else {
