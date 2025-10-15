@@ -19,14 +19,18 @@ import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import type { Target } from "@/services/apis/gen/queries";
 import { JobStatus, UpdateTargetDtoScanSchedule, useTargetsControllerDeleteTargetFromWorkspace, useTargetsControllerReScanTarget, useTargetsControllerUpdateTarget } from "@/services/apis/gen/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { Clock, RefreshCw, Settings, Trash2 } from "lucide-react";
+import type { AxiosError } from 'axios';
+import clsx from 'clsx';
+import { Clock, OctagonAlert, RefreshCw, Settings, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => void }) => {
 
-    const { selectedWorkspace } = useWorkspaceSelector();
+    const { selectedWorkspace, workspaces, } = useWorkspaceSelector();
+    const workspaceData = workspaces.find(w => w.id === selectedWorkspace);
+    const isAssetsDiscovery = workspaceData?.isAssetsDiscovery ?? false;
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -102,11 +106,16 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
                 </SheetHeader>
 
                 <div className="flex flex-col h-full">
-                    <div className="flex flex-col h-full">
-                        <div className="flex-1 px-1 space-y-0.5 overflow-y-auto">
+
+                    <div className="flex-1 space-y-0.5 overflow-y-auto p-3">
+                        {!isAssetsDiscovery && <div className='flex gap-2 mb-5 justify-center text-red-500'>
+                            <OctagonAlert />
+                            <span className="">Assets discovery is disabled for this workspace</span>
+                        </div>}
+                        <div className={clsx("space-y-4", isAssetsDiscovery ? "" : "border-dashed border-2 border-red-500 opacity-50 py-3 px-3 space-y-4 rounded-xl")}>
                             <div className="space-y-2">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-3 p-4">
+                                <div>
+                                    <div className="flex items-center gap-3">
                                         <div className="p-2.5 rounded-lg bg-purple-100 dark:bg-purple-900/30">
                                             <Clock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                         </div>
@@ -136,7 +145,6 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
                             </div>
 
                             <div className="space-y-0.5">
-
                                 <div className="space-y-1">
                                     <ConfirmDialog
                                         title="Re-discover target"
@@ -145,6 +153,15 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
                                             setIsRediscovering(true);
                                             rediscoverTarget({
                                                 id: target.id,
+                                            }, {
+                                                onError: (e) => {
+                                                    const err = e as AxiosError<{ message: string }>
+                                                    toast.error(err.response?.data.message ?? "Failed to re-discover target");
+                                                },
+                                                onSuccess: () => {
+                                                    toast.success("Target re-discovered successfully");
+                                                    setIsRediscovering(false);
+                                                },
                                             });
                                             navigate(`/targets/${target.id}?animation=true&page=1&pageSize=100`);
                                             setIsSheetOpen(false);
@@ -152,7 +169,7 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
                                         trigger={
                                             <Button
                                                 variant="ghost"
-                                                className="w-full justify-start h-12 px-4 text-left hover:bg-accent/50"
+                                                className="w-full justify-start h-12 text-left p-0 hover:bg-accent/50"
                                                 disabled={target.status !== JobStatus.completed}
                                             >
                                                 <div className="flex items-center gap-3">
@@ -177,7 +194,6 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
                                 </div>
                             </div>
                         </div>
-
                     </div>
                 </div>
 

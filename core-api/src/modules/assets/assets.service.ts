@@ -1,13 +1,14 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
@@ -28,6 +29,7 @@ export class AssetsService {
     public readonly targetRepo: Repository<Target>,
     private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
+    private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
   ) { }
@@ -227,11 +229,24 @@ export class AssetsService {
     if (!asset) {
       throw new NotFoundException('Asset not found');
     }
+
     const target = await this.targetRepo.findOne({
       where: {
         id: targetId,
       },
+      relations: ['workspaceTargets.workspace'],
     });
+    const workspaceId = target?.workspaceTargets[0].workspace.id;
+    if (!workspaceId) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    const workspaceConfigs = await this.workspaceService.getWorkspaceConfigValue(workspaceId);
+
+    if (!workspaceConfigs.isAssetsDiscovery) {
+      throw new BadRequestException('Asset discovery is disabled for this workspace');
+    }
+
     if (!target) {
       throw new NotFoundException('Target not found');
     }
@@ -240,7 +255,9 @@ export class AssetsService {
       reScanCount,
       lastDiscoveredAt: new Date(),
     });
+
     this.eventEmitter.emit('target.re_scan', target);
+
     return {
       message: 'Scan started',
     };

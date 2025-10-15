@@ -108,6 +108,20 @@ export interface Workspace {
    */
   description: string;
   archivedAt?: object;
+  /**
+   * Asset discovery
+   * Asset discovery is enabled for the workspace
+   * @default true
+   * @example true
+   */
+  isAssetsDiscovery: boolean;
+  /**
+   * Auto enable assets
+   * Assets are automatically enabled after discovery
+   * @default true
+   * @example true
+   */
+  isAutoEnableAssetAfterDiscovered: boolean;
 }
 
 export interface CreateWorkspaceDto {
@@ -126,6 +140,36 @@ export interface CreateWorkspaceDto {
 
 export interface GetApiKeyResponseDto {
   apiKey: string;
+}
+
+export interface SwaggerPropertyMetadata {
+  value: object;
+  type: string;
+  example: object;
+  description: object;
+  title: string;
+}
+
+export interface GetWorkspaceConfigsDto {
+  isAssetsDiscovery: SwaggerPropertyMetadata;
+  isAutoEnableAssetAfterDiscovered: SwaggerPropertyMetadata;
+}
+
+export interface UpdateWorkspaceConfigsDto {
+  /**
+   * Asset discovery
+   * Asset discovery is enabled for the workspace
+   * @default true
+   * @example true
+   */
+  isAssetsDiscovery: boolean;
+  /**
+   * Auto enable assets
+   * Assets are automatically enabled after discovery
+   * @default true
+   * @example true
+   */
+  isAutoEnableAssetAfterDiscovered: boolean;
 }
 
 export interface GetManyWorkspaceDto {
@@ -1401,6 +1445,43 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/api-key`,
       method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves the configuration settings for a specified workspace, including asset discovery and auto-enablement settings.
+   *
+   * @tags Workspaces
+   * @name WorkspacesControllerGetWorkspaceConfigs
+   * @summary Get workspace configs
+   * @request GET:/api/workspaces/configs
+   */
+  workspacesControllerGetWorkspaceConfigs = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workspaces/configs`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates the configuration settings for a specified workspace, including asset discovery and auto-enablement options.
+   *
+   * @tags Workspaces
+   * @name WorkspacesControllerUpdateWorkspaceConfigs
+   * @summary Update workspace configs
+   * @request PATCH:/api/workspaces/configs
+   */
+  workspacesControllerUpdateWorkspaceConfigs = (
+    data: UpdateWorkspaceConfigsDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workspaces/configs`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });

@@ -29,7 +29,7 @@ export class Target extends BaseEntity {
       return value;
     }
   })
-  @Column({ unique: true, type: 'varchar' })
+  @Column({ type: 'varchar' })
   value: string;
 
   @ApiProperty()

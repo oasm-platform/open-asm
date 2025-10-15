@@ -49,7 +49,7 @@ export class ApiKeysService {
     });
 
     if (!apiKey) {
-      throw new NotFoundException('API key not found');
+      throw new Error('API key not found');
     }
 
     return apiKey;

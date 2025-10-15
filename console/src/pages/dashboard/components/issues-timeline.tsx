@@ -20,10 +20,12 @@ export default function IssuesTimeline() {
   const { data, isLoading, isError } = useStatisticControllerGetIssuesTimeline({
     query: {
       enabled: !!selectedWorkspace,
+      queryKey: [selectedWorkspace],
     },
+
   });
 
-  if (isLoading) {
+  if (isLoading || !data?.data) {
     return <div>Loading...</div>;
   }
 

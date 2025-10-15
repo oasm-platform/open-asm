@@ -141,6 +141,10 @@ export type Workspace = {
   /** The description of the workspace */
   description: string;
   archivedAt?: WorkspaceArchivedAt;
+  /** Asset discovery is enabled for the workspace */
+  isAssetsDiscovery: boolean;
+  /** Assets are automatically enabled after discovery */
+  isAutoEnableAssetAfterDiscovered: boolean;
 };
 
 export type CreateWorkspaceDtoArchivedAt = { [key: string]: unknown };
@@ -155,6 +159,32 @@ export type CreateWorkspaceDto = {
 
 export type GetApiKeyResponseDto = {
   apiKey: string;
+};
+
+export type SwaggerPropertyMetadataValue = { [key: string]: unknown };
+
+export type SwaggerPropertyMetadataExample = { [key: string]: unknown };
+
+export type SwaggerPropertyMetadataDescription = { [key: string]: unknown };
+
+export type SwaggerPropertyMetadata = {
+  value: SwaggerPropertyMetadataValue;
+  type: string;
+  example: SwaggerPropertyMetadataExample;
+  description: SwaggerPropertyMetadataDescription;
+  title: string;
+};
+
+export type GetWorkspaceConfigsDto = {
+  isAssetsDiscovery: SwaggerPropertyMetadata;
+  isAutoEnableAssetAfterDiscovered: SwaggerPropertyMetadata;
+};
+
+export type UpdateWorkspaceConfigsDto = {
+  /** Asset discovery is enabled for the workspace */
+  isAssetsDiscovery: boolean;
+  /** Assets are automatically enabled after discovery */
+  isAutoEnableAssetAfterDiscovered: boolean;
 };
 
 export type GetManyWorkspaceDto = {
@@ -3004,6 +3034,413 @@ export function useWorkspacesControllerGetWorkspaceApiKey<
 
   return query;
 }
+
+/**
+ * Retrieves the configuration settings for a specified workspace, including asset discovery and auto-enablement settings.
+ * @summary Get workspace configs
+ */
+export const workspacesControllerGetWorkspaceConfigs = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetWorkspaceConfigsDto>(
+    { url: `/api/workspaces/configs`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkspacesControllerGetWorkspaceConfigsQueryKey = () => {
+  return [`/api/workspaces/configs`] as const;
+};
+
+export const getWorkspacesControllerGetWorkspaceConfigsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetWorkspaceConfigsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+  > = ({ signal }) =>
+    workspacesControllerGetWorkspaceConfigs(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetWorkspaceConfigsInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+  >;
+export type WorkspacesControllerGetWorkspaceConfigsInfiniteQueryError = unknown;
+
+export function useWorkspacesControllerGetWorkspaceConfigsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceConfigsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceConfigsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace configs
+ */
+
+export function useWorkspacesControllerGetWorkspaceConfigsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetWorkspaceConfigsInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkspacesControllerGetWorkspaceConfigsQueryOptions = <
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkspacesControllerGetWorkspaceConfigsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+  > = ({ signal }) =>
+    workspacesControllerGetWorkspaceConfigs(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkspacesControllerGetWorkspaceConfigsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+>;
+export type WorkspacesControllerGetWorkspaceConfigsQueryError = unknown;
+
+export function useWorkspacesControllerGetWorkspaceConfigs<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceConfigs<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkspacesControllerGetWorkspaceConfigs<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace configs
+ */
+
+export function useWorkspacesControllerGetWorkspaceConfigs<
+  TData = Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workspacesControllerGetWorkspaceConfigs>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkspacesControllerGetWorkspaceConfigsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates the configuration settings for a specified workspace, including asset discovery and auto-enablement options.
+ * @summary Update workspace configs
+ */
+export const workspacesControllerUpdateWorkspaceConfigs = (
+  updateWorkspaceConfigsDto: UpdateWorkspaceConfigsDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/workspaces/configs`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateWorkspaceConfigsDto,
+    },
+    options,
+  );
+};
+
+export const getWorkspacesControllerUpdateWorkspaceConfigsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
+    TError,
+    { data: UpdateWorkspaceConfigsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
+  TError,
+  { data: UpdateWorkspaceConfigsDto },
+  TContext
+> => {
+  const mutationKey = ['workspacesControllerUpdateWorkspaceConfigs'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
+    { data: UpdateWorkspaceConfigsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workspacesControllerUpdateWorkspaceConfigs(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkspacesControllerUpdateWorkspaceConfigsMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>
+  >;
+export type WorkspacesControllerUpdateWorkspaceConfigsMutationBody =
+  UpdateWorkspaceConfigsDto;
+export type WorkspacesControllerUpdateWorkspaceConfigsMutationError = unknown;
+
+/**
+ * @summary Update workspace configs
+ */
+export const useWorkspacesControllerUpdateWorkspaceConfigs = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
+      TError,
+      { data: UpdateWorkspaceConfigsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workspacesControllerUpdateWorkspaceConfigs>>,
+  TError,
+  { data: UpdateWorkspaceConfigsDto },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkspacesControllerUpdateWorkspaceConfigsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * Fetches detailed information about a specific security workspace using its unique identifier, including all associated metadata and configuration.

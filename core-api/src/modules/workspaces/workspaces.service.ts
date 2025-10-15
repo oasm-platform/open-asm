@@ -4,15 +4,19 @@ import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { ApiKeyType } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
+import getSwaggerMetadata, { SwaggerPropertyMetadata } from '@/utils/getSwaggerMetadata';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
+import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
 import {
   CreateWorkspaceDto,
   GetApiKeyResponseDto,
@@ -23,7 +27,7 @@ import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
 
 @Injectable()
-export class WorkspacesService {
+export class WorkspacesService implements OnModuleInit {
   constructor(
     @InjectRepository(Workspace)
     private readonly repo: Repository<Workspace>,
@@ -31,6 +35,10 @@ export class WorkspacesService {
     private readonly workspaceMembersRepository: Repository<WorkspaceMembers>,
     private apiKeyService: ApiKeysService,
   ) { }
+
+  onModuleInit() {
+  }
+
 
   /**
    * Creates a new workspace, and adds the requesting user as a member.
@@ -194,6 +202,68 @@ export class WorkspacesService {
   }
 
   /**
+   * Retrieves the configuration settings for a specific workspace.
+   * @param workspaceId 
+   * @returns 
+   */
+  public async getWorkspaceConfigs(workspaceId: string, userContext: UserContextPayload): Promise<GetWorkspaceConfigsDto> {
+    const swaggerMetadata = getSwaggerMetadata(Workspace);
+
+    const workspace = await this.getWorkspaceByIdAndOwner(
+      workspaceId,
+      userContext,
+    );
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    const result = new GetWorkspaceConfigsDto();
+    const keyConfigs = Object.keys(result);
+    keyConfigs.forEach((key) => {
+      result[key] = {
+        ...swaggerMetadata[key],
+        value: workspace[key] as Workspace,
+      } as SwaggerPropertyMetadata;
+    });
+
+    return result;
+  }
+
+  /**
+   * Retrieves the configuration settings for a specific workspace.
+   * @param workspaceId 
+   * @returns 
+   */
+  public async getWorkspaceConfigValue(workspaceId: string): Promise<Workspace> {
+
+    const workspace = await this.repo.findOne({
+      where: {
+        id: workspaceId,
+      }
+    });
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    return workspace;
+  }
+
+  /**
+   * Updates the configuration settings for a specific workspace.
+   * @param workspaceId 
+   * @param dto 
+   * @param userContext 
+   * @returns 
+   */
+  async updateWorkspaceConfigs(workspaceId: string, dto: UpdateWorkspaceConfigsDto, userContext: UserContextPayload) {
+    await this.getWorkspaceByIdAndOwner(workspaceId, userContext);
+    await this.repo.update({ id: workspaceId }, dto);
+    return { message: 'Workspace configs updated successfully' };
+  }
+
+  /**
    * Retrieves the API key for a workspace.
    * @param workspaceId The ID of the workspace to retrieve the API key for.
    * @returns The API key for the workspace.
@@ -225,7 +295,7 @@ export class WorkspacesService {
   public async getWorkspaceById(
     id: string,
     userContext: UserContextPayload,
-  ): Promise<Workspace | null> {
+  ): Promise<Workspace> {
     const userId = userContext.id;
     const workspace = await this.repo
       .createQueryBuilder('workspace')
@@ -234,6 +304,10 @@ export class WorkspacesService {
       .where('workspace.id = :workspaceId', { workspaceId: id })
       .andWhere('member.user.id = :userId', { userId })
       .getOne();
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
 
     return workspace;
   }

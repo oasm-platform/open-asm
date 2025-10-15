@@ -7,7 +7,7 @@ import { Template } from '@/modules/templates/entities/templates.entity';
 import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
 import {
   Column,
   DeleteDateColumn,
@@ -76,4 +76,26 @@ export class Workspace extends BaseEntity {
 
   @OneToMany(() => Statistic, (statistic) => statistic.workspace)
   statistics: Statistic[];
+
+  @ApiProperty({
+    example: true,
+    default: true,
+    // name: 'Asset discovery',
+    title: 'Asset discovery',
+    description: 'Asset discovery is enabled for the workspace',
+  })
+  @IsBoolean()
+  @Column({ default: true })
+  isAssetsDiscovery: boolean;
+
+  @ApiProperty({
+    example: true,
+    default: true,
+    // name: 'Auto enable assets',
+    title: 'Auto enable assets',
+    description: 'Assets are automatically enabled after discovery',
+  })
+  @IsBoolean()
+  @Column({ default: true })
+  isAutoEnableAssetAfterDiscovered: boolean;
 }
