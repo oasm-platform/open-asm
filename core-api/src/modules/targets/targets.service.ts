@@ -4,10 +4,9 @@ import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
+  OnModuleInit
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron } from '@nestjs/schedule';
@@ -105,48 +104,24 @@ export class TargetsService implements OnModuleInit {
       workspaceId,
       userContext,
     );
-    let target = await this.getTargetByValue(value);
 
-    // If the target does not exist, create it
-    if (!target) {
-      target = await this.repo.save({ value });
+    const target = await this.repo.save({ value });
 
-      await this.workspaceTargetRepository.save({
-        workspace,
-        target,
-      });
+    await this.workspaceTargetRepository.save({
+      workspace,
+      target,
+    });
 
-      await this.assetService.createPrimaryAsset({
-        target,
-        value,
-      });
+    await this.assetService.createPrimaryAsset({
+      target,
+      value,
+    });
 
-      // Trigger workflow run assets discovery
-      const workspaceConfigs = await this.workspacesService.getWorkspaceConfigValue(workspaceId);
+    // Trigger workflow run assets discovery
+    const workspaceConfigs = await this.workspacesService.getWorkspaceConfigValue(workspaceId);
 
-      if (workspaceConfigs.isAssetsDiscovery) {
-        this.eventEmitter.emit('target.create', target);
-      }
-    }
-    // If the target exists, check if it is already associated with the workspace
-    else {
-      const workspaceTarget = await this.workspaceTargetRepository.findOne({
-        where: {
-          workspace: { id: workspace.id },
-          target: { id: target.id },
-        },
-        relations: ['workspace', 'target'],
-      });
-
-      if (workspaceTarget) {
-        throw new BadRequestException(
-          'Targer has field "value" existed in workspace',
-        );
-      }
-      await this.workspaceTargetRepository.save({
-        workspace,
-        target,
-      });
+    if (workspaceConfigs.isAssetsDiscovery) {
+      this.eventEmitter.emit('target.create', target);
     }
 
     return target;

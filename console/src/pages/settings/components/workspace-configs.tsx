@@ -13,7 +13,7 @@ import {
 } from '@/services/apis/gen/queries';
 
 export function WorkspaceConfigs() {
-    const { selectedWorkspace } = useWorkspaceSelector();
+    const { selectedWorkspace, refetch: refetchWorkspaces } = useWorkspaceSelector();
     const { data: configs, isLoading, refetch } = useWorkspacesControllerGetWorkspaceConfigs({
         query: {
             enabled: selectedWorkspace !== undefined,
@@ -62,6 +62,7 @@ export function WorkspaceConfigs() {
             {
                 onSuccess: () => {
                     refetch();
+                    refetchWorkspaces();
                 },
             }
         );
