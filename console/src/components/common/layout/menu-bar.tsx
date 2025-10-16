@@ -42,11 +42,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: '',
         },
         {
-          title: 'Tools',
-          icon: <Cpu />,
-          url: '/tools',
-        },
-        {
           title: 'Targets',
           icon: <Target />,
           url: '/targets',
@@ -61,6 +56,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Vulnerabilities',
           icon: <Bug />,
           url: '/vulnerabilities',
+        },
+        {
+          title: 'Tools',
+          icon: <Cpu />,
+          url: '/tools',
         },
         // {
         //   title: 'Studio',

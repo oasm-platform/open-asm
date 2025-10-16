@@ -237,9 +237,9 @@ export class AssetsService {
       where: {
         id: targetId,
       },
-      relations: ['workspaceTargets.workspace'],
     });
-    const workspaceId = target?.workspaceTargets[0].workspace.id;
+    const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(targetId);
+
     if (!workspaceId) {
       throw new NotFoundException('Workspace not found');
     }

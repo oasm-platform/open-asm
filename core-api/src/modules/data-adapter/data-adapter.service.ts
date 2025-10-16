@@ -10,11 +10,12 @@ import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterInput } from './data-adapter.interface';
 
 @Injectable()
 export class DataAdapterService {
-  constructor(private readonly dataSource: DataSource) { }
+  constructor(private readonly dataSource: DataSource, private workspaceService: WorkspacesService) { }
 
   public async validateData<T extends object>(
     data: object | object[],
@@ -32,6 +33,7 @@ export class DataAdapterService {
 
     return true;
   }
+
   public async subdomains({
     data,
     job,
@@ -61,6 +63,10 @@ export class DataAdapterService {
         .where({ id: job.id })
         .execute();
 
+      const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(job.asset.target.id);
+      const workspaceConfigs = await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
+
+      // const workspaceId =
       // Insert Assets
       const insertResult = await queryRunner.manager
         .createQueryBuilder()
@@ -70,6 +76,7 @@ export class DataAdapterService {
           data.map((asset) => ({
             ...asset,
             target: { id: job.asset.target.id },
+            isEnabled: workspaceConfigs.isAutoEnableAssetAfterDiscovered,
           })),
         )
         .orIgnore()

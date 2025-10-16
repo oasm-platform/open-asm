@@ -39,6 +39,7 @@ export class TargetsService implements OnModuleInit {
   async onModuleInit() {
     await this.handleUpdateScanSchedule();
   }
+
   /**
    * Retrieves a target entity by its ID.
    *

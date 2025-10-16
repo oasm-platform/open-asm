@@ -113,7 +113,7 @@ export class JobsRegistryService {
     // Step 2: find assets of the given targets
     const assetsQueryBuilder = this.dataSource
       .getRepository(Asset)
-      .createQueryBuilder('assets');
+      .createQueryBuilder('assets').where('assets.isEnabled = true');
 
     if (targetIds && targetIds.length > 0) {
       assetsQueryBuilder.andWhere('assets.targetId IN (:...targetIds)', {
