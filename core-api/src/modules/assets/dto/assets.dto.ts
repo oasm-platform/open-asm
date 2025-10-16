@@ -37,12 +37,12 @@ export class GetAssetsResponseDto {
   dnsRecords?: object;
   @ApiProperty()
   ipAddresses?: string[];
-
   @ApiProperty({ required: false })
   httpResponses?: HttpResponseDTO;
-
   @ApiProperty({ required: false })
   ports?: Port;
+  @ApiProperty()
+  isEnabled?: boolean;
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {

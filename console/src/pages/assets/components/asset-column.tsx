@@ -17,6 +17,7 @@ import {
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
 import HTTPXStatusCode from './status-code';
+import SwitchEnableAsset from './switch-enable-asset';
 import { TechnologyTooltip } from './technology-tooltip';
 
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
@@ -115,7 +116,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
         Math.abs(
           (new Date(tls.not_after as unknown as Date).getTime() -
             new Date().getTime()) /
-            (1000 * 60 * 60 * 24),
+          (1000 * 60 * 60 * 24),
         ),
       );
       const color = daysLeft < 30 ? 'red' : daysLeft < 60 ? 'yellow' : 'green';
@@ -162,6 +163,15 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
         <div className="flex flex-col gap-1 max-w-[120px] min-h-[60px] justify-center">
           <span>{dayjs(createdAt).fromNow()}</span>
         </div>
+      );
+    },
+  },
+  {
+    header: 'Enabled',
+    size: 120,
+    cell: ({ row }) => {
+      return (
+        <SwitchEnableAsset id={row.original.id} currentStatus={row.original.isEnabled} />
       );
     },
   },

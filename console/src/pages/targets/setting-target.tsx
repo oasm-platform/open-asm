@@ -107,7 +107,7 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
 
                 <div className="flex flex-col h-full">
 
-                    <div className="flex-1 space-y-0.5 overflow-y-auto p-3">
+                    <div className="flex-1 space-y-0.5 overflow-y-auto p-1">
                         {!isAssetsDiscovery && <div className='flex gap-2 mb-5 justify-center text-red-500'>
                             <OctagonAlert />
                             <span className="">Assets discovery is disabled for this workspace</span>
@@ -115,7 +115,7 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
                         <div className={clsx("space-y-4", isAssetsDiscovery ? "" : "border-dashed border-2 border-red-500 opacity-50 py-3 px-3 space-y-4 rounded-xl")}>
                             <div className="space-y-2">
                                 <div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 p-2">
                                         <div className="p-2.5 rounded-lg bg-purple-100 dark:bg-purple-900/30">
                                             <Clock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                         </div>
@@ -169,7 +169,7 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
                                         trigger={
                                             <Button
                                                 variant="ghost"
-                                                className="w-full justify-start h-12 text-left p-0 hover:bg-accent/50"
+                                                className="w-full justify-start h-12 text-left p-2"
                                                 disabled={target.status !== JobStatus.completed}
                                             >
                                                 <div className="flex items-center gap-3">

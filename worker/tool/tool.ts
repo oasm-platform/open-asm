@@ -289,8 +289,6 @@ export class Tool {
   private async commandExecution(
     command: string
   ): Promise<string> {
-    console.log(command);
-
     logger.color("blue").log(`[RUNNING]: ${command}`);
 
     try {

@@ -1,7 +1,11 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -48,17 +52,13 @@ export class AssetsService {
     });
   }
 
-  private buildBaseQuery(query: GetAssetsQueryDto, workspaceId?: string) {
+  private buildBaseQuery(query: GetAssetsQueryDto, workspaceId: string) {
     const { targetIds, ipAddresses, ports, techs, statusCodes } = query;
 
     const whereBuilder = {
       targetIds: {
         value: targetIds,
         whereClause: `"assets"."targetId" = ANY(:param)`,
-      },
-      workspaceId: {
-        value: workspaceId,
-        whereClause: `"workspaceTargets"."workspaceId" = :param`,
       },
       techs: {
         value: techs,
@@ -87,7 +87,7 @@ export class AssetsService {
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoin('assets.ipAssets', 'ipAssets')
       .leftJoin('assets.statusCodeAssets', 'statusCodeAssets')
-      .where('assets."isErrorPage" = false');
+      .where('assets."isErrorPage" = false').andWhere('"workspaceTargets"."workspaceId" = :workspaceId', { workspaceId });
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -111,7 +111,7 @@ export class AssetsService {
    * @param query - The query parameters to filter and paginate the assets.
    * @returns A promise that resolves to a paginated list of assets, including total count and pagination information.
    */
-  public async getAssetsInWorkspace(
+  public async getManyAsssets(
     query: GetAssetsQueryDto,
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
@@ -124,6 +124,7 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(query, workspaceId).select([
       'assets.value',
       'assets.id',
+      'assets.isEnabled',
       'assets.targetId',
       'assets.createdAt',
       'ipAssets.ipAddress',
@@ -155,6 +156,7 @@ export class AssetsService {
       asset.targetId = item.targetId;
       asset.createdAt = item.createdAt;
       asset.dnsRecords = item.dnsRecords;
+      asset.isEnabled = item.isEnabled;
 
       asset.tags = item.tags || [];
 
@@ -188,6 +190,7 @@ export class AssetsService {
     });
 
     const data = await Promise.all(assets);
+
     return getManyResponse({ query, data, total });
   }
 
@@ -234,17 +237,20 @@ export class AssetsService {
       where: {
         id: targetId,
       },
-      relations: ['workspaceTargets.workspace'],
     });
-    const workspaceId = target?.workspaceTargets[0].workspace.id;
+    const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(targetId);
+
     if (!workspaceId) {
       throw new NotFoundException('Workspace not found');
     }
 
-    const workspaceConfigs = await this.workspaceService.getWorkspaceConfigValue(workspaceId);
+    const workspaceConfigs =
+      await this.workspaceService.getWorkspaceConfigValue(workspaceId);
 
     if (!workspaceConfigs.isAssetsDiscovery) {
-      throw new BadRequestException('Asset discovery is disabled for this workspace');
+      throw new BadRequestException(
+        'Asset discovery is disabled for this workspace',
+      );
     }
 
     if (!target) {
@@ -270,8 +276,8 @@ export class AssetsService {
    * @returns A promise that resolves to the found asset.
    * @throws NotFoundException if the asset with the given ID is not found.
    */
-  public async getAssetById(id: string): Promise<GetAssetsResponseDto> {
-    const queryBuilder = this.buildBaseQuery(new GetAssetsQueryDto())
+  public async getAssetById(id: string, workspaceId: string): Promise<GetAssetsResponseDto> {
+    const queryBuilder = this.buildBaseQuery(new GetAssetsQueryDto(), workspaceId)
       .select([
         'assets.value',
         'assets.id',
@@ -637,4 +643,29 @@ export class AssetsService {
     // Save the updated asset
     return this.assetRepo.save(asset);
   }
+
+  /**
+   * Toggle the enabled/disabled status of an asset
+   *
+   * @param assetId - The ID of the asset to toggle
+   * @param isEnabled - The new enabled status
+   * @returns A promise that resolves to the updated asset
+   * @throws NotFoundException if the asset with the given ID is not found
+   */
+  public async switchAsset(assetId: string, isEnabled: boolean): Promise<Asset> {
+    const asset = await this.assetRepo.findOne({
+      where: { id: assetId },
+    });
+
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    // Update the asset's enabled status
+    asset.isEnabled = isEnabled;
+
+    // Save and return the updated asset
+    return this.assetRepo.save(asset);
+  }
 }
+

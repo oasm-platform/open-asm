@@ -13,8 +13,9 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
 import {
@@ -33,10 +34,13 @@ export class WorkspacesService implements OnModuleInit {
     private readonly repo: Repository<Workspace>,
     @InjectRepository(WorkspaceMembers)
     private readonly workspaceMembersRepository: Repository<WorkspaceMembers>,
+    @InjectRepository(WorkspaceTarget)
+    private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private apiKeyService: ApiKeysService,
+    private dataSource: DataSource
   ) { }
 
-  onModuleInit() {
+  async onModuleInit() {
   }
 
 
@@ -228,6 +232,24 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     return result;
+  }
+
+  /**
+   * Retrieves the workspace ID associated with a target ID by joining through the workspace_targets table.
+   * @param targetId - The ID of the target to look up.
+   * @returns The workspace ID associated with the target, or null if not found.
+   */
+  public async getWorkspaceIdByTargetId(targetId: string): Promise<string | null> {
+    const workspaceTarget = await this.workspaceTargetRepository
+      .createQueryBuilder('workspaceTarget')
+      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .innerJoin('workspaceTarget.target', 'target')
+      .select('workspace.id', 'workspaceId')
+      .where('target.id = :targetId', { targetId })
+      .cache(60000)
+      .getRawOne<{ workspaceId: string }>();
+
+    return workspaceTarget ? workspaceTarget.workspaceId : null;
   }
 
   /**

@@ -390,6 +390,7 @@ export type GetAssetsResponseDto = {
   ipAddresses: string[];
   httpResponses?: HttpResponseDTO;
   ports?: Port;
+  isEnabled: boolean;
 };
 
 export type GetManyGetAssetsResponseDtoDto = {
@@ -499,6 +500,11 @@ export type UpdateAssetDto = {
   tags: string[] | null;
 };
 
+export type SwitchAssetDto = {
+  assetId: string;
+  isEnabled: boolean;
+};
+
 export type WorkerAliveDto = {
   token: string;
 };
@@ -538,6 +544,7 @@ export type Asset = {
   isPrimary: boolean;
   dnsRecords: AssetDnsRecords;
   isErrorPage: boolean;
+  isEnabled: boolean;
 };
 
 export type SearchData = {
@@ -8224,6 +8231,100 @@ export const useAssetsControllerUpdateAssetById = <
 > => {
   const mutationOptions =
     getAssetsControllerUpdateAssetByIdMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Toggle the enabled/disabled status of an asset.
+ * @summary Switch asset enabled/disabled
+ */
+export const assetsControllerSwitchAsset = (
+  switchAssetDto: SwitchAssetDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetAssetsResponseDto>(
+    {
+      url: `/api/assets/switch`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: switchAssetDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetsControllerSwitchAssetMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+    TError,
+    { data: SwitchAssetDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+  TError,
+  { data: SwitchAssetDto },
+  TContext
+> => {
+  const mutationKey = ['assetsControllerSwitchAsset'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+    { data: SwitchAssetDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assetsControllerSwitchAsset(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetsControllerSwitchAssetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerSwitchAsset>>
+>;
+export type AssetsControllerSwitchAssetMutationBody = SwitchAssetDto;
+export type AssetsControllerSwitchAssetMutationError = unknown;
+
+/**
+ * @summary Switch asset enabled/disabled
+ */
+export const useAssetsControllerSwitchAsset = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+      TError,
+      { data: SwitchAssetDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetsControllerSwitchAsset>>,
+  TError,
+  { data: SwitchAssetDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetsControllerSwitchAssetMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
