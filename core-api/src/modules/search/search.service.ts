@@ -56,7 +56,7 @@ export class SearchService {
     // Fetch the actual data with calculated limits
     const [assets, targets] = await Promise.all([
       assetsLimit > 0
-        ? this.assetService.getAssetsInWorkspace(
+        ? this.assetService.getManyAsssets(
           {
             ...query,
             limit: assetsLimit,

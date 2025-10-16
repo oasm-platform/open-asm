@@ -36,7 +36,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all assets associated with a specified target.
@@ -52,17 +52,13 @@ export class AssetsService {
     });
   }
 
-  private buildBaseQuery(query: GetAssetsQueryDto, workspaceId?: string) {
+  private buildBaseQuery(query: GetAssetsQueryDto, workspaceId: string) {
     const { targetIds, ipAddresses, ports, techs, statusCodes } = query;
 
     const whereBuilder = {
       targetIds: {
         value: targetIds,
         whereClause: `"assets"."targetId" = ANY(:param)`,
-      },
-      workspaceId: {
-        value: workspaceId,
-        whereClause: `"workspaceTargets"."workspaceId" = :param`,
       },
       techs: {
         value: techs,
@@ -91,7 +87,7 @@ export class AssetsService {
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoin('assets.ipAssets', 'ipAssets')
       .leftJoin('assets.statusCodeAssets', 'statusCodeAssets')
-      .where('assets."isErrorPage" = false');
+      .where('assets."isErrorPage" = false').andWhere('"workspaceTargets"."workspaceId" = :workspaceId', { workspaceId });
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -115,7 +111,7 @@ export class AssetsService {
    * @param query - The query parameters to filter and paginate the assets.
    * @returns A promise that resolves to a paginated list of assets, including total count and pagination information.
    */
-  public async getAssetsInWorkspace(
+  public async getManyAsssets(
     query: GetAssetsQueryDto,
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
@@ -280,8 +276,8 @@ export class AssetsService {
    * @returns A promise that resolves to the found asset.
    * @throws NotFoundException if the asset with the given ID is not found.
    */
-  public async getAssetById(id: string): Promise<GetAssetsResponseDto> {
-    const queryBuilder = this.buildBaseQuery(new GetAssetsQueryDto())
+  public async getAssetById(id: string, workspaceId: string): Promise<GetAssetsResponseDto> {
+    const queryBuilder = this.buildBaseQuery(new GetAssetsQueryDto(), workspaceId)
       .select([
         'assets.value',
         'assets.id',
@@ -645,6 +641,30 @@ export class AssetsService {
     }
 
     // Save the updated asset
+    return this.assetRepo.save(asset);
+  }
+
+  /**
+   * Toggle the enabled/disabled status of an asset
+   *
+   * @param assetId - The ID of the asset to toggle
+   * @param isEnabled - The new enabled status
+   * @returns A promise that resolves to the updated asset
+   * @throws NotFoundException if the asset with the given ID is not found
+   */
+  public async switchAsset(assetId: string, isEnabled: boolean): Promise<Asset> {
+    const asset = await this.assetRepo.findOne({
+      where: { id: assetId },
+    });
+
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    // Update the asset's enabled status
+    asset.isEnabled = isEnabled;
+
+    // Save and return the updated asset
     return this.assetRepo.save(asset);
   }
 }

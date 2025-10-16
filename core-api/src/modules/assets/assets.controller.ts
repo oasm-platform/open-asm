@@ -1,7 +1,7 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
@@ -9,6 +9,7 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
+import { SwitchAssetDto } from './dto/switch-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 
 @ApiTags('Assets')
@@ -31,7 +32,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getAssetsInWorkspace(query, workspaceId);
+    return this.assetsService.getManyAsssets(query, workspaceId);
   }
 
   @Doc({
@@ -112,10 +113,13 @@ export class AssetsController {
     response: {
       serialization: GetAssetsResponseDto,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get(':id')
-  getAssetById(@Param('id') id: string) {
-    return this.assetsService.getAssetById(id);
+  getAssetById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
+    return this.assetsService.getAssetById(id, workspaceId);
   }
 
   @Doc({
@@ -131,5 +135,17 @@ export class AssetsController {
     @Body() updateAssetDto: UpdateAssetDto,
   ) {
     return this.assetsService.updateAssetById(id, updateAssetDto);
+  }
+
+  @Doc({
+    summary: 'Switch asset enabled/disabled',
+    description: 'Toggle the enabled/disabled status of an asset.',
+    response: {
+      serialization: GetAssetsResponseDto,
+    },
+  })
+  @Post('/switch')
+  switchAsset(@Body() switchAssetDto: SwitchAssetDto) {
+    return this.assetsService.switchAsset(switchAssetDto.assetId, switchAssetDto.isEnabled);
   }
 }

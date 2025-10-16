@@ -391,6 +391,7 @@ export interface GetAssetsResponseDto {
   ipAddresses: string[];
   httpResponses?: HttpResponseDTO;
   ports?: Port;
+  isEnabled: boolean;
 }
 
 export interface GetManyGetAssetsResponseDtoDto {
@@ -490,6 +491,11 @@ export interface UpdateAssetDto {
   tags: string[] | null;
 }
 
+export interface SwitchAssetDto {
+  assetId: string;
+  isEnabled: boolean;
+}
+
 export interface WorkerAliveDto {
   token: string;
 }
@@ -532,6 +538,7 @@ export interface Asset {
   isPrimary: boolean;
   dnsRecords: object;
   isErrorPage: boolean;
+  isEnabled: boolean;
 }
 
 export interface SearchData {
@@ -1949,6 +1956,27 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/${id}`,
       method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Toggle the enabled/disabled status of an asset.
+   *
+   * @tags Assets
+   * @name AssetsControllerSwitchAsset
+   * @summary Switch asset enabled/disabled
+   * @request POST:/api/assets/switch
+   */
+  assetsControllerSwitchAsset = (
+    data: SwitchAssetDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/switch`,
+      method: "POST",
       body: data,
       type: ContentType.Json,
       format: "json",
