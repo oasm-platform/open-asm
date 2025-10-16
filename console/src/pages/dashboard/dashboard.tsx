@@ -1,4 +1,5 @@
 import Page from "@/components/common/page";
+import AssetLocationsMap from './components/asset-locations-map';
 import IssuesTimeline from './components/issues-timeline';
 import Statistic from "./components/statistic";
 import TopTagsAssets from './components/top-tags-assets';
@@ -15,7 +16,7 @@ export default function Dashboard() {
                             <IssuesTimeline />
                         </div>
                         <div className='col-span-1'>
-
+                            <AssetLocationsMap />
                         </div>
                     </div>
                 </div>

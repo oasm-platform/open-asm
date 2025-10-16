@@ -52,12 +52,14 @@ export default function TopTagsAssets() {
           {topTags &&
             topTags.map((item: TopTagAsset, index: number) => (
               <div key={index} className="flex items-center gap-2">
-                <span className="w-1/6 truncate text-sm font-bold">{item.tag}</span>
-                <Progress
-                  value={maxCount > 0 ? (item.count / maxCount) * 100 : 0}
-                  className="w-4/6"
-                />
-                <span className="w-1/6 text-right text-sm">{item.count}</span>
+                <span className="w-3/8 truncate text-sm font-bold">{item.tag}</span>
+                <div className='w-5/8 flex items-center'>
+                  <Progress
+                    value={maxCount > 0 ? (item.count / maxCount) * 100 : 0}
+                    className="w-full mr-2"
+                  />
+                  <span className="text-right text-sm">{item.count}</span>
+                </div>
               </div>
             ))}
         </div>

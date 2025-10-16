@@ -28,7 +28,7 @@ export class StatisticCronService implements OnModuleInit {
      * Currently commented out to prevent running handleCron on module initialization.
      */
     async onModuleInit() {
-        // await this.handleCron(); // Uncomment to run the cron job on application startup
+        await this.handleCron(); // Uncomment to run the cron job on application startup
     }
 
     /**
