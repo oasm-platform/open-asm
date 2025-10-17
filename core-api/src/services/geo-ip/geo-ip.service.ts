@@ -53,9 +53,32 @@ export class GeoIpService {
     private readonly logger = new Logger(GeoIpService.name);
 
     constructor(
-        private configService: ConfigService,
-        private httpService: HttpService,
-    ) { }
+        private readonly configService: ConfigService,
+        private readonly httpService: HttpService,
+    ) {
+        const geoIpUrl = this.configService.get<string>('GEO_IP_URL');
+        if (!geoIpUrl) {
+            throw new Error('GEO_IP_URL configuration is missing');
+        }
+        this.httpService.axiosRef.defaults.baseURL = `http://${geoIpUrl}`;
+
+        // Test connection to base URL
+        void this.testConnection();
+    }
+
+    private async testConnection(): Promise<void> {
+        try {
+            // Make a simple request to test the connection
+            await firstValueFrom(
+                this.httpService.get('/'),
+            );
+            this.logger.log('Geo IP service connection established successfully');
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Failed to connect to Geo IP service: ${errorMessage}`);
+            throw new Error(`Geo IP service connection failed: ${errorMessage}`);
+        }
+    }
 
     /**
      * Fetches geolocation data for the provided IP addresses
@@ -64,16 +87,8 @@ export class GeoIpService {
      */
     async getGeoIp(ips: string[]): Promise<GeoIp[]> {
         try {
-            const geoIpUrl = this.configService.get<string>('GEO_IP_URL');
-            if (!geoIpUrl) {
-                this.logger.error('GEO_IP_URL configuration is missing');
-                throw new BadRequestException('GEO_IP_URL configuration is missing');
-            }
-
             const response: AxiosResponse<GeoIp[]> = await firstValueFrom(
-
-                // eslint-disable-next-line
-                this.httpService.get<GeoIp[]>(`http://${geoIpUrl}/bulk/${ips.join(',')}`),
+                this.httpService.get<GeoIp[]>(`/bulk/${ips.join(',')}`),
             );
 
             return response.data;
