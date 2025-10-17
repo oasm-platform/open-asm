@@ -3,8 +3,10 @@ import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetAssetLocations } from '@/services/apis/gen/queries';
 import 'leaflet/dist/leaflet.css';
 import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
+import { useNavigate } from 'react-router-dom';
 
 export default function AssetLocationsMap() {
+    const navigate = useNavigate();
     const { selectedWorkspace } = useWorkspaceSelector()
     const { data: locations, isLoading } = useStatisticControllerGetAssetLocations({
         query: {
@@ -14,14 +16,13 @@ export default function AssetLocationsMap() {
 
     return (
         <div className="h-[450px] xl:h-full w-full relative rounded-lg overflow-hidden border">
-            <div className='absolute top-0 left-0 z-5 p-3'>
+            <div className='absolute top-0 z-2 left-0 p-3'>
                 <div className='bg-background/30 p-2 rounded'>
                     <CardTitle className="text-lg">Asset locations</CardTitle>
                     <CardDescription className="text-xs">
                         Shows the locations of assets.
                     </CardDescription>
                 </div>
-
             </div>
             <MapContainer
                 attributionControl={false}
@@ -33,8 +34,8 @@ export default function AssetLocationsMap() {
                 touchZoom={false}
                 boxZoom={false}
                 dragging={false}
+                className='z-1'
                 style={{ height: '100%', width: '100%' }}
-                className="z-10"
             >
                 <TileLayer
                     detectRetina={true}
@@ -52,6 +53,7 @@ export default function AssetLocationsMap() {
                         eventHandlers={{
                             mouseover: (event) => event.target.openPopup(),
                             mouseout: (event) => event.target.closePopup(),
+                            click: () => navigate(`/assets?ipAddresses=${location.query}`)
                         }}
                     >
                         <Popup>

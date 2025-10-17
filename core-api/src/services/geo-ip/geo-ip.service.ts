@@ -71,7 +71,8 @@ export class GeoIpService {
             }
 
             const response: AxiosResponse<GeoIp[]> = await firstValueFrom(
-                 
+
+                // eslint-disable-next-line
                 this.httpService.get<GeoIp[]>(`http://${geoIpUrl}/bulk/${ips.join(',')}`),
             );
 
