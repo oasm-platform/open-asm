@@ -98,19 +98,22 @@ export class StatisticService {
    */
   private async countUniquePorts(workspaceId: string): Promise<number> {
     const result = await this.dataSource
-      .getRepository(HttpResponse)
-      .createQueryBuilder('httpResponse')
-      .select('DISTINCT httpResponse.port', 'port')
-      .innerJoin('httpResponse.asset', 'asset')
-      .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'workspaceTarget')
-      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
-      .andWhere('httpResponse.port IS NOT NULL')
-      .andWhere('asset."isErrorPage" = false')
-      .getRawMany();
-
-    return result.length;
+      .createQueryBuilder()
+      .select('COUNT(DISTINCT unnest_port)', 'count')
+      .from(subQuery => {
+        return subQuery
+          .select('unnest(port.ports)', 'unnest_port')
+          .from('ports', 'port')
+          .innerJoin('assets', 'asset', 'port."assetId" = asset.id')
+          .innerJoin('targets', 'target', 'asset."targetId" = target.id')
+          .innerJoin('workspace_targets', 'workspaceTarget', '"workspaceTarget"."targetId" = target.id')
+          .where('"workspaceTarget"."workspaceId" = :workspaceId', { workspaceId })
+          .andWhere('asset."isErrorPage" = false');
+      }, 'unnested')
+      .getRawOne<{ count: string }>();
+    return Number(result?.count || 0);
   }
+
 
   /**
    * Retrieves the total count of targets in a workspace.
