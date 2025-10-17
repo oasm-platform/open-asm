@@ -76,7 +76,7 @@ export default function VulnerabilityStatistic() {
       <Card className="w-full hover:bg-accent/70 cursor-pointer">
         <CardHeader className='flex justify-between items-center'>
           <div className="flex items-center gap-2">
-            <CardTitle className="">Vulnerabilities Issues</CardTitle>
+            <CardTitle className="">Vulnerabilities issues</CardTitle>
             {totalVulsTrend?.difference !== 0 && renderTrend(totalVulsTrend)}
           </div>
           <Bug />

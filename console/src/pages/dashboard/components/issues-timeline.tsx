@@ -39,9 +39,9 @@ export default function IssuesTimeline() {
   })) || [];
 
   return (
-    <Card className="w-full h-full p-4">
+    <Card className="w-full h-full p-2">
       <CardHeader className="p-4 pb-2">
-        <CardTitle className="text-lg">Issues Timeline</CardTitle>
+        <CardTitle className="text-lg">Issues timeline</CardTitle>
         <CardDescription className="text-xs">
           Number of vulnerabilities over time.
         </CardDescription>

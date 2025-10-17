@@ -10,7 +10,7 @@ export default function Statistic() {
     const { selectedWorkspace } = useWorkspaceSelector();
     const navigate = useNavigate();
 
-    const { data: statistics, isLoading, isError } = useStatisticControllerGetStatistics({
+    const { data: statistics, isLoading } = useStatisticControllerGetStatistics({
         workspaceId: selectedWorkspace ?? ''
     }, {
         query: {
@@ -36,14 +36,6 @@ export default function Statistic() {
                         </CardContent>
                     </Card>
                 ))}
-            </div>
-        );
-    }
-
-    if (isError || !selectedWorkspace) {
-        return (
-            <div className="text-red-500">
-                {isError ? "Error loading statistics" : "Please select a workspace"}
             </div>
         );
     }
