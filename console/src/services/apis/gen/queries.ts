@@ -648,6 +648,29 @@ export type TopTagAsset = {
   count: number;
 };
 
+export type GeoIp = {
+  query: string;
+  status: string;
+  continent: string;
+  continentCode: string;
+  country: string;
+  countryCode: string;
+  region: string;
+  regionName: string;
+  city: string;
+  district: string;
+  zip: string;
+  lat: number;
+  lon: number;
+  timezone: string;
+  offset: number;
+  currency: string;
+  isp: string;
+  org: string;
+  as: string;
+  asname: string;
+};
+
 export type ScanDto = {
   /** Target ID */
   targetId: string;
@@ -11371,6 +11394,315 @@ export function useStatisticControllerGetTopTagsAssets<
 } {
   const queryOptions =
     getStatisticControllerGetTopTagsAssetsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves the location of assets in a workspace.
+ * @summary Get assets location
+ */
+export const statisticControllerGetAssetLocations = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GeoIp[]>(
+    { url: `/api/statistic/asset-locations`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetAssetLocationsQueryKey = () => {
+  return [`/api/statistic/asset-locations`] as const;
+};
+
+export const getStatisticControllerGetAssetLocationsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetAssetLocationsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+  > = ({ signal }) =>
+    statisticControllerGetAssetLocations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetAssetLocationsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>>;
+export type StatisticControllerGetAssetLocationsInfiniteQueryError = unknown;
+
+export function useStatisticControllerGetAssetLocationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAssetLocationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAssetLocationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets location
+ */
+
+export function useStatisticControllerGetAssetLocationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetAssetLocationsInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStatisticControllerGetAssetLocationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetAssetLocationsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+  > = ({ signal }) =>
+    statisticControllerGetAssetLocations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetAssetLocationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+>;
+export type StatisticControllerGetAssetLocationsQueryError = unknown;
+
+export function useStatisticControllerGetAssetLocations<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAssetLocations<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAssetLocations<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets location
+ */
+
+export function useStatisticControllerGetAssetLocations<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetAssetLocationsQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

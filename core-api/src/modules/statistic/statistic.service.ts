@@ -1,20 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, MoreThanOrEqual } from 'typeorm';
 
+import { SortOrder } from '@/common/dtos/get-many-base.dto';
+import { GeoIp, GeoIpService } from '@/services/geo-ip/geo-ip.service';
+import { AssetsService } from '../assets/assets.service';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
-import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { Statistic } from './entities/statistic.entity';
 
 @Injectable()
 export class StatisticService {
-  constructor(private readonly dataSource: DataSource) { }
+  constructor(private readonly dataSource: DataSource,
+    private assetService: AssetsService,
+    private geoIpService: GeoIpService
+  ) { }
 
   /**
    * Retrieves the total count of targets in a workspace directly from the database.
@@ -247,5 +253,22 @@ export class StatisticService {
       tag: result.tag,
       count: parseInt(result.count, 10),
     }));
+  }
+
+  /**
+   * Retrieves the location of assets in a workspace.
+   * @param workspaceId 
+   * @returns 
+   */
+  async getAssetLocations(workspaceId: string): Promise<GeoIp[]> {
+    const assets = await this.assetService.getIpAssets({
+      page: 1, limit: 1000,
+      sortBy: 'createdAt',
+      value: '',
+      sortOrder: SortOrder.DESC
+    }, workspaceId);
+    const ips = assets.data.map(i => i.ip);
+    const geoIps = await this.geoIpService.getGeoIp(ips);
+    return geoIps.filter(i => i.lat && i.lon);
   }
 }

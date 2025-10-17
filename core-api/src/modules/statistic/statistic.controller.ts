@@ -1,9 +1,10 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
+import { GeoIp } from '@/services/geo-ip/geo-ip.service';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, getSchemaPath } from '@nestjs/swagger';
-import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
+import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { StatisticService } from './statistic.service';
@@ -74,5 +75,24 @@ export class StatisticController {
     @WorkspaceId() workspaceId: string,
   ): Promise<TopTagAsset[]> {
     return this.statisticService.getTopTagsAssets(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get assets location',
+    description: 'Retrieves the location of assets in a workspace.',
+    response: {
+      extraModels: [GeoIp],
+      dataSchema: {
+        type: 'array',
+        items: { $ref: getSchemaPath(GeoIp) },
+      }
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('asset-locations')
+  getAssetLocations(@WorkspaceId() workspaceId: string) {
+    return this.statisticService.getAssetLocations(workspaceId);
   }
 }

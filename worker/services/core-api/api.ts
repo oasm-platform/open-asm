@@ -710,6 +710,29 @@ export interface TopTagAsset {
   count: number;
 }
 
+export interface GeoIp {
+  query: string;
+  status: string;
+  continent: string;
+  continentCode: string;
+  country: string;
+  countryCode: string;
+  region: string;
+  regionName: string;
+  city: string;
+  district: string;
+  zip: string;
+  lat: number;
+  lon: number;
+  timezone: string;
+  offset: number;
+  currency: string;
+  isp: string;
+  org: string;
+  as: string;
+  asname: string;
+}
+
 export interface ScanDto {
   /** Target ID */
   targetId: string;
@@ -2235,6 +2258,22 @@ export class Api<
   statisticControllerGetTopTagsAssets = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic/top-tags-assets`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves the location of assets in a workspace.
+   *
+   * @tags Statistic
+   * @name StatisticControllerGetAssetLocations
+   * @summary Get assets location
+   * @request GET:/api/statistic/asset-locations
+   */
+  statisticControllerGetAssetLocations = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/statistic/asset-locations`,
       method: "GET",
       format: "json",
       ...params,

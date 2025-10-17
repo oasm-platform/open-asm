@@ -39,7 +39,7 @@ export default function TopTagsAssets() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="font-medium text-base">Top Tags Assets</CardTitle>
+        <CardTitle className="font-medium text-base">Top tags assets</CardTitle>
         <Tag className="h-5 w-5 text-primary" />
       </CardHeader>
       {!topTags || topTags.length === 0 && (

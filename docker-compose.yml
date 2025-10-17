@@ -1,4 +1,4 @@
-version: "3.8"
+version: '3.8'
 
 services:
   core-api:
@@ -12,8 +12,8 @@ services:
     env_file:
       - ./core-api/.env
     ports:
-      - "6276:6276"
-    restart: "always"
+      - '6276:6276'
+    restart: 'always'
     depends_on:
       postgres:
         condition: service_healthy
@@ -24,7 +24,7 @@ services:
     volumes:
       - ./.open-api:/.open-api
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6276/api/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:6276/api/health']
       interval: 1s
       timeout: 5s
       retries: 10
@@ -42,7 +42,7 @@ services:
       - nuclei-templates:/root/nuclei-templates:rw
     networks:
       - oasm
-    restart: "always"
+    restart: 'always'
     depends_on:
       core-api:
         condition: service_healthy
@@ -54,20 +54,20 @@ services:
     env_file:
       - ./core-api/.env
     environment:
-      POSTGRES_USER: "${POSTGRES_USERNAME:-postgres}"
+      POSTGRES_USER: '${POSTGRES_USERNAME:-postgres}'
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-open_asm}
       POSTGRES_HOST_AUTH_METHOD: trust
-      PGUSER: "${POSTGRES_USERNAME:-postgres}"
-      PGPASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+      PGUSER: '${POSTGRES_USERNAME:-postgres}'
+      PGPASSWORD: '${POSTGRES_PASSWORD:-postgres}'
     volumes:
       - pgdata:/var/lib/postgresql/data:rw
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - '${POSTGRES_PORT:-5432}:5432'
     networks:
       - oasm
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
+      test: ['CMD-SHELL', 'pg_isready']
       interval: 1s
       timeout: 5s
       retries: 10
@@ -77,14 +77,14 @@ services:
     image: redis:alpine
     restart: always
     ports:
-      - "6379:6379"
+      - '6379:6379'
     networks:
       - oasm
     volumes:
       - redis-data:/data
-    command: "redis-server --requirepass password"
+    command: 'redis-server --requirepass password'
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "password", "ping"]
+      test: ['CMD', 'redis-cli', '-a', 'password', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -92,10 +92,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1"
+          cpus: '1'
           memory: 1500M
         reservations:
-          cpus: "0.5"
+          cpus: '0.5'
           memory: 512M
 
   redpanda:
@@ -103,7 +103,7 @@ services:
     image: redpandadata/redpanda:latest
     restart: always
     ports:
-      - "9092:9092"
+      - '9092:9092'
     networks:
       - oasm
     volumes:
@@ -124,17 +124,29 @@ services:
       - --set redpanda.retention_bytes=64424509440
       - --set redpanda.transaction_coordinator_cleanup_policy=compact
     healthcheck:
-      test: [ "CMD", "rpk", "cluster", "health" ]
+      test: ['CMD', 'rpk', 'cluster', 'health']
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  geo-ip:
+    container_name: geo-ip
+    image: ghcr.io/l1ttps/geoip-proxy:latest
+    networks:
+      - oasm
+    ports:
+      - '4360:4360'
+    restart: 'always'
+    volumes:
+      - geoip-data:/app/data:rw
 
 volumes:
   pgdata:
   nuclei-templates:
   redis-data:
   redpanda-data:
+  geoip-data:
 
 networks:
   oasm:
