@@ -47,3 +47,7 @@ tasks:
     deps:
       - install
       - worker:tools
+  clean:
+    - task: api:clean
+    - task: console:clean
+    - task: worker:clean

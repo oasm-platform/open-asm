@@ -15,3 +15,7 @@ tasks:
     env:
       NODE_ENV: 'production'
   install: npm install
+  clean:
+    cmds:
+      - rm -rf ./husky
+      - rm -rf ./node_modules

@@ -26,3 +26,7 @@ tasks:
   gen-api:
     cmds:
       - npm run gen:api
+  clean:
+    cmds:
+      - rm -rf ./husky
+      - rm -rf ./node_modules
