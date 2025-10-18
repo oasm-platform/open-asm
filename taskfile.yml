@@ -48,6 +48,8 @@ tasks:
       - install
       - worker:tools
   clean:
-    - task: api:clean
-    - task: console:clean
-    - task: worker:clean
+    cmds:
+      - rm -rf ./node_modules
+      - task: api:clean
+      - task: console:clean
+      - task: worker:clean
