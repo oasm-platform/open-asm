@@ -1,9 +1,26 @@
 version: '3.8'
 
 services:
+  console:
+    container_name: console
+    image: oasm/console:latest
+    build:
+      context: ./console
+      dockerfile: Dockerfile
+    networks:
+      - oasm
+    env_file:
+      - ./console/.env
+    ports:
+      - '3000:3000'
+    restart: 'always'
+    depends_on:
+      core-api:
+        condition: service_healthy
+
   core-api:
     container_name: oasm-api
-    image: oasm/oasm-api:v0.1.0
+    image: oasm/oasm-api:latest
     build:
       context: ./core-api
       dockerfile: Dockerfile
