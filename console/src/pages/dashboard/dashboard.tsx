@@ -15,7 +15,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
                 <div className="col-span-1 xl:col-span-3 gap-4 space-y-4">
                     <Statistic />
-                    <div className='grid grid-cols-1 xl:grid-cols-2 gap-4'>
+                    <div className='grid grid-cols-1 min-h-96 xl:grid-cols-2 gap-4'>
                         <div className='col-span-1'>
                             <IssuesTimeline />
                         </div>
