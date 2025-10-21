@@ -33,7 +33,7 @@ export class TechnologyController {
     if (techInfo && techInfo.icon) {
       return {
         ...techInfo,
-        iconUrl: this.technologyForwarderService.getIconUrl(techInfo.icon),
+        iconUrl: await this.technologyForwarderService.getIconUrl(techInfo.icon),
       };
     }
 

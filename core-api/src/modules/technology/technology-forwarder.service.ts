@@ -1,7 +1,9 @@
- 
+
 import { Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { WEBAPP_ANALYZER_SRC_URL } from '../../common/constants/app.constants';
 import { RedisService } from '../../services/redis/redis.service';
+import { StorageService } from '../storage/storage.service';
 import {
   CategoryInfoDTO,
   TechnologyDetailDTO,
@@ -14,7 +16,10 @@ export class TechnologyForwarderService {
   private readonly CATEGORY_CACHE_KEY = 'categories';
   private readonly CACHE_TTL = 60 * 60 * 24 * 30;
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly storageService: StorageService,
+  ) { }
 
   /**
    * Fetch technology information from the webappanalyzer repository
@@ -57,7 +62,7 @@ export class TechnologyForwarderService {
           ...techInfo,
           categories: categories,
           categoryNames: categoryNames,
-          iconUrl: techInfo.icon ? this.getIconUrl(techInfo.icon) : '',
+          iconUrl: techInfo.icon ? await this.getIconUrl(techInfo.icon) : '',
         };
 
         await this.cacheTechnologyInfo(techName, enrichedTechInfo);
@@ -140,7 +145,6 @@ export class TechnologyForwarderService {
           new TechnologyDetailDTO(),
       ),
     );
-
     return enrichedTechs;
   }
 
@@ -248,15 +252,34 @@ export class TechnologyForwarderService {
   /**
    * Get the icon URL for a technology
    * @param iconName The name of the icon
-   * @returns The full URL to the icon
+   * @returns The path of bucket + fileName
    */
-  getIconUrl(iconName: string): string {
+  async getIconUrl(iconName: string): Promise<string> {
     if (!iconName) {
       return '';
     }
-
     // Determine the file extension
-    const extension = iconName.includes('.') ? '' : '.svg';
-    return `/api/storage/forward?url=${WEBAPP_ANALYZER_SRC_URL}/images/icons/${iconName}${extension}`;
+    const hasDot = iconName.includes('.');
+    const extension = hasDot ? '' : '.svg';
+    const url = `${WEBAPP_ANALYZER_SRC_URL}/images/icons/${iconName}${extension}`;
+
+    // Extract actual extension for bucket
+    const actualExt = hasDot ? iconName.split('.').pop() : 'svg';
+    const bucket = `cached-static`;
+    const fileName = `${createHash('md5').update(url).digest('hex')}.${actualExt}`;
+
+    try {
+      // Fetch the image
+      const { buffer } = await this.storageService.forwardImage(url);
+
+      // Upload to storage
+      const uploadResult = this.storageService.uploadFile(fileName, buffer, bucket);
+
+      // Return the path
+      return `/api/storage/${uploadResult.path}`;
+    } catch (error) {
+      this.logger.error(`Error processing icon ${iconName}:`, error);
+      return '';
+    }
   }
 }
