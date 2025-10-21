@@ -991,12 +991,18 @@ export interface McpTool {
   moduleId: string;
 }
 
+export interface McpPermissionValue {
+  workspaceId: string;
+  /** @example ["get_assets"] */
+  permissions: string[];
+}
+
 export interface CreateMcpPermissionsRequestDto {
   /** @example "MCP Permission" */
   name: string;
   /** @example "Allows access to assets in the workspaces" */
   description?: string;
-  value: string[];
+  value: McpPermissionValue[];
 }
 
 export interface McpPermission {
@@ -1009,7 +1015,7 @@ export interface McpPermission {
   name: string;
   /** @example "Allows access to assets in the workspaces" */
   description?: string;
-  value: string[];
+  value: McpPermissionValue[];
 }
 
 export interface GetManyMcpPermissionDto {

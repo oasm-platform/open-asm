@@ -37,6 +37,7 @@ export const WorkspacePermissionDetails = ({ permission }: { permission: McpPerm
             {isExpanded && (
                 <div className='space-y-5'>
                     {permission.value.map((permValue, index) => {
+                        console.log(permission);
                         const workspace = workspaces.find((ws) => ws.id === permValue.workspaceId);
                         return (
                             <div key={index} className="rounded-lg">

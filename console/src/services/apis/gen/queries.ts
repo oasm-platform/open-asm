@@ -968,10 +968,15 @@ export type McpTool = {
   moduleId: string;
 };
 
+export type McpPermissionValue = {
+  workspaceId: string;
+  permissions: string[];
+};
+
 export type CreateMcpPermissionsRequestDto = {
   name: string;
   description?: string;
-  value: string[];
+  value: McpPermissionValue[];
 };
 
 export type McpPermission = {
@@ -980,7 +985,7 @@ export type McpPermission = {
   updatedAt: string;
   name: string;
   description?: string;
-  value: string[];
+  value: McpPermissionValue[];
 };
 
 export type GetManyMcpPermissionDto = {
@@ -1349,8 +1354,7 @@ export const getTargetsControllerGetTargetsInWorkspaceQueryKey = (
 
 export const getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -1360,9 +1364,7 @@ export const getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -1375,22 +1377,14 @@ export const getTargetsControllerGetTargetsInWorkspaceInfiniteQueryOptions = <
     getTargetsControllerGetTargetsInWorkspaceQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    QueryKey,
-    TargetsControllerGetTargetsInWorkspaceParams['page']
-  > = ({ signal, pageParam }) =>
-    targetsControllerGetTargetsInWorkspace(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
+  > = ({ signal }) =>
+    targetsControllerGetTargetsInWorkspace(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
     TError,
-    TData,
-    QueryKey,
-    TargetsControllerGetTargetsInWorkspaceParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -1402,8 +1396,7 @@ export type TargetsControllerGetTargetsInWorkspaceInfiniteQueryError = unknown;
 
 export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -1413,17 +1406,14 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
           TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          QueryKey
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
         >,
         'initialData'
       >;
@@ -1435,8 +1425,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
 };
 export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -1446,17 +1435,14 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
           TError,
-          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-          QueryKey
+          Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
         >,
         'initialData'
       >;
@@ -1468,8 +1454,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
 };
 export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -1479,9 +1464,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -1496,8 +1479,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
 
 export function useTargetsControllerGetTargetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
-    TargetsControllerGetTargetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -1507,9 +1489,7 @@ export function useTargetsControllerGetTargetsInWorkspaceInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof targetsControllerGetTargetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        TargetsControllerGetTargetsInWorkspaceParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -2417,8 +2397,7 @@ export const getWorkspacesControllerGetWorkspacesQueryKey = (
 
 export const getWorkspacesControllerGetWorkspacesInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-    WorkspacesControllerGetWorkspacesParams['page']
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
   >,
   TError = unknown,
 >(
@@ -2428,9 +2407,7 @@ export const getWorkspacesControllerGetWorkspacesInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
         TError,
-        TData,
-        QueryKey,
-        WorkspacesControllerGetWorkspacesParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -2443,22 +2420,14 @@ export const getWorkspacesControllerGetWorkspacesInfiniteQueryOptions = <
     getWorkspacesControllerGetWorkspacesQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-    QueryKey,
-    WorkspacesControllerGetWorkspacesParams['page']
-  > = ({ signal, pageParam }) =>
-    workspacesControllerGetWorkspaces(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
+  > = ({ signal }) =>
+    workspacesControllerGetWorkspaces(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
     TError,
-    TData,
-    QueryKey,
-    WorkspacesControllerGetWorkspacesParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -2469,8 +2438,7 @@ export type WorkspacesControllerGetWorkspacesInfiniteQueryError = unknown;
 
 export function useWorkspacesControllerGetWorkspacesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-    WorkspacesControllerGetWorkspacesParams['page']
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
   >,
   TError = unknown,
 >(
@@ -2480,17 +2448,14 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
         TError,
-        TData,
-        QueryKey,
-        WorkspacesControllerGetWorkspacesParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
           TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-          QueryKey
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
         >,
         'initialData'
       >;
@@ -2502,8 +2467,7 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
 };
 export function useWorkspacesControllerGetWorkspacesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-    WorkspacesControllerGetWorkspacesParams['page']
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
   >,
   TError = unknown,
 >(
@@ -2513,17 +2477,14 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
         TError,
-        TData,
-        QueryKey,
-        WorkspacesControllerGetWorkspacesParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
           TError,
-          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-          QueryKey
+          Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
         >,
         'initialData'
       >;
@@ -2535,8 +2496,7 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
 };
 export function useWorkspacesControllerGetWorkspacesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-    WorkspacesControllerGetWorkspacesParams['page']
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
   >,
   TError = unknown,
 >(
@@ -2546,9 +2506,7 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
         TError,
-        TData,
-        QueryKey,
-        WorkspacesControllerGetWorkspacesParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -2563,8 +2521,7 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
 
 export function useWorkspacesControllerGetWorkspacesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
-    WorkspacesControllerGetWorkspacesParams['page']
+    Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>
   >,
   TError = unknown,
 >(
@@ -2574,9 +2531,7 @@ export function useWorkspacesControllerGetWorkspacesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workspacesControllerGetWorkspaces>>,
         TError,
-        TData,
-        QueryKey,
-        WorkspacesControllerGetWorkspacesParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -4872,8 +4827,7 @@ export const getJobsRegistryControllerGetManyJobsQueryKey = (
 
 export const getJobsRegistryControllerGetManyJobsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-    JobsRegistryControllerGetManyJobsParams['page']
+    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
   >,
   TError = unknown,
 >(
@@ -4883,9 +4837,7 @@ export const getJobsRegistryControllerGetManyJobsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
         TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetManyJobsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -4898,22 +4850,14 @@ export const getJobsRegistryControllerGetManyJobsInfiniteQueryOptions = <
     getJobsRegistryControllerGetManyJobsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-    QueryKey,
-    JobsRegistryControllerGetManyJobsParams['page']
-  > = ({ signal, pageParam }) =>
-    jobsRegistryControllerGetManyJobs(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
+  > = ({ signal }) =>
+    jobsRegistryControllerGetManyJobs(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
     TError,
-    TData,
-    QueryKey,
-    JobsRegistryControllerGetManyJobsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -4924,8 +4868,7 @@ export type JobsRegistryControllerGetManyJobsInfiniteQueryError = unknown;
 
 export function useJobsRegistryControllerGetManyJobsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-    JobsRegistryControllerGetManyJobsParams['page']
+    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
   >,
   TError = unknown,
 >(
@@ -4935,17 +4878,14 @@ export function useJobsRegistryControllerGetManyJobsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
         TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetManyJobsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
           TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-          QueryKey
+          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
         >,
         'initialData'
       >;
@@ -4957,8 +4897,7 @@ export function useJobsRegistryControllerGetManyJobsInfinite<
 };
 export function useJobsRegistryControllerGetManyJobsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-    JobsRegistryControllerGetManyJobsParams['page']
+    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
   >,
   TError = unknown,
 >(
@@ -4968,17 +4907,14 @@ export function useJobsRegistryControllerGetManyJobsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
         TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetManyJobsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
           TError,
-          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-          QueryKey
+          Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
         >,
         'initialData'
       >;
@@ -4990,8 +4926,7 @@ export function useJobsRegistryControllerGetManyJobsInfinite<
 };
 export function useJobsRegistryControllerGetManyJobsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-    JobsRegistryControllerGetManyJobsParams['page']
+    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
   >,
   TError = unknown,
 >(
@@ -5001,9 +4936,7 @@ export function useJobsRegistryControllerGetManyJobsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
         TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetManyJobsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -5018,8 +4951,7 @@ export function useJobsRegistryControllerGetManyJobsInfinite<
 
 export function useJobsRegistryControllerGetManyJobsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
-    JobsRegistryControllerGetManyJobsParams['page']
+    Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>
   >,
   TError = unknown,
 >(
@@ -5029,9 +4961,7 @@ export function useJobsRegistryControllerGetManyJobsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof jobsRegistryControllerGetManyJobs>>,
         TError,
-        TData,
-        QueryKey,
-        JobsRegistryControllerGetManyJobsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6074,8 +6004,7 @@ export const getAssetsControllerGetAssetsInWorkspaceQueryKey = (
 
 export const getAssetsControllerGetAssetsInWorkspaceInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-    AssetsControllerGetAssetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -6085,9 +6014,7 @@ export const getAssetsControllerGetAssetsInWorkspaceInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetAssetsInWorkspaceParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6100,22 +6027,14 @@ export const getAssetsControllerGetAssetsInWorkspaceInfiniteQueryOptions = <
     getAssetsControllerGetAssetsInWorkspaceQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-    QueryKey,
-    AssetsControllerGetAssetsInWorkspaceParams['page']
-  > = ({ signal, pageParam }) =>
-    assetsControllerGetAssetsInWorkspace(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
+  > = ({ signal }) =>
+    assetsControllerGetAssetsInWorkspace(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
     TError,
-    TData,
-    QueryKey,
-    AssetsControllerGetAssetsInWorkspaceParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -6125,8 +6044,7 @@ export type AssetsControllerGetAssetsInWorkspaceInfiniteQueryError = unknown;
 
 export function useAssetsControllerGetAssetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-    AssetsControllerGetAssetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -6136,17 +6054,14 @@ export function useAssetsControllerGetAssetsInWorkspaceInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetAssetsInWorkspaceParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
         >,
         'initialData'
       >;
@@ -6158,8 +6073,7 @@ export function useAssetsControllerGetAssetsInWorkspaceInfinite<
 };
 export function useAssetsControllerGetAssetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-    AssetsControllerGetAssetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -6169,17 +6083,14 @@ export function useAssetsControllerGetAssetsInWorkspaceInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetAssetsInWorkspaceParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
         >,
         'initialData'
       >;
@@ -6191,8 +6102,7 @@ export function useAssetsControllerGetAssetsInWorkspaceInfinite<
 };
 export function useAssetsControllerGetAssetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-    AssetsControllerGetAssetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -6202,9 +6112,7 @@ export function useAssetsControllerGetAssetsInWorkspaceInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetAssetsInWorkspaceParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6219,8 +6127,7 @@ export function useAssetsControllerGetAssetsInWorkspaceInfinite<
 
 export function useAssetsControllerGetAssetsInWorkspaceInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
-    AssetsControllerGetAssetsInWorkspaceParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>
   >,
   TError = unknown,
 >(
@@ -6230,9 +6137,7 @@ export function useAssetsControllerGetAssetsInWorkspaceInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetAssetsInWorkspace>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetAssetsInWorkspaceParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6431,10 +6336,7 @@ export const getAssetsControllerGetIpAssetsQueryKey = (
 };
 
 export const getAssetsControllerGetIpAssetsInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-    AssetsControllerGetIpAssetsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof assetsControllerGetIpAssets>>>,
   TError = unknown,
 >(
   params?: AssetsControllerGetIpAssetsParams,
@@ -6443,9 +6345,7 @@ export const getAssetsControllerGetIpAssetsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetIpAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6457,22 +6357,14 @@ export const getAssetsControllerGetIpAssetsInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getAssetsControllerGetIpAssetsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-    QueryKey,
-    AssetsControllerGetIpAssetsParams['page']
-  > = ({ signal, pageParam }) =>
-    assetsControllerGetIpAssets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
+  > = ({ signal }) =>
+    assetsControllerGetIpAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
     TError,
-    TData,
-    QueryKey,
-    AssetsControllerGetIpAssetsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -6482,10 +6374,7 @@ export type AssetsControllerGetIpAssetsInfiniteQueryResult = NonNullable<
 export type AssetsControllerGetIpAssetsInfiniteQueryError = unknown;
 
 export function useAssetsControllerGetIpAssetsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-    AssetsControllerGetIpAssetsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof assetsControllerGetIpAssets>>>,
   TError = unknown,
 >(
   params: undefined | AssetsControllerGetIpAssetsParams,
@@ -6494,17 +6383,14 @@ export function useAssetsControllerGetIpAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetIpAssetsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
         >,
         'initialData'
       >;
@@ -6515,10 +6401,7 @@ export function useAssetsControllerGetIpAssetsInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useAssetsControllerGetIpAssetsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-    AssetsControllerGetIpAssetsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof assetsControllerGetIpAssets>>>,
   TError = unknown,
 >(
   params?: AssetsControllerGetIpAssetsParams,
@@ -6527,17 +6410,14 @@ export function useAssetsControllerGetIpAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetIpAssetsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetIpAssets>>
         >,
         'initialData'
       >;
@@ -6548,10 +6428,7 @@ export function useAssetsControllerGetIpAssetsInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useAssetsControllerGetIpAssetsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-    AssetsControllerGetIpAssetsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof assetsControllerGetIpAssets>>>,
   TError = unknown,
 >(
   params?: AssetsControllerGetIpAssetsParams,
@@ -6560,9 +6437,7 @@ export function useAssetsControllerGetIpAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetIpAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6576,10 +6451,7 @@ export function useAssetsControllerGetIpAssetsInfinite<
  */
 
 export function useAssetsControllerGetIpAssetsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
-    AssetsControllerGetIpAssetsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof assetsControllerGetIpAssets>>>,
   TError = unknown,
 >(
   params?: AssetsControllerGetIpAssetsParams,
@@ -6588,9 +6460,7 @@ export function useAssetsControllerGetIpAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetIpAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetIpAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6788,8 +6658,7 @@ export const getAssetsControllerGetPortAssetsQueryKey = (
 
 export const getAssetsControllerGetPortAssetsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-    AssetsControllerGetPortAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
   >,
   TError = unknown,
 >(
@@ -6799,9 +6668,7 @@ export const getAssetsControllerGetPortAssetsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetPortAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6813,22 +6680,14 @@ export const getAssetsControllerGetPortAssetsInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getAssetsControllerGetPortAssetsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-    QueryKey,
-    AssetsControllerGetPortAssetsParams['page']
-  > = ({ signal, pageParam }) =>
-    assetsControllerGetPortAssets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
+  > = ({ signal }) =>
+    assetsControllerGetPortAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
     TError,
-    TData,
-    QueryKey,
-    AssetsControllerGetPortAssetsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -6839,8 +6698,7 @@ export type AssetsControllerGetPortAssetsInfiniteQueryError = unknown;
 
 export function useAssetsControllerGetPortAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-    AssetsControllerGetPortAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
   >,
   TError = unknown,
 >(
@@ -6850,17 +6708,14 @@ export function useAssetsControllerGetPortAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetPortAssetsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
         >,
         'initialData'
       >;
@@ -6872,8 +6727,7 @@ export function useAssetsControllerGetPortAssetsInfinite<
 };
 export function useAssetsControllerGetPortAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-    AssetsControllerGetPortAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
   >,
   TError = unknown,
 >(
@@ -6883,17 +6737,14 @@ export function useAssetsControllerGetPortAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetPortAssetsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
         >,
         'initialData'
       >;
@@ -6905,8 +6756,7 @@ export function useAssetsControllerGetPortAssetsInfinite<
 };
 export function useAssetsControllerGetPortAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-    AssetsControllerGetPortAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
   >,
   TError = unknown,
 >(
@@ -6916,9 +6766,7 @@ export function useAssetsControllerGetPortAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetPortAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6933,8 +6781,7 @@ export function useAssetsControllerGetPortAssetsInfinite<
 
 export function useAssetsControllerGetPortAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
-    AssetsControllerGetPortAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetPortAssets>>
   >,
   TError = unknown,
 >(
@@ -6944,9 +6791,7 @@ export function useAssetsControllerGetPortAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetPortAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetPortAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -7144,8 +6989,7 @@ export const getAssetsControllerGetTechnologyAssetsQueryKey = (
 
 export const getAssetsControllerGetTechnologyAssetsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-    AssetsControllerGetTechnologyAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
   >,
   TError = unknown,
 >(
@@ -7155,9 +6999,7 @@ export const getAssetsControllerGetTechnologyAssetsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetTechnologyAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -7170,22 +7012,14 @@ export const getAssetsControllerGetTechnologyAssetsInfiniteQueryOptions = <
     getAssetsControllerGetTechnologyAssetsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-    QueryKey,
-    AssetsControllerGetTechnologyAssetsParams['page']
-  > = ({ signal, pageParam }) =>
-    assetsControllerGetTechnologyAssets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
+  > = ({ signal }) =>
+    assetsControllerGetTechnologyAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
     TError,
-    TData,
-    QueryKey,
-    AssetsControllerGetTechnologyAssetsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -7195,8 +7029,7 @@ export type AssetsControllerGetTechnologyAssetsInfiniteQueryError = unknown;
 
 export function useAssetsControllerGetTechnologyAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-    AssetsControllerGetTechnologyAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
   >,
   TError = unknown,
 >(
@@ -7206,17 +7039,14 @@ export function useAssetsControllerGetTechnologyAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetTechnologyAssetsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
         >,
         'initialData'
       >;
@@ -7228,8 +7058,7 @@ export function useAssetsControllerGetTechnologyAssetsInfinite<
 };
 export function useAssetsControllerGetTechnologyAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-    AssetsControllerGetTechnologyAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
   >,
   TError = unknown,
 >(
@@ -7239,17 +7068,14 @@ export function useAssetsControllerGetTechnologyAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetTechnologyAssetsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
         >,
         'initialData'
       >;
@@ -7261,8 +7087,7 @@ export function useAssetsControllerGetTechnologyAssetsInfinite<
 };
 export function useAssetsControllerGetTechnologyAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-    AssetsControllerGetTechnologyAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
   >,
   TError = unknown,
 >(
@@ -7272,9 +7097,7 @@ export function useAssetsControllerGetTechnologyAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetTechnologyAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -7289,8 +7112,7 @@ export function useAssetsControllerGetTechnologyAssetsInfinite<
 
 export function useAssetsControllerGetTechnologyAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
-    AssetsControllerGetTechnologyAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>
   >,
   TError = unknown,
 >(
@@ -7300,9 +7122,7 @@ export function useAssetsControllerGetTechnologyAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetTechnologyAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetTechnologyAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -7499,8 +7319,7 @@ export const getAssetsControllerGetStatusCodeAssetsQueryKey = (
 
 export const getAssetsControllerGetStatusCodeAssetsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-    AssetsControllerGetStatusCodeAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
   >,
   TError = unknown,
 >(
@@ -7510,9 +7329,7 @@ export const getAssetsControllerGetStatusCodeAssetsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetStatusCodeAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -7525,22 +7342,14 @@ export const getAssetsControllerGetStatusCodeAssetsInfiniteQueryOptions = <
     getAssetsControllerGetStatusCodeAssetsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-    QueryKey,
-    AssetsControllerGetStatusCodeAssetsParams['page']
-  > = ({ signal, pageParam }) =>
-    assetsControllerGetStatusCodeAssets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
+  > = ({ signal }) =>
+    assetsControllerGetStatusCodeAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
     TError,
-    TData,
-    QueryKey,
-    AssetsControllerGetStatusCodeAssetsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -7550,8 +7359,7 @@ export type AssetsControllerGetStatusCodeAssetsInfiniteQueryError = unknown;
 
 export function useAssetsControllerGetStatusCodeAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-    AssetsControllerGetStatusCodeAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
   >,
   TError = unknown,
 >(
@@ -7561,17 +7369,14 @@ export function useAssetsControllerGetStatusCodeAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetStatusCodeAssetsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
         >,
         'initialData'
       >;
@@ -7583,8 +7388,7 @@ export function useAssetsControllerGetStatusCodeAssetsInfinite<
 };
 export function useAssetsControllerGetStatusCodeAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-    AssetsControllerGetStatusCodeAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
   >,
   TError = unknown,
 >(
@@ -7594,17 +7398,14 @@ export function useAssetsControllerGetStatusCodeAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetStatusCodeAssetsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
           TError,
-          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-          QueryKey
+          Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
         >,
         'initialData'
       >;
@@ -7616,8 +7417,7 @@ export function useAssetsControllerGetStatusCodeAssetsInfinite<
 };
 export function useAssetsControllerGetStatusCodeAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-    AssetsControllerGetStatusCodeAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
   >,
   TError = unknown,
 >(
@@ -7627,9 +7427,7 @@ export function useAssetsControllerGetStatusCodeAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetStatusCodeAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -7644,8 +7442,7 @@ export function useAssetsControllerGetStatusCodeAssetsInfinite<
 
 export function useAssetsControllerGetStatusCodeAssetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
-    AssetsControllerGetStatusCodeAssetsParams['page']
+    Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>
   >,
   TError = unknown,
 >(
@@ -7655,9 +7452,7 @@ export function useAssetsControllerGetStatusCodeAssetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof assetsControllerGetStatusCodeAssets>>,
         TError,
-        TData,
-        QueryKey,
-        AssetsControllerGetStatusCodeAssetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -8896,10 +8691,7 @@ export const getWorkersControllerGetWorkersQueryKey = (
 };
 
 export const getWorkersControllerGetWorkersInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-    WorkersControllerGetWorkersParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof workersControllerGetWorkers>>>,
   TError = unknown,
 >(
   params?: WorkersControllerGetWorkersParams,
@@ -8908,9 +8700,7 @@ export const getWorkersControllerGetWorkersInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workersControllerGetWorkers>>,
         TError,
-        TData,
-        QueryKey,
-        WorkersControllerGetWorkersParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -8922,22 +8712,14 @@ export const getWorkersControllerGetWorkersInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getWorkersControllerGetWorkersQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-    QueryKey,
-    WorkersControllerGetWorkersParams['page']
-  > = ({ signal, pageParam }) =>
-    workersControllerGetWorkers(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof workersControllerGetWorkers>>
+  > = ({ signal }) =>
+    workersControllerGetWorkers(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof workersControllerGetWorkers>>,
     TError,
-    TData,
-    QueryKey,
-    WorkersControllerGetWorkersParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -8947,10 +8729,7 @@ export type WorkersControllerGetWorkersInfiniteQueryResult = NonNullable<
 export type WorkersControllerGetWorkersInfiniteQueryError = unknown;
 
 export function useWorkersControllerGetWorkersInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-    WorkersControllerGetWorkersParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof workersControllerGetWorkers>>>,
   TError = unknown,
 >(
   params: undefined | WorkersControllerGetWorkersParams,
@@ -8959,17 +8738,14 @@ export function useWorkersControllerGetWorkersInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workersControllerGetWorkers>>,
         TError,
-        TData,
-        QueryKey,
-        WorkersControllerGetWorkersParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof workersControllerGetWorkers>>,
           TError,
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-          QueryKey
+          Awaited<ReturnType<typeof workersControllerGetWorkers>>
         >,
         'initialData'
       >;
@@ -8980,10 +8756,7 @@ export function useWorkersControllerGetWorkersInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useWorkersControllerGetWorkersInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-    WorkersControllerGetWorkersParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof workersControllerGetWorkers>>>,
   TError = unknown,
 >(
   params?: WorkersControllerGetWorkersParams,
@@ -8992,17 +8765,14 @@ export function useWorkersControllerGetWorkersInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workersControllerGetWorkers>>,
         TError,
-        TData,
-        QueryKey,
-        WorkersControllerGetWorkersParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof workersControllerGetWorkers>>,
           TError,
-          Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-          QueryKey
+          Awaited<ReturnType<typeof workersControllerGetWorkers>>
         >,
         'initialData'
       >;
@@ -9013,10 +8783,7 @@ export function useWorkersControllerGetWorkersInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useWorkersControllerGetWorkersInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-    WorkersControllerGetWorkersParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof workersControllerGetWorkers>>>,
   TError = unknown,
 >(
   params?: WorkersControllerGetWorkersParams,
@@ -9025,9 +8792,7 @@ export function useWorkersControllerGetWorkersInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workersControllerGetWorkers>>,
         TError,
-        TData,
-        QueryKey,
-        WorkersControllerGetWorkersParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -9041,10 +8806,7 @@ export function useWorkersControllerGetWorkersInfinite<
  */
 
 export function useWorkersControllerGetWorkersInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workersControllerGetWorkers>>,
-    WorkersControllerGetWorkersParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof workersControllerGetWorkers>>>,
   TError = unknown,
 >(
   params?: WorkersControllerGetWorkersParams,
@@ -9053,9 +8815,7 @@ export function useWorkersControllerGetWorkersInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof workersControllerGetWorkers>>,
         TError,
-        TData,
-        QueryKey,
-        WorkersControllerGetWorkersParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -9253,8 +9013,7 @@ export const getSearchControllerSearchAssetsTargetsQueryKey = (
 
 export const getSearchControllerSearchAssetsTargetsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-    SearchControllerSearchAssetsTargetsParams['page']
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
   >,
   TError = unknown,
 >(
@@ -9264,9 +9023,7 @@ export const getSearchControllerSearchAssetsTargetsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerSearchAssetsTargetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -9279,22 +9036,14 @@ export const getSearchControllerSearchAssetsTargetsInfiniteQueryOptions = <
     getSearchControllerSearchAssetsTargetsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-    QueryKey,
-    SearchControllerSearchAssetsTargetsParams['page']
-  > = ({ signal, pageParam }) =>
-    searchControllerSearchAssetsTargets(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
+  > = ({ signal }) =>
+    searchControllerSearchAssetsTargets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
     TError,
-    TData,
-    QueryKey,
-    SearchControllerSearchAssetsTargetsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -9304,8 +9053,7 @@ export type SearchControllerSearchAssetsTargetsInfiniteQueryError = unknown;
 
 export function useSearchControllerSearchAssetsTargetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-    SearchControllerSearchAssetsTargetsParams['page']
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
   >,
   TError = unknown,
 >(
@@ -9315,17 +9063,14 @@ export function useSearchControllerSearchAssetsTargetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerSearchAssetsTargetsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
           TError,
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-          QueryKey
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
         >,
         'initialData'
       >;
@@ -9337,8 +9082,7 @@ export function useSearchControllerSearchAssetsTargetsInfinite<
 };
 export function useSearchControllerSearchAssetsTargetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-    SearchControllerSearchAssetsTargetsParams['page']
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
   >,
   TError = unknown,
 >(
@@ -9348,17 +9092,14 @@ export function useSearchControllerSearchAssetsTargetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerSearchAssetsTargetsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
           TError,
-          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-          QueryKey
+          Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
         >,
         'initialData'
       >;
@@ -9370,8 +9111,7 @@ export function useSearchControllerSearchAssetsTargetsInfinite<
 };
 export function useSearchControllerSearchAssetsTargetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-    SearchControllerSearchAssetsTargetsParams['page']
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
   >,
   TError = unknown,
 >(
@@ -9381,9 +9121,7 @@ export function useSearchControllerSearchAssetsTargetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerSearchAssetsTargetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -9398,8 +9136,7 @@ export function useSearchControllerSearchAssetsTargetsInfinite<
 
 export function useSearchControllerSearchAssetsTargetsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
-    SearchControllerSearchAssetsTargetsParams['page']
+    Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>
   >,
   TError = unknown,
 >(
@@ -9409,9 +9146,7 @@ export function useSearchControllerSearchAssetsTargetsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerSearchAssetsTargets>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerSearchAssetsTargetsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -9608,8 +9343,7 @@ export const getSearchControllerGetSearchHistoryQueryKey = (
 
 export const getSearchControllerGetSearchHistoryInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-    SearchControllerGetSearchHistoryParams['page']
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
   >,
   TError = unknown,
 >(
@@ -9619,9 +9353,7 @@ export const getSearchControllerGetSearchHistoryInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerGetSearchHistoryParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -9634,22 +9366,14 @@ export const getSearchControllerGetSearchHistoryInfiniteQueryOptions = <
     getSearchControllerGetSearchHistoryQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-    QueryKey,
-    SearchControllerGetSearchHistoryParams['page']
-  > = ({ signal, pageParam }) =>
-    searchControllerGetSearchHistory(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
+  > = ({ signal }) =>
+    searchControllerGetSearchHistory(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
     TError,
-    TData,
-    QueryKey,
-    SearchControllerGetSearchHistoryParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -9660,8 +9384,7 @@ export type SearchControllerGetSearchHistoryInfiniteQueryError = unknown;
 
 export function useSearchControllerGetSearchHistoryInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-    SearchControllerGetSearchHistoryParams['page']
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
   >,
   TError = unknown,
 >(
@@ -9671,17 +9394,14 @@ export function useSearchControllerGetSearchHistoryInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerGetSearchHistoryParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
           TError,
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-          QueryKey
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
         >,
         'initialData'
       >;
@@ -9693,8 +9413,7 @@ export function useSearchControllerGetSearchHistoryInfinite<
 };
 export function useSearchControllerGetSearchHistoryInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-    SearchControllerGetSearchHistoryParams['page']
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
   >,
   TError = unknown,
 >(
@@ -9704,17 +9423,14 @@ export function useSearchControllerGetSearchHistoryInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerGetSearchHistoryParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
           TError,
-          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-          QueryKey
+          Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
         >,
         'initialData'
       >;
@@ -9726,8 +9442,7 @@ export function useSearchControllerGetSearchHistoryInfinite<
 };
 export function useSearchControllerGetSearchHistoryInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-    SearchControllerGetSearchHistoryParams['page']
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
   >,
   TError = unknown,
 >(
@@ -9737,9 +9452,7 @@ export function useSearchControllerGetSearchHistoryInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerGetSearchHistoryParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -9754,8 +9467,7 @@ export function useSearchControllerGetSearchHistoryInfinite<
 
 export function useSearchControllerGetSearchHistoryInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
-    SearchControllerGetSearchHistoryParams['page']
+    Awaited<ReturnType<typeof searchControllerGetSearchHistory>>
   >,
   TError = unknown,
 >(
@@ -9765,9 +9477,7 @@ export function useSearchControllerGetSearchHistoryInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
         TError,
-        TData,
-        QueryKey,
-        SearchControllerGetSearchHistoryParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -10138,8 +9848,7 @@ export const getStatisticControllerGetStatisticsQueryKey = (
 
 export const getStatisticControllerGetStatisticsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-    StatisticControllerGetStatisticsParams['page']
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>
   >,
   TError = unknown,
 >(
@@ -10149,9 +9858,7 @@ export const getStatisticControllerGetStatisticsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
         TError,
-        TData,
-        QueryKey,
-        StatisticControllerGetStatisticsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -10164,22 +9871,14 @@ export const getStatisticControllerGetStatisticsInfiniteQueryOptions = <
     getStatisticControllerGetStatisticsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-    QueryKey,
-    StatisticControllerGetStatisticsParams['page']
-  > = ({ signal, pageParam }) =>
-    statisticControllerGetStatistics(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+  > = ({ signal }) =>
+    statisticControllerGetStatistics(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
     TError,
-    TData,
-    QueryKey,
-    StatisticControllerGetStatisticsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -10190,8 +9889,7 @@ export type StatisticControllerGetStatisticsInfiniteQueryError = unknown;
 
 export function useStatisticControllerGetStatisticsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-    StatisticControllerGetStatisticsParams['page']
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>
   >,
   TError = unknown,
 >(
@@ -10201,17 +9899,14 @@ export function useStatisticControllerGetStatisticsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
         TError,
-        TData,
-        QueryKey,
-        StatisticControllerGetStatisticsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
           TError,
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          QueryKey
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
         >,
         'initialData'
       >;
@@ -10223,8 +9918,7 @@ export function useStatisticControllerGetStatisticsInfinite<
 };
 export function useStatisticControllerGetStatisticsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-    StatisticControllerGetStatisticsParams['page']
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>
   >,
   TError = unknown,
 >(
@@ -10234,17 +9928,14 @@ export function useStatisticControllerGetStatisticsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
         TError,
-        TData,
-        QueryKey,
-        StatisticControllerGetStatisticsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
           TError,
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          QueryKey
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
         >,
         'initialData'
       >;
@@ -10256,8 +9947,7 @@ export function useStatisticControllerGetStatisticsInfinite<
 };
 export function useStatisticControllerGetStatisticsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-    StatisticControllerGetStatisticsParams['page']
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>
   >,
   TError = unknown,
 >(
@@ -10267,9 +9957,7 @@ export function useStatisticControllerGetStatisticsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
         TError,
-        TData,
-        QueryKey,
-        StatisticControllerGetStatisticsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -10284,8 +9972,7 @@ export function useStatisticControllerGetStatisticsInfinite<
 
 export function useStatisticControllerGetStatisticsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-    StatisticControllerGetStatisticsParams['page']
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>
   >,
   TError = unknown,
 >(
@@ -10295,9 +9982,7 @@ export function useStatisticControllerGetStatisticsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
         TError,
-        TData,
-        QueryKey,
-        StatisticControllerGetStatisticsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -11825,8 +11510,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesQueryKey = (
 export const getVulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryOptions =
   <
     TData = InfiniteData<
-      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
-      VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
     >,
     TError = unknown,
   >(
@@ -11838,9 +11522,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryOptions 
             ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
           >,
           TError,
-          TData,
-          QueryKey,
-          VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+          TData
         >
       >;
       request?: SecondParameter<typeof orvalClient>;
@@ -11853,12 +11535,10 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryOptions 
       getVulnerabilitiesControllerGetVulnerabilitiesQueryKey(params);
 
     const queryFn: QueryFunction<
-      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
-      QueryKey,
-      VulnerabilitiesControllerGetVulnerabilitiesParams['page']
-    > = ({ signal, pageParam }) =>
+      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
+    > = ({ signal }) =>
       vulnerabilitiesControllerGetVulnerabilities(
-        { ...params, page: pageParam || params?.['page'] },
+        params,
         requestOptions,
         signal,
       );
@@ -11866,9 +11546,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryOptions 
     return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
       Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
       TError,
-      TData,
-      QueryKey,
-      VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+      TData
     > & { queryKey: DataTag<QueryKey, TData, TError> };
   };
 
@@ -11881,8 +11559,7 @@ export type VulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryError =
 
 export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
-    VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
   >,
   TError = unknown,
 >(
@@ -11892,9 +11569,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+        TData
       >
     > &
       Pick<
@@ -11905,8 +11580,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
           TError,
           Awaited<
             ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >,
-          QueryKey
+          >
         >,
         'initialData'
       >;
@@ -11918,8 +11592,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
 };
 export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
-    VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
   >,
   TError = unknown,
 >(
@@ -11929,9 +11602,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+        TData
       >
     > &
       Pick<
@@ -11942,8 +11613,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
           TError,
           Awaited<
             ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>
-          >,
-          QueryKey
+          >
         >,
         'initialData'
       >;
@@ -11955,8 +11625,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
 };
 export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
-    VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
   >,
   TError = unknown,
 >(
@@ -11966,9 +11635,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -11983,8 +11650,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
 
 export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
-    VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>
   >,
   TError = unknown,
 >(
@@ -11994,9 +11660,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilities>>,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -12218,8 +11882,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfiniteQue
     TData = InfiniteData<
       Awaited<
         ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics>
-      >,
-      VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+      >
     >,
     TError = unknown,
   >(
@@ -12233,9 +11896,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfiniteQue
             >
           >,
           TError,
-          TData,
-          QueryKey,
-          VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+          TData
         >
       >;
       request?: SecondParameter<typeof orvalClient>;
@@ -12250,12 +11911,10 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfiniteQue
     const queryFn: QueryFunction<
       Awaited<
         ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics>
-      >,
-      QueryKey,
-      VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
-    > = ({ signal, pageParam }) =>
+      >
+    > = ({ signal }) =>
       vulnerabilitiesControllerGetVulnerabilitiesStatistics(
-        { ...params, page: pageParam || params?.['page'] },
+        params,
         requestOptions,
         signal,
       );
@@ -12265,9 +11924,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfiniteQue
         ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics>
       >,
       TError,
-      TData,
-      QueryKey,
-      VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+      TData
     > & { queryKey: DataTag<QueryKey, TData, TError> };
   };
 
@@ -12284,8 +11941,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
   TData = InfiniteData<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics>
-    >,
-    VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+    >
   >,
   TError = unknown,
 >(
@@ -12299,9 +11955,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
           >
         >,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+        TData
       >
     > &
       Pick<
@@ -12316,8 +11970,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
             ReturnType<
               typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
             >
-          >,
-          QueryKey
+          >
         >,
         'initialData'
       >;
@@ -12331,8 +11984,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
   TData = InfiniteData<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics>
-    >,
-    VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+    >
   >,
   TError = unknown,
 >(
@@ -12346,9 +11998,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
           >
         >,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+        TData
       >
     > &
       Pick<
@@ -12363,8 +12013,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
             ReturnType<
               typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics
             >
-          >,
-          QueryKey
+          >
         >,
         'initialData'
       >;
@@ -12378,8 +12027,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
   TData = InfiniteData<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics>
-    >,
-    VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+    >
   >,
   TError = unknown,
 >(
@@ -12393,9 +12041,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
           >
         >,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -12412,8 +12058,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
   TData = InfiniteData<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesStatistics>
-    >,
-    VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+    >
   >,
   TError = unknown,
 >(
@@ -12427,9 +12072,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatisticsInfinite
           >
         >,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -12695,8 +12338,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesSeverityInfiniteQuery
     TData = InfiniteData<
       Awaited<
         ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
-      >,
-      VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+      >
     >,
     TError = unknown,
   >(
@@ -12710,9 +12352,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesSeverityInfiniteQuery
             >
           >,
           TError,
-          TData,
-          QueryKey,
-          VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+          TData
         >
       >;
       request?: SecondParameter<typeof orvalClient>;
@@ -12727,12 +12367,10 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesSeverityInfiniteQuery
     const queryFn: QueryFunction<
       Awaited<
         ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
-      >,
-      QueryKey,
-      VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
-    > = ({ signal, pageParam }) =>
+      >
+    > = ({ signal }) =>
       vulnerabilitiesControllerGetVulnerabilitiesSeverity(
-        { ...params, page: pageParam || params?.['page'] },
+        params,
         requestOptions,
         signal,
       );
@@ -12742,9 +12380,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesSeverityInfiniteQuery
         ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
       >,
       TError,
-      TData,
-      QueryKey,
-      VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+      TData
     > & { queryKey: DataTag<QueryKey, TData, TError> };
   };
 
@@ -12761,8 +12397,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
   TData = InfiniteData<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
-    >,
-    VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+    >
   >,
   TError = unknown,
 >(
@@ -12774,9 +12409,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
           ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
         >,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+        TData
       >
     > &
       Pick<
@@ -12791,8 +12424,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
             ReturnType<
               typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
             >
-          >,
-          QueryKey
+          >
         >,
         'initialData'
       >;
@@ -12806,8 +12438,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
   TData = InfiniteData<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
-    >,
-    VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+    >
   >,
   TError = unknown,
 >(
@@ -12819,9 +12450,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
           ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
         >,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+        TData
       >
     > &
       Pick<
@@ -12836,8 +12465,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
             ReturnType<
               typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity
             >
-          >,
-          QueryKey
+          >
         >,
         'initialData'
       >;
@@ -12851,8 +12479,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
   TData = InfiniteData<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
-    >,
-    VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+    >
   >,
   TError = unknown,
 >(
@@ -12864,9 +12491,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
           ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
         >,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -12883,8 +12508,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
   TData = InfiniteData<
     Awaited<
       ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
-    >,
-    VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+    >
   >,
   TError = unknown,
 >(
@@ -12896,9 +12520,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesSeverityInfinite<
           ReturnType<typeof vulnerabilitiesControllerGetVulnerabilitiesSeverity>
         >,
         TError,
-        TData,
-        QueryKey,
-        VulnerabilitiesControllerGetVulnerabilitiesSeverityParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -13242,10 +12864,7 @@ export const getToolsControllerGetManyToolsQueryKey = (
 };
 
 export const getToolsControllerGetManyToolsInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetManyTools>>>,
   TError = unknown,
 >(
   params?: ToolsControllerGetManyToolsParams,
@@ -13254,9 +12873,7 @@ export const getToolsControllerGetManyToolsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -13268,22 +12885,14 @@ export const getToolsControllerGetManyToolsInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getToolsControllerGetManyToolsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    QueryKey,
-    ToolsControllerGetManyToolsParams['page']
-  > = ({ signal, pageParam }) =>
-    toolsControllerGetManyTools(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+  > = ({ signal }) =>
+    toolsControllerGetManyTools(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
     TError,
-    TData,
-    QueryKey,
-    ToolsControllerGetManyToolsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -13293,10 +12902,7 @@ export type ToolsControllerGetManyToolsInfiniteQueryResult = NonNullable<
 export type ToolsControllerGetManyToolsInfiniteQueryError = unknown;
 
 export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetManyTools>>>,
   TError = unknown,
 >(
   params: undefined | ToolsControllerGetManyToolsParams,
@@ -13305,17 +12911,14 @@ export function useToolsControllerGetManyToolsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
           TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          QueryKey
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
         >,
         'initialData'
       >;
@@ -13326,10 +12929,7 @@ export function useToolsControllerGetManyToolsInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetManyTools>>>,
   TError = unknown,
 >(
   params?: ToolsControllerGetManyToolsParams,
@@ -13338,17 +12938,14 @@ export function useToolsControllerGetManyToolsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
           TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          QueryKey
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
         >,
         'initialData'
       >;
@@ -13359,10 +12956,7 @@ export function useToolsControllerGetManyToolsInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetManyTools>>>,
   TError = unknown,
 >(
   params?: ToolsControllerGetManyToolsParams,
@@ -13371,9 +12965,7 @@ export function useToolsControllerGetManyToolsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -13387,10 +12979,7 @@ export function useToolsControllerGetManyToolsInfinite<
  */
 
 export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
+  TData = InfiniteData<Awaited<ReturnType<typeof toolsControllerGetManyTools>>>,
   TError = unknown,
 >(
   params?: ToolsControllerGetManyToolsParams,
@@ -13399,9 +12988,7 @@ export function useToolsControllerGetManyToolsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -14278,8 +13865,7 @@ export const getToolsControllerGetInstalledToolsQueryKey = (
 
 export const getToolsControllerGetInstalledToolsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-    ToolsControllerGetInstalledToolsParams['page']
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
   >,
   TError = unknown,
 >(
@@ -14289,9 +13875,7 @@ export const getToolsControllerGetInstalledToolsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetInstalledToolsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -14304,22 +13888,14 @@ export const getToolsControllerGetInstalledToolsInfiniteQueryOptions = <
     getToolsControllerGetInstalledToolsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-    QueryKey,
-    ToolsControllerGetInstalledToolsParams['page']
-  > = ({ signal, pageParam }) =>
-    toolsControllerGetInstalledTools(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
+  > = ({ signal }) =>
+    toolsControllerGetInstalledTools(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
     TError,
-    TData,
-    QueryKey,
-    ToolsControllerGetInstalledToolsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -14330,8 +13906,7 @@ export type ToolsControllerGetInstalledToolsInfiniteQueryError = unknown;
 
 export function useToolsControllerGetInstalledToolsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-    ToolsControllerGetInstalledToolsParams['page']
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
   >,
   TError = unknown,
 >(
@@ -14341,17 +13916,14 @@ export function useToolsControllerGetInstalledToolsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetInstalledToolsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
           TError,
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-          QueryKey
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
         >,
         'initialData'
       >;
@@ -14363,8 +13935,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
 };
 export function useToolsControllerGetInstalledToolsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-    ToolsControllerGetInstalledToolsParams['page']
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
   >,
   TError = unknown,
 >(
@@ -14374,17 +13945,14 @@ export function useToolsControllerGetInstalledToolsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetInstalledToolsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
           TError,
-          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-          QueryKey
+          Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
         >,
         'initialData'
       >;
@@ -14396,8 +13964,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
 };
 export function useToolsControllerGetInstalledToolsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-    ToolsControllerGetInstalledToolsParams['page']
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
   >,
   TError = unknown,
 >(
@@ -14407,9 +13974,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetInstalledToolsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -14424,8 +13989,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
 
 export function useToolsControllerGetInstalledToolsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
-    ToolsControllerGetInstalledToolsParams['page']
+    Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>
   >,
   TError = unknown,
 >(
@@ -14435,9 +13999,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
         TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetInstalledToolsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -15689,8 +15251,7 @@ export const getProvidersControllerGetManyProvidersQueryKey = (
 
 export const getProvidersControllerGetManyProvidersInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-    ProvidersControllerGetManyProvidersParams['page']
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>
   >,
   TError = unknown,
 >(
@@ -15700,9 +15261,7 @@ export const getProvidersControllerGetManyProvidersInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
         TError,
-        TData,
-        QueryKey,
-        ProvidersControllerGetManyProvidersParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -15715,22 +15274,14 @@ export const getProvidersControllerGetManyProvidersInfiniteQueryOptions = <
     getProvidersControllerGetManyProvidersQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-    QueryKey,
-    ProvidersControllerGetManyProvidersParams['page']
-  > = ({ signal, pageParam }) =>
-    providersControllerGetManyProviders(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>
+  > = ({ signal }) =>
+    providersControllerGetManyProviders(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
     TError,
-    TData,
-    QueryKey,
-    ProvidersControllerGetManyProvidersParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -15740,8 +15291,7 @@ export type ProvidersControllerGetManyProvidersInfiniteQueryError = unknown;
 
 export function useProvidersControllerGetManyProvidersInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-    ProvidersControllerGetManyProvidersParams['page']
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>
   >,
   TError = unknown,
 >(
@@ -15751,17 +15301,14 @@ export function useProvidersControllerGetManyProvidersInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
         TError,
-        TData,
-        QueryKey,
-        ProvidersControllerGetManyProvidersParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
           TError,
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-          QueryKey
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>
         >,
         'initialData'
       >;
@@ -15773,8 +15320,7 @@ export function useProvidersControllerGetManyProvidersInfinite<
 };
 export function useProvidersControllerGetManyProvidersInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-    ProvidersControllerGetManyProvidersParams['page']
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>
   >,
   TError = unknown,
 >(
@@ -15784,17 +15330,14 @@ export function useProvidersControllerGetManyProvidersInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
         TError,
-        TData,
-        QueryKey,
-        ProvidersControllerGetManyProvidersParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
           TError,
-          Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-          QueryKey
+          Awaited<ReturnType<typeof providersControllerGetManyProviders>>
         >,
         'initialData'
       >;
@@ -15806,8 +15349,7 @@ export function useProvidersControllerGetManyProvidersInfinite<
 };
 export function useProvidersControllerGetManyProvidersInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-    ProvidersControllerGetManyProvidersParams['page']
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>
   >,
   TError = unknown,
 >(
@@ -15817,9 +15359,7 @@ export function useProvidersControllerGetManyProvidersInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
         TError,
-        TData,
-        QueryKey,
-        ProvidersControllerGetManyProvidersParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -15834,8 +15374,7 @@ export function useProvidersControllerGetManyProvidersInfinite<
 
 export function useProvidersControllerGetManyProvidersInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
-    ProvidersControllerGetManyProvidersParams['page']
+    Awaited<ReturnType<typeof providersControllerGetManyProviders>>
   >,
   TError = unknown,
 >(
@@ -15845,9 +15384,7 @@ export function useProvidersControllerGetManyProvidersInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof providersControllerGetManyProviders>>,
         TError,
-        TData,
-        QueryKey,
-        ProvidersControllerGetManyProvidersParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -16751,8 +16288,7 @@ export const getTemplatesControllerGetAllTemplatesQueryKey = (
 
 export const getTemplatesControllerGetAllTemplatesInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
   >,
   TError = unknown,
 >(
@@ -16762,9 +16298,7 @@ export const getTemplatesControllerGetAllTemplatesInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
         TError,
-        TData,
-        QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -16777,22 +16311,14 @@ export const getTemplatesControllerGetAllTemplatesInfiniteQueryOptions = <
     getTemplatesControllerGetAllTemplatesQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    QueryKey,
-    TemplatesControllerGetAllTemplatesParams['page']
-  > = ({ signal, pageParam }) =>
-    templatesControllerGetAllTemplates(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+  > = ({ signal }) =>
+    templatesControllerGetAllTemplates(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
     TError,
-    TData,
-    QueryKey,
-    TemplatesControllerGetAllTemplatesParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -16803,8 +16329,7 @@ export type TemplatesControllerGetAllTemplatesInfiniteQueryError = unknown;
 
 export function useTemplatesControllerGetAllTemplatesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
   >,
   TError = unknown,
 >(
@@ -16814,17 +16339,14 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
         TError,
-        TData,
-        QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-          QueryKey
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
         >,
         'initialData'
       >;
@@ -16836,8 +16358,7 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 };
 export function useTemplatesControllerGetAllTemplatesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
   >,
   TError = unknown,
 >(
@@ -16847,17 +16368,14 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
         TError,
-        TData,
-        QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-          QueryKey
+          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
         >,
         'initialData'
       >;
@@ -16869,8 +16387,7 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 };
 export function useTemplatesControllerGetAllTemplatesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
   >,
   TError = unknown,
 >(
@@ -16880,9 +16397,7 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
         TError,
-        TData,
-        QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -16897,8 +16412,7 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 
 export function useTemplatesControllerGetAllTemplatesInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
   >,
   TError = unknown,
 >(
@@ -16908,9 +16422,7 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
         TError,
-        TData,
-        QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -18273,8 +17785,7 @@ export const getStorageControllerForwardImageQueryKey = (
 
 export const getStorageControllerForwardImageInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>,
-    StorageControllerForwardImageParams['page']
+    Awaited<ReturnType<typeof storageControllerForwardImage>>
   >,
   TError = void,
 >(
@@ -18284,9 +17795,7 @@ export const getStorageControllerForwardImageInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof storageControllerForwardImage>>,
         TError,
-        TData,
-        QueryKey,
-        StorageControllerForwardImageParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -18298,22 +17807,14 @@ export const getStorageControllerForwardImageInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getStorageControllerForwardImageQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>,
-    QueryKey,
-    StorageControllerForwardImageParams['page']
-  > = ({ signal, pageParam }) =>
-    storageControllerForwardImage(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof storageControllerForwardImage>>
+  > = ({ signal }) =>
+    storageControllerForwardImage(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof storageControllerForwardImage>>,
     TError,
-    TData,
-    QueryKey,
-    StorageControllerForwardImageParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -18324,8 +17825,7 @@ export type StorageControllerForwardImageInfiniteQueryError = void;
 
 export function useStorageControllerForwardImageInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>,
-    StorageControllerForwardImageParams['page']
+    Awaited<ReturnType<typeof storageControllerForwardImage>>
   >,
   TError = void,
 >(
@@ -18335,17 +17835,14 @@ export function useStorageControllerForwardImageInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof storageControllerForwardImage>>,
         TError,
-        TData,
-        QueryKey,
-        StorageControllerForwardImageParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof storageControllerForwardImage>>,
           TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          QueryKey
+          Awaited<ReturnType<typeof storageControllerForwardImage>>
         >,
         'initialData'
       >;
@@ -18357,8 +17854,7 @@ export function useStorageControllerForwardImageInfinite<
 };
 export function useStorageControllerForwardImageInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>,
-    StorageControllerForwardImageParams['page']
+    Awaited<ReturnType<typeof storageControllerForwardImage>>
   >,
   TError = void,
 >(
@@ -18368,17 +17864,14 @@ export function useStorageControllerForwardImageInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof storageControllerForwardImage>>,
         TError,
-        TData,
-        QueryKey,
-        StorageControllerForwardImageParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof storageControllerForwardImage>>,
           TError,
-          Awaited<ReturnType<typeof storageControllerForwardImage>>,
-          QueryKey
+          Awaited<ReturnType<typeof storageControllerForwardImage>>
         >,
         'initialData'
       >;
@@ -18390,8 +17883,7 @@ export function useStorageControllerForwardImageInfinite<
 };
 export function useStorageControllerForwardImageInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>,
-    StorageControllerForwardImageParams['page']
+    Awaited<ReturnType<typeof storageControllerForwardImage>>
   >,
   TError = void,
 >(
@@ -18401,9 +17893,7 @@ export function useStorageControllerForwardImageInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof storageControllerForwardImage>>,
         TError,
-        TData,
-        QueryKey,
-        StorageControllerForwardImageParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -18418,8 +17908,7 @@ export function useStorageControllerForwardImageInfinite<
 
 export function useStorageControllerForwardImageInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof storageControllerForwardImage>>,
-    StorageControllerForwardImageParams['page']
+    Awaited<ReturnType<typeof storageControllerForwardImage>>
   >,
   TError = void,
 >(
@@ -18429,9 +17918,7 @@ export function useStorageControllerForwardImageInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof storageControllerForwardImage>>,
         TError,
-        TData,
-        QueryKey,
-        StorageControllerForwardImageParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -19020,8 +18507,7 @@ export const getMcpControllerGetMcpPermissionsQueryKey = (
 
 export const getMcpControllerGetMcpPermissionsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
-    McpControllerGetMcpPermissionsParams['page']
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
   >,
   TError = unknown,
 >(
@@ -19031,9 +18517,7 @@ export const getMcpControllerGetMcpPermissionsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
         TError,
-        TData,
-        QueryKey,
-        McpControllerGetMcpPermissionsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -19045,22 +18529,14 @@ export const getMcpControllerGetMcpPermissionsInfiniteQueryOptions = <
     queryOptions?.queryKey ?? getMcpControllerGetMcpPermissionsQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
-    QueryKey,
-    McpControllerGetMcpPermissionsParams['page']
-  > = ({ signal, pageParam }) =>
-    mcpControllerGetMcpPermissions(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
+  > = ({ signal }) =>
+    mcpControllerGetMcpPermissions(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
     TError,
-    TData,
-    QueryKey,
-    McpControllerGetMcpPermissionsParams['page']
+    TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -19071,8 +18547,7 @@ export type McpControllerGetMcpPermissionsInfiniteQueryError = unknown;
 
 export function useMcpControllerGetMcpPermissionsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
-    McpControllerGetMcpPermissionsParams['page']
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
   >,
   TError = unknown,
 >(
@@ -19082,17 +18557,14 @@ export function useMcpControllerGetMcpPermissionsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
         TError,
-        TData,
-        QueryKey,
-        McpControllerGetMcpPermissionsParams['page']
+        TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
           TError,
-          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
-          QueryKey
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
         >,
         'initialData'
       >;
@@ -19104,8 +18576,7 @@ export function useMcpControllerGetMcpPermissionsInfinite<
 };
 export function useMcpControllerGetMcpPermissionsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
-    McpControllerGetMcpPermissionsParams['page']
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
   >,
   TError = unknown,
 >(
@@ -19115,17 +18586,14 @@ export function useMcpControllerGetMcpPermissionsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
         TError,
-        TData,
-        QueryKey,
-        McpControllerGetMcpPermissionsParams['page']
+        TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
           TError,
-          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
-          QueryKey
+          Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
         >,
         'initialData'
       >;
@@ -19137,8 +18605,7 @@ export function useMcpControllerGetMcpPermissionsInfinite<
 };
 export function useMcpControllerGetMcpPermissionsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
-    McpControllerGetMcpPermissionsParams['page']
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
   >,
   TError = unknown,
 >(
@@ -19148,9 +18615,7 @@ export function useMcpControllerGetMcpPermissionsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
         TError,
-        TData,
-        QueryKey,
-        McpControllerGetMcpPermissionsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -19165,8 +18630,7 @@ export function useMcpControllerGetMcpPermissionsInfinite<
 
 export function useMcpControllerGetMcpPermissionsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
-    McpControllerGetMcpPermissionsParams['page']
+    Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>
   >,
   TError = unknown,
 >(
@@ -19176,9 +18640,7 @@ export function useMcpControllerGetMcpPermissionsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof mcpControllerGetMcpPermissions>>,
         TError,
-        TData,
-        QueryKey,
-        McpControllerGetMcpPermissionsParams['page']
+        TData
       >
     >;
     request?: SecondParameter<typeof orvalClient>;

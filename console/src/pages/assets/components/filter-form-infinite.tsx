@@ -1,16 +1,16 @@
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import useDebounce from '@/hooks/use-debounce';
 import { X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAsset } from '../context/asset-context';
 import {
   IpFacetedFilter,
   PortFacetedFilter,
   StatusCodesFacetedFilter,
   TechsFacetedFilter,
 } from './faceted-filter';
-import { useAsset } from '../context/asset-context';
-import { useEffect, useState } from 'react';
-import useDebounce from '@/hooks/use-debounce';
-import { Input } from '@/components/ui/input';
 
 export default function FilterFormInfinite() {
   const [params, setParams] = useSearchParams();
@@ -27,7 +27,7 @@ export default function FilterFormInfinite() {
   }, [debouncedValue, setFilter]);
 
   const facets = ['ipAddresses', 'statusCodes', 'techs', 'ports'];
-  const isFiltered = facets.some((e) => params.has(e));
+  const isFiltered = facets.some((e: string) => params.has(e));
 
   return (
     <div className="flex items-center justify-between">
