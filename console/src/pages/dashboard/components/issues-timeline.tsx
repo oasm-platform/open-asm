@@ -17,21 +17,13 @@ const chartConfig = {
 
 export default function IssuesTimeline() {
   const { selectedWorkspace } = useWorkspaceSelector();
-  const { data, isLoading, isError } = useStatisticControllerGetIssuesTimeline({
+  const { data } = useStatisticControllerGetIssuesTimeline({
     query: {
       enabled: !!selectedWorkspace,
       queryKey: [selectedWorkspace],
     },
 
   });
-
-  if (isLoading || !data?.data) {
-    return <div>Loading...</div>;
-  }
-
-  if (isError) {
-    return <div>Error loading issues timeline.</div>;
-  }
 
   const chartData = data?.data.map((item) => ({
     ...item,
