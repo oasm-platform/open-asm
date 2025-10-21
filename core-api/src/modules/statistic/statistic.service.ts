@@ -271,7 +271,12 @@ export class StatisticService {
       sortOrder: SortOrder.DESC
     }, workspaceId);
     const ips = assets.data.map(i => i.ip);
+    if (ips.length === 0) {
+      return [];
+    }
+
     const geoIps = await this.geoIpService.getGeoIp(ips);
+
     return geoIps.filter(i => i.lat && i.lon);
   }
 }

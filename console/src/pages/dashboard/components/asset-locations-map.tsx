@@ -1,6 +1,7 @@
 import { CardDescription, CardTitle } from '@/components/ui/card';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetAssetLocations } from '@/services/apis/gen/queries';
+import type { LeafletMouseEvent } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
 import { useNavigate } from 'react-router-dom';
@@ -51,7 +52,7 @@ export default function AssetLocationsMap() {
                         fillOpacity={0.8}
                         className="blink-marker"
                         eventHandlers={{
-                            mouseover: (event) => event.target.openPopup(),
+                            mouseover: (event: LeafletMouseEvent) => event.target.openPopup(),
                             mouseout: (event) => event.target.closePopup(),
                             click: () => navigate(`/assets?ipAddresses=${location.query}`)
                         }}
