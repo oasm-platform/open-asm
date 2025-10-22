@@ -174,19 +174,37 @@ export class StatisticService {
    * @param query - The query parameters containing workspaceId.
    * @returns A promise that resolves to an object containing all statistics.
    */
-  async getStatistics(query: GetStatisticQueryDto): Promise<StatisticResponseDto & { totalUniqueTechnologies: number; totalUniquePorts: number }> {
-    const [totalTargets, totalAssets, totalUniqueTechnologies, totalUniquePorts] = await Promise.all([
-      this.countTargets(query.workspaceId),
-      this.countAssets(query.workspaceId),
-      this.countUniqueTechnologies(query.workspaceId),
-      this.countUniquePorts(query.workspaceId),
-    ]);
+  async getStatistics(query: GetStatisticQueryDto): Promise<StatisticResponseDto> {
+    const statistics = await this.calculateStatistics([query.workspaceId]);
+    if (statistics.length === 0) {
+      // Return default values if no statistics found for the workspace
+      return {
+        assets: 0,
+        targets: 0,
+        vuls: 0,
+        criticalVuls: 0,
+        highVuls: 0,
+        mediumVuls: 0,
+        lowVuls: 0,
+        infoVuls: 0,
+        techs: 0,
+        ports: 0,
+      };
+    }
+
+    const workspaceStats = statistics[0]; // Get the first (and only) workspace statistics
 
     return {
-      totalTargets,
-      totalAssets,
-      totalUniqueTechnologies,
-      totalUniquePorts,
+      assets: workspaceStats.assets,
+      targets: workspaceStats.targets,
+      vuls: workspaceStats.vuls,
+      criticalVuls: workspaceStats.criticalVuls,
+      highVuls: workspaceStats.highVuls,
+      mediumVuls: workspaceStats.mediumVuls,
+      lowVuls: workspaceStats.lowVuls,
+      infoVuls: workspaceStats.infoVuls,
+      techs: workspaceStats.techs,
+      ports: workspaceStats.ports,
     };
   }
 
@@ -399,28 +417,26 @@ export class StatisticService {
   }
 
   /**
-   * Handles the cron task to calculate and store statistics.
-   * - Fetches all workspaces.
-   * - Retrieves counts for assets, targets, vulnerabilities, technologies, and ports for each workspace.
-   * - Aggregates the data and saves it to the statistics table.
+   * Calculates statistics for specified workspaces without saving them to the database.
+   * - Retrieves counts for assets, targets, vulnerabilities, technologies, and ports for each workspace using concurrent queries.
+   * - Aggregates the data into Statistic objects.
+   * @param workspaceIds Array of workspace IDs to calculate statistics for
+   * @returns An array of Statistic objects with calculated data
    */
-  async calculateAndStoreStatistics() {
-    // Retrieve all existing workspaces
-    const workspaces = await this.dataSource.getRepository(Workspace).find({ select: ['id'] });
-    if (workspaces.length === 0) {
-      // No workspaces found, no statistics to calculate
-      return;
+  async calculateStatistics(workspaceIds: string[]): Promise<Statistic[]> {
+    if (workspaceIds.length === 0) {
+      // No workspace IDs provided, no statistics to calculate
+      return [];
     }
 
-    // Extract IDs of the workspaces
-    const workspaceIds = workspaces.map((workspace) => workspace.id);
-
-    // Fetch counts for each data type
-    const assetCounts = await this.getAssetCounts(workspaceIds);
-    const targetCounts = await this.getTargetCounts(workspaceIds);
-    const vulnerabilityCounts = await this.getVulnerabilityCounts(workspaceIds);
-    const techCounts = await this.getTechCounts(workspaceIds);
-    const portCounts = await this.getPortCounts(workspaceIds);
+    // Fetch counts for each data type concurrently using Promise.all
+    const [assetCounts, targetCounts, vulnerabilityCounts, techCounts, portCounts] = await Promise.all([
+      this.getAssetCounts(workspaceIds),
+      this.getTargetCounts(workspaceIds),
+      this.getVulnerabilityCounts(workspaceIds),
+      this.getTechCounts(workspaceIds),
+      this.getPortCounts(workspaceIds)
+    ]);
 
     // Initialize a Map to store statistics for each workspace
     const statisticsMap = new Map<string, Statistic>();
@@ -491,8 +507,38 @@ export class StatisticService {
       if (stat) stat.ports = Number(row.count);
     });
 
-    // Convert the Map to an array and save to the database
-    const statistics = Array.from(statisticsMap.values());
+    // Convert the Map to an array and return
+    return Array.from(statisticsMap.values());
+  }
+
+  /**
+   * Retrieves all workspace IDs from the database.
+   * @returns An array of workspace IDs
+   */
+  async getWorkspaceIds(): Promise<string[]> {
+    const workspaces = await this.dataSource.getRepository(Workspace).find({ select: ['id'] });
+    return workspaces.map((workspace) => workspace.id);
+  }
+
+  /**
+   * Saves an array of Statistic objects to the database.
+   * @param statistics An array of Statistic objects to save
+   */
+  async saveStatistics(statistics: Statistic[]): Promise<void> {
     await this.dataSource.getRepository(Statistic).save(statistics);
+  }
+
+  /**
+   * Handles the cron task to calculate and store statistics.
+   * - Fetches all workspaces.
+   * - Retrieves counts for assets, targets, vulnerabilities, technologies, and ports for each workspace.
+   * - Aggregates the data and saves it to the statistics table.
+   */
+  async calculateAndStoreStatistics() {
+    const workspaceIds = await this.getWorkspaceIds();
+    const statistics = await this.calculateStatistics(workspaceIds);
+    if (statistics.length > 0) {
+      await this.saveStatistics(statistics);
+    }
   }
 }

@@ -16,13 +16,13 @@ export class StatisticController {
 
   @Doc({
     summary: 'Get workspace statistics',
-    description: 'Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.',
+    description: 'Retrieves statistics for a workspace including assets, targets, vulnerabilities (by severity), technologies, and ports.',
     response: {
       serialization: StatisticResponseDto,
     },
   })
   @Get()
-  getStatistics(@Query() query: GetStatisticQueryDto): Promise<Omit<StatisticResponseDto, 'totalVulnerabilities'> & { totalUniqueTechnologies: number; totalUniquePorts: number }> {
+  getStatistics(@Query() query: GetStatisticQueryDto): Promise<StatisticResponseDto> {
     return this.statisticService.getStatistics(query);
   }
 

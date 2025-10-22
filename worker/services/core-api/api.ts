@@ -584,25 +584,55 @@ export interface DeleteResponseDto {
 
 export interface StatisticResponseDto {
   /**
-   * Total number of targets in the workspace
-   * @example 10
-   */
-  totalTargets: number;
-  /**
-   * Total number of assets in the workspace
+   * Number of assets
    * @example 42
    */
-  totalAssets: number;
+  assets: number;
   /**
-   * Total number of unique technologies in the workspace
+   * Number of targets
+   * @example 10
+   */
+  targets: number;
+  /**
+   * Number of vulnerabilities
+   * @example 100
+   */
+  vuls: number;
+  /**
+   * Number of critical vulnerabilities
+   * @example 5
+   */
+  criticalVuls: number;
+  /**
+   * Number of high severity vulnerabilities
    * @example 15
    */
-  totalUniqueTechnologies: number;
+  highVuls: number;
   /**
-   * Total number of unique ports in the workspace
+   * Number of medium severity vulnerabilities
+   * @example 30
+   */
+  mediumVuls: number;
+  /**
+   * Number of low severity vulnerabilities
+   * @example 40
+   */
+  lowVuls: number;
+  /**
+   * Number of info severity vulnerabilities
+   * @example 10
+   */
+  infoVuls: number;
+  /**
+   * Number of technologies detected
+   * @example 15
+   */
+  techs: number;
+  /**
+   * Number of ports
    * @example 80
    */
-  totalUniquePorts: number;
+  ports: number;
 }
 
 export interface Statistic {
@@ -2179,7 +2209,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
+   * @description Retrieves statistics for a workspace including assets, targets, vulnerabilities (by severity), technologies, and ports.
    *
    * @tags Statistic
    * @name StatisticControllerGetStatistics

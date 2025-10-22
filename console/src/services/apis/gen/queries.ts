@@ -584,14 +584,26 @@ export type DeleteResponseDto = {
 };
 
 export type StatisticResponseDto = {
-  /** Total number of targets in the workspace */
-  totalTargets: number;
-  /** Total number of assets in the workspace */
-  totalAssets: number;
-  /** Total number of unique technologies in the workspace */
-  totalUniqueTechnologies: number;
-  /** Total number of unique ports in the workspace */
-  totalUniquePorts: number;
+  /** Number of assets */
+  assets: number;
+  /** Number of targets */
+  targets: number;
+  /** Number of vulnerabilities */
+  vuls: number;
+  /** Number of critical vulnerabilities */
+  criticalVuls: number;
+  /** Number of high severity vulnerabilities */
+  highVuls: number;
+  /** Number of medium severity vulnerabilities */
+  mediumVuls: number;
+  /** Number of low severity vulnerabilities */
+  lowVuls: number;
+  /** Number of info severity vulnerabilities */
+  infoVuls: number;
+  /** Number of technologies detected */
+  techs: number;
+  /** Number of ports */
+  ports: number;
 };
 
 export type Statistic = {
@@ -9937,7 +9949,7 @@ export const useSearchControllerDeleteSearchHistory = <
 };
 
 /**
- * Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
+ * Retrieves statistics for a workspace including assets, targets, vulnerabilities (by severity), technologies, and ports.
  * @summary Get workspace statistics
  */
 export const statisticControllerGetStatistics = (

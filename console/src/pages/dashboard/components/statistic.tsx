@@ -44,28 +44,28 @@ export default function Statistic() {
         {
             title: 'Targets',
             icon: <Target className="h-5 w-5 text-primary" />,
-            value: statistics?.totalTargets || 0,
+            value: statistics?.targets || 0,
             path: '/targets',
             trend: calculateTrend('targets')
         },
         {
             title: 'Assets',
             icon: <CloudCheck className="h-5 w-5 text-primary" />,
-            value: statistics?.totalAssets || 0,
+            value: statistics?.assets || 0,
             path: '/assets',
             trend: calculateTrend('assets')
         },
         {
             title: 'Technologies',
             icon: <Cpu className="h-5 w-5 text-primary" />,
-            value: statistics?.totalUniqueTechnologies || 0,
+            value: statistics?.techs || 0,
             path: '/assets',
             trend: calculateTrend('techs')
         },
         {
             title: 'Ports',
             icon: <EthernetPort className="h-5 w-5 text-primary" />,
-            value: statistics?.totalUniquePorts || 0,
+            value: statistics?.ports || 0,
             path: '/assets',
             trend: calculateTrend('ports')
         },
