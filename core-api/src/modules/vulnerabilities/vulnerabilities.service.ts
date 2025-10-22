@@ -6,10 +6,6 @@ import { Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { ToolsService } from '../tools/tools.service';
 import {
-  GetVulnerabilitiesSeverityQueryDto,
-  VulnerabilitySeverityDto,
-} from './dto/get-vulnerability-severity.dto';
-import {
   GetVulnerabilitiesStatisticsQueryDto,
   VulnerabilityStatisticsDto,
 } from './dto/get-vulnerability-statistics.dto';
@@ -147,52 +143,5 @@ export class VulnerabilitiesService {
     );
 
     return { data: statistics };
-  }
-
-  /**
-   * Retrieves counts of vulnerabilities by severity level for a specified workspace.
-   * This method follows the relation path: workspaceId -> target -> assets -> vuls
-   *
-   * @param query - The query parameters to filter vulnerabilities, including workspaceId and optional targetIds.
-   * @returns A promise that resolves to an array of vulnerability counts by severity level.
-   */
-  async getVulnerabilitiesSeverity(query: GetVulnerabilitiesSeverityQueryDto) {
-    const { workspaceId } = query;
-    const queryBuilder = this.vulnerabilitiesRepository
-      .createQueryBuilder('vulnerabilities')
-      .select('vulnerabilities.severity', 'severity')
-      .addSelect('COUNT(vulnerabilities.severity)', 'count')
-      .leftJoin('vulnerabilities.asset', 'assets')
-      .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspaceTargets', 'workspace_targets')
-      .leftJoin('workspace_targets.workspace', 'workspaces')
-      .where('workspaces.id = :workspaceId', { workspaceId })
-      .groupBy('vulnerabilities.severity');
-
-    const result = await queryBuilder.getRawMany();
-
-    // Convert the result to a map for easy lookup
-    const severityCounts = new Map<Severity, number>();
-    result.forEach((item: { severity: Severity; count: string }) => {
-      severityCounts.set(item.severity, parseInt(item.count, 10));
-    });
-
-    // Ensure all severity levels are included, even with zero counts
-    const allSeverities: Severity[] = [
-      Severity.CRITICAL,
-      Severity.HIGH,
-      Severity.MEDIUM,
-      Severity.LOW,
-      Severity.INFO,
-    ];
-
-    const severityData: VulnerabilitySeverityDto[] = allSeverities.map(
-      (severity) => ({
-        severity,
-        count: severityCounts.get(severity) || 0,
-      }),
-    );
-
-    return { data: severityData };
   }
 }

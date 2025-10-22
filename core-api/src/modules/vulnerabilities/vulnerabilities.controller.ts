@@ -2,10 +2,6 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import {
-  GetVulnerabilitiesSeverityQueryDto,
-  GetVulnerabilitiesSeverityResponseDto,
-} from './dto/get-vulnerability-severity.dto';
-import {
   GetVulnerabilitiesStatisticsQueryDto,
   GetVulnerabilitiesStatisticsResponseDto,
 } from './dto/get-vulnerability-statistics.dto';
@@ -49,20 +45,5 @@ export class VulnerabilitiesController {
     @Query() query: GetVulnerabilitiesStatisticsQueryDto,
   ) {
     return this.vulnerabilitiesService.getVulnerabilitiesStatistics(query);
-  }
-
-  @Doc({
-    summary: 'Get vulnerabilities severity counts',
-    description:
-      'Provides a detailed breakdown of vulnerability counts by severity level across the workspace hierarchy, following the relationship path from workspace to targets, assets, and vulnerabilities.',
-    response: {
-      serialization: GetVulnerabilitiesSeverityResponseDto,
-    },
-  })
-  @Get('severity')
-  getVulnerabilitiesSeverity(
-    @Query() query: GetVulnerabilitiesSeverityQueryDto,
-  ) {
-    return this.vulnerabilitiesService.getVulnerabilitiesSeverity(query);
   }
 }

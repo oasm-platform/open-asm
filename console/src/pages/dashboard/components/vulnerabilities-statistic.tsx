@@ -3,13 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useTimelineTrend } from "@/hooks/useTimelineTrend";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useVulnerabilitiesControllerGetVulnerabilitiesSeverity } from "@/services/apis/gen/queries";
+import { useVulnerabilitiesControllerGetVulnerabilitiesStatistics } from '@/services/apis/gen/queries';
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function VulnerabilityStatistic() {
   const { selectedWorkspace } = useWorkspaceSelector();
-  const { data: response } = useVulnerabilitiesControllerGetVulnerabilitiesSeverity({
+  const { data: response } = useVulnerabilitiesControllerGetVulnerabilitiesStatistics({
     workspaceId: selectedWorkspace ?? "",
   });
   const data = response?.data;

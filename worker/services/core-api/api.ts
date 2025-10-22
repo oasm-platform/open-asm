@@ -798,15 +798,6 @@ export interface GetVulnerabilitiesStatisticsResponseDto {
   data: VulnerabilityStatisticsDto[];
 }
 
-export interface VulnerabilitySeverityDto {
-  severity: VulnerabilitySeverityDtoSeverityEnum;
-  count: number;
-}
-
-export interface GetVulnerabilitiesSeverityResponseDto {
-  data: VulnerabilitySeverityDto[];
-}
-
 export interface CreateToolDto {
   name: string;
   description: string;
@@ -1058,14 +1049,6 @@ export enum ToolCategoryEnum {
 }
 
 export enum VulnerabilityStatisticsDtoSeverityEnum {
-  Info = "info",
-  Low = "low",
-  Medium = "medium",
-  High = "high",
-  Critical = "critical",
-}
-
-export enum VulnerabilitySeverityDtoSeverityEnum {
   Info = "info",
   Low = "low",
   Medium = "medium",
@@ -2350,28 +2333,6 @@ export class Api<
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/vulnerabilities/statistics`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Provides a detailed breakdown of vulnerability counts by severity level across the workspace hierarchy, following the relationship path from workspace to targets, assets, and vulnerabilities.
-   *
-   * @tags Vulnerabilities
-   * @name VulnerabilitiesControllerGetVulnerabilitiesSeverity
-   * @summary Get vulnerabilities severity counts
-   * @request GET:/api/vulnerabilities/severity
-   */
-  vulnerabilitiesControllerGetVulnerabilitiesSeverity = (
-    query: {
-      workspaceId: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/vulnerabilities/severity`,
       method: "GET",
       query: query,
       format: "json",
