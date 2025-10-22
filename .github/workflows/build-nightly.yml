@@ -3,7 +3,7 @@ name: Build OASM Nightly
 on:
   push:
     branches:
-      - 'main'
+      - "main"
   workflow_dispatch:
 
 concurrency:
@@ -20,9 +20,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      api: ${{ steps.filter.outputs.api }}
-      worker: ${{ steps.filter.outputs.worker }}
-      console: ${{ steps.filter.outputs.console }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
       - name: Detect changed services
@@ -36,22 +34,31 @@ jobs:
               - 'worker/**'
             console:
               - 'console/**'
+      - id: set-matrix
+        run: |
+          CHANGED=()
+          if [ "${{ steps.filter.outputs.api }}" == "true" ]; then CHANGED+=('"api"'); fi
+          if [ "${{ steps.filter.outputs.worker }}" == "true" ]; then CHANGED+=('"worker"'); fi
+          if [ "${{ steps.filter.outputs.console }}" == "true" ]; then CHANGED+=('"console"'); fi
+
+          if [ ${#CHANGED[@]} -eq 0 ]; then
+            MATRIX="{}"
+          else
+            MATRIX="{\"service\": [$(IFS=,; echo "${CHANGED[*]}")]}"
+          fi
+
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
   build:
     name: Build Changed Services
     needs: detect-changes
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       security-events: write
-
+    if: ${{ needs.detect-changes.outputs.matrix != '{}' && needs.detect-changes.outputs.matrix != '' }}
     strategy:
-      matrix:
-        service: [api, worker, console]
-
-    if: ${{ needs.detect-changes.outputs[matrix.service] == 'true' }}
-
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
