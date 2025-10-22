@@ -1,8 +1,20 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { useStatistics } from '@/hooks/useStatistics';
+import { useEffect, useState } from 'react';
 
 export default function Score() {
     const { statistics, isLoading } = useStatistics();
+    const [animatedOffset, setAnimatedOffset] = useState(2 * Math.PI * 70);
+    const [hasAnimated, setHasAnimated] = useState(false);
+
+    useEffect(() => {
+        if (!hasAnimated && !isLoading && statistics) {
+            const radius = 70;
+            const circumference = 2 * Math.PI * radius;
+            setAnimatedOffset(circumference - (statistics.score / 10) * circumference);
+            setHasAnimated(true);
+        }
+    }, [statistics, isLoading, hasAnimated]);
 
     // Function to get color based on score (red -> yellow -> green)
     const getColor = (score: number) => {
@@ -18,7 +30,6 @@ export default function Score() {
     const circumference = 2 * Math.PI * radius;
     const scoreValue = statistics?.score || 0;
     const strokeDasharray = circumference;
-    const strokeDashoffset = circumference - (scoreValue / 10) * circumference;
 
     return (
         <Card className='gap-1 p-3'>
@@ -49,7 +60,7 @@ export default function Score() {
                                 strokeWidth="8"
                                 fill="transparent"
                                 strokeDasharray={strokeDasharray}
-                                strokeDashoffset={strokeDashoffset}
+                                strokeDashoffset={animatedOffset}
                                 strokeLinecap="round"
                                 className="transition-all duration-500 ease-in-out"
                             />

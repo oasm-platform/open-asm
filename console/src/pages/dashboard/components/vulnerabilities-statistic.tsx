@@ -3,13 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from "@/hooks/useTimelineTrend";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function VulnerabilityStatistic() {
-  const { selectedWorkspace } = useWorkspaceSelector();
-  const { statistics } = useStatistics(selectedWorkspace);
+  const { statistics } = useStatistics();
   const { calculateTrend } = useTimelineTrend();
 
   if (!statistics) return null;
