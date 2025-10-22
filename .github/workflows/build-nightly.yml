@@ -1,9 +1,9 @@
-name: Build OASM Unstable
+name: Build OASM Nightly
 
 on:
   push:
     branches:
-      - "main"
+      - 'main'
   workflow_dispatch:
 
 concurrency:
