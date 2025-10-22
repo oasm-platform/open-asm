@@ -1,13 +1,15 @@
 import { useStatisticControllerGetStatistics } from '@/services/apis/gen/queries';
+import { useWorkspaceSelector } from './useWorkspaceSelector';
 
-export const useStatistics = (workspaceId: string | undefined) => {
+export const useStatistics = () => {
+    const { selectedWorkspace } = useWorkspaceSelector()
     const { data: statistics, isLoading, ...rest } = useStatisticControllerGetStatistics(
         {
-            workspaceId: workspaceId ?? ''
+            workspaceId: selectedWorkspace
         },
         {
             query: {
-                enabled: !!workspaceId,
+                enabled: !!selectedWorkspace,
                 refetchInterval: 5000, // Auto refresh every 5 seconds
             }
         }

@@ -633,6 +633,11 @@ export interface StatisticResponseDto {
    * @example 80
    */
   ports: number;
+  /**
+   * Security score
+   * @example 7.5
+   */
+  score: number;
 }
 
 export interface Statistic {
@@ -691,6 +696,11 @@ export interface Statistic {
    * @default 0
    */
   ports: number;
+  /**
+   * Security score
+   * @default 0
+   */
+  score: number;
 }
 
 export interface TimelineResponseDto {

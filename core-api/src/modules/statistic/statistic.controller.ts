@@ -16,7 +16,7 @@ export class StatisticController {
 
   @Doc({
     summary: 'Get workspace statistics',
-    description: 'Retrieves statistics for a workspace including assets, targets, vulnerabilities (by severity), technologies, and ports.',
+    description: 'Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.',
     response: {
       serialization: StatisticResponseDto,
     },

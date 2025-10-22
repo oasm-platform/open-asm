@@ -604,6 +604,8 @@ export type StatisticResponseDto = {
   techs: number;
   /** Number of ports */
   ports: number;
+  /** Security score */
+  score: number;
 };
 
 export type Statistic = {
@@ -630,6 +632,8 @@ export type Statistic = {
   techs: number;
   /** Number of ports */
   ports: number;
+  /** Security score */
+  score: number;
 };
 
 export type TimelineResponseDto = {

@@ -2,15 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { CloudCheck, Cpu, EthernetPort, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Statistic() {
-    const { selectedWorkspace } = useWorkspaceSelector();
     const navigate = useNavigate();
 
-    const { statistics, isLoading } = useStatistics(selectedWorkspace);
+    const { statistics, isLoading } = useStatistics();
 
     const { calculateTrend } = useTimelineTrend();
 
@@ -73,7 +71,7 @@ export default function Statistic() {
                     onClick={() => card.path && navigate(card.path)}
                 >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="font-medium text-base">{card.title}</CardTitle>
+                        <CardTitle className="font-medium text-lg">{card.title}</CardTitle>
                         {card.icon}
                     </CardHeader>
                     <CardContent>
