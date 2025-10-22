@@ -25,7 +25,7 @@ export default function IssuesTimeline() {
 
   });
 
-  const chartData = data?.data.map((item) => ({
+  const chartData = data?.data?.map((item) => ({
     ...item,
     createdAt: format(new Date(item.createdAt), 'MMM dd'),
   })) || [];

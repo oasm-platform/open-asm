@@ -8,7 +8,8 @@ import TopTagsAssets from './components/top-tags-assets';
 import VulnerabilityStatistic from "./components/vulnerabilities-statistic";
 
 export default function Dashboard() {
-    const { workspaces } = useWorkspaceSelector()
+    const { workspaces, isLoading } = useWorkspaceSelector()
+    if (isLoading) return null;
     if (workspaces.length === 0) return <CreateWorkspace />;
     return (
         <Page title="Dashboard">
