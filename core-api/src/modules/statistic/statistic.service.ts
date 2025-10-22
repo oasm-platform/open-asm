@@ -189,6 +189,7 @@ export class StatisticService {
         infoVuls: 0,
         techs: 0,
         ports: 0,
+        score: 0, // Default score when no statistics found
       };
     }
 
@@ -205,6 +206,7 @@ export class StatisticService {
       infoVuls: workspaceStats.infoVuls,
       techs: workspaceStats.techs,
       ports: workspaceStats.ports,
+      score: workspaceStats.score,
     };
   }
 
@@ -455,6 +457,7 @@ export class StatisticService {
       statistic.infoVuls = 0;
       statistic.techs = 0;
       statistic.ports = 0;
+      statistic.score = 0; // Initialize score to 0
       statisticsMap.set(id, statistic);
     }
 
@@ -506,6 +509,34 @@ export class StatisticService {
       const stat = statisticsMap.get(row.workspaceId);
       if (stat) stat.ports = Number(row.count);
     });
+
+    // Calculate scores for each workspace
+    const alpha = 0.3; // asset weight
+    const beta = 0.7;  // vuln weight
+
+    for (const [, stat] of statisticsMap) {
+      const { criticalVuls, highVuls, mediumVuls, lowVuls, infoVuls, assets: totalAssets } = stat;
+
+      // Only calculate score if there are assets to avoid division by zero
+      if (totalAssets > 0) {
+        // Total risk score of vulnerabilities
+        const vulRisk = (criticalVuls * 5 + highVuls * 3 + mediumVuls * 2 + lowVuls * 1 + infoVuls * 0.5);
+
+        // Normalize risk to 0-10 scale according to workspace size
+        const Rvuln = Math.min(10, vulRisk / totalAssets);
+
+        // Risk according to asset scale (more assets = higher potential risk)
+        const Rasset = Math.min(10, totalAssets / 100); // example: above 10 assets then max risk is 10
+
+        // Total calculation
+        const totalScore = Math.max(0, 10 - (alpha * Rasset + beta * Rvuln));
+
+        stat.score = totalScore;
+      } else {
+        // If no assets, set score to maximum (best security score)
+        stat.score = 10;
+      }
+    }
 
     // Convert the Map to an array and return
     return Array.from(statisticsMap.values());

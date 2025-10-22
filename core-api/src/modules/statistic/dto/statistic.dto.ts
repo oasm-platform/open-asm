@@ -72,4 +72,10 @@ export class StatisticResponseDto {
     example: 80,
   })
   ports: number;
+
+  @ApiProperty({
+    description: 'Security score',
+    example: 7.5,
+  })
+  score: number;
 }
