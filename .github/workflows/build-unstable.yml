@@ -14,8 +14,30 @@ env:
   IMAGE_NAME: oasm/oasm
 
 jobs:
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      worker: ${{ steps.filter.outputs.worker }}
+      console: ${{ steps.filter.outputs.console }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Detect changed services
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            api:
+              - 'core-api/**'
+            worker:
+              - 'worker/**'
+            console:
+              - 'console/**'
+
   build:
-#    runs-on: self-hosted
+    name: Build Changed Services
+    needs: detect-changes
     runs-on: ubuntu-latest
 
     permissions:
@@ -26,6 +48,8 @@ jobs:
     strategy:
       matrix:
         service: [api, worker, console]
+
+    if: ${{ needs.detect-changes.outputs[matrix.service] == 'true' }}
 
     steps:
       - name: Checkout code
@@ -66,4 +90,3 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.${{ matrix.service }}.sarif'
-
