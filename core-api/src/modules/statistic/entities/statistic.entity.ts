@@ -45,6 +45,10 @@ export class Statistic extends BaseEntity {
     @Column({ default: 0 })
     ports: number;
 
+    @ApiProperty({ description: 'Security score', default: 0 })
+    @Column({ default: 0, type: 'decimal', precision: 5, scale: 2 })
+    score: number;
+
     @ManyToOne(() => Workspace, (workspace) => workspace.statistics)
     workspace: Workspace;
 }

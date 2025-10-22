@@ -1,21 +1,18 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NumberAnimate } from '@/components/ui/number-animate';
+import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from "@/hooks/useTimelineTrend";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useVulnerabilitiesControllerGetVulnerabilitiesSeverity } from "@/services/apis/gen/queries";
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function VulnerabilityStatistic() {
   const { selectedWorkspace } = useWorkspaceSelector();
-  const { data: response } = useVulnerabilitiesControllerGetVulnerabilitiesSeverity({
-    workspaceId: selectedWorkspace ?? "",
-  });
-  const data = response?.data;
+  const { statistics } = useStatistics(selectedWorkspace);
   const { calculateTrend } = useTimelineTrend();
 
-  if (!data || data.length === 0) return null;
+  if (!statistics) return null;
 
   const getSeverityColorClass = (severity: string) => {
     switch (severity) {
@@ -35,23 +32,13 @@ export default function VulnerabilityStatistic() {
   };
 
   const vulnerabilityStats = [
-    { severity: 'total', label: 'Total', colorClass: '', count: 0 },
-    { severity: 'critical', label: 'Critical', colorClass: getSeverityColorClass('critical'), count: 0 },
-    { severity: 'high', label: 'High', colorClass: getSeverityColorClass('high'), count: 0 },
-    { severity: 'medium', label: 'Medium', colorClass: getSeverityColorClass('medium'), count: 0 },
-    { severity: 'low', label: 'Low', colorClass: getSeverityColorClass('low'), count: 0 },
-    { severity: 'info', label: 'Info', colorClass: getSeverityColorClass('info'), count: 0 },
+    { severity: 'total', label: 'Total', colorClass: '', count: statistics?.vuls || 0 },
+    { severity: 'critical', label: 'Critical', colorClass: getSeverityColorClass('critical'), count: statistics?.criticalVuls || 0 },
+    { severity: 'high', label: 'High', colorClass: getSeverityColorClass('high'), count: statistics?.highVuls || 0 },
+    { severity: 'medium', label: 'Medium', colorClass: getSeverityColorClass('medium'), count: statistics?.mediumVuls || 0 },
+    { severity: 'low', label: 'Low', colorClass: getSeverityColorClass('low'), count: statistics?.lowVuls || 0 },
+    { severity: 'info', label: 'Info', colorClass: getSeverityColorClass('info'), count: statistics?.infoVuls || 0 },
   ];
-
-  if (data && data.length > 0) {
-    vulnerabilityStats.forEach(stat => {
-      const item = data.find(d => d.severity === stat.severity);
-      if (item) {
-        stat.count = item.count;
-      }
-    });
-    vulnerabilityStats[0].count = data.reduce((sum, item) => sum + item.count, 0); // Total count
-  }
 
   const totalVulsTrend = calculateTrend('vuls');
 

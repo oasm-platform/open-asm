@@ -22,7 +22,7 @@ export class StatisticController {
     },
   })
   @Get()
-  getStatistics(@Query() query: GetStatisticQueryDto): Promise<Omit<StatisticResponseDto, 'totalVulnerabilities'> & { totalUniqueTechnologies: number; totalUniquePorts: number }> {
+  getStatistics(@Query() query: GetStatisticQueryDto): Promise<StatisticResponseDto> {
     return this.statisticService.getStatistics(query);
   }
 

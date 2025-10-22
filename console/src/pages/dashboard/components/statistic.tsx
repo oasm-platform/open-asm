@@ -1,23 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
+import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { useStatisticControllerGetStatistics } from '@/services/apis/gen/queries';
 import { CloudCheck, Cpu, EthernetPort, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Statistic() {
-    const { selectedWorkspace } = useWorkspaceSelector();
     const navigate = useNavigate();
 
-    const { data: statistics, isLoading } = useStatisticControllerGetStatistics({
-        workspaceId: selectedWorkspace ?? ''
-    }, {
-        query: {
-            enabled: !!selectedWorkspace,
-            refetchInterval: 5000, // Auto refresh every 5 seconds
-        }
-    });
+    const { statistics, isLoading } = useStatistics();
 
     const { calculateTrend } = useTimelineTrend();
 
@@ -44,28 +35,28 @@ export default function Statistic() {
         {
             title: 'Targets',
             icon: <Target className="h-5 w-5 text-primary" />,
-            value: statistics?.totalTargets || 0,
+            value: statistics?.targets || 0,
             path: '/targets',
             trend: calculateTrend('targets')
         },
         {
             title: 'Assets',
             icon: <CloudCheck className="h-5 w-5 text-primary" />,
-            value: statistics?.totalAssets || 0,
+            value: statistics?.assets || 0,
             path: '/assets',
             trend: calculateTrend('assets')
         },
         {
             title: 'Technologies',
             icon: <Cpu className="h-5 w-5 text-primary" />,
-            value: statistics?.totalUniqueTechnologies || 0,
+            value: statistics?.techs || 0,
             path: '/assets',
             trend: calculateTrend('techs')
         },
         {
             title: 'Ports',
             icon: <EthernetPort className="h-5 w-5 text-primary" />,
-            value: statistics?.totalUniquePorts || 0,
+            value: statistics?.ports || 0,
             path: '/assets',
             trend: calculateTrend('ports')
         },
@@ -80,7 +71,7 @@ export default function Statistic() {
                     onClick={() => card.path && navigate(card.path)}
                 >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="font-medium text-base">{card.title}</CardTitle>
+                        <CardTitle className="font-medium text-lg">{card.title}</CardTitle>
                         {card.icon}
                     </CardHeader>
                     <CardContent>

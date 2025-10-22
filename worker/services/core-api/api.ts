@@ -584,25 +584,60 @@ export interface DeleteResponseDto {
 
 export interface StatisticResponseDto {
   /**
-   * Total number of targets in the workspace
-   * @example 10
-   */
-  totalTargets: number;
-  /**
-   * Total number of assets in the workspace
+   * Number of assets
    * @example 42
    */
-  totalAssets: number;
+  assets: number;
   /**
-   * Total number of unique technologies in the workspace
+   * Number of targets
+   * @example 10
+   */
+  targets: number;
+  /**
+   * Number of vulnerabilities
+   * @example 100
+   */
+  vuls: number;
+  /**
+   * Number of critical vulnerabilities
+   * @example 5
+   */
+  criticalVuls: number;
+  /**
+   * Number of high severity vulnerabilities
    * @example 15
    */
-  totalUniqueTechnologies: number;
+  highVuls: number;
   /**
-   * Total number of unique ports in the workspace
+   * Number of medium severity vulnerabilities
+   * @example 30
+   */
+  mediumVuls: number;
+  /**
+   * Number of low severity vulnerabilities
+   * @example 40
+   */
+  lowVuls: number;
+  /**
+   * Number of info severity vulnerabilities
+   * @example 10
+   */
+  infoVuls: number;
+  /**
+   * Number of technologies detected
+   * @example 15
+   */
+  techs: number;
+  /**
+   * Number of ports
    * @example 80
    */
-  totalUniquePorts: number;
+  ports: number;
+  /**
+   * Security score
+   * @example 7.5
+   */
+  score: number;
 }
 
 export interface Statistic {
@@ -661,6 +696,11 @@ export interface Statistic {
    * @default 0
    */
   ports: number;
+  /**
+   * Security score
+   * @default 0
+   */
+  score: number;
 }
 
 export interface TimelineResponseDto {
@@ -796,15 +836,6 @@ export interface VulnerabilityStatisticsDto {
 
 export interface GetVulnerabilitiesStatisticsResponseDto {
   data: VulnerabilityStatisticsDto[];
-}
-
-export interface VulnerabilitySeverityDto {
-  severity: VulnerabilitySeverityDtoSeverityEnum;
-  count: number;
-}
-
-export interface GetVulnerabilitiesSeverityResponseDto {
-  data: VulnerabilitySeverityDto[];
 }
 
 export interface CreateToolDto {
@@ -1058,14 +1089,6 @@ export enum ToolCategoryEnum {
 }
 
 export enum VulnerabilityStatisticsDtoSeverityEnum {
-  Info = "info",
-  Low = "low",
-  Medium = "medium",
-  High = "high",
-  Critical = "critical",
-}
-
-export enum VulnerabilitySeverityDtoSeverityEnum {
   Info = "info",
   Low = "low",
   Medium = "medium",
@@ -2196,7 +2219,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
+   * @description Retrieves statistics for a workspace including assets, targets, vulnerabilities (by severity), technologies, and ports.
    *
    * @tags Statistic
    * @name StatisticControllerGetStatistics
@@ -2350,28 +2373,6 @@ export class Api<
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/vulnerabilities/statistics`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Provides a detailed breakdown of vulnerability counts by severity level across the workspace hierarchy, following the relationship path from workspace to targets, assets, and vulnerabilities.
-   *
-   * @tags Vulnerabilities
-   * @name VulnerabilitiesControllerGetVulnerabilitiesSeverity
-   * @summary Get vulnerabilities severity counts
-   * @request GET:/api/vulnerabilities/severity
-   */
-  vulnerabilitiesControllerGetVulnerabilitiesSeverity = (
-    query: {
-      workspaceId: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/vulnerabilities/severity`,
       method: "GET",
       query: query,
       format: "json",
