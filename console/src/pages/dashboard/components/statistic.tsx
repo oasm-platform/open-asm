@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
+import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { useStatisticControllerGetStatistics } from '@/services/apis/gen/queries';
 import { CloudCheck, Cpu, EthernetPort, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,14 +10,7 @@ export default function Statistic() {
     const { selectedWorkspace } = useWorkspaceSelector();
     const navigate = useNavigate();
 
-    const { data: statistics, isLoading } = useStatisticControllerGetStatistics({
-        workspaceId: selectedWorkspace ?? ''
-    }, {
-        query: {
-            enabled: !!selectedWorkspace,
-            refetchInterval: 5000, // Auto refresh every 5 seconds
-        }
-    });
+    const { statistics, isLoading } = useStatistics(selectedWorkspace);
 
     const { calculateTrend } = useTimelineTrend();
 
