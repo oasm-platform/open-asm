@@ -2,6 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as compression from 'compression';
 import * as cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import type { Response } from 'express';
@@ -44,7 +45,8 @@ async function bootstrap() {
 
   // Configure cookie parser
   app.use(cookieParser());
-
+  // Compress responses
+  app.use(compression());
   // Configure global validation
   app.useGlobalPipes(
     new ValidationPipe({

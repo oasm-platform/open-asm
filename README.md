@@ -69,8 +69,8 @@ To quickly get started with OASM using Docker:
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/oasm-platform/open-asm.git
-   cd open-asm
+   git clone https://github.com/oasm-platform/oasm-docker.git
+   cd oasm-docker
    ```
 
 2. Rename the example environment file:
