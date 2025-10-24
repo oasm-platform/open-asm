@@ -1,8 +1,8 @@
-FROM golang:1.25 AS tools-base
+FROM golang:1.25-alpine AS tools-base
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y libpcap-dev && \
+RUN apk add --no-cache gcc musl-dev libpcap-dev && \
     go install github.com/go-task/task/v3/cmd/task@latest
 
 FROM tools-base AS tools
