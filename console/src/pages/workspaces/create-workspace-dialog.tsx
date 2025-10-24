@@ -60,7 +60,7 @@ const CreateWorkspaceDialog = () => {
                 <Plus size={20} />  Create workspace
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="w-full md:w-[450px]">
                     <DialogHeader>
                         <DialogTitle>Create Workspace</DialogTitle>
                     </DialogHeader>
@@ -70,7 +70,7 @@ const CreateWorkspaceDialog = () => {
                     >
                         <Input
                             {...register("name", { required: "Workspace name is required" })}
-                            placeholder="Workspace Name"
+                            placeholder="Name"
                         />
                         {errors.name && <p className="text-red-600 text-sm">{errors.name.message}</p>}
                         <Textarea
@@ -79,7 +79,7 @@ const CreateWorkspaceDialog = () => {
                             rows={4}
                         />
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => { setOpen(false); reset(); }}>Cancel</Button>
+                            <Button variant="outline" type='button' onClick={() => { setOpen(false); reset(); }}>Cancel</Button>
                             <Button type="submit" disabled={isPending}>
                                 {isPending && <Loader2Icon className="animate-spin" />}
                                 Create

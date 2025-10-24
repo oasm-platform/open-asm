@@ -1,5 +1,7 @@
 import { Tabs } from '@/components/ui/tabs';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useMemo, useState } from 'react';
+import CreateWorkspace from '../workspaces/create-workspace';
 import AssetTabContent from './components/asset-tab';
 import FilterFormInfinite from './components/filter-form-infinite';
 import IpAssetsTab from './components/ip-assets-tab';
@@ -9,6 +11,8 @@ import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
 
 export function ListAssets() {
+  const { workspaces } = useWorkspaceSelector()
+
   const tabList = useMemo(
     () => [
       {
@@ -41,7 +45,7 @@ export function ListAssets() {
   );
 
   const [selectedTab, setSelectedTab] = useState('asset');
-
+  if (workspaces.length === 0) return <CreateWorkspace />;
   return (
     <div className="w-full">
       {/* <FilterForm /> */}
