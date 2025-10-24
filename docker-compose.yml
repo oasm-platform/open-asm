@@ -30,6 +30,11 @@ services:
       - ./core-api/.env
     ports:
       - '6276:6276'
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_URL=redis://:password@redis:6379/0
+      - GEO_IP_URL=geo-ip:4360
+      - OASM_CLOUD_APIKEY=change_me
     restart: 'always'
     depends_on:
       postgres:
@@ -43,7 +48,7 @@ services:
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:6276/api/health']
       interval: 1s
-      timeout: 5s
+      timeout: 30s
       retries: 10
 
   oasm-worker:
@@ -55,8 +60,8 @@ services:
       - ./worker/.env
     environment:
       - API=http://core-api:6276/
-      - API_KEY=change_me
       - MAX_JOBS=10
+      - OASM_CLOUD_APIKEY=change_me
     volumes:
       - nuclei-templates:/root/nuclei-templates:rw
     networks:
