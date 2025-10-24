@@ -115,7 +115,7 @@ export class Tool {
     while (true) {
       try {
         const worker: any = await coreApi.workersControllerJoin({
-          apiKey: process.env.API_KEY!,
+          apiKey: process.env.API_KEY! || process.env.OASM_CLOUD_APIKEY!,
         });
         Tool.workerId = worker.id;
         Tool.token = worker.token;

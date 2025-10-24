@@ -51,6 +51,8 @@ services:
     build:
       context: ./worker
       dockerfile: Dockerfile
+    env_file:
+      - ./worker/.env
     environment:
       - API=http://core-api:6276/
       - API_KEY=change_me

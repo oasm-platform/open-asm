@@ -3,7 +3,7 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
-import { JobPriority, JobStatus, ToolCategory, WorkerType } from '@/common/enums/enum';
+import { JobPriority, JobStatus, ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { RedisService } from '@/services/redis/redis.service';
 import bindingCommand from '@/utils/bindingCommand';
@@ -200,7 +200,6 @@ export class JobsRegistryService {
           },
           relations: ['workspace', 'tool'],
         });
-
       if (!worker) {
         throw new NotFoundException('Worker not found');
       }
@@ -222,10 +221,13 @@ export class JobsRegistryService {
         queryBuilder
           .andWhere('tool.name IN (:...names)', {
             names: builtInToolsName,
-          })
-          .andWhere('workspaces.id = :workspaceId', {
+          });
+
+        if (worker.scope !== WorkerScope.CLOUD) {
+          queryBuilder.andWhere('workspaces.id = :workspaceId', {
             workspaceId: worker.workspace.id,
           });
+        }
       } else {
         queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
       }

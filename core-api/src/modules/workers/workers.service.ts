@@ -16,6 +16,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -46,6 +47,8 @@ export class WorkersService {
     private jobsRegistryService: JobsRegistryService,
 
     private apiKeyService: ApiKeysService,
+
+    private configService: ConfigService
   ) { }
 
   /**
@@ -208,6 +211,7 @@ export class WorkersService {
         scope: WorkerScope.WORKSPACE,
       };
     }
+
     return {
       type: WorkerType.PROVIDER,
       scope: WorkerScope.CLOUD,
@@ -234,31 +238,65 @@ export class WorkersService {
   }
 
   /**
-   * Registers a worker in the database by inserting a new record
-   * with a unique worker index for the given worker name ID.
+   * Registers a worker in the database by creating a new worker instance.
+   * Handles both cloud workers (using cloud API key) and regular workers (using API keys).
    *
-   * This function runs within a transaction to ensure that the worker
-   * index is generated atomically and without conflicts even with
-   * concurrent requests. It attempts to find the smallest available
-   * index for the worker name and assigns it to the new worker.
-   *
-   * @param dto - The data transfer object containing the token of the worker.
-   * @returns A promise that resolves to the assigned worker index.
+   * @param dto - The data transfer object containing the API key.
+   * @returns A promise that resolves to the created worker instance.
    */
-  public async join(dto: WorkerJoinDto): Promise<WorkerInstance | null> {
+  public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
     const { apiKey } = dto;
+    const cloudApiKey = this.configService.get<string>('OASM_CLOUD_APIKEY');
 
+    if (cloudApiKey === apiKey) {
+      return this.createCloudWorker();
+    }
+
+    return this.createRegularWorker(apiKey);
+  }
+
+  /**
+   * Creates a cloud worker instance.
+   * @returns A promise that resolves to the created cloud worker.
+   */
+  private async createCloudWorker(): Promise<WorkerInstance> {
+    const workerId = randomUUID();
+    const TOKEN_LENGTH = 48;
+
+    const data: Partial<WorkerInstance> = {
+      id: workerId,
+      token: generateToken(TOKEN_LENGTH),
+      type: WorkerType.BUILT_IN,
+      scope: WorkerScope.CLOUD,
+    };
+
+    await this.repo.save(data);
+
+    const worker = await this.repo.findOne({
+      where: { id: workerId },
+    });
+
+    if (!worker) {
+      throw new Error('Failed to create cloud worker');
+    }
+
+    return worker;
+  }
+
+  /**
+   * Creates a regular worker instance based on the provided API key.
+   * @param apiKey - The API key to validate and use for worker creation.
+   * @returns A promise that resolves to the created worker.
+   */
+  private async createRegularWorker(apiKey: string): Promise<WorkerInstance> {
     const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
-      where: {
-        key: apiKey,
-      },
+      where: { key: apiKey },
     });
 
     if (!apiKeyRecord) {
       throw new NotFoundException(`API key not found: ${apiKey}`);
     }
 
-    // Generate a unique ID for the new worker instance
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
 
@@ -278,12 +316,15 @@ export class WorkersService {
 
     await this.repo.save(data);
 
-    // Fetch and return the newly created worker instance from the repository
-    return this.repo.findOne({
-      where: {
-        id: workerId,
-      },
+    const worker = await this.repo.findOne({
+      where: { id: workerId },
     });
+
+    if (!worker) {
+      throw new Error('Failed to create regular worker');
+    }
+
+    return worker;
   }
 
   /**
