@@ -1,4 +1,4 @@
-name: Build OASM Stable
+name: Build OASM Release
 
 on:
   push:
@@ -50,6 +50,7 @@ jobs:
             --push \
             --cache-from=type=registry,ref=${{ env.IMAGE_NAME }}-${{ matrix.service }}:buildcache \
             --cache-to=type=registry,ref=${{ env.IMAGE_NAME }}-${{ matrix.service }}:buildcache,mode=max \
-            --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:dev \
+            --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:latest \
+            --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.ref_name }} \
             --file ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}/Dockerfile \
             ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}
