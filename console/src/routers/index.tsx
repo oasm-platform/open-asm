@@ -1,4 +1,5 @@
 import Layout from '@/components/common/layout/layout';
+import Splash from '@/components/common/layout/splash';
 import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
@@ -27,7 +28,11 @@ import RegisterRoute from './RegisterRoute';
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Layout />,
+    element: (
+      <Splash>
+        <Layout />
+      </Splash>
+    ),
     children: [
       {
         path: 'login',

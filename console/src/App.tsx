@@ -5,7 +5,6 @@ import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { RouterProvider } from "react-router-dom";
 import { ThemeProvider } from "./components/ui/theme-provider";
 
-import Splash from './components/common/layout/splash';
 import { router } from "./routers";
 
 const queryClient = new QueryClient({
@@ -36,9 +35,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="dark" storageKey="theme">
-        <Splash>
-          <RouterProvider router={router} />
-        </Splash>
+        <RouterProvider router={router} />
         <Toaster position="bottom-center" />
       </ThemeProvider>
     </QueryClientProvider>
