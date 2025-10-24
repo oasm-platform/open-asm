@@ -70,9 +70,19 @@ const ListWorkers = () => {
         }>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
                 {data.data.map((worker) => (
-                    <Card key={worker.id}>
-                        <CardContent className="p-3 space-y-1.5">
-
+                    <Card key={worker.id} className='py-2'>
+                        <CardContent className="p-3 space-y-3">
+                            <div className="flex justify-between items-start">
+                                <Badge variant="outline">
+                                    Scope
+                                </Badge>
+                                <Badge
+                                    variant={worker.currentJobsCount > 0 ? "default" : "secondary"}
+                                    className={`${worker.currentJobsCount > 0 ? 'bg-green-500 hover:bg-green-700 text-white' : ''} ml-2`}
+                                >
+                                    {worker.scope === "cloud" ? "Global" : "This workspace"}
+                                </Badge>
+                            </div>
                             <div className="flex justify-between items-start">
                                 <Badge variant="outline">
                                     {worker.id.slice(0, 8)}
@@ -85,7 +95,7 @@ const ListWorkers = () => {
                                 </Badge>
                             </div>
 
-                            <div className="flex items-center justify-between mt-3">
+                            <div className="flex items-center justify-between">
                                 <Badge variant="outline">Status</Badge>
                                 <div className="flex items-center space-x-2">
                                     {new Date().getTime() - new Date(worker.lastSeenAt).getTime() < 30000 ? (
@@ -103,7 +113,7 @@ const ListWorkers = () => {
                                     )}
                                 </div>
                             </div>
-                            <div className="flex items-center justify-between mt-3">
+                            <div className="flex items-center justify-between">
                                 <Badge variant="outline">Created at</Badge>
                                 <span className="text-sm text-muted-foreground">
                                     {dayjs(worker.createdAt).fromNow()}

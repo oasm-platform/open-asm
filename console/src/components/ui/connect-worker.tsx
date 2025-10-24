@@ -40,7 +40,10 @@ export function ConnectWorker() {
             },
         },
     })
-    // if (import.meta.env.DEV) return null;
+
+
+    // Temporary disable connect custom workspace worker in production mode
+    if (import.meta.env.PROD) return null;
 
     const handleCopyCommand = async () => {
         await navigator.clipboard.writeText(rawCommand);

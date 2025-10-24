@@ -161,9 +161,20 @@ export class WorkersService {
       )
       .where('1=1');
 
-    // Add workspace filter if workspaceId is provided
+    // Add workspace filter if workspaceId is provided, or if worker has cloud scope
     if (workspaceId) {
-      queryBuilder.andWhere('w."workspaceId" = :workspaceId', { workspaceId });
+      queryBuilder.andWhere(
+        '(w."workspaceId" = :workspaceId OR w."scope" = :cloudScope)',
+        {
+          workspaceId,
+          cloudScope: WorkerScope.CLOUD
+        }
+      );
+    } else {
+      // If no workspaceId provided, we still want to include cloud workers
+      queryBuilder.andWhere('w."scope" = :cloudScope', {
+        cloudScope: WorkerScope.CLOUD
+      });
     }
 
     const [workers, total] = await queryBuilder

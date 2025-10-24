@@ -60,7 +60,7 @@ export const builtInTools: Tool[] = [
       'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
     logoUrl:
       'https://raw.githubusercontent.com/projectdiscovery/naabu/refs/heads/main/static/naabu-logo.png',
-    command: 'naabu -duc -host {{value}} -silent',
+    command: 'naabu -host {{value}} -silent',
     parser: (result: string) => {
       const parsed = result
         .trim()

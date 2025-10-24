@@ -20,7 +20,6 @@ import {
   CloudCheck,
   Cpu,
   LayoutDashboard,
-  MessageSquareCode,
   Radar,
   SquareTerminal,
   Target
@@ -70,14 +69,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       ],
     },
     {
-      title: 'Management (admin)',
+      title: 'Management',
       url: '#',
       items: [
-        {
-          title: 'Providers',
-          icon: <MessageSquareCode />,
-          url: '/providers',
-        },
+        // {
+        //   title: 'Providers',
+        //   icon: <MessageSquareCode />,
+        //   url: '/providers',
+        // },
         {
           title: 'Workers',
           icon: <SquareTerminal />,
