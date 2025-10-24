@@ -27,6 +27,14 @@ import RegisterRoute from './RegisterRoute';
 
 export const router = createBrowserRouter([
   {
+    path: 'init-admin',
+    element: (
+      <RegisterRoute>
+        <Register />
+      </RegisterRoute>
+    ),
+  },
+  {
     path: '/',
     element: (
       <Splash>
@@ -40,14 +48,6 @@ export const router = createBrowserRouter([
           <GuestRoute>
             <Login />
           </GuestRoute>
-        ),
-      },
-      {
-        path: 'init-admin',
-        element: (
-          <RegisterRoute>
-            <Register />
-          </RegisterRoute>
         ),
       },
       {
