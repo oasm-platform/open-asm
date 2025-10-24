@@ -295,17 +295,21 @@ export class WorkspacesService implements OnModuleInit {
     userContext: UserContextPayload,
   ): Promise<GetApiKeyResponseDto> {
     await this.getWorkspaceByIdAndOwner(workspaceId, userContext);
-    const apiKey = await this.apiKeyService.getCurrentApiKey(
-      ApiKeyType.WORKSPACE,
-      workspaceId,
-    );
+    try {
+      const apiKey = await this.apiKeyService.getCurrentApiKey(
+        ApiKeyType.WORKSPACE,
+        workspaceId,
+      );
 
-    if (!apiKey) {
+      if (!apiKey) {
+        return this.rotateApiKey(workspaceId, userContext);
+      }
+      return {
+        apiKey: apiKey.key,
+      };
+    } catch {
       return this.rotateApiKey(workspaceId, userContext);
     }
-    return {
-      apiKey: apiKey.key,
-    };
   }
 
   /**
