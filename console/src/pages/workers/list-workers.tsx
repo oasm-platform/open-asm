@@ -77,8 +77,8 @@ const ListWorkers = () => {
                                     Scope
                                 </Badge>
                                 <Badge
-                                    variant={worker.currentJobsCount > 0 ? "default" : "secondary"}
-                                    className={`${worker.currentJobsCount > 0 ? 'bg-green-500 hover:bg-green-700 text-white' : ''} ml-2`}
+                                    variant="outline"
+                                    className={`ml-2`}
                                 >
                                     {worker.scope === "cloud" ? "Global" : "This workspace"}
                                 </Badge>

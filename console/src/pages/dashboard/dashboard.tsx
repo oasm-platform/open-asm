@@ -3,7 +3,6 @@ import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import CreateWorkspace from '../workspaces/create-workspace';
 import AssetLocationsMap from './components/asset-locations-map';
 import IssuesTimeline from './components/issues-timeline';
-import Score from './components/score';
 import Statistic from "./components/statistic";
 import TopTagsAssets from './components/top-tags-assets';
 import VulnerabilityStatistic from "./components/vulnerabilities-statistic";
@@ -27,7 +26,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="col-span-1 space-y-4 flex flex-col order-first 2xl:order-2">
-                        <Score />
                         <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-1 gap-4">
                             <VulnerabilityStatistic />
                             <TopTagsAssets />
