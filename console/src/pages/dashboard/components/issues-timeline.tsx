@@ -25,10 +25,16 @@ export default function IssuesTimeline() {
 
   });
 
-  const chartData = data?.data?.map((item) => ({
+  const rawData = data?.data?.map((item) => ({
     ...item,
     createdAt: format(new Date(item.createdAt), 'MMM dd'),
   })) || [];
+
+  // Filter out consecutive duplicate vuls values to avoid horizontal lines in chart
+  const chartData = rawData.filter((item, index, array) => {
+    if (index === 0) return true;
+    return item.vuls !== array[index - 1].vuls;
+  });
 
   return (
     <Card className="w-full h-full p-2">

@@ -5,6 +5,7 @@ import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from "@/hooks/useTimelineTrend";
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import Score from './score';
 
 export default function VulnerabilityStatistic() {
   const { statistics } = useStatistics();
@@ -58,7 +59,8 @@ export default function VulnerabilityStatistic() {
 
   return (
     <Link to="/vulnerabilities">
-      <Card className="w-full hover:bg-accent/70 cursor-pointer">
+      <Card className="w-full hover:bg-accent/70 pt-3 cursor-pointer">
+        <Score />
         <CardHeader className='flex justify-between items-center'>
           <div className="flex items-center gap-2">
             <CardTitle className="">Vulnerabilities issues</CardTitle>
