@@ -11,7 +11,7 @@ export class WorkflowsService implements OnModuleInit {
   constructor(
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
-  ) {}
+  ) { }
 
   private readonly logger = new Logger(WorkflowsService.name);
   private readonly templatesPath = path.join(__dirname, 'templates');
@@ -86,18 +86,30 @@ export class WorkflowsService implements OnModuleInit {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           const parsed = yaml.load(fileContent) as Record<string, unknown>;
 
-          const normalized = this.normalizeOn(parsed);
+          const newContent = this.normalizeOn(parsed);
 
-          await this.workflowRepository.upsert(
-            {
+          // Check current workflow
+          const existing = await this.workflowRepository.findOne({
+            where: { filePath: fileName },
+          });
+
+          if (!existing) {
+            // Update new template with change
+            await this.workflowRepository.insert({
               name: fileName,
-              content: normalized,
+              content: newContent,
               filePath: fileName,
-            },
-            ['filePath'],
-          );
-
-          this.logger.log(`Successfully processed workflow: ${fileName}`);
+            });
+            this.logger.log(`Inserted new workflow: ${fileName}`);
+          } else if (JSON.stringify(newContent) !== JSON.stringify(existing.content)) {
+            await this.workflowRepository.update(
+              { filePath: fileName },
+              { content: newContent },
+            );
+            this.logger.log(`Updated workflow content: ${fileName}`);
+          } else {
+            this.logger.log(`No changes for workflow: ${fileName}`);
+          }
         } catch (error) {
           this.logger.error(
             `Error processing workflow ${fileName}: ${(error as Error).message}`,
