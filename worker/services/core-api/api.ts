@@ -486,6 +486,25 @@ export interface GetManyGetStatusCodeAssetsDTODto {
   pageCount: number;
 }
 
+export interface GetTlsResponseDto {
+  host: string;
+  sni: string;
+  subject_dn: string;
+  subject_an: string[];
+  not_after: string;
+  not_before: string;
+  tls_connection: string;
+}
+
+export interface GetManyGetTlsResponseDtoDto {
+  data: GetTlsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export interface UpdateAssetDto {
   /** @default [] */
   tags: string[] | null;
@@ -1977,6 +1996,22 @@ export class Api<
     });
 
   /**
+   * @description Retrieves a list of TLS certificates expiring soon.
+   *
+   * @tags Assets
+   * @name AssetsControllerGetTlsAssets
+   * @summary Get TLS certificates
+   * @request GET:/api/assets/tls
+   */
+  assetsControllerGetTlsAssets = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/tls`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Retrieves a single asset by its ID.
    *
    * @tags Assets
@@ -2219,7 +2254,7 @@ export class Api<
     });
 
   /**
-   * @description Retrieves statistics for a workspace including assets, targets, vulnerabilities (by severity), technologies, and ports.
+   * @description Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
    *
    * @tags Statistic
    * @name StatisticControllerGetStatistics

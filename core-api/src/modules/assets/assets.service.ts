@@ -1,5 +1,5 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto, SortOrder } from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
@@ -681,7 +681,7 @@ export class AssetsService {
     const limit = 10;
 
     // Query to get total count
-     
+
     const totalResult = await this.dataSource
       .createQueryBuilder()
       .select('COUNT(DISTINCT("httpResponses"."tls"))', 'count')
@@ -694,7 +694,7 @@ export class AssetsService {
       .getRawOne<{ count: number }>();
 
     // Main query ordered by expiry date (earliest first)
-     
+
     const queryResult = await this.dataSource
       .createQueryBuilder()
       .select(['"httpResponses"."tls"'])
@@ -709,10 +709,10 @@ export class AssetsService {
       .limit(limit)
       .getRawMany<TlsRawQueryItem>();
 
-     
+
     const data = queryResult.map((item): GetTlsResponseDto => {
       const obj = new GetTlsResponseDto();
-       
+
       if (item.tls) {
         obj.host = item.tls.host;
         obj.sni = item.tls.sni;
@@ -730,7 +730,7 @@ export class AssetsService {
       page,
       limit,
       sortBy: 'not_after',
-      sortOrder: 'ASC',
+      sortOrder: SortOrder.ASC,
     };
 
     return getManyResponse({ query: queryObj, data, total: totalResult?.count ?? 0 });
