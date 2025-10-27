@@ -148,6 +148,7 @@ export class AuthModule implements NestModule, OnModuleInit {
           await originalHook(ctx);
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (hookPath === ctx.path) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           await providerMethod(ctx);
