@@ -8,7 +8,7 @@ export default function DetailAsset() {
   if (!id) return null;
 
   return (
-    <Page title="Assets Detail">
+    <Page isShowButtonGoBack>
       <AssetDetail id={id} />
     </Page>
   );

@@ -15,12 +15,25 @@ import { Workspace } from '../workspaces/entities/workspace.entity';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
+import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { Statistic } from './entities/statistic.entity';
 
+interface RawAssetVulCount {
+  id: string;
+  value: string;
+  critical: string;
+  high: string;
+  medium: string;
+  low: string;
+  info: string;
+  total: string;
+}
+
 @Injectable()
 export class StatisticService {
-  constructor(private readonly dataSource: DataSource,
+  constructor(
+    private readonly dataSource: DataSource,
     private assetService: AssetsService,
     private geoIpService: GeoIpService
   ) { }
@@ -278,6 +291,42 @@ export class StatisticService {
     return rawResults.map((result) => ({
       tag: result.tag,
       count: parseInt(result.count, 10),
+    }));
+  }
+
+  async getTopAssetsWithMostVulnerabilities(
+    workspaceId: string,
+  ): Promise<TopAssetVulnerabilities[]> {
+    const rawResults: RawAssetVulCount[] = await this.dataSource
+      .getRepository(Asset)
+      .createQueryBuilder('asset')
+      .select('asset.id', 'id')
+      .addSelect('asset.value', 'value')
+      .addSelect('COUNT(CASE WHEN v.severity = \'critical\' THEN 1 ELSE NULL END)', 'critical')
+      .addSelect('COUNT(CASE WHEN v.severity = \'high\' THEN 1 ELSE NULL END)', 'high')
+      .addSelect('COUNT(CASE WHEN v.severity = \'medium\' THEN 1 ELSE NULL END)', 'medium')
+      .addSelect('COUNT(CASE WHEN v.severity = \'low\' THEN 1 ELSE NULL END)', 'low')
+      .addSelect('COUNT(CASE WHEN v.severity = \'info\' THEN 1 ELSE NULL END)', 'info')
+      .addSelect('COUNT(v.id)', 'total')
+      .leftJoin('asset.vulnerabilities', 'v')
+      .innerJoin('asset.target', 'target')
+      .innerJoin('target.workspaceTargets', 'workspaceTarget')
+      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
+      .andWhere('asset."isErrorPage" = false')
+      .groupBy('asset.id, asset.value')
+      .orderBy('total', 'DESC')
+      .limit(10)
+      .getRawMany();
+
+    return rawResults.map((result) => ({
+      id: result.id,
+      value: result.value,
+      critical: parseInt(result.critical, 10),
+      high: parseInt(result.high, 10),
+      medium: parseInt(result.medium, 10),
+      low: parseInt(result.low, 10),
+      info: parseInt(result.info, 10),
+      total: parseInt(result.total, 10),
     }));
   }
 

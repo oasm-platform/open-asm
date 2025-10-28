@@ -792,6 +792,49 @@ export interface GeoIp {
   asname: string;
 }
 
+export interface TopAssetVulnerabilities {
+  /**
+   * The number of critical vulnerabilities
+   * @example 5
+   */
+  critical: number;
+  /**
+   * The number of high severity vulnerabilities
+   * @example 10
+   */
+  high: number;
+  /**
+   * The number of medium severity vulnerabilities
+   * @example 15
+   */
+  medium: number;
+  /**
+   * The number of low severity vulnerabilities
+   * @example 20
+   */
+  low: number;
+  /**
+   * The number of info severity vulnerabilities
+   * @example 5
+   */
+  info: number;
+  /**
+   * The total number of vulnerabilities
+   * @example 55
+   */
+  total: number;
+  /**
+   * The ID of the asset
+   * @example "asset-id-123"
+   */
+  id: string;
+  /**
+   * The value of the asset
+   * @example "example.com"
+   */
+  value: string;
+}
+
 export interface ScanDto {
   /** Target ID */
   targetId: string;
@@ -2338,6 +2381,24 @@ export class Api<
   statisticControllerGetAssetLocations = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic/asset-locations`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves the top 10 assets with the most vulnerabilities in a workspace.
+   *
+   * @tags Statistic
+   * @name StatisticControllerGetTopAssetsWithMostVulnerabilities
+   * @summary Get top 10 assets with the most vulnerabilities in a workspace
+   * @request GET:/api/statistic/top-assets-vulnerabilities
+   */
+  statisticControllerGetTopAssetsWithMostVulnerabilities = (
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/statistic/top-assets-vulnerabilities`,
       method: "GET",
       format: "json",
       ...params,
