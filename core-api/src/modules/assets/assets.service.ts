@@ -1,5 +1,5 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto, SortOrder } from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
@@ -18,10 +18,27 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
+import { GetTlsResponseDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
 import { Port } from './entities/ports.entity';
+
+// Type cho raw database response từ TLS query
+interface TlsRawData {
+  host: string;
+  sni: string;
+  subject_dn: string;
+  subject_an: string[];
+  not_after: string;
+  not_before: string;
+  tls_connection: string;
+}
+
+// Type cho item từ raw query result
+interface TlsRawQueryItem {
+  tls: TlsRawData;
+}
 
 @Injectable()
 export class AssetsService {
@@ -652,6 +669,73 @@ export class AssetsService {
    * @returns A promise that resolves to the updated asset
    * @throws NotFoundException if the asset with the given ID is not found
    */
+  /**
+   * Retrieves TLS certificates expiring soonest (for warning notifications)
+   * Returns top 10 certificates with earliest expiry dates
+   */
+  public async getManyTls(
+    workspaceId: string,
+  ): Promise<GetManyBaseResponseDto<GetTlsResponseDto>> {
+    // Hard-coded pagination for notification purposes
+    const page = 1;
+    const limit = 10;
+
+    // Query to get total count
+
+    const totalResult = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(DISTINCT("httpResponses"."tls"))', 'count')
+      .from('http_responses', 'httpResponses')
+      .innerJoin('assets', 'assets', '"httpResponses"."assetId" = "assets"."id"')
+      .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
+      .innerJoin('workspace_targets', 'workspaceTargets', '"targets"."id" = "workspaceTargets"."targetId"')
+      .where('"httpResponses"."tls" IS NOT NULL')
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', { workspaceId })
+      .getRawOne<{ count: number }>();
+
+    // Main query ordered by expiry date (earliest first)
+
+    const queryResult = await this.dataSource
+      .createQueryBuilder()
+      .select(['"httpResponses"."tls"'])
+      .from('http_responses', 'httpResponses')
+      .innerJoin('assets', 'assets', '"httpResponses"."assetId" = "assets"."id"')
+      .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
+      .innerJoin('workspace_targets', 'workspaceTargets', '"targets"."id" = "workspaceTargets"."targetId"')
+      .where('"httpResponses"."tls" IS NOT NULL')
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', { workspaceId })
+      .groupBy('"httpResponses"."tls"')
+      .orderBy("(\"httpResponses\".\"tls\"->>'not_after')::timestamp", 'ASC')
+      .limit(limit)
+      .getRawMany<TlsRawQueryItem>();
+
+
+    const data = queryResult.map((item): GetTlsResponseDto => {
+      const obj = new GetTlsResponseDto();
+
+      if (item.tls) {
+        obj.host = item.tls.host;
+        obj.sni = item.tls.sni;
+        obj.subject_dn = item.tls.subject_dn;
+        obj.subject_an = item.tls.subject_an;
+        obj.not_after = item.tls.not_after;
+        obj.not_before = item.tls.not_before;
+        obj.tls_connection = item.tls.tls_connection;
+      }
+      return obj;
+    });
+
+    // Create query object with proper typing
+    const queryObj = {
+      page,
+      limit,
+      sortBy: 'not_after',
+      sortOrder: SortOrder.ASC,
+    };
+
+    return getManyResponse({ query: queryObj, data, total: totalResult?.count ?? 0 });
+  }
+
   public async switchAsset(assetId: string, isEnabled: boolean): Promise<Asset> {
     const asset = await this.assetRepo.findOne({
       where: { id: assetId },
@@ -668,4 +752,3 @@ export class AssetsService {
     return this.assetRepo.save(asset);
   }
 }
-
