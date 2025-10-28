@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { TlsDateBadge } from "@/components/tls-date-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { useAssetsControllerGetTlsAssets } from "@/services/apis/gen/queries";
@@ -27,39 +27,6 @@ const TlsExpirationTable = () => {
             ),
         },
         {
-            accessorKey: "not_after",
-            header: "Expires",
-            cell: ({ row }) => {
-                const notAfter = row.getValue("not_after") as string;
-                if (!notAfter) {
-                    return <div>N/A</div>;
-                }
-                const expiryDate = new Date(notAfter);
-                if (isNaN(expiryDate.getTime())) {
-                    return <div>Invalid Date</div>;
-                }
-                const now = new Date();
-                const daysUntilExpiry = Math.ceil(
-                    (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-                );
-
-                return (
-                    <div>
-                        <div>{format(expiryDate, "yyyy-MM-dd HH:mm")}</div>
-                        <div className="text-sm">
-                            {daysUntilExpiry > 0 ? (
-                                <Badge variant={daysUntilExpiry <= 30 ? "destructive" : "default"}>
-                                    {daysUntilExpiry} days left
-                                </Badge>
-                            ) : (
-                                <Badge variant="destructive">Expired</Badge>
-                            )}
-                        </div>
-                    </div>
-                );
-            },
-        },
-        {
             accessorKey: "not_before",
             header: "Valid From",
             cell: ({ row }) => {
@@ -75,11 +42,20 @@ const TlsExpirationTable = () => {
             },
         },
         {
-            accessorKey: "tls_connection",
-            header: "Connection",
-            cell: ({ row }) => (
-                <Badge variant="secondary">{row.getValue("tls_connection") || "N/A"}</Badge>
-            ),
+            accessorKey: "not_after",
+            header: "Expires",
+            cell: ({ row }) => {
+                const notAfter = row.getValue("not_after") as string;
+                if (!notAfter) {
+                    return <div>N/A</div>;
+                }
+                const expiryDate = new Date(notAfter);
+                if (isNaN(expiryDate.getTime())) {
+                    return <div>Invalid Date</div>;
+                }
+
+                return <TlsDateBadge date={notAfter} />;
+            },
         },
     ];
 
@@ -111,9 +87,9 @@ const TlsExpirationTable = () => {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>TLS Certificate Expirations</CardTitle>
+                <CardTitle>TLS certificate expirations</CardTitle>
             </CardHeader>
-            <CardContent className="p-4">
+            <CardContent className="p-4 py-0">
                 <DataTable
                     columns={columns}
                     data={expiringSoon}
