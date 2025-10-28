@@ -6,6 +6,7 @@ import { ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
+import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { StatisticService } from './statistic.service';
 
@@ -94,5 +95,26 @@ export class StatisticController {
   @Get('asset-locations')
   getAssetLocations(@WorkspaceId() workspaceId: string) {
     return this.statisticService.getAssetLocations(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get top 10 assets with the most vulnerabilities in a workspace',
+    description: 'Retrieves the top 10 assets with the most vulnerabilities in a workspace.',
+    response: {
+      extraModels: [TopAssetVulnerabilities],
+      dataSchema: {
+        type: 'array',
+        items: { $ref: getSchemaPath(TopAssetVulnerabilities) },
+      }
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('top-assets-vulnerabilities')
+  getTopAssetsWithMostVulnerabilities(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<TopAssetVulnerabilities[]> {
+    return this.statisticService.getTopAssetsWithMostVulnerabilities(workspaceId);
   }
 }
