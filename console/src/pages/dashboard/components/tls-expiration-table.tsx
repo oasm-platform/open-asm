@@ -4,6 +4,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { useAssetsControllerGetTlsAssets } from "@/services/apis/gen/queries";
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
+import { useNavigate } from 'react-router-dom';
 
 interface TlsAsset {
     host: string;
@@ -16,6 +17,7 @@ interface TlsAsset {
 }
 
 const TlsExpirationTable = () => {
+    const navigate = useNavigate()
     const { data, isLoading, error } = useAssetsControllerGetTlsAssets();
 
     const columns: ColumnDef<TlsAsset>[] = [
@@ -54,7 +56,9 @@ const TlsExpirationTable = () => {
                     return <div>Invalid Date</div>;
                 }
 
-                return <TlsDateBadge date={notAfter} />;
+                return <div className='h-8 flex items-center'>
+                    <TlsDateBadge date={notAfter} />
+                </div>;
             },
         },
     ];
@@ -85,12 +89,14 @@ const TlsExpirationTable = () => {
     }
 
     return (
-        <Card>
+        <Card className="py-3 pt-6">
             <CardHeader>
                 <CardTitle>TLS certificate expirations</CardTitle>
             </CardHeader>
             <CardContent className="p-4 py-0">
                 <DataTable
+                    onRowClick={(row) => navigate(`/assets?filter=${row.host}`)}
+                    isShowBorder={false}
                     columns={columns}
                     data={expiringSoon}
                     isLoading={isLoading}
