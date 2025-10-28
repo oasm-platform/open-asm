@@ -706,6 +706,25 @@ export type GeoIp = {
   asname: string;
 };
 
+export type TopAssetVulnerabilities = {
+  /** The number of critical vulnerabilities */
+  critical: number;
+  /** The number of high severity vulnerabilities */
+  high: number;
+  /** The number of medium severity vulnerabilities */
+  medium: number;
+  /** The number of low severity vulnerabilities */
+  low: number;
+  /** The number of info severity vulnerabilities */
+  info: number;
+  /** The total number of vulnerabilities */
+  total: number;
+  /** The ID of the asset */
+  id: string;
+  /** The value of the asset */
+  value: string;
+};
+
 export type ScanDto = {
   /** Target ID */
   targetId: string;
@@ -11871,6 +11890,454 @@ export function useStatisticControllerGetAssetLocations<
 } {
   const queryOptions =
     getStatisticControllerGetAssetLocationsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves the top 10 assets with the most vulnerabilities in a workspace.
+ * @summary Get top 10 assets with the most vulnerabilities in a workspace
+ */
+export const statisticControllerGetTopAssetsWithMostVulnerabilities = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TopAssetVulnerabilities[]>(
+    { url: `/api/statistic/top-assets-vulnerabilities`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryKey =
+  () => {
+    return ['infinate', `/api/statistic/top-assets-vulnerabilities`] as const;
+  };
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryKey =
+  () => {
+    return [`/api/statistic/top-assets-vulnerabilities`] as const;
+  };
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >
+    >,
+    TError = unknown,
+  >(options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryKey();
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >
+    > = ({ signal }) =>
+      statisticControllerGetTopAssetsWithMostVulnerabilities(
+        requestOptions,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >;
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryError =
+  unknown;
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top 10 assets with the most vulnerabilities in a workspace
+ */
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryOptions(
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >,
+    TError = unknown,
+  >(options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryKey();
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >
+    > = ({ signal }) =>
+      statisticControllerGetTopAssetsWithMostVulnerabilities(
+        requestOptions,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >;
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryError =
+  unknown;
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top 10 assets with the most vulnerabilities in a workspace
+ */
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions(
+      options,
+    );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

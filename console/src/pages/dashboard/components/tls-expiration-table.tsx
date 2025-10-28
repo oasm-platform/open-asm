@@ -1,6 +1,7 @@
 import { TlsDateBadge } from "@/components/tls-date-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useAssetsControllerGetTlsAssets } from "@/services/apis/gen/queries";
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -18,7 +19,12 @@ interface TlsAsset {
 
 const TlsExpirationTable = () => {
     const navigate = useNavigate()
-    const { data, isLoading, error } = useAssetsControllerGetTlsAssets();
+    const { selectedWorkspace } = useWorkspaceSelector()
+    const { data, isLoading, error } = useAssetsControllerGetTlsAssets({
+        query: {
+            queryKey: ['tls-assets', selectedWorkspace]
+        }
+    });
 
     const columns: ColumnDef<TlsAsset>[] = [
         {

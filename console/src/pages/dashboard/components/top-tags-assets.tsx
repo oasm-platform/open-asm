@@ -51,7 +51,7 @@ export default function TopTagsAssets() {
         <div className="flex flex-col gap-2">
           {topTags &&
             topTags.map((item: TopTagAsset, index: number) => (
-              <div key={index} className="flex items-center gap-2">
+              <div key={index} className="flex items-center gap-2 py-1">
                 <span className="w-3/8 truncate text-sm font-bold">{item.tag}</span>
                 <div className='w-5/8 flex items-center'>
                   <Progress
