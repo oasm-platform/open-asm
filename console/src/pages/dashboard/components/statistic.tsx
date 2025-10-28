@@ -71,7 +71,7 @@ export default function Statistic() {
                     onClick={() => card.path && navigate(card.path)}
                 >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="font-medium text-lg">{card.title}</CardTitle>
+                        <CardTitle>{card.title}</CardTitle>
                         {card.icon}
                     </CardHeader>
                     <CardContent>

@@ -10,6 +10,7 @@ import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { SwitchAssetDto } from './dto/switch-asset.dto';
+import { GetTlsResponseDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 
 @ApiTags('Assets')
@@ -105,6 +106,21 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetsService.getStatusCodeAssets(query, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get TLS certificates',
+    description: 'Retrieves a list of TLS certificates expiring soon.',
+    response: {
+      serialization: GetManyResponseDto(GetTlsResponseDto),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('/tls')
+  getTlsAssets(@WorkspaceId() workspaceId: string) {
+    return this.assetsService.getManyTls(workspaceId);
   }
 
   @Doc({

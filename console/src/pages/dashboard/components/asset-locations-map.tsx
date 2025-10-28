@@ -19,7 +19,7 @@ export default function AssetLocationsMap() {
         <div className="h-[450px] xl:h-full w-full relative rounded-lg overflow-hidden border">
             <div className='absolute top-0 z-2 left-0 p-3'>
                 <div className='bg-background/30 p-2 rounded'>
-                    <CardTitle className="text-lg">Asset locations</CardTitle>
+                    <CardTitle>Asset locations</CardTitle>
                     <CardDescription className="text-xs">
                         Shows the locations of assets.
                     </CardDescription>

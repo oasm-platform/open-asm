@@ -60,6 +60,7 @@ interface DataTableProps<TData, TValue> {
   emptyMessage?: string;
   filterComponents?: React.JSX.Element[];
   isShowHeader?: boolean;
+  isShowBorder?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -84,6 +85,7 @@ export function DataTable<TData, TValue>({
   emptyMessage = "No data",
   filterComponents,
   isShowHeader = true,
+  isShowBorder = true,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -160,7 +162,7 @@ export function DataTable<TData, TValue>({
       {filterComponents}
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div className={cn("rounded-md", isShowBorder && "border")}>
         <Table>
           {isShowHeader && (
             <TableHeader>
