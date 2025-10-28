@@ -1,5 +1,5 @@
+import { TlsDateBadge } from '@/components/tls-date-badge';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import type {
   GetAssetsResponseDto,
   TechnologyDetailDTO,
@@ -10,9 +10,8 @@ import {
   BriefcaseBusiness,
   EthernetPort,
   Globe,
-  Lock,
   Network,
-  Tag,
+  Tag
 } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
@@ -112,31 +111,9 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const tls = data.httpResponses?.tls;
       if (!tls) return <div className="min-h-[60px]" />;
 
-      const daysLeft = Math.round(
-        Math.abs(
-          (new Date(tls.not_after as unknown as Date).getTime() -
-            new Date().getTime()) /
-          (1000 * 60 * 60 * 24),
-        ),
-      );
-      const color = daysLeft < 30 ? 'red' : daysLeft < 60 ? 'yellow' : 'green';
-
       return (
         <div className="flex flex-col gap-1 max-w-[200px] min-h-[60px]">
-          <Badge
-            variant="outline"
-            className={cn(
-              'h-6 text-xs',
-              color === 'red'
-                ? 'text-red-500 border-red-500'
-                : color === 'yellow'
-                  ? 'text-yellow-500 border-yellow-500'
-                  : 'text-green-500 border-green-500',
-            )}
-          >
-            <Lock size={14} color={color} className="mr-1" />
-            SSL {daysLeft}d
-          </Badge>
+          <TlsDateBadge date={tls.not_after} />
           {(tls?.issuer_org as string[]) && (
             <BadgeList list={tls.issuer_org as string[]} Icon={Globe} />
           )}

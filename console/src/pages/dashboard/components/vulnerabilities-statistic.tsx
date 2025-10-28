@@ -63,7 +63,7 @@ export default function VulnerabilityStatistic() {
         <Score />
         <CardHeader className='flex justify-between items-center'>
           <div className="flex items-center gap-2">
-            <CardTitle className="">Vulnerabilities issues</CardTitle>
+            <CardTitle>Vulnerabilities issues</CardTitle>
             {totalVulsTrend?.difference !== 0 && renderTrend(totalVulsTrend)}
           </div>
           <Bug />

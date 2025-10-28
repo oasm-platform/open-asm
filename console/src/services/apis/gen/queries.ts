@@ -495,6 +495,25 @@ export type GetManyGetStatusCodeAssetsDTODto = {
   pageCount: number;
 };
 
+export type GetTlsResponseDto = {
+  host: string;
+  sni: string;
+  subject_dn: string;
+  subject_an: string[];
+  not_after: string;
+  not_before: string;
+  tls_connection: string;
+};
+
+export type GetManyGetTlsResponseDtoDto = {
+  data: GetTlsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type UpdateAssetDto = {
   /** @nullable */
   tags: string[] | null;
@@ -7718,6 +7737,317 @@ export function useAssetsControllerGetStatusCodeAssets<
 }
 
 /**
+ * Retrieves a list of TLS certificates expiring soon.
+ * @summary Get TLS certificates
+ */
+export const assetsControllerGetTlsAssets = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetTlsResponseDtoDto>(
+    { url: `/api/assets/tls`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAssetsControllerGetTlsAssetsInfiniteQueryKey = () => {
+  return ['infinate', `/api/assets/tls`] as const;
+};
+
+export const getAssetsControllerGetTlsAssetsQueryKey = () => {
+  return [`/api/assets/tls`] as const;
+};
+
+export const getAssetsControllerGetTlsAssetsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetTlsAssetsInfiniteQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+  > = ({ signal }) => assetsControllerGetTlsAssets(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetTlsAssetsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+>;
+export type AssetsControllerGetTlsAssetsInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetTlsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTlsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTlsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get TLS certificates
+ */
+
+export function useAssetsControllerGetTlsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetsControllerGetTlsAssetsInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetsControllerGetTlsAssetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerGetTlsAssetsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+  > = ({ signal }) => assetsControllerGetTlsAssets(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetTlsAssetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+>;
+export type AssetsControllerGetTlsAssetsQueryError = unknown;
+
+export function useAssetsControllerGetTlsAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTlsAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTlsAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get TLS certificates
+ */
+
+export function useAssetsControllerGetTlsAssets<
+  TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetTlsAssetsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Retrieves a single asset by its ID.
  * @summary Get asset by ID
  */
@@ -9953,7 +10283,7 @@ export const useSearchControllerDeleteSearchHistory = <
 };
 
 /**
- * Retrieves statistics for a workspace including assets, targets, vulnerabilities (by severity), technologies, and ports.
+ * Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
  * @summary Get workspace statistics
  */
 export const statisticControllerGetStatistics = (
