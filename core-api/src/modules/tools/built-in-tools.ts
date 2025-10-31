@@ -100,7 +100,7 @@ export const builtInTools: Tool[] = [
               affectedUrl: finding['matched-at'] as string,
               ipAddress: finding['ip'] as string,
               host: finding['host'] as string,
-              ports: finding['port'],
+              ports: [finding['port']?.toString()] as string[],
               cvssMetric: finding['info']['classification']?.[
                 'cvss-metrics'
               ] as string,
