@@ -37,7 +37,7 @@ export function DetailTarget() {
     data: target,
     isLoading,
     error,
-    refetch
+    refetch,
   } = useTargetsControllerGetTargetById(id || '', {
     query: { enabled: !!id, refetchInterval: 5000 },
   });

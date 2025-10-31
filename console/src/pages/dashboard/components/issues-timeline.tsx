@@ -1,6 +1,17 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetIssuesTimeline } from '@/services/apis/gen/queries';
 import clsx from 'clsx';
@@ -25,13 +36,15 @@ export default function IssuesTimeline() {
       enabled: !!selectedWorkspace,
       queryKey: [selectedWorkspace],
     },
-
   });
 
-  const rawData = data?.data?.map((item) => ({
-    ...item,
-    createdAt: format(new Date(item.createdAt), 'MMM dd'),
-  })) || [];
+  console.log(data);
+
+  const rawData =
+    data?.data?.map((item) => ({
+      ...item,
+      createdAt: format(new Date(item.createdAt), 'MMM dd'),
+    })) || [];
 
   // Filter out consecutive duplicate vuls values to avoid horizontal lines in chart
   const chartData = rawData.filter((item, index, array) => {
@@ -48,9 +61,9 @@ export default function IssuesTimeline() {
         </CardDescription>
       </CardHeader>
       {chartData.length === 0 && (
-        <div className='absolute h-full w-full flex items-center justify-center z-1'>
+        <div className="absolute h-full w-full flex items-center justify-center z-1">
           <Button
-            href='/vulnerabilities'
+            href="/vulnerabilities"
             variant="secondary"
             className="hover:cursor-pointer text-sm"
             size={'sm'}
@@ -60,7 +73,9 @@ export default function IssuesTimeline() {
           </Button>
         </div>
       )}
-      <CardContent className={clsx('p-0', chartData.length === 0 && 'blur-[1px]')}>
+      <CardContent
+        className={clsx('p-0', chartData.length === 0 && 'blur-[1px]')}
+      >
         <ChartContainer config={chartConfig} className="w-full">
           <AreaChart
             className="w-full h-64"
@@ -79,7 +94,6 @@ export default function IssuesTimeline() {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => format(new Date(value), 'MMM dd')}
             />
             <YAxis
               tickLine={false}
