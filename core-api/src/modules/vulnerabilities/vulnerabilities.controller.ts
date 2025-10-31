@@ -51,9 +51,9 @@ export class VulnerabilitiesController {
   }
 
   @Doc({
-    summary: 'Get vulnerabilities',
+    summary: 'Get vulnerability by id',
     description:
-      'Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.',
+      'Retrieves detailed information about a specific security vulnerability identified within the system, including its attributes, associated assets, and remediation guidance.',
     response: {
       serialization: Vulnerability,
     },
@@ -66,6 +66,6 @@ export class VulnerabilitiesController {
     @Param('id') id: string,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.vulnerabilitiesService.getVulnarabilityById(id, workspaceId);
+    return this.vulnerabilitiesService.getVulnerability(id, workspaceId);
   }
 }

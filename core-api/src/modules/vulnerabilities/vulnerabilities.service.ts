@@ -86,7 +86,7 @@ export class VulnerabilitiesService {
    * @param workspaceId - The ID of the workspace to which the vulnerability belongs.
    * @returns A promise that resolves to the vulnerability entity.
    */
-  async getVulnarabilityById(id: string, workspaceId: string) {
+  async getVulnerability(id: string, workspaceId: string) {
     const queryBuilder = this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')
       .leftJoin('vulnerabilities.asset', 'assets')
@@ -166,4 +166,3 @@ export class VulnerabilitiesService {
     return { data: statistics };
   }
 }
-

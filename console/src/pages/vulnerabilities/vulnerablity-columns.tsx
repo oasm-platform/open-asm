@@ -33,16 +33,18 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
     cell: ({ row }) => {
       const data = row.original;
       const value: string = row.getValue('name');
-      const cveId: string = row.original.cveId;
+      const cveIds: string[] = row.original.cveId;
       return (
         <div className="flex flex-col gap-2 py-2 justify-center min-h-[60px]">
           <div className="flex items-center gap-2">
             <div className="font-medium">{value}</div>
-            {cveId && (
-              <Badge variant="outline" className="text-xs">
-                {cveId}
-              </Badge>
-            )}
+            {Array.isArray(cveIds) &&
+              cveIds.length > 0 &&
+              cveIds.map((id, idx) => (
+                <Badge key={id || idx} variant="outline" className="text-xs">
+                  {id}
+                </Badge>
+              ))}
             {data.description && (
               <TooltipProvider>
                 <Tooltip>

@@ -38,8 +38,6 @@ export default function IssuesTimeline() {
     },
   });
 
-  console.log(data);
-
   const rawData =
     data?.data?.map((item) => ({
       ...item,
