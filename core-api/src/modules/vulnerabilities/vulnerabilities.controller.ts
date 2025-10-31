@@ -1,6 +1,6 @@
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   GetVulnerabilitiesStatisticsResponseDto,
@@ -9,12 +9,13 @@ import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilitiesService } from './vulnerabilities.service';
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
   constructor(
     private readonly vulnerabilitiesService: VulnerabilitiesService,
-  ) { }
+  ) {}
 
   @Post('scan')
   scan(@Body() scanDto: ScanDto) {
@@ -23,7 +24,8 @@ export class VulnerabilitiesController {
 
   @Doc({
     summary: 'Get vulnerabilities',
-    description: 'Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.',
+    description:
+      'Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.',
     response: {
       serialization: GetManyResponseDto(Vulnerability),
     },
@@ -35,7 +37,8 @@ export class VulnerabilitiesController {
 
   @Doc({
     summary: 'Get vulnerabilities statistics',
-    description: 'Provides aggregated statistical analysis of security vulnerabilities categorized by severity levels, enabling risk assessment and prioritization of remediation efforts.',
+    description:
+      'Provides aggregated statistical analysis of security vulnerabilities categorized by severity levels, enabling risk assessment and prioritization of remediation efforts.',
     response: {
       serialization: GetVulnerabilitiesStatisticsResponseDto,
     },
@@ -45,5 +48,24 @@ export class VulnerabilitiesController {
     @Query() query: GetVulnerabilitiesStatisticsQueryDto,
   ) {
     return this.vulnerabilitiesService.getVulnerabilitiesStatistics(query);
+  }
+
+  @Doc({
+    summary: 'Get vulnerabilities',
+    description:
+      'Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.',
+    response: {
+      serialization: Vulnerability,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get(':id')
+  getVulnerabilityById(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.vulnerabilitiesService.getVulnarabilityById(id, workspaceId);
   }
 }

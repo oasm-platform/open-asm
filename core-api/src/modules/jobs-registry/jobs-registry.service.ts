@@ -172,7 +172,7 @@ export class JobsRegistryService {
         tool,
         priority: priority ?? 4,
         jobHistory,
-        command: bindingCommand(defaultCommand!, {
+        command: bindingCommand(defaultCommand ?? '', {
           value: asset.value,
         }),
         isSaveRawResult: isSaveRawResult ?? false,
