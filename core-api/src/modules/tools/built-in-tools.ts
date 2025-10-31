@@ -100,16 +100,14 @@ export const builtInTools: Tool[] = [
               affectedUrl: finding['matched-at'] as string,
               ipAddress: finding['ip'] as string,
               host: finding['host'] as string,
-              port: finding['port']?.toString(),
+              ports: [finding['port']?.toString()] as string[],
               cvssMetric: finding['info']['classification']?.[
                 'cvss-metrics'
               ] as string,
               cvssScore: finding['info']['classification']?.[
                 'cvss-score'
               ] as number,
-              cveId: finding['info']['classification']?.[
-                'cve-id'
-              ]?.[0] as string,
+              cveId: finding['info']['classification']?.['cve-id'] as string[],
               cweId: finding['info']['classification']?.['cwe-id'] as string[],
               extractorName: finding['extractor-name'] as string,
               extractedResults: finding['extracted-results'] || [],

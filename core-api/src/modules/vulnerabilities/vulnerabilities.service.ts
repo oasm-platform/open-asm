@@ -19,7 +19,7 @@ export class VulnerabilitiesService {
     private vulnerabilitiesRepository: Repository<Vulnerability>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
-  ) { }
+  ) {}
 
   /**
    * Initiates a vulnerability scan for a given target.
@@ -68,18 +68,39 @@ export class VulnerabilitiesService {
 
     // Add search query if provided
     if (q) {
-      queryBuilder.andWhere(
-        '"vulnerabilities"."name" ILIKE :q   ',
-        {
-          q: `%${q}%`,
-          qArray: `%${q}%`
-        },
-      );
+      queryBuilder.andWhere('"vulnerabilities"."name" ILIKE :q   ', {
+        q: `%${q}%`,
+        qArray: `%${q}%`,
+      });
     }
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
 
     return getManyResponse({ query, data: vulnerabilities, total });
+  }
+
+  /**
+   * Retrieves a vulnerability by id
+   *
+   * @param id - The ID of the vulnerability to retrieve.
+   * @param workspaceId - The ID of the workspace to which the vulnerability belongs.
+   * @returns A promise that resolves to the vulnerability entity.
+   */
+  async getVulnerability(id: string, workspaceId: string) {
+    const queryBuilder = this.vulnerabilitiesRepository
+      .createQueryBuilder('vulnerabilities')
+      .leftJoin('vulnerabilities.asset', 'assets')
+      .leftJoin('assets.target', 'targets')
+      .leftJoin('targets.workspaceTargets', 'workspace_targets')
+      .leftJoin('workspace_targets.workspace', 'workspaces')
+      .leftJoinAndSelect('vulnerabilities.tool', 'tools')
+      .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
+      .where('workspaces.id = :workspaceId', { workspaceId })
+      .andWhere('vulnerabilities.id = :id', { id });
+
+    const vulnerability = await queryBuilder.getOneOrFail();
+
+    return vulnerability;
   }
 
   /**
@@ -105,8 +126,8 @@ export class VulnerabilitiesService {
       .where('workspaces.id = :workspaceId', { workspaceId })
       // .andWhere(
       //   `(
-      //     SELECT MAX(jh."createdAt") 
-      //     FROM job_histories jh 
+      //     SELECT MAX(jh."createdAt")
+      //     FROM job_histories jh
       //     INNER JOIN vulnerabilities v2 ON v2."jobHistoryId" = jh.id
       //     INNER JOIN assets a2 ON v2."assetId" = a2.id
       //     WHERE a2."targetId" = targets.id
