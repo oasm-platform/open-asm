@@ -53,7 +53,7 @@ export class JobsRegistryService {
     private toolsService: ToolsService,
     private storageService: StorageService,
     private redis: RedisService,
-  ) {}
+  ) { }
   public async getManyJobs(
     query: GetManyBaseQueryParams,
   ): Promise<GetManyBaseResponseDto<Job>> {
@@ -105,7 +105,7 @@ export class JobsRegistryService {
       priority &&
       (priority < JobPriority.CRITICAL || priority > JobPriority.BACKGROUND)
     ) {
-      priority = 4;
+      priority = tool.priority || JobPriority.BACKGROUND;
     }
     // Step 1: create job history
     let jobHistory: JobHistory;
