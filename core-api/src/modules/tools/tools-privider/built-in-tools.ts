@@ -3,9 +3,9 @@
 import type { Severity } from '@/common/enums/enum';
 import { JobPriority, ToolCategory } from '@/common/enums/enum';
 import { randomUUID } from 'crypto';
-import { Asset } from '../assets/entities/assets.entity';
-import type { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
-import { Tool } from './entities/tools.entity';
+import { Asset } from '../../assets/entities/assets.entity';
+import type { Vulnerability } from '../../vulnerabilities/entities/vulnerability.entity';
+import { Tool } from '../entities/tools.entity';
 
 export const builtInTools: Tool[] = [
   {

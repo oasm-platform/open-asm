@@ -102,7 +102,7 @@ export class Tool {
   assetTags?: AssetTag[];
 
   @ApiProperty()
-  @Column({ name: 'provider_id', nullable: true })
+  @Column({ name: 'providerId', nullable: true })
   providerId?: string;
 
   @ManyToOne(() => ToolProvider, (provider) => provider.tools, {
