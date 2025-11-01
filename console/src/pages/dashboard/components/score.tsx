@@ -60,7 +60,7 @@ export default function Score() {
                             strokeDasharray={strokeDasharray}
                             strokeDashoffset={animatedOffset}
                             strokeLinecap="round"
-                            className="transition-all duration-500 ease-in-out"
+                            className="transition-all duration-1000 ease-in-out"
                         />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">

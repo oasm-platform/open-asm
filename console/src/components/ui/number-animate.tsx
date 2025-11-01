@@ -8,7 +8,7 @@ interface NumberAnimateProps {
 export const NumberAnimate: React.FC<NumberAnimateProps> = ({ value, className }) => {
   const elementRef = useRef<HTMLSpanElement>(null);
   const startTimeRef = useRef<number>(0);
-  const duration = 300;
+  const duration = 1000;
   useEffect(() => {
     if (!elementRef.current) return;
 
