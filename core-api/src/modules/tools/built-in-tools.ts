@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import type { Severity } from '@/common/enums/enum';
-import { ToolCategory } from '@/common/enums/enum';
+import { JobPriority, ToolCategory } from '@/common/enums/enum';
 import { randomUUID } from 'crypto';
 import { Asset } from '../assets/entities/assets.entity';
 import type { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
@@ -37,6 +37,7 @@ export const builtInTools: Tool[] = [
       })) as Asset[];
     },
     version: '2.8.0',
+    priority: JobPriority.MEDIUM,
   },
   {
     name: 'httpx',
@@ -52,6 +53,7 @@ export const builtInTools: Tool[] = [
       return parsed;
     },
     version: '1.7.1',
+    priority: JobPriority.MEDIUM,
   },
   {
     name: 'naabu',
@@ -71,6 +73,7 @@ export const builtInTools: Tool[] = [
       return parsed;
     },
     version: '2.3.5',
+    priority: JobPriority.MEDIUM,
   },
   {
     name: 'nuclei',
@@ -155,5 +158,6 @@ export const builtInTools: Tool[] = [
     },
 
     version: '3.4.7',
+    priority: JobPriority.LOW,
   },
 ];
