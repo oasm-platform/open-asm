@@ -179,15 +179,7 @@ export class DataAdapterService {
     job,
   }: DataAdapterInput<Vulnerability[]>): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
-      // Step 1: Delete old vulnerabilities of this asset
-      await manager
-        .createQueryBuilder()
-        .delete()
-        .from(Vulnerability)
-        .where('assetId = :assetId', { assetId: job.asset.id })
-        .execute();
-
-      // Step 2: Insert new vulnerabilities
+      // Insert new vulnerabilities if data length > 0, do not delete old records
       if (data.length > 0) {
         await manager
           .createQueryBuilder()
@@ -201,6 +193,10 @@ export class DataAdapterService {
               tool: { id: job.tool.id },
             })),
           )
+          .orUpdate({
+            conflict_target: ['name', 'toolId', 'assetId'],
+            overwrite: ['updatedAt'],
+          })
           .execute();
       }
     });

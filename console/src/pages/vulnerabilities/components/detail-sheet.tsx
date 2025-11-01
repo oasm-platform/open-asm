@@ -1,3 +1,16 @@
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { SeverityBadge } from '@/components/ui/severity-badge';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
+import { useVulnerabilitiesControllerGetVulnerabilityById } from '@/services/apis/gen/queries';
 import { AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle,
@@ -16,19 +29,6 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { SeverityBadge } from '@/components/ui/severity-badge';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
-import { useVulnerabilitiesControllerGetVulnerabilityById } from '@/services/apis/gen/queries';
 
 interface DetailSheetProps {
   vulId: string;
@@ -217,90 +217,90 @@ export default function DetailSheet({
                     data.host ||
                     (data.ports && data.ports.length > 0) ||
                     data.cvssMetric) && (
-                    <>
-                      <Section
-                        title="Network & Metrics"
-                        icon={
-                          <Network
-                            size={20}
-                            className="text-cyan-600 dark:text-cyan-400"
-                          />
-                        }
-                        color="text-cyan-600 dark:text-cyan-400"
-                      >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6">
-                          {data.affectedUrl && (
-                            <div className="md:col-span-2">
-                              <span className="block mb-1">Affected URL</span>
-                              <div className="flex items-start gap-2">
-                                <a
-                                  href={`https://${data.affectedUrl}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-500 hover:text-blue-600 hover:underline transition-colors break-all flex-1 min-w-0"
-                                >
-                                  {data.affectedUrl}
-                                </a>
-                                <CopyButton text={data.affectedUrl} />
-                              </div>
-                            </div>
-                          )}
-                          {data.host && (
-                            <div className="md:col-span-2">
-                              <span className="block mb-1">Host</span>
-                              <div className="flex items-start gap-2">
-                                <span className="font-mono text-sm break-all flex-1 min-w-0">
-                                  {data.host}
-                                </span>
-                                <CopyButton text={data.host} />
-                              </div>
-                            </div>
-                          )}
-                          {data.ipAddress && (
-                            <div>
-                              <span className="block mb-1">IP Address</span>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-sm">
-                                  {data.ipAddress}
-                                </span>
-                                <CopyButton text={data.ipAddress} />
-                              </div>
-                            </div>
-                          )}
-                          {data.ports &&
-                            Array.isArray(data.ports) &&
-                            data.ports.length > 0 && (
-                              <div>
-                                <span className="block mb-1">Ports</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {data.ports.map((port: string) => (
-                                    <Badge
-                                      key={port}
-                                      variant="secondary"
-                                      className="font-mono"
-                                    >
-                                      {port}
-                                    </Badge>
-                                  ))}
+                      <>
+                        <Section
+                          title="Network & Metrics"
+                          icon={
+                            <Network
+                              size={20}
+                              className="text-cyan-600 dark:text-cyan-400"
+                            />
+                          }
+                          color="text-cyan-600 dark:text-cyan-400"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6">
+                            {data.affectedUrl && (
+                              <div className="md:col-span-2">
+                                <span className="block mb-1">Affected URL</span>
+                                <div className="flex items-start gap-2">
+                                  <a
+                                    href={`https://${data.affectedUrl}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-500 hover:text-blue-600 hover:underline transition-colors break-all flex-1 min-w-0"
+                                  >
+                                    {data.affectedUrl}
+                                  </a>
+                                  <CopyButton text={data.affectedUrl} />
                                 </div>
                               </div>
                             )}
-                          {data.cvssMetric && (
-                            <div className="md:col-span-2">
-                              <span className="block mb-1">CVSS Vector</span>
-                              <div className="flex items-center gap-2">
-                                <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                                  {data.cvssMetric}
-                                </code>
-                                <CopyButton text={data.cvssMetric} />
+                            {data.host && (
+                              <div className="md:col-span-2">
+                                <span className="block mb-1">Host</span>
+                                <div className="flex items-start gap-2">
+                                  <span className="font-mono text-sm break-all flex-1 min-w-0">
+                                    {data.host}
+                                  </span>
+                                  <CopyButton text={data.host} />
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      </Section>
-                      <Separator />
-                    </>
-                  )}
+                            )}
+                            {data.ipAddress && (
+                              <div>
+                                <span className="block mb-1">IP Address</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-sm">
+                                    {data.ipAddress}
+                                  </span>
+                                  <CopyButton text={data.ipAddress} />
+                                </div>
+                              </div>
+                            )}
+                            {data.ports &&
+                              Array.isArray(data.ports) &&
+                              data.ports.length > 0 && (
+                                <div>
+                                  <span className="block mb-1">Ports</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {data.ports.map((port: string) => (
+                                      <Badge
+                                        key={port}
+                                        variant="secondary"
+                                        className="font-mono"
+                                      >
+                                        {port}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            {data.cvssMetric && (
+                              <div className="md:col-span-2">
+                                <span className="block mb-1">CVSS Vector</span>
+                                <div className="flex items-center gap-2">
+                                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                                    {data.cvssMetric}
+                                  </code>
+                                  <CopyButton text={data.cvssMetric} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </Section>
+                        <Separator />
+                      </>
+                    )}
 
                   {/* Identifiers */}
                   {(data.cveId ||
@@ -308,188 +308,188 @@ export default function DetailSheet({
                     data.bidId ||
                     data.ceaId ||
                     data.iava) && (
-                    <>
-                      <Section
-                        title="Identifiers"
-                        icon={
-                          <ShieldAlert
-                            size={20}
-                            className="text-pink-600 dark:text-pink-400"
-                          />
-                        }
-                        color="text-pink-600 dark:text-pink-400"
-                      >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6">
-                          {data.cveId &&
-                            Array.isArray(data.cveId) &&
-                            data.cveId.length > 0 && (
-                              <div>
-                                <span className="block mb-1">CVE IDs</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {data.cveId.map((cve: string) => (
-                                    <div
-                                      key={cve}
-                                      className="flex items-center gap-1"
-                                    >
+                      <>
+                        <Section
+                          title="Identifiers"
+                          icon={
+                            <ShieldAlert
+                              size={20}
+                              className="text-pink-600 dark:text-pink-400"
+                            />
+                          }
+                          color="text-pink-600 dark:text-pink-400"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6">
+                            {data.cveId &&
+                              Array.isArray(data.cveId) &&
+                              data.cveId.length > 0 && (
+                                <div>
+                                  <span className="block mb-1">CVE IDs</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {data.cveId.map((cve: string) => (
+                                      <div
+                                        key={cve}
+                                        className="flex items-center gap-1"
+                                      >
+                                        <Badge
+                                          variant="destructive"
+                                          className="font-mono"
+                                        >
+                                          {cve}
+                                        </Badge>
+                                        <CopyButton text={cve} />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            {data.cweId &&
+                              Array.isArray(data.cweId) &&
+                              data.cweId.length > 0 && (
+                                <div>
+                                  <span className="block mb-1">CWE IDs</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {data.cweId.map((cwe: string) => (
                                       <Badge
-                                        variant="destructive"
+                                        key={cwe}
+                                        variant="outline"
                                         className="font-mono"
                                       >
-                                        {cve}
+                                        {cwe}
                                       </Badge>
-                                      <CopyButton text={cve} />
-                                    </div>
-                                  ))}
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          {data.cweId &&
-                            Array.isArray(data.cweId) &&
-                            data.cweId.length > 0 && (
-                              <div>
-                                <span className="block mb-1">CWE IDs</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {data.cweId.map((cwe: string) => (
-                                    <Badge
-                                      key={cwe}
-                                      variant="outline"
-                                      className="font-mono"
-                                    >
-                                      {cwe}
-                                    </Badge>
-                                  ))}
+                              )}
+                            {data.bidId &&
+                              Array.isArray(data.bidId) &&
+                              data.bidId.length > 0 && (
+                                <div>
+                                  <span className="block mb-1">BID IDs</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {data.bidId.map((bid: string) => (
+                                      <Badge
+                                        key={bid}
+                                        variant="outline"
+                                        className="font-mono"
+                                      >
+                                        {bid}
+                                      </Badge>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          {data.bidId &&
-                            Array.isArray(data.bidId) &&
-                            data.bidId.length > 0 && (
-                              <div>
-                                <span className="block mb-1">BID IDs</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {data.bidId.map((bid: string) => (
-                                    <Badge
-                                      key={bid}
-                                      variant="outline"
-                                      className="font-mono"
-                                    >
-                                      {bid}
-                                    </Badge>
-                                  ))}
+                              )}
+                            {data.ceaId &&
+                              Array.isArray(data.ceaId) &&
+                              data.ceaId.length > 0 && (
+                                <div>
+                                  <span className="block mb-1">CEA IDs</span>
+                                  <div className="flex flex-wrap gap-2">
+                                    {data.ceaId.map((cea: string) => (
+                                      <Badge
+                                        key={cea}
+                                        variant="outline"
+                                        className="font-mono"
+                                      >
+                                        {cea}
+                                      </Badge>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          {data.ceaId &&
-                            Array.isArray(data.ceaId) &&
-                            data.ceaId.length > 0 && (
-                              <div>
-                                <span className="block mb-1">CEA IDs</span>
-                                <div className="flex flex-wrap gap-2">
-                                  {data.ceaId.map((cea: string) => (
-                                    <Badge
-                                      key={cea}
-                                      variant="outline"
-                                      className="font-mono"
-                                    >
-                                      {cea}
-                                    </Badge>
-                                  ))}
+                              )}
+                            {data.iava &&
+                              Array.isArray(data.iava) &&
+                              data.iava.length > 0 && (
+                                <div>
+                                  <span className="block mb-1">IAVA</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {data.iava.map((iava: string) => (
+                                      <Badge
+                                        key={iava}
+                                        variant="outline"
+                                        className="font-mono"
+                                      >
+                                        {iava}
+                                      </Badge>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          {data.iava &&
-                            Array.isArray(data.iava) &&
-                            data.iava.length > 0 && (
-                              <div>
-                                <span className="block mb-1">IAVA</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {data.iava.map((iava: string) => (
-                                    <Badge
-                                      key={iava}
-                                      variant="outline"
-                                      className="font-mono"
-                                    >
-                                      {iava}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                        </div>
-                      </Section>
-                      <Separator />
-                    </>
-                  )}
+                              )}
+                          </div>
+                        </Section>
+                        <Separator />
+                      </>
+                    )}
 
                   {/* References */}
                   {((data.references && data.references.length > 0) ||
                     data.cveUrl ||
                     data.cweUrl) && (
-                    <>
-                      <Section
-                        title="References"
-                        icon={
-                          <LinkIcon
-                            size={20}
-                            className="text-teal-600 dark:text-teal-400"
-                          />
-                        }
-                        color="text-teal-600 dark:text-teal-400"
-                      >
-                        <div className="space-y-2">
-                          {data.cveUrl && (
-                            <div>
-                              <span className="block mb-1">CVE Reference</span>
-                              <a
-                                href={data.cveUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-500 hover:text-blue-600 hover:underline transition-colors text-sm break-all"
-                              >
-                                {data.cveUrl}
-                              </a>
-                            </div>
-                          )}
-                          {data.cweUrl && (
-                            <div>
-                              <span className="block mb-1">CWE Reference</span>
-                              <a
-                                href={data.cweUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-500 hover:text-blue-600 hover:underline transition-colors text-sm break-all"
-                              >
-                                {data.cweUrl}
-                              </a>
-                            </div>
-                          )}
-                          {data.references &&
-                            Array.isArray(data.references) &&
-                            data.references.length > 0 && (
+                      <>
+                        <Section
+                          title="References"
+                          icon={
+                            <LinkIcon
+                              size={20}
+                              className="text-teal-600 dark:text-teal-400"
+                            />
+                          }
+                          color="text-teal-600 dark:text-teal-400"
+                        >
+                          <div className="space-y-2">
+                            {data.cveUrl && (
                               <div>
-                                <span className="block mb-1">
-                                  Additional References
-                                </span>
-                                <div className="space-y-1">
-                                  {data.references.map((ref: string) => (
-                                    <a
-                                      key={ref}
-                                      href={ref}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-500 hover:text-blue-600 hover:underline transition-colors text-sm break-all block"
-                                    >
-                                      {ref}
-                                    </a>
-                                  ))}
-                                </div>
+                                <span className="block mb-1">CVE Reference</span>
+                                <a
+                                  href={data.cveUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-500 hover:text-blue-600 hover:underline transition-colors text-sm break-all"
+                                >
+                                  {data.cveUrl}
+                                </a>
                               </div>
                             )}
-                        </div>
-                      </Section>
-                      <Separator />
-                    </>
-                  )}
+                            {data.cweUrl && (
+                              <div>
+                                <span className="block mb-1">CWE Reference</span>
+                                <a
+                                  href={data.cweUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-500 hover:text-blue-600 hover:underline transition-colors text-sm break-all"
+                                >
+                                  {data.cweUrl}
+                                </a>
+                              </div>
+                            )}
+                            {data.references &&
+                              Array.isArray(data.references) &&
+                              data.references.length > 0 && (
+                                <div>
+                                  <span className="block mb-1">
+                                    Additional References
+                                  </span>
+                                  <div className="space-y-1">
+                                    {data.references.map((ref: string) => (
+                                      <a
+                                        key={ref}
+                                        href={ref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-500 hover:text-blue-600 hover:underline transition-colors text-sm break-all block"
+                                      >
+                                        {ref}
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                          </div>
+                        </Section>
+                        <Separator />
+                      </>
+                    )}
 
                   {/* Solution */}
                   {data.solution && (
@@ -598,12 +598,12 @@ export default function DetailSheet({
                         <span>
                           {data.createdAt
                             ? new Date(data.createdAt).toLocaleString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
                             : 'Unknown'}
                         </span>
                       </div>
@@ -612,12 +612,12 @@ export default function DetailSheet({
                         <span>
                           {data.updatedAt
                             ? new Date(data.updatedAt).toLocaleString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
                             : 'Unknown'}
                         </span>
                       </div>
@@ -673,19 +673,31 @@ export default function DetailSheet({
                             variant="outline"
                             className="w-full justify-start gap-2 h-auto p-3 hover:bg-accent"
                           >
-                            <div className="p-1.5 rounded-md bg-blue-500">
-                              <Cpu className="h-4 w-4 text-white" />
+                            <div className="bg-white p-4 rounded-xl flex items-center justify-center w-20 h-20 mx-auto lg:mx-0">
+                              {data.tool.logoUrl ? (
+                                <img
+                                  src={data.tool.logoUrl}
+                                  alt={data.tool.name}
+                                  className="max-h-18 object-contain"
+                                />
+                              ) : (
+                                <div className="h-18 w-18 flex items-center justify-center bg-gray-200 rounded-lg">
+                                  <span className="text-3xl font-bold text-gray-500">
+                                    {data.tool.name.charAt(0)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
-                            <div className="flex flex-col items-start flex-1 min-w-0">
+                            <div className="flex  items-center gap-3 flex-1 min-w-0">
                               <span className="font-semibold">
                                 {data.tool.name.charAt(0).toUpperCase() +
                                   data.tool.name.slice(1)}
                               </span>
-                              {data.tool.description && (
+                              {/* {data.tool.description && (
                                 <span className="text-xs text-muted-foreground line-clamp-1 w-full text-left">
                                   {data.tool.description}
                                 </span>
-                              )}
+                              )} */}
                               {data.tool.version && (
                                 <Badge
                                   variant="secondary"
