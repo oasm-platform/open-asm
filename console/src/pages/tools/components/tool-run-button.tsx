@@ -45,7 +45,6 @@ const ToolRunButton = ({ tool, workspaceId }: ToolRunButtonProps) => {
       trigger={
         <Button
           variant="default"
-          className="ml-2"
         >
           Run
           <ArrowRight className="h-4 w-4" />
