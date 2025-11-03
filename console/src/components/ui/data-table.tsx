@@ -146,16 +146,14 @@ export function DataTable<TData, TValue>({
       {/* Filter and column visibility controls */}
       {filterColumnKey && (
         <div className="flex items-center gap-4 py-1">
-          {filterColumnKey && (
-            <Input
-              placeholder={filterPlaceholder}
-              className="max-w-sm"
-              value={searchValue}
-              onChange={(e) => {
-                setSearchValue(e.target.value);
-              }}
-            />
-          )}
+          <Input
+            placeholder={filterPlaceholder}
+            className="max-w-sm"
+            value={searchValue}
+            onChange={(e) => {
+              setSearchValue(e.target.value);
+            }}
+          />
         </div>
       )}
 
@@ -197,7 +195,7 @@ export function DataTable<TData, TValue>({
           )}
           <TableBody>
             {showSkeleton ? (
-              [...Array(5)].map((_, rowIndex) => (
+              [...Array(pageSize)].map((_, rowIndex) => (
                 <TableRow key={`skeleton-${rowIndex}`}>
                   {[...Array(table.getAllLeafColumns().length)].map(
                     (_, colIndex) => (

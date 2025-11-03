@@ -39,7 +39,7 @@ export function AssetTable({
         isShowBorder={false}
         onRowClick={(row) => {
           setRowID(row.id);
-          setIsOpen(!isOpen);
+          setIsOpen(true);
         }}
       />
       <AssetDetailSheet open={isOpen} setOpen={setIsOpen} id={rowID} />

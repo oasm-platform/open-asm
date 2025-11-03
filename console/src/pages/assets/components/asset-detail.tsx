@@ -277,9 +277,12 @@ export default function AssetDetail({ id }: { id: string }) {
               <div className="flex flex-wrap gap-2">
                 {(
                   httpResponses.techList as unknown as TechnologyDetailDTO[]
-                ).map((item) => (
-                  <TechnologyTooltip tech={item} key={item.name} />
-                ))}
+                ).map(
+                  (item) =>
+                    item.name && (
+                      <TechnologyTooltip tech={item} key={item.name} />
+                    ),
+                )}
               </div>
             </section>
           </>
