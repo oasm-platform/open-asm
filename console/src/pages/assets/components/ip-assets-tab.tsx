@@ -1,4 +1,4 @@
-import { CollapibleDataTable } from '@/components/ui/collapsible-data-table';
+import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetIpAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -28,7 +28,7 @@ export default function IpAssetsTab() {
   return (
     <>
       <TabsContent value="ip" className="overflow-hidden">
-        <CollapibleDataTable
+        <CollapsibleDataTable
           data={ipAssets}
           columns={ipAssetsColumn}
           isLoading={isLoading}

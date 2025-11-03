@@ -1,4 +1,4 @@
-import { CollapibleDataTable } from '@/components/ui/collapsible-data-table';
+import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetPortAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -28,7 +28,7 @@ export default function PortAssetsTab() {
   return (
     <>
       <TabsContent value="port" className="overflow-hidden">
-        <CollapibleDataTable
+        <CollapsibleDataTable
           data={portAssets}
           columns={portAssetsColumn}
           isLoading={isLoading}

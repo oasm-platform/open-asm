@@ -1,4 +1,4 @@
-import { CollapibleDataTable } from '@/components/ui/collapsible-data-table';
+import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetStatusCodeAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -31,7 +31,7 @@ export default function StatusCodeAssetsTab() {
   return (
     <>
       <TabsContent value="statusCode" className="overflow-hidden">
-        <CollapibleDataTable
+        <CollapsibleDataTable
           data={statusCodeAssets}
           columns={statusCodeAssetsColumn}
           isLoading={isLoading}

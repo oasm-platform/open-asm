@@ -69,7 +69,7 @@ interface DataTableProps<TData, TValue> {
   collapsibleElement: (row: TData) => React.JSX.Element;
 }
 
-export function CollapibleDataTable<TData, TValue>({
+export function CollapsibleDataTable<TData, TValue>({
   columns,
   data,
   isLoading = false,

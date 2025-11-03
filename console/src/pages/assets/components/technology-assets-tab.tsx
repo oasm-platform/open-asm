@@ -1,4 +1,4 @@
-import { CollapibleDataTable } from '@/components/ui/collapsible-data-table';
+import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetTechnologyAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -31,7 +31,7 @@ export default function TechnologyAssetsTab() {
   return (
     <>
       <TabsContent value="tech" className="overflow-hidden">
-        <CollapibleDataTable
+        <CollapsibleDataTable
           data={technologyAssets}
           columns={technologyAssetsColumn}
           isLoading={isLoading}
