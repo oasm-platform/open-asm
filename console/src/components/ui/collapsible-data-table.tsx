@@ -242,7 +242,7 @@ export function CollapibleDataTable<TData, TValue>({
                     </CollapsibleTrigger>
 
                     <CollapsibleContent asChild>
-                      <TableRow>
+                      <TableRow className="bg-background hover:bg-background">
                         <TableCell colSpan={columns.length} className="p-0">
                           {collapsibleElement(row.original)}
                         </TableCell>

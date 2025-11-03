@@ -167,7 +167,7 @@ export function DataTable<TData, TValue>({
           {isShowHeader && (
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+                <TableRow key={headerGroup.id} className="border-b!">
                   {headerGroup.headers.map((header) => (
                     <TableHead
                       key={header.id}
