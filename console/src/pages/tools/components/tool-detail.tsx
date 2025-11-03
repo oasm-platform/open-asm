@@ -2,9 +2,10 @@ import Page from "@/components/common/page";
 import { ToolApiKeyDialog } from '@/components/tools/tool-api-key-dialog';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import Image from '@/components/ui/image';
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
 import { ToolsControllerGetManyToolsType, useToolsControllerGetToolById } from "@/services/apis/gen/queries";
-import { Hash, Verified } from "lucide-react";
+import { Verified } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import ToolInstallButton from "./tool-install-button";
@@ -71,24 +72,8 @@ export default function ToolDetail() {
         <CardHeader>
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Logo section - moved to the left */}
-            <div className="flex-shrink-0">
-              <div className="bg-white p-4 rounded-xl flex items-center justify-center w-32 h-32 mx-auto lg:mx-0">
-                {tool.logoUrl ? (
-                  <img
-                    src={tool.logoUrl}
-                    alt={tool.name}
-                    className="max-h-24 object-contain"
-                  />
-                ) : (
-                  <div className="h-24 w-24 flex items-center justify-center bg-gray-200 rounded-lg">
-                    <span className="text-3xl font-bold text-gray-500">
-                      {tool.name.charAt(0)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
 
+            <Image url={tool?.logoUrl} width={140} height={140} className='rounded-2xl' />
             {/* Content section */}
             <div className="flex-1">
               <div className="space-y-4">
@@ -126,10 +111,10 @@ export default function ToolDetail() {
                 </p>
 
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary" className="gap-1">
+                  {/* <Badge variant="secondary" className="gap-1">
                     <Hash className="w-3 h-3" />
                     Version: {tool.version || "N/A"}
-                  </Badge>
+                  </Badge> */}
                   <Badge variant="secondary" className="gap-1">
                     Category: {formatCategory(tool.category)}
                   </Badge>
