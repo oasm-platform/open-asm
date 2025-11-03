@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import Image from '@/components/ui/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { SeverityBadge } from '@/components/ui/severity-badge';
@@ -673,21 +674,12 @@ export default function DetailSheet({
                             variant="outline"
                             className="w-full justify-start gap-2 h-auto p-3 hover:bg-accent"
                           >
-                            <div className="bg-white p-4 rounded-xl flex items-center justify-center w-20 h-20 mx-auto lg:mx-0">
-                              {data.tool.logoUrl ? (
-                                <img
-                                  src={data.tool.logoUrl}
-                                  alt={data.tool.name}
-                                  className="max-h-18 object-contain"
-                                />
-                              ) : (
-                                <div className="h-18 w-18 flex items-center justify-center bg-gray-200 rounded-lg">
-                                  <span className="text-3xl font-bold text-gray-500">
-                                    {data.tool.name.charAt(0)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
+                            <Image
+                              url={data.tool.logoUrl}
+                              width={70}
+                              height={70}
+                              className="rounded-xl"
+                            />
                             <div className="flex  items-center gap-3 flex-1 min-w-0">
                               <span className="font-semibold">
                                 {data.tool.name.charAt(0).toUpperCase() +
