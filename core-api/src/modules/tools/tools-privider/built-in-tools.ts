@@ -14,7 +14,7 @@ export const builtInTools: Tool[] = [
     description:
       'Subfinder is a subdomain discovery tool that returns valid subdomains for websites, using passive online sources.',
     logoUrl:
-      'https://raw.githubusercontent.com/projectdiscovery/subfinder/refs/heads/main/static/subfinder-logo.png',
+      '/static/images/subfinder.png',
     command:
       '(echo {{value}} && subfinder -duc -d {{value}}) | dnsx -duc -a -aaaa -cname -mx -ns -soa -txt -resp',
     parser: (result: string) => {
@@ -45,7 +45,7 @@ export const builtInTools: Tool[] = [
     description:
       'Httpx is a fast and multi-purpose HTTP toolkit that allows running multiple probes using the retryable http library. It is designed to maintain result reliability with an increased number of threads.',
     logoUrl:
-      'https://raw.githubusercontent.com/projectdiscovery/httpx/main/static/httpx-logo.png',
+      '/static/images/httpx.png',
     command:
       'httpx -duc -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
     parser: (result: string) => {
@@ -61,7 +61,7 @@ export const builtInTools: Tool[] = [
     description:
       'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
     logoUrl:
-      'https://raw.githubusercontent.com/projectdiscovery/naabu/refs/heads/main/static/naabu-logo.png',
+      '/static/images/naabu.png',
     command: 'naabu -host {{value}} -silent',
     parser: (result: string) => {
       const parsed = result
@@ -81,7 +81,7 @@ export const builtInTools: Tool[] = [
     description:
       'Nuclei is a fast, customizable vulnerability scanner powered by the global security community and built on a simple YAML-based DSL, enabling collaboration to tackle trending vulnerabilities on the internet. It helps you find vulnerabilities in your applications, APIs, networks, DNS, and cloud configurations.',
     logoUrl:
-      'https://raw.githubusercontent.com/projectdiscovery/nuclei/refs/heads/dev/static/nuclei-logo.png',
+      '/static/images/nuclei.png',
     command: 'nuclei -duc -u {{value}} -j --silent',
     parser: (result: string) => {
       const initialVulnerabilities = result
