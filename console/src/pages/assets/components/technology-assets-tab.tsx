@@ -51,7 +51,7 @@ export default function TechnologyAssetsTab() {
               filter={{
                 techs: [row.technology.name],
               }}
-            ></AssetTable>
+            />
           )}
         />
       </TabsContent>

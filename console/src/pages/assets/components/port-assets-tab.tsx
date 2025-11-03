@@ -48,7 +48,7 @@ export default function PortAssetsTab() {
               filter={{
                 ports: [row.port],
               }}
-            ></AssetTable>
+            />
           )}
         />
       </TabsContent>

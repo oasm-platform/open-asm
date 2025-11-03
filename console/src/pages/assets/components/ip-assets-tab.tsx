@@ -48,7 +48,7 @@ export default function IpAssetsTab() {
               filter={{
                 ipAddresses: [row.ip],
               }}
-            ></AssetTable>
+            />
           )}
         />
       </TabsContent>

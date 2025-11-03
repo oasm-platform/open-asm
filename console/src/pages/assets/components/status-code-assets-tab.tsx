@@ -51,7 +51,7 @@ export default function StatusCodeAssetsTab() {
               filter={{
                 statusCodes: [row.statusCode],
               }}
-            ></AssetTable>
+            />
           )}
         />
       </TabsContent>
