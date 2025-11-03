@@ -1,7 +1,8 @@
-import { DataTable } from '@/components/ui/data-table';
+import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetStatusCodeAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
+import { AssetTable } from './asset-table';
 import { statusCodeAssetsColumn } from './status-code-assets-column';
 
 export default function StatusCodeAssetsTab() {
@@ -10,8 +11,6 @@ export default function StatusCodeAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
-    filterParams,
-    filterHandlers,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetStatusCodeAssets(
@@ -32,7 +31,7 @@ export default function StatusCodeAssetsTab() {
   return (
     <>
       <TabsContent value="statusCode" className="overflow-hidden">
-        <DataTable
+        <CollapsibleDataTable
           data={statusCodeAssets}
           columns={statusCodeAssetsColumn}
           isLoading={isLoading}
@@ -47,13 +46,13 @@ export default function StatusCodeAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
-          onRowClick={(row) => {
-            let selectedValue = filterParams.statusCodes || [];
-            if (selectedValue.indexOf(row.statusCode.toString()) < 0) {
-              selectedValue = [...selectedValue, row.statusCode];
-              filterHandlers('statusCodes', selectedValue);
-            }
-          }}
+          collapsibleElement={(row) => (
+            <AssetTable
+              filter={{
+                statusCodes: [row.statusCode],
+              }}
+            />
+          )}
         />
       </TabsContent>
     </>

@@ -52,7 +52,7 @@ export default function AssetTab() {
           totalItems={total}
           onRowClick={(row) => {
             setRowID(row.id);
-            setIsOpen(!isOpen);
+            setIsOpen(true);
           }}
         />
       </TabsContent>

@@ -35,6 +35,11 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from './pagination';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from './collapsible';
 
 // Define props interface
 interface DataTableProps<TData, TValue> {
@@ -61,9 +66,10 @@ interface DataTableProps<TData, TValue> {
   filterComponents?: React.JSX.Element[];
   isShowHeader?: boolean;
   isShowBorder?: boolean;
+  collapsibleElement: (row: TData) => React.JSX.Element;
 }
 
-export function DataTable<TData, TValue>({
+export function CollapsibleDataTable<TData, TValue>({
   columns,
   data,
   isLoading = false,
@@ -86,6 +92,7 @@ export function DataTable<TData, TValue>({
   filterComponents,
   isShowHeader = true,
   isShowBorder = true,
+  collapsibleElement,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -165,7 +172,7 @@ export function DataTable<TData, TValue>({
           {isShowHeader && (
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-b!">
+                <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <TableHead
                       key={header.id}
@@ -208,24 +215,39 @@ export function DataTable<TData, TValue>({
               ))
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
-                  className={cn(
-                    rowClassName,
-                    onRowClick && 'cursor-pointer hover:bg-muted/50',
-                  )}
-                  onClick={() => onRowClick?.(row.original)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                <Collapsible asChild key={row.id}>
+                  <>
+                    <CollapsibleTrigger asChild>
+                      <TableRow
+                        data-state={row.getIsSelected() && 'selected'}
+                        className={cn(
+                          rowClassName,
+                          'cursor-pointer',
+                          onRowClick && 'hover:bg-muted/50',
+                        )}
+                        onClick={() => onRowClick?.(row.original)}
+                      >
+                        {/* These cells render normally in their correct columns */}
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent asChild>
+                      <TableRow className="bg-background hover:bg-background">
+                        <TableCell colSpan={columns.length} className="p-0">
+                          {collapsibleElement(row.original)}
+                        </TableCell>
+                      </TableRow>
+                    </CollapsibleContent>
+                  </>
+                </Collapsible>
               ))
             ) : (
               <TableRow>
