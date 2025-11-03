@@ -1,4 +1,5 @@
 import Page from "@/components/common/page";
+import { ToolApiKeyDialog } from '@/components/tools/tool-api-key-dialog';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
@@ -6,8 +7,8 @@ import { ToolsControllerGetManyToolsType, useToolsControllerGetToolById } from "
 import { Hash, Verified } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import ToolInstallButton from "../tool-install-button";
-import ToolRunButton from "../tool-run-button";
+import ToolInstallButton from "./tool-install-button";
+import ToolRunButton from "./tool-run-button";
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
@@ -92,7 +93,7 @@ export default function ToolDetail() {
             <div className="flex-1">
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <CardTitle className="text-3xl">{tool.name}</CardTitle>
                     {tool.isOfficialSupport && (
                       <Badge variant="default" className="gap-1">
@@ -101,7 +102,10 @@ export default function ToolDetail() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex-shrink-0 flex items-center ">
+                  <div className="flex-shrink-0 flex items-center gap-2">
+                    <ToolApiKeyDialog
+                      tool={tool}
+                    />
                     <ToolInstallButton
                       tool={tool}
                       workspaceId={selectedWorkspace || ""}
@@ -113,6 +117,7 @@ export default function ToolDetail() {
                         workspaceId={selectedWorkspace || ""}
                       />
                     )}
+
                   </div>
                 </div>
 
@@ -137,6 +142,7 @@ export default function ToolDetail() {
           </div>
         </CardHeader>
       </Card>
+
     </Page>
   );
 }
