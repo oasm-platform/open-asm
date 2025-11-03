@@ -2,7 +2,7 @@ import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { createContext, useCallback, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-type AssetContextType = ReturnType<typeof useServerDataTable> & {
+export type AssetContextType = ReturnType<typeof useServerDataTable> & {
   queryParams: {
     targetIds?: string[];
     value?: string;
@@ -10,6 +10,7 @@ type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ipAddresses?: string[];
     ports?: string[];
     techs?: string[];
+    statusCodes?: string[];
     page: number;
     sortBy: string;
     sortOrder: 'ASC' | 'DESC';
