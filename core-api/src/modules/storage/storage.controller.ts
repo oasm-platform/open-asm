@@ -1,3 +1,4 @@
+import { CACHE_STATIC_RESOURCE } from '@/common/constants/app.constants';
 import { Public, Roles } from '@/common/decorators/app.decorator';
 import { Role } from '@/common/enums/enum';
 import {
@@ -158,7 +159,7 @@ export class StorageController {
       if (mimeType) {
         res.set({
           'Content-Type': mimeType,
-          'Cache-Control': 'max-age=1209600, no-transform',
+          'Cache-Control': `max-age=${CACHE_STATIC_RESOURCE}, no-transform`,
         });
       }
     }
@@ -212,7 +213,7 @@ export class StorageController {
       // Set the content type header
       res.set({
         'Content-Type': contentType,
-        'Cache-Control': 'max-age=1209600, no-transform',
+        'Cache-Control': `max-age=${CACHE_STATIC_RESOURCE}, no-transform`,
       });
 
       // Return the image as a StreamableFile
