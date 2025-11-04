@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import Image from '@/components/ui/image';
 import SeverityBadge from '@/components/ui/severity-badge';
 import {
   Tooltip,
@@ -164,16 +165,48 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
   },
   {
     header: 'Scanned by',
-    size: 120,
+    size: 200,
     cell: ({ row }) => {
       const { tool } = row.original;
-      if (!tool) return <>-</>;
+      if (!tool) return (
+        <div className="min-h-[60px] flex items-center justify-center">
+          -
+        </div>
+      );
       return (
-        <Link to={`/tools/${tool.id}`}>
-          <Badge variant="outline" className="text-xs">
-            {tool?.name.charAt(0).toUpperCase() + tool?.name.slice(1)}
-          </Badge>
-        </Link>
+        <div className="min-h-[60px] flex items-center">
+          <Link to={`/tools/${tool.id}`} className='flex items-center gap-2'>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 cursor-pointer">
+                    <Image
+                      url={tool?.logoUrl}
+                      width={24}
+                      height={24}
+                      className='rounded'
+                    />
+                    <span className="text-sm font-medium">{tool.name}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="w-full max-w-[300px] p-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Image
+                      url={tool?.logoUrl}
+                      width={40}
+                      height={40}
+                      className='rounded'
+                    />
+                    <h4 className="font-bold">{tool.name}</h4>
+                  </div>
+                  {tool.description && (
+                    <p className="text-sm">{tool.description}</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </Link>
+        </div>
       );
     },
   },

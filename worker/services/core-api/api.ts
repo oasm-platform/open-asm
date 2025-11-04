@@ -519,6 +519,23 @@ export interface WorkerAliveDto {
   token: string;
 }
 
+export interface Tool {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  description: string;
+  category: ToolCategoryEnum;
+  version: string;
+  logoUrl?: string | null;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: string;
+  providerId: string;
+}
+
 export interface WorkerInstance {
   id: string;
   /** @format date-time */
@@ -531,6 +548,7 @@ export interface WorkerInstance {
   currentJobsCount: number;
   type: string;
   scope: string;
+  tool: Tool;
 }
 
 export interface WorkerJoinDto {
@@ -840,23 +858,6 @@ export interface ScanDto {
   targetId: string;
 }
 
-export interface Tool {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  name: string;
-  description: string;
-  category: ToolCategoryEnum;
-  version: string;
-  logoUrl?: string | null;
-  isInstalled: boolean;
-  isOfficialSupport: boolean;
-  type: string;
-  providerId: string;
-}
-
 export interface Vulnerability {
   id: string;
   /** @format date-time */
@@ -865,6 +866,7 @@ export interface Vulnerability {
   updatedAt: string;
   name: string;
   description: string;
+  synopsis: string;
   severity: string;
   tags: string[];
   references: string[];
@@ -872,13 +874,25 @@ export interface Vulnerability {
   affectedUrl: string;
   ipAddress: string;
   host: string;
-  port: string;
+  ports: string[];
   cvssMetric: string;
   cvssScore: number;
-  cveId: string;
+  epssScore: number;
+  vprScore: number;
+  cveId: string[];
+  bidId: string[];
   cweId: string[];
+  ceaId: string[];
+  iava: string[];
+  cveUrl: string;
+  cweUrl: string;
+  solution: string;
   extractorName: string;
   extractedResults: string[];
+  /** @format date-time */
+  publicationDate: string;
+  /** @format date-time */
+  modificationDate: string;
   tool: Tool;
 }
 
@@ -1274,7 +1288,7 @@ export class HttpClient<SecurityDataType = unknown> {
       headers: {
         ...((method &&
           this.instance.defaults.headers[
-          method.toLowerCase() as keyof HeadersDefaults
+            method.toLowerCase() as keyof HeadersDefaults
           ]) ||
           {}),
         ...(params1.headers || {}),
@@ -2471,6 +2485,25 @@ export class Api<
       path: `/api/vulnerabilities/statistics`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves detailed information about a specific security vulnerability identified within the system, including its attributes, associated assets, and remediation guidance.
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerGetVulnerabilityById
+   * @summary Get vulnerability by id
+   * @request GET:/api/vulnerabilities/{id}
+   */
+  vulnerabilitiesControllerGetVulnerabilityById = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities/${id}`,
+      method: "GET",
       format: "json",
       ...params,
     });

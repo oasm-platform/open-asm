@@ -163,6 +163,7 @@ export class WorkersService {
         `(SELECT COUNT(j.id) FROM jobs j WHERE j."workerId"::uuid = w.id::uuid and j.status = '${JobStatus.IN_PROGRESS}')`,
         'currentJobsCount',
       )
+      .leftJoinAndSelect('w.tool', 't')
       .where('1=1');
 
     // Add workspace filter if workspaceId is provided, or if worker has cloud scope
