@@ -3,8 +3,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
 import { DatabaseModule } from './database/database.module';
 import { McpServerModule } from './mcp/mcp.module';
 import { CombineModule } from './modules/combine.module';
@@ -18,10 +16,10 @@ import { ServicesModule } from './services/services.module';
       isGlobal: true,
     }),
     EventEmitterModule.forRoot({ wildcard: true }),
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
-      serveRoot: '/api/static',
-    }),
+    // ServeStaticModule.forRoot({
+    //   rootPath: join(__dirname, '..', 'public'),
+    //   serveRoot: '/api/static',
+    // }),
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       useFactory: (config: ConfigService) => ({

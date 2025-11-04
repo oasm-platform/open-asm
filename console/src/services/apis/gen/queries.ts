@@ -528,6 +528,33 @@ export type WorkerAliveDto = {
   token: string;
 };
 
+export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ToolCategory = {
+  subdomains: 'subdomains',
+  http_probe: 'http_probe',
+  ports_scanner: 'ports_scanner',
+  vulnerabilities: 'vulnerabilities',
+  classifier: 'classifier',
+} as const;
+
+export type Tool = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  description: string;
+  category: ToolCategory;
+  version: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: string;
+  providerId: string;
+};
+
 export type WorkerInstance = {
   id: string;
   createdAt: string;
@@ -537,6 +564,7 @@ export type WorkerInstance = {
   currentJobsCount: number;
   type: string;
   scope: string;
+  tool: Tool;
 };
 
 export type WorkerJoinDto = {
@@ -728,33 +756,6 @@ export type TopAssetVulnerabilities = {
 export type ScanDto = {
   /** Target ID */
   targetId: string;
-};
-
-export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ToolCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  classifier: 'classifier',
-} as const;
-
-export type Tool = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  name: string;
-  description: string;
-  category: ToolCategory;
-  version: string;
-  /** @nullable */
-  logoUrl?: string | null;
-  isInstalled: boolean;
-  isOfficialSupport: boolean;
-  type: string;
-  providerId: string;
 };
 
 export type Vulnerability = {
@@ -13292,8 +13293,8 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
 }
 
 /**
- * Retrieves a comprehensive list of security vulnerabilities identified across targets and assets, including detailed information about risks and remediation recommendations.
- * @summary Get vulnerabilities
+ * Retrieves detailed information about a specific security vulnerability identified within the system, including its attributes, associated assets, and remediation guidance.
+ * @summary Get vulnerability by id
  */
 export const vulnerabilitiesControllerGetVulnerabilityById = (
   id: string,
@@ -13462,7 +13463,7 @@ export function useVulnerabilitiesControllerGetVulnerabilityByIdInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get vulnerabilities
+ * @summary Get vulnerability by id
  */
 
 export function useVulnerabilitiesControllerGetVulnerabilityByIdInfinite<
@@ -13649,7 +13650,7 @@ export function useVulnerabilitiesControllerGetVulnerabilityById<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get vulnerabilities
+ * @summary Get vulnerability by id
  */
 
 export function useVulnerabilitiesControllerGetVulnerabilityById<

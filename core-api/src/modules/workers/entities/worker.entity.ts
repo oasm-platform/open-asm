@@ -29,6 +29,7 @@ export class WorkerInstance extends BaseEntity {
   @ManyToOne(() => Workspace, (workspace) => workspace.workers)
   workspace: Workspace;
 
+  @ApiProperty({ type: () => Tool })
   @ManyToOne(() => Tool, (tool) => tool.workers)
   tool: Tool;
 }
