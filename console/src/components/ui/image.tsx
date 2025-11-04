@@ -1,3 +1,4 @@
+import { ImageIcon } from 'lucide-react';
 import React from 'react';
 
 interface ImageProps {
@@ -12,8 +13,9 @@ export const Image: React.FC<ImageProps> = ({ url, width, height, className }) =
     const isHttpUrl = url?.startsWith('http://') || url?.startsWith('https://');
 
     // If not a complete URL, prepend with API storage path
-    const imageUrl = isHttpUrl ? url : `${import.meta.env.VITE_API_URL}/api${url}`;
-    if (!imageUrl) return <></>
+    const imageUrl = isHttpUrl ? url : `/api${url}`;
+    if (!imageUrl) return <ImageIcon width={width} height={height} className={className} />
+    console.log(imageUrl);
     return (
         <img
             src={imageUrl}

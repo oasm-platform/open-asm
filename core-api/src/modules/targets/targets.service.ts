@@ -272,7 +272,6 @@ export class TargetsService implements OnModuleInit {
   private async updateTargetScanScheduleJob(targetId: string, scanSchedule: string | null | undefined): Promise<void> {
     // Remove any existing jobs for this target
     await this.scanScheduleQueue.remove(targetId);
-
     // If there's a new scan schedule, add a new job
     if (scanSchedule) {
       await this.scanScheduleQueue.add(
