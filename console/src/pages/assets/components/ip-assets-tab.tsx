@@ -11,6 +11,7 @@ export default function IpAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    targetId,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetIpAssets(queryParams, {
@@ -47,6 +48,7 @@ export default function IpAssetsTab() {
             <AssetTable
               filter={{
                 ipAddresses: [row.ip],
+                targetIds: targetId ? [targetId] : undefined,
               }}
             />
           )}

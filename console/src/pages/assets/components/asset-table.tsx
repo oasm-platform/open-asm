@@ -8,7 +8,7 @@ import AssetDetailSheet from './asset-detail-sheet';
 export function AssetTable({
   filter,
 }: {
-  filter: Partial<AssetContextType['filterParams']>;
+  filter: Partial<AssetContextType['queryParams']>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [rowID, setRowID] = useState('');
