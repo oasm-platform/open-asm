@@ -28,7 +28,7 @@ async function bootstrap() {
   app.useStaticAssets(path.join(__dirname, '..', 'public'), {
     prefix: '/api/static/',
     setHeaders: (res: Response) => {
-      res.set('Cache-Control', `max-age=${CACHE_STATIC_RESOURCE}`);
+      res.set('Cache-Control', `max-age=${CACHE_STATIC_RESOURCE}, no-transform`);
     },
   });
 
