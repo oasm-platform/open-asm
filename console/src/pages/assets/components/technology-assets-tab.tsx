@@ -11,6 +11,7 @@ export default function TechnologyAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    targetId,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetTechnologyAssets(
@@ -50,6 +51,7 @@ export default function TechnologyAssetsTab() {
             <AssetTable
               filter={{
                 techs: [row.technology.name],
+                targetIds: targetId ? [targetId] : undefined,
               }}
             />
           )}

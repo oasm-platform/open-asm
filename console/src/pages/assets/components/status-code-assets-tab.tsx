@@ -11,6 +11,7 @@ export default function StatusCodeAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    targetId,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetStatusCodeAssets(
@@ -50,6 +51,7 @@ export default function StatusCodeAssetsTab() {
             <AssetTable
               filter={{
                 statusCodes: [row.statusCode],
+                targetIds: targetId ? [targetId] : undefined,
               }}
             />
           )}

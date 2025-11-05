@@ -11,6 +11,7 @@ export default function PortAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
+    targetId,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetPortAssets(queryParams, {
@@ -47,6 +48,7 @@ export default function PortAssetsTab() {
             <AssetTable
               filter={{
                 ports: [row.port],
+                targetIds: targetId ? [targetId] : undefined,
               }}
             />
           )}
