@@ -97,7 +97,7 @@ export class AssetsService {
 
     const queryBuilder = this.assetRepo
       .createQueryBuilder('assets')
-      .leftJoin('assets.httpResponses', 'httpResponses')
+      .leftJoin('assets.httpResponses', 'httpResponses', 'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetId" = assets.id)')
       .leftJoin('assets.ports', 'ports')
       .leftJoin('assets.target', 'targets')
       .leftJoinAndSelect('assets.tags', 'tags')
