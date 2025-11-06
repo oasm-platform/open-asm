@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
 import { Target } from '../targets/entities/target.entity';
+import { TechnologyDetailDTO } from '../technology/dto/technology-detail.dto';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
@@ -520,8 +521,6 @@ export class AssetsService {
       .offset(offset)
       .getRawMany();
 
-    const total = totalInDb?.count ?? 0;
-
     const enrichedTechs =
       await this.technologyForwarderService.enrichTechnologies(
         list.map(
@@ -538,13 +537,27 @@ export class AssetsService {
           (tech) => tech?.name === item.technology,
         );
 
-        if (enrichedTech) {
+        if (enrichedTech && enrichedTech.name) {
           obj.technology = enrichedTech;
+        } else {
+          // Create a minimal technology object with just the name when enrichment fails
+          obj.technology = {
+            name: item.technology,
+            description: '',
+            icon: '',
+            website: '',
+            iconUrl: '',
+            categoryNames: [],
+            categories: [],
+          } as TechnologyDetailDTO;
         }
 
         return obj;
-      })
-      .filter((e) => e.technology !== undefined);
+      });
+
+    // Use the database total since we want to show the actual count of distinct technologies
+    // even if some have missing enrichment data
+    const total = totalInDb?.count ?? 0;
 
     return getManyResponse({ query, data, total });
   }
