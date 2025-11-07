@@ -19,7 +19,7 @@ export class VulnerabilitiesService {
     private vulnerabilitiesRepository: Repository<Vulnerability>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
-  ) {}
+  ) { }
 
   /**
    * Initiates a vulnerability scan for a given target.
@@ -33,6 +33,7 @@ export class VulnerabilitiesService {
     await this.jobRegistryService.createNewJob({
       tool: tools[0],
       targetIds: [targetId],
+      priority: tools[0].priority,
     });
     return { message: `Scanning target ${targetId}...` };
   }

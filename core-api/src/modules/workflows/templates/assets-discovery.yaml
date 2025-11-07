@@ -4,5 +4,7 @@ on:
   target: [create, re_scan]
 
 jobs:
-  subfinder: [httpx, naabu]
-  nuclei:
+  subfinder:
+    - httpx
+    - naabu
+    - nuclei
