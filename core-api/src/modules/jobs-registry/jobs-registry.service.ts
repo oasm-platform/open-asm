@@ -107,6 +107,10 @@ export class JobsRegistryService {
     ) {
       priority = tool.priority || JobPriority.BACKGROUND;
     }
+
+    else if (!priority) {
+      priority = tool.priority || JobPriority.BACKGROUND;
+    }
     // Step 1: create job history
     let jobHistory: JobHistory;
 
@@ -225,8 +229,9 @@ export class JobsRegistryService {
         .leftJoin('workspace_targets.workspace', 'workspaces')
         .leftJoin('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
-        .orderBy('jobs.createdAt', 'ASC')
-        .orderBy('jobs.priority', 'ASC');
+        .orderBy('jobs.priority', 'DESC')
+        .orderBy('jobs.createdAt', 'ASC');
+
 
       if (isBuiltInTools) {
         const builtInToolsName = builtInTools.map((tool) => tool.name);
@@ -576,6 +581,7 @@ export class JobsRegistryService {
             targetIds: [job.asset.target.id],
             workflow: job.jobHistory.workflow,
             jobHistory: job.jobHistory,
+            priority: tool.priority,
           }),
         ),
       );

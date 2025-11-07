@@ -118,5 +118,6 @@ export class Tool {
   @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.tool)
   workers?: WorkerInstance[];
 
+  @Column({ default: JobPriority.BACKGROUND })
   priority?: JobPriority;
 }
