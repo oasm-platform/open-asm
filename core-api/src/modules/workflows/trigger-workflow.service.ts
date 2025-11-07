@@ -27,6 +27,7 @@ export class TriggerWorkflowService implements OnModuleInit {
               tool,
               targetIds: [payload.id],
               workflow: workflow,
+              priority: tool.priority,
             })));
           }
         })
