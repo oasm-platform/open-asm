@@ -248,12 +248,11 @@ function FacetedFilterTemplate({
 export function IpFacetedFilter() {
   const [open, setOpen] = useState(false);
   const { filterParams } = useAsset();
-  const { queryFilterParams } = useAsset();
   const [value, setValue] = useState('');
 
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetching } =
     useAssetsControllerGetIpAssetsInfinite(
-      { ...queryFilterParams, value: value },
+      { ...filterParams, value: value },
       {
         query: {
           getNextPageParam: (lastGroup) =>
