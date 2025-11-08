@@ -2,6 +2,7 @@ import { useWorkspacesControllerGetWorkspaces } from '@/services/apis/gen/querie
 import { setGlobalWorkspaceId } from '@/utils/workspaceState';
 import React from 'react';
 import createState from './createState'; // adjust path as needed
+import { useQueryClient } from '@tanstack/react-query';
 
 // Define workspace state type
 interface WorkspaceState {
@@ -49,12 +50,17 @@ export function useWorkspaceSelector() {
   const { state, setSelectedWorkspace, clearSelectedWorkspace } =
     useWorkspaceState();
 
+  const queryClient = useQueryClient();
+
   const handleSelectWorkspace = React.useCallback(
     (id: string) => {
       setSelectedWorkspace(id);
       setGlobalWorkspaceId(id); // Always set the global workspace ID when manually selecting
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] !== 'global',
+      });
     },
-    [setSelectedWorkspace],
+    [queryClient, setSelectedWorkspace],
   );
 
   // Auto-select workspace logic
