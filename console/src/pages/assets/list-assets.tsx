@@ -11,7 +11,7 @@ import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
 
 export function ListAssets() {
-  const { workspaces } = useWorkspaceSelector()
+  const { workspaces } = useWorkspaceSelector();
 
   const tabList = useMemo(
     () => [
@@ -27,7 +27,7 @@ export function ListAssets() {
       },
       {
         value: 'ip',
-        text: 'IP Adresses',
+        text: 'IP Addresses',
         tab: <IpAssetsTab />,
       },
       {

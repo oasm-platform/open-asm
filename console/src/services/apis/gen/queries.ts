@@ -1006,6 +1006,65 @@ export type RunTemplateDto = {
   assetId: string;
 };
 
+export type AssetGroupResponseDto = {
+  /** ID of the asset group */
+  id: string;
+  /** Name of the asset group */
+  name: string;
+  /** Date when the asset group was created */
+  createdAt: string;
+  /** Date when the asset group was last updated */
+  updatedAt: string;
+  /** List of assets in the asset group */
+  assets?: Asset[];
+  /** List of tools in the asset group */
+  tools?: Tool[];
+};
+
+export type GetManyAssetGroupResponseDtoDto = {
+  data: AssetGroupResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type CreateAssetGroupDto = {
+  /** Name of the asset group */
+  name: string;
+  /** ID of the workspace the asset group belongs to */
+  workspaceId: string;
+};
+
+export type AddManyToolsToAssetGroupDto = {
+  /** ID of the asset group */
+  assetGroupId: string;
+  /** Array of tool IDs to add */
+  toolIds: string[];
+};
+
+export type AddManyAssetsToAssetGroupDto = {
+  /** ID of the asset group */
+  assetGroupId: string;
+  /** Array of asset IDs to add */
+  assetIds: string[];
+};
+
+export type RemoveManyToolsFromAssetGroupDto = {
+  /** ID of the asset group */
+  assetGroupId: string;
+  /** Array of tool IDs to remove */
+  toolIds: string[];
+};
+
+export type RemoveManyAssetsFromAssetGroupDto = {
+  /** ID of the asset group */
+  assetGroupId: string;
+  /** Array of asset IDs to remove */
+  assetIds: string[];
+};
+
 export type McpTool = {
   name: string;
   type: string;
@@ -1248,6 +1307,13 @@ export type TemplatesControllerGetAllTemplatesParams = {
   sortBy?: string;
   sortOrder?: string;
   value?: string;
+};
+
+export type AssetGroupControllerGetAllParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -18307,6 +18373,1584 @@ export const useTemplatesControllerRunTemplate = <
 > => {
   const mutationOptions =
     getTemplatesControllerRunTemplateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all asset groups with optional filtering and pagination.
+ * @summary Get all asset groups
+ */
+export const assetGroupControllerGetAll = (
+  params?: AssetGroupControllerGetAllParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyAssetGroupResponseDtoDto>(
+    { url: `/api/asset-group`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetAllInfiniteQueryKey = (
+  params?: AssetGroupControllerGetAllParams,
+) => {
+  return ['infinate', `/api/asset-group`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetGroupControllerGetAllQueryKey = (
+  params?: AssetGroupControllerGetAllParams,
+) => {
+  return [`/api/asset-group`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetGroupControllerGetAllInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetAllInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+  > = ({ signal }) =>
+    assetGroupControllerGetAll(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetAllInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+>;
+export type AssetGroupControllerGetAllInfiniteQueryError = unknown;
+
+export function useAssetGroupControllerGetAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params: undefined | AssetGroupControllerGetAllParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all asset groups
+ */
+
+export function useAssetGroupControllerGetAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetGroupControllerGetAllInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetAllQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetGroupControllerGetAllQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+  > = ({ signal }) =>
+    assetGroupControllerGetAll(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetAllQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+>;
+export type AssetGroupControllerGetAllQueryError = unknown;
+
+export function useAssetGroupControllerGetAll<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params: undefined | AssetGroupControllerGetAllParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAll<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAll<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all asset groups
+ */
+
+export function useAssetGroupControllerGetAll<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetGroupControllerGetAllQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Creates a new asset group.
+ * @summary Create asset group
+ */
+export const assetGroupControllerCreate = (
+  createAssetGroupDto: CreateAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AssetGroupResponseDto>(
+    {
+      url: `/api/asset-group`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createAssetGroupDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerCreateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+    TError,
+    { data: CreateAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+  TError,
+  { data: CreateAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerCreate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+    { data: CreateAssetGroupDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assetGroupControllerCreate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerCreateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerCreate>>
+>;
+export type AssetGroupControllerCreateMutationBody = CreateAssetGroupDto;
+export type AssetGroupControllerCreateMutationError = unknown;
+
+/**
+ * @summary Create asset group
+ */
+export const useAssetGroupControllerCreate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+      TError,
+      { data: CreateAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+  TError,
+  { data: CreateAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions = getAssetGroupControllerCreateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Fetches a specific asset group by its unique identifier.
+ * @summary Get asset group by ID
+ */
+export const assetGroupControllerGetById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AssetGroupResponseDto>(
+    { url: `/api/asset-group/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetByIdInfiniteQueryKey = (id?: string) => {
+  return ['infinate', `/api/asset-group/${id}`] as const;
+};
+
+export const getAssetGroupControllerGetByIdQueryKey = (id?: string) => {
+  return [`/api/asset-group/${id}`] as const;
+};
+
+export const getAssetGroupControllerGetByIdInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetByIdInfiniteQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetById>>
+  > = ({ signal }) => assetGroupControllerGetById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetByIdInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerGetById>>
+>;
+export type AssetGroupControllerGetByIdInfiniteQueryError = unknown;
+
+export function useAssetGroupControllerGetByIdInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetByIdInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetByIdInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get asset group by ID
+ */
+
+export function useAssetGroupControllerGetByIdInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetGroupControllerGetByIdInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetGroupControllerGetByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetById>>
+  > = ({ signal }) => assetGroupControllerGetById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerGetById>>
+>;
+export type AssetGroupControllerGetByIdQueryError = unknown;
+
+export function useAssetGroupControllerGetById<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetById<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetById<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get asset group by ID
+ */
+
+export function useAssetGroupControllerGetById<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetGroupControllerGetByIdQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Permanently removes an asset group.
+ * @summary Delete asset group
+ */
+export const assetGroupControllerDelete = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/asset-group/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAssetGroupControllerDeleteMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerDelete'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return assetGroupControllerDelete(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerDelete>>
+>;
+
+export type AssetGroupControllerDeleteMutationError = unknown;
+
+/**
+ * @summary Delete asset group
+ */
+export const useAssetGroupControllerDelete = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions = getAssetGroupControllerDeleteMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Associates a tool with the specified asset group.
+ * @summary Add tool to asset group
+ */
+export const assetGroupControllerAddTool = (
+  groupId: string,
+  toolId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/tools/${toolId}`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerAddToolMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
+    TError,
+    { groupId: string; toolId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
+  TError,
+  { groupId: string; toolId: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerAddTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
+    { groupId: string; toolId: string }
+  > = (props) => {
+    const { groupId, toolId } = props ?? {};
+
+    return assetGroupControllerAddTool(groupId, toolId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerAddToolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerAddTool>>
+>;
+
+export type AssetGroupControllerAddToolMutationError = unknown;
+
+/**
+ * @summary Add tool to asset group
+ */
+export const useAssetGroupControllerAddTool = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
+      TError,
+      { groupId: string; toolId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
+  TError,
+  { groupId: string; toolId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerAddToolMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Disassociates a tool from the asset group.
+ * @summary Remove tool from asset group
+ */
+export const assetGroupControllerRemoveTool = (
+  groupId: string,
+  toolId: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/asset-group/${groupId}/tools/${toolId}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAssetGroupControllerRemoveToolMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
+    TError,
+    { groupId: string; toolId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
+  TError,
+  { groupId: string; toolId: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRemoveTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
+    { groupId: string; toolId: string }
+  > = (props) => {
+    const { groupId, toolId } = props ?? {};
+
+    return assetGroupControllerRemoveTool(groupId, toolId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerRemoveToolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>
+>;
+
+export type AssetGroupControllerRemoveToolMutationError = unknown;
+
+/**
+ * @summary Remove tool from asset group
+ */
+export const useAssetGroupControllerRemoveTool = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
+      TError,
+      { groupId: string; toolId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
+  TError,
+  { groupId: string; toolId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerRemoveToolMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Associates multiple tools with the specified asset group.
+ * @summary Add multiple tools to asset group
+ */
+export const assetGroupControllerAddManyTools = (
+  groupId: string,
+  addManyToolsToAssetGroupDto: AddManyToolsToAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/tools`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: addManyToolsToAssetGroupDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerAddManyToolsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
+    TError,
+    { groupId: string; data: AddManyToolsToAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
+  TError,
+  { groupId: string; data: AddManyToolsToAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerAddManyTools'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
+    { groupId: string; data: AddManyToolsToAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerAddManyTools(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerAddManyToolsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>
+>;
+export type AssetGroupControllerAddManyToolsMutationBody =
+  AddManyToolsToAssetGroupDto;
+export type AssetGroupControllerAddManyToolsMutationError = unknown;
+
+/**
+ * @summary Add multiple tools to asset group
+ */
+export const useAssetGroupControllerAddManyTools = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
+      TError,
+      { groupId: string; data: AddManyToolsToAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
+  TError,
+  { groupId: string; data: AddManyToolsToAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerAddManyToolsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Disassociates multiple tools from the asset group.
+ * @summary Remove multiple tools from asset group
+ */
+export const assetGroupControllerRemoveManyTools = (
+  groupId: string,
+  removeManyToolsFromAssetGroupDto: RemoveManyToolsFromAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/tools`,
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      data: removeManyToolsFromAssetGroupDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerRemoveManyToolsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
+    TError,
+    { groupId: string; data: RemoveManyToolsFromAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
+  TError,
+  { groupId: string; data: RemoveManyToolsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRemoveManyTools'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
+    { groupId: string; data: RemoveManyToolsFromAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerRemoveManyTools(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerRemoveManyToolsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>
+>;
+export type AssetGroupControllerRemoveManyToolsMutationBody =
+  RemoveManyToolsFromAssetGroupDto;
+export type AssetGroupControllerRemoveManyToolsMutationError = unknown;
+
+/**
+ * @summary Remove multiple tools from asset group
+ */
+export const useAssetGroupControllerRemoveManyTools = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
+      TError,
+      { groupId: string; data: RemoveManyToolsFromAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
+  TError,
+  { groupId: string; data: RemoveManyToolsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerRemoveManyToolsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Associates an asset with the specified asset group.
+ * @summary Add asset to asset group
+ */
+export const assetGroupControllerAddAsset = (
+  groupId: string,
+  assetId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/assets/${assetId}`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerAddAssetMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
+    TError,
+    { groupId: string; assetId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
+  TError,
+  { groupId: string; assetId: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerAddAsset'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
+    { groupId: string; assetId: string }
+  > = (props) => {
+    const { groupId, assetId } = props ?? {};
+
+    return assetGroupControllerAddAsset(groupId, assetId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerAddAssetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerAddAsset>>
+>;
+
+export type AssetGroupControllerAddAssetMutationError = unknown;
+
+/**
+ * @summary Add asset to asset group
+ */
+export const useAssetGroupControllerAddAsset = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
+      TError,
+      { groupId: string; assetId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
+  TError,
+  { groupId: string; assetId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerAddAssetMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Disassociates an asset from the asset group.
+ * @summary Remove asset from asset group
+ */
+export const assetGroupControllerRemoveAsset = (
+  groupId: string,
+  assetId: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/asset-group/${groupId}/assets/${assetId}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAssetGroupControllerRemoveAssetMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
+    TError,
+    { groupId: string; assetId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
+  TError,
+  { groupId: string; assetId: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRemoveAsset'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
+    { groupId: string; assetId: string }
+  > = (props) => {
+    const { groupId, assetId } = props ?? {};
+
+    return assetGroupControllerRemoveAsset(groupId, assetId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerRemoveAssetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>
+>;
+
+export type AssetGroupControllerRemoveAssetMutationError = unknown;
+
+/**
+ * @summary Remove asset from asset group
+ */
+export const useAssetGroupControllerRemoveAsset = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
+      TError,
+      { groupId: string; assetId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
+  TError,
+  { groupId: string; assetId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerRemoveAssetMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Associates multiple assets with the specified asset group.
+ * @summary Add multiple assets to asset group
+ */
+export const assetGroupControllerAddManyAssets = (
+  groupId: string,
+  addManyAssetsToAssetGroupDto: AddManyAssetsToAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/assets`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: addManyAssetsToAssetGroupDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerAddManyAssetsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+    TError,
+    { groupId: string; data: AddManyAssetsToAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+  TError,
+  { groupId: string; data: AddManyAssetsToAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerAddManyAssets'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+    { groupId: string; data: AddManyAssetsToAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerAddManyAssets(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerAddManyAssetsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>
+>;
+export type AssetGroupControllerAddManyAssetsMutationBody =
+  AddManyAssetsToAssetGroupDto;
+export type AssetGroupControllerAddManyAssetsMutationError = unknown;
+
+/**
+ * @summary Add multiple assets to asset group
+ */
+export const useAssetGroupControllerAddManyAssets = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+      TError,
+      { groupId: string; data: AddManyAssetsToAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+  TError,
+  { groupId: string; data: AddManyAssetsToAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerAddManyAssetsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Disassociates multiple assets from the asset group.
+ * @summary Remove multiple assets from asset group
+ */
+export const assetGroupControllerRemoveManyAssets = (
+  groupId: string,
+  removeManyAssetsFromAssetGroupDto: RemoveManyAssetsFromAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/assets`,
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      data: removeManyAssetsFromAssetGroupDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerRemoveManyAssetsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+    TError,
+    { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+  TError,
+  { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRemoveManyAssets'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+    { groupId: string; data: RemoveManyAssetsFromAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerRemoveManyAssets(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerRemoveManyAssetsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>
+>;
+export type AssetGroupControllerRemoveManyAssetsMutationBody =
+  RemoveManyAssetsFromAssetGroupDto;
+export type AssetGroupControllerRemoveManyAssetsMutationError = unknown;
+
+/**
+ * @summary Remove multiple assets from asset group
+ */
+export const useAssetGroupControllerRemoveManyAssets = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+      TError,
+      { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+  TError,
+  { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerRemoveManyAssetsMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

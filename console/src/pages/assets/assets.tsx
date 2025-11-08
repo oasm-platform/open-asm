@@ -1,12 +1,12 @@
 import Page from '@/components/common/page';
-import { ListAssets } from './list-assets';
+import { AssetGroupTab } from '@/pages/asset-group/asset-group-tab';
 import AssetProvider from './context/asset-context';
 
 const Assets = () => {
   return (
     <Page title="Assets">
       <AssetProvider>
-        <ListAssets />
+        <AssetGroupTab />
       </AssetProvider>
     </Page>
   );
