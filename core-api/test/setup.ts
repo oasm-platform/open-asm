@@ -1,0 +1,2 @@
+import 'tsconfig-paths/register';
+
