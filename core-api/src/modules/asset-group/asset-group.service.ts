@@ -150,6 +150,23 @@ export class AssetGroupService {
         );
       }
 
+      // Check if an asset group with the same name already exists in the workspace
+      const existingAssetGroup = await this.assetGroupRepo.findOne({
+        where: {
+          name: createAssetGroupDto.name,
+          workspace: { id: createAssetGroupDto.workspaceId },
+        },
+      });
+
+      if (existingAssetGroup) {
+        this.logger.warn(
+          `An asset group with name "${createAssetGroupDto.name}" already exists in workspace "${createAssetGroupDto.workspaceId}"`,
+        );
+        throw new BadRequestException(
+          `An asset group with name "${createAssetGroupDto.name}" already exists in this workspace`,
+        );
+      }
+
       const assetGroup = this.assetGroupRepo.create({
         name: createAssetGroupDto.name,
         workspace: { id: createAssetGroupDto.workspaceId },
