@@ -9,6 +9,7 @@ import PortAssetsTab from './components/port-assets-tab';
 import StatusCodeAssetsTab from './components/status-code-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
+import { AssetGroupTab } from './components/asset-group-tab';
 
 export function ListAssets() {
   const { workspaces } = useWorkspaceSelector();
@@ -39,6 +40,11 @@ export function ListAssets() {
         value: 'statusCode',
         text: 'Status Code',
         tab: <StatusCodeAssetsTab />,
+      },
+      {
+        value: 'group',
+        text: 'Group',
+        tab: <AssetGroupTab />,
       },
     ],
     [],
