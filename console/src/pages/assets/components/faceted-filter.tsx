@@ -247,17 +247,19 @@ function FacetedFilterTemplate({
 
 export function IpFacetedFilter() {
   const [open, setOpen] = useState(false);
-  const { filterParams } = useAsset();
+
+  const { filterParams, queryFilterParams } = useAsset();
   const [value, setValue] = useState('');
 
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetching } =
     useAssetsControllerGetIpAssetsInfinite(
-      { ...filterParams, value: value },
+      { ...filterParams, ...queryFilterParams, value: value },
       {
         query: {
           getNextPageParam: (lastGroup) =>
             lastGroup.hasNextPage ? lastGroup.page + 1 : undefined,
           enabled: open,
+          initialPageParam: 1,
           select: (res) => {
             const items = res?.pages.flatMap((page) => page.data) || [];
             return items.map((e) => ({
@@ -288,18 +290,18 @@ export function IpFacetedFilter() {
 
 export function PortFacetedFilter() {
   const [open, setOpen] = useState(false);
-  const { filterParams } = useAsset();
-  const { queryFilterParams } = useAsset();
+  const { filterParams, queryFilterParams } = useAsset();
   const [value, setValue] = useState('');
 
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetching } =
     useAssetsControllerGetPortAssetsInfinite(
-      { ...queryFilterParams, value: value },
+      { ...queryFilterParams, ...filterParams, value: value },
       {
         query: {
           getNextPageParam: (lastGroup) =>
             lastGroup.hasNextPage ? lastGroup.page + 1 : undefined,
           enabled: open,
+          initialPageParam: 1,
           select: (res) => {
             const items = res?.pages.flatMap((page) => page.data) || [];
             return items.map((e) => ({
@@ -330,17 +332,17 @@ export function PortFacetedFilter() {
 
 export function TechsFacetedFilter() {
   const [open, setOpen] = useState(false);
-  const { filterParams } = useAsset();
-  const { queryFilterParams } = useAsset();
+  const { filterParams, queryFilterParams } = useAsset();
   const [value, setValue] = useState('');
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetching } =
     useAssetsControllerGetTechnologyAssetsInfinite(
-      { ...queryFilterParams, value: value },
+      { ...queryFilterParams, ...filterParams, value: value },
       {
         query: {
           getNextPageParam: (lastGroup) =>
             lastGroup.hasNextPage ? lastGroup.page + 1 : undefined,
           enabled: open,
+          initialPageParam: 1,
           select: (res) => {
             const items = res?.pages.flatMap((page) => page.data) || [];
             return items.map((e) => ({
@@ -371,17 +373,17 @@ export function TechsFacetedFilter() {
 
 export function StatusCodesFacetedFilter() {
   const [open, setOpen] = useState(false);
-  const { filterParams } = useAsset();
-  const { queryFilterParams } = useAsset();
+  const { filterParams, queryFilterParams } = useAsset();
   const [value, setValue] = useState('');
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetching } =
     useAssetsControllerGetStatusCodeAssetsInfinite(
-      { ...queryFilterParams, value: value },
+      { ...queryFilterParams, ...filterParams, value: value },
       {
         query: {
           getNextPageParam: (lastGroup) =>
             lastGroup.hasNextPage ? lastGroup.page + 1 : undefined,
           enabled: open,
+          initialPageParam: 1,
           select: (res) => {
             const items = res?.pages.flatMap((page) => page.data) || [];
             return items.map((e) => ({

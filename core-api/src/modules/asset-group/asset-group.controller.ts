@@ -39,7 +39,7 @@ export class AssetGroupController {
   })
   @Get()
   getAll(
-    @Query() query: GetManyBaseQueryParams,
+    @Query() query: GetManyBaseQueryParams & { targetId?: string },
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetGroupService.getAll(query, workspaceId);
@@ -73,18 +73,6 @@ export class AssetGroupController {
   }
 
   @Doc({
-    summary: 'Add tool to asset group',
-    description: 'Associates a tool with the specified asset group.',
-    response: {
-      serialization: DefaultMessageResponseDto,
-    },
-  })
-  @Post(':groupId/tools/:toolId')
-  addTool(@Param('groupId') groupId: string, @Param('toolId') toolId: string) {
-    return this.assetGroupService.addTool(groupId, toolId);
-  }
-
-  @Doc({
     summary: 'Add multiple tools to asset group',
     description: 'Associates multiple tools with the specified asset group.',
     response: {
@@ -103,21 +91,6 @@ export class AssetGroupController {
   }
 
   @Doc({
-    summary: 'Add asset to asset group',
-    description: 'Associates an asset with the specified asset group.',
-    response: {
-      serialization: DefaultMessageResponseDto,
-    },
-  })
-  @Post(':groupId/assets/:assetId')
-  addAsset(
-    @Param('groupId') groupId: string,
-    @Param('assetId') assetId: string,
-  ) {
-    return this.assetGroupService.addAsset(groupId, assetId);
-  }
-
-  @Doc({
     summary: 'Add multiple assets to asset group',
     description: 'Associates multiple assets with the specified asset group.',
     response: {
@@ -133,36 +106,6 @@ export class AssetGroupController {
       groupId,
       addManyAssetsDto.assetIds,
     );
-  }
-
-  @Doc({
-    summary: 'Remove tool from asset group',
-    description: 'Disassociates a tool from the asset group.',
-    response: {
-      serialization: DefaultMessageResponseDto,
-    },
-  })
-  @Delete(':groupId/tools/:toolId')
-  removeTool(
-    @Param('groupId') groupId: string,
-    @Param('toolId') toolId: string,
-  ) {
-    return this.assetGroupService.removeTool(groupId, toolId);
-  }
-
-  @Doc({
-    summary: 'Remove asset from asset group',
-    description: 'Disassociates an asset from the asset group.',
-    response: {
-      serialization: DefaultMessageResponseDto,
-    },
-  })
-  @Delete(':groupId/assets/:assetId')
-  removeAsset(
-    @Param('groupId') groupId: string,
-    @Param('assetId') assetId: string,
-  ) {
-    return this.assetGroupService.removeAsset(groupId, assetId);
   }
 
   @Doc({

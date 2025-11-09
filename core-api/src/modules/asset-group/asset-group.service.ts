@@ -38,15 +38,22 @@ export class AssetGroupService {
   /**
    * Retrieves all asset groups with optional filtering and pagination
    */
-  async getAll(query: GetManyBaseQueryParams, workspaceId: string) {
+  async getAll(
+    query: GetManyBaseQueryParams & { targetId?: string },
+    workspaceId: string,
+  ) {
     try {
-      this.logger.log(`Retrieving asset groups for workspace: ${workspaceId}`);
       const { page, limit, sortBy, sortOrder } = query;
       const offset = (page - 1) * limit;
 
       const [data, total] = await this.assetGroupRepo.findAndCount({
         where: {
           workspace: { id: workspaceId },
+          assetGroupAssets: {
+            asset: {
+              targetId: query.targetId,
+            },
+          },
         },
         order: { [sortBy]: sortOrder },
         skip: offset,
@@ -59,9 +66,6 @@ export class AssetGroupService {
         ],
       });
 
-      this.logger.log(
-        `Retrieved ${data.length} asset groups out of ${total} total for workspace: ${workspaceId}`,
-      );
       return getManyResponse({ query, data, total });
     } catch (error) {
       this.logger.error(
@@ -80,9 +84,6 @@ export class AssetGroupService {
     workspaceId: string,
   ): Promise<AssetGroupResponseDto> {
     try {
-      this.logger.log(
-        `Retrieving asset group with ID: ${id} for workspace: ${workspaceId}`,
-      );
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id, workspace: { id: workspaceId } },
         relations: [
@@ -94,9 +95,6 @@ export class AssetGroupService {
       });
 
       if (!assetGroup) {
-        this.logger.warn(
-          `Asset group with ID "${id}" not found in workspace "${workspaceId}"`,
-        );
         throw new NotFoundException(
           `Asset group with ID "${id}" not found in workspace "${workspaceId}"`,
         );
@@ -117,7 +115,6 @@ export class AssetGroupService {
         response.tools = assetGroup.assetGroupTools.map((agt) => agt.tool);
       }
 
-      this.logger.log(`Successfully retrieved asset group with ID: ${id}`);
       return response;
     } catch (error) {
       this.logger.error(
@@ -133,18 +130,11 @@ export class AssetGroupService {
    */
   async create(createAssetGroupDto: CreateAssetGroupDto) {
     try {
-      this.logger.log(
-        `Creating new asset group with name: ${createAssetGroupDto.name}`,
-      );
-
       // Validate the workspace exists
       const workspace = await this.assetGroupRepo.manager.findOneBy(Workspace, {
         id: createAssetGroupDto.workspaceId,
       });
       if (!workspace) {
-        this.logger.warn(
-          `Workspace with ID "${createAssetGroupDto.workspaceId}" not found`,
-        );
         throw new NotFoundException(
           `Workspace with ID "${createAssetGroupDto.workspaceId}" not found`,
         );
@@ -159,9 +149,6 @@ export class AssetGroupService {
       });
 
       if (existingAssetGroup) {
-        this.logger.warn(
-          `An asset group with name "${createAssetGroupDto.name}" already exists in workspace "${createAssetGroupDto.workspaceId}"`,
-        );
         throw new BadRequestException(
           `An asset group with name "${createAssetGroupDto.name}" already exists in this workspace`,
         );
@@ -173,82 +160,9 @@ export class AssetGroupService {
       });
 
       const savedAssetGroup = await this.assetGroupRepo.save(assetGroup);
-      this.logger.log(
-        `Successfully created asset group with ID: ${savedAssetGroup.id}`,
-      );
       return savedAssetGroup;
     } catch (error) {
       this.logger.error(`Error creating asset group:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Associates a tool with the specified asset group
-   */
-  async addTool(
-    groupId: string,
-    toolId: string,
-  ): Promise<DefaultMessageResponseDto> {
-    try {
-      this.logger.log(
-        `Adding tool with ID: ${toolId} to asset group with ID: ${groupId}`,
-      );
-
-      // Verify that both the asset group and tool exist
-      const [assetGroup, tool] = await Promise.all([
-        this.assetGroupRepo.findOne({ where: { id: groupId } }),
-        this.toolRepo.findOne({ where: { id: toolId } }),
-      ]);
-
-      if (!assetGroup) {
-        this.logger.warn(`Asset group with ID "${groupId}" not found`);
-        throw new NotFoundException(
-          `Asset group with ID "${groupId}" not found`,
-        );
-      }
-
-      if (!tool) {
-        this.logger.warn(`Tool with ID "${toolId}" not found`);
-        throw new NotFoundException(`Tool with ID "${toolId}" not found`);
-      }
-
-      // Check if the association already exists
-      const existingAssociation = await this.assetGroupToolRepo.findOne({
-        where: {
-          assetGroup: { id: groupId },
-          tool: { id: toolId },
-        },
-      });
-
-      if (existingAssociation) {
-        this.logger.warn(
-          `Tool "${toolId}" is already associated with asset group "${groupId}"`,
-        );
-        throw new BadRequestException(
-          `Tool "${toolId}" is already associated with asset group "${groupId}"`,
-        );
-      }
-
-      // Create the association
-      const assetGroupTool = this.assetGroupToolRepo.create({
-        assetGroup: { id: groupId },
-        tool: { id: toolId },
-      });
-
-      await this.assetGroupToolRepo.save(assetGroupTool);
-
-      this.logger.log(
-        `Successfully added tool with ID: ${toolId} to asset group with ID: ${groupId}`,
-      );
-      return {
-        message: `Tool "${toolId}" successfully added to asset group "${groupId}"`,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error adding tool with ID ${toolId} to asset group with ID ${groupId}:`,
-        error,
-      );
       throw error;
     }
   }
@@ -337,76 +251,6 @@ export class AssetGroupService {
   }
 
   /**
-   * Associates an asset with the specified asset group
-   */
-  async addAsset(
-    groupId: string,
-    assetId: string,
-  ): Promise<DefaultMessageResponseDto> {
-    try {
-      this.logger.log(
-        `Adding asset with ID: ${assetId} to asset group with ID: ${groupId}`,
-      );
-
-      // Verify that both the asset group and asset exist
-      const [assetGroup, asset] = await Promise.all([
-        this.assetGroupRepo.findOne({ where: { id: groupId } }),
-        this.assetRepo.findOne({ where: { id: assetId } }),
-      ]);
-
-      if (!assetGroup) {
-        this.logger.warn(`Asset group with ID "${groupId}" not found`);
-        throw new NotFoundException(
-          `Asset group with ID "${groupId}" not found`,
-        );
-      }
-
-      if (!asset) {
-        this.logger.warn(`Asset with ID "${assetId}" not found`);
-        throw new NotFoundException(`Asset with ID "${assetId}" not found`);
-      }
-
-      // Check if the association already exists
-      const existingAssociation = await this.assetGroupAssetRepo.findOne({
-        where: {
-          assetGroup: { id: groupId },
-          asset: { id: assetId },
-        },
-      });
-
-      if (existingAssociation) {
-        this.logger.warn(
-          `Asset "${assetId}" is already associated with asset group "${groupId}"`,
-        );
-        throw new BadRequestException(
-          `Asset "${assetId}" is already associated with asset group "${groupId}"`,
-        );
-      }
-
-      // Create the association
-      const assetGroupAsset = this.assetGroupAssetRepo.create({
-        assetGroup: { id: groupId },
-        asset: { id: assetId },
-      });
-
-      await this.assetGroupAssetRepo.save(assetGroupAsset);
-
-      this.logger.log(
-        `Successfully added asset with ID: ${assetId} to asset group with ID: ${groupId}`,
-      );
-      return {
-        message: `Asset "${assetId}" successfully added to asset group "${groupId}"`,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error adding asset with ID ${assetId} to asset group with ID ${groupId}:`,
-        error,
-      );
-      throw error;
-    }
-  }
-
-  /**
    * Associates multiple assets with the specified asset group
    */
   async addManyAssets(
@@ -414,10 +258,6 @@ export class AssetGroupService {
     assetIds: string[],
   ): Promise<DefaultMessageResponseDto> {
     try {
-      this.logger.log(
-        `Adding ${assetIds.length} assets to asset group with ID: ${groupId}`,
-      );
-
       // Verify that the asset group exists
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id: groupId },
@@ -490,53 +330,6 @@ export class AssetGroupService {
   }
 
   /**
-   * Disassociates a tool from the asset group
-   */
-  async removeTool(
-    groupId: string,
-    toolId: string,
-  ): Promise<DefaultMessageResponseDto> {
-    try {
-      this.logger.log(
-        `Removing tool with ID: ${toolId} from asset group with ID: ${groupId}`,
-      );
-
-      // Verify that the association exists
-      const association = await this.assetGroupToolRepo.findOne({
-        where: {
-          assetGroup: { id: groupId },
-          tool: { id: toolId },
-        },
-      });
-
-      if (!association) {
-        this.logger.warn(
-          `Tool "${toolId}" is not associated with asset group "${groupId}"`,
-        );
-        throw new NotFoundException(
-          `Tool "${toolId}" is not associated with asset group "${groupId}"`,
-        );
-      }
-
-      // Remove the association
-      await this.assetGroupToolRepo.remove(association);
-
-      this.logger.log(
-        `Successfully removed tool with ID: ${toolId} from asset group with ID: ${groupId}`,
-      );
-      return {
-        message: `Tool "${toolId}" successfully removed from asset group "${groupId}"`,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error removing tool with ID ${toolId} from asset group with ID ${groupId}:`,
-        error,
-      );
-      throw error;
-    }
-  }
-
-  /**
    * Disassociates multiple tools from the asset group
    */
   async removeManyTools(
@@ -544,10 +337,6 @@ export class AssetGroupService {
     toolIds: string[],
   ): Promise<DefaultMessageResponseDto> {
     try {
-      this.logger.log(
-        `Removing ${toolIds.length} tools from asset group with ID: ${groupId}`,
-      );
-
       // Find existing associations
       const associations = await this.assetGroupToolRepo.find({
         where: {
@@ -571,9 +360,6 @@ export class AssetGroupService {
         (id) => !associatedToolIds.includes(id),
       );
       if (missingToolIds.length > 0) {
-        this.logger.warn(
-          `Tools with IDs "${missingToolIds.join(', ')}" are not associated with asset group "${groupId}"`,
-        );
         throw new NotFoundException(
           `Tools with IDs "${missingToolIds.join(', ')}" are not associated with asset group "${groupId}"`,
         );
@@ -582,62 +368,12 @@ export class AssetGroupService {
       // Remove the associations
       await this.assetGroupToolRepo.remove(associations);
 
-      this.logger.log(
-        `Successfully removed ${associations.length} tools from asset group with ID: ${groupId}`,
-      );
       return {
         message: `${associations.length} tools successfully removed from asset group "${groupId}"`,
       };
     } catch (error) {
       this.logger.error(
         `Error removing tools from asset group with ID ${groupId}:`,
-        error,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Disassociates an asset from the asset group
-   */
-  async removeAsset(
-    groupId: string,
-    assetId: string,
-  ): Promise<DefaultMessageResponseDto> {
-    try {
-      this.logger.log(
-        `Removing asset with ID: ${assetId} from asset group with ID: ${groupId}`,
-      );
-
-      // Verify that the association exists
-      const association = await this.assetGroupAssetRepo.findOne({
-        where: {
-          assetGroup: { id: groupId },
-          asset: { id: assetId },
-        },
-      });
-
-      if (!association) {
-        this.logger.warn(
-          `Asset "${assetId}" is not associated with asset group "${groupId}"`,
-        );
-        throw new NotFoundException(
-          `Asset "${assetId}" is not associated with asset group "${groupId}"`,
-        );
-      }
-
-      // Remove the association
-      await this.assetGroupAssetRepo.remove(association);
-
-      this.logger.log(
-        `Successfully removed asset with ID: ${assetId} from asset group with ID: ${groupId}`,
-      );
-      return {
-        message: `Asset "${assetId}" successfully removed from asset group "${groupId}"`,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error removing asset with ID ${assetId} from asset group with ID ${groupId}:`,
         error,
       );
       throw error;
@@ -652,10 +388,6 @@ export class AssetGroupService {
     assetIds: string[],
   ): Promise<DefaultMessageResponseDto> {
     try {
-      this.logger.log(
-        `Removing ${assetIds.length} assets from asset group with ID: ${groupId}`,
-      );
-
       // Find existing associations
       const associations = await this.assetGroupAssetRepo.find({
         where: {
@@ -665,9 +397,6 @@ export class AssetGroupService {
       });
 
       if (associations.length === 0) {
-        this.logger.warn(
-          `No assets with IDs "${assetIds.join(', ')}" are associated with asset group "${groupId}"`,
-        );
         throw new NotFoundException(
           `No assets with IDs "${assetIds.join(', ')}" are associated with asset group "${groupId}"`,
         );
@@ -679,9 +408,6 @@ export class AssetGroupService {
         (id) => !associatedAssetIds.includes(id),
       );
       if (missingAssetIds.length > 0) {
-        this.logger.warn(
-          `Assets with IDs "${missingAssetIds.join(', ')}" are not associated with asset group "${groupId}"`,
-        );
         throw new NotFoundException(
           `Assets with IDs "${missingAssetIds.join(', ')}" are not associated with asset group "${groupId}"`,
         );
@@ -690,9 +416,6 @@ export class AssetGroupService {
       // Remove the associations
       await this.assetGroupAssetRepo.remove(associations);
 
-      this.logger.log(
-        `Successfully removed ${associations.length} assets from asset group with ID: ${groupId}`,
-      );
       return {
         message: `${associations.length} assets successfully removed from asset group "${groupId}"`,
       };
@@ -710,15 +433,12 @@ export class AssetGroupService {
    */
   async delete(id: string): Promise<DefaultMessageResponseDto> {
     try {
-      this.logger.log(`Deleting asset group with ID: ${id}`);
-
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id },
         relations: ['assetGroupAssets', 'assetGroupTools'],
       });
 
       if (!assetGroup) {
-        this.logger.warn(`Asset group with ID "${id}" not found`);
         throw new NotFoundException(`Asset group with ID "${id}" not found`);
       }
 
@@ -737,7 +457,6 @@ export class AssetGroupService {
       // Delete the asset group itself
       await this.assetGroupRepo.remove(assetGroup);
 
-      this.logger.log(`Successfully deleted asset group with ID: ${id}`);
       return {
         message: `Asset group "${id}" successfully deleted`,
       };
