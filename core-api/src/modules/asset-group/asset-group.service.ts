@@ -1,5 +1,4 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
@@ -9,11 +8,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Tool } from '../tools/entities/tools.entity';
 import { AssetGroupResponseDto } from './dto/asset-group-response.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
+import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
 import { AssetGroupTool } from './entities/asset-groups-tools.entity';
 import { AssetGroup } from './entities/asset-groups.entity';
@@ -38,23 +38,28 @@ export class AssetGroupService {
   /**
    * Retrieves all asset groups with optional filtering and pagination
    */
-  async getAll(
-    query: GetManyBaseQueryParams & { targetId?: string },
-    workspaceId: string,
-  ) {
+  async getAll(query: GetAllAssetGroupsQueryDto, workspaceId: string) {
     try {
       const { page, limit, sortBy, sortOrder } = query;
       const offset = (page - 1) * limit;
 
-      const [data, total] = await this.assetGroupRepo.findAndCount({
-        where: {
-          workspace: { id: workspaceId },
-          assetGroupAssets: {
-            asset: {
-              targetId: query.targetId,
-            },
+      const whereConditions:
+        | FindOptionsWhere<AssetGroup>
+        | FindOptionsWhere<AssetGroup>[]
+        | undefined = {
+        workspace: { id: workspaceId },
+      };
+
+      if (query.targetIds && query.targetIds.length > 0) {
+        whereConditions.assetGroupAssets = {
+          asset: {
+            targetId: In(query.targetIds || []),
           },
-        },
+        };
+      }
+
+      const [data, total] = await this.assetGroupRepo.findAndCount({
+        where: whereConditions,
         order: { [sortBy]: sortOrder },
         skip: offset,
         take: limit,

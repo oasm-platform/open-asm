@@ -1,7 +1,6 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -18,6 +17,7 @@ import { AddManyAssetsToAssetGroupDto } from './dto/add-many-assets-to-asset-gro
 import { AddManyToolsToAssetGroupDto } from './dto/add-many-tools-to-asset-group.dto';
 import { AssetGroupResponseDto } from './dto/asset-group-response.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
+import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { RemoveManyAssetsFromAssetGroupDto } from './dto/remove-many-assets-from-asset-group.dto';
 import { RemoveManyToolsFromAssetGroupDto } from './dto/remove-many-tools-from-asset-group.dto';
 
@@ -39,7 +39,7 @@ export class AssetGroupController {
   })
   @Get()
   getAll(
-    @Query() query: GetManyBaseQueryParams & { targetId?: string },
+    @Query() query: GetAllAssetGroupsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetGroupService.getAll(query, workspaceId);

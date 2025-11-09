@@ -54,7 +54,6 @@ export function ListAssets() {
   if (workspaces.length === 0) return <CreateWorkspace />;
   return (
     <div className="w-full">
-      {/* <FilterForm /> */}
       <FilterFormInfinite />
       <Tabs
         value={selectedTab}

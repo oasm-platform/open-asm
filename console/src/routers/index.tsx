@@ -24,6 +24,7 @@ import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
 import ProtectedRoute from './ProtectedRoute';
 import RegisterRoute from './RegisterRoute';
+import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
 
 export const router = createBrowserRouter([
   {
@@ -76,7 +77,6 @@ export const router = createBrowserRouter([
                 path: ':tab',
                 element: <Settings />,
               },
-
             ],
           },
           {
@@ -127,6 +127,15 @@ export const router = createBrowserRouter([
               {
                 path: ':id',
                 element: <DetailAsset />,
+              },
+            ],
+          },
+          {
+            path: 'asset-group',
+            children: [
+              {
+                path: ':id',
+                element: <AssetGroupDetail />,
               },
             ],
           },

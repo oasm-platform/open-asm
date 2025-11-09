@@ -1038,29 +1038,21 @@ export type CreateAssetGroupDto = {
 };
 
 export type AddManyToolsToAssetGroupDto = {
-  /** ID of the asset group */
-  assetGroupId: string;
   /** Array of tool IDs to add */
   toolIds: string[];
 };
 
 export type AddManyAssetsToAssetGroupDto = {
-  /** ID of the asset group */
-  assetGroupId: string;
   /** Array of asset IDs to add */
   assetIds: string[];
 };
 
 export type RemoveManyToolsFromAssetGroupDto = {
-  /** ID of the asset group */
-  assetGroupId: string;
   /** Array of tool IDs to remove */
   toolIds: string[];
 };
 
 export type RemoveManyAssetsFromAssetGroupDto = {
-  /** ID of the asset group */
-  assetGroupId: string;
   /** Array of asset IDs to remove */
   assetIds: string[];
 };
@@ -1314,6 +1306,7 @@ export type AssetGroupControllerGetAllParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  targetIds?: string[];
 };
 
 export type StorageControllerUploadFileBody = {
@@ -19721,187 +19714,6 @@ export const useAssetGroupControllerDelete = <
 };
 
 /**
- * Associates a tool with the specified asset group.
- * @summary Add tool to asset group
- */
-export const assetGroupControllerAddTool = (
-  groupId: string,
-  toolId: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    {
-      url: `/api/asset-group/${groupId}/tools/${toolId}`,
-      method: 'POST',
-      signal,
-    },
-    options,
-  );
-};
-
-export const getAssetGroupControllerAddToolMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
-    TError,
-    { groupId: string; toolId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
-  TError,
-  { groupId: string; toolId: string },
-  TContext
-> => {
-  const mutationKey = ['assetGroupControllerAddTool'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
-    { groupId: string; toolId: string }
-  > = (props) => {
-    const { groupId, toolId } = props ?? {};
-
-    return assetGroupControllerAddTool(groupId, toolId, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AssetGroupControllerAddToolMutationResult = NonNullable<
-  Awaited<ReturnType<typeof assetGroupControllerAddTool>>
->;
-
-export type AssetGroupControllerAddToolMutationError = unknown;
-
-/**
- * @summary Add tool to asset group
- */
-export const useAssetGroupControllerAddTool = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
-      TError,
-      { groupId: string; toolId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof assetGroupControllerAddTool>>,
-  TError,
-  { groupId: string; toolId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getAssetGroupControllerAddToolMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Disassociates a tool from the asset group.
- * @summary Remove tool from asset group
- */
-export const assetGroupControllerRemoveTool = (
-  groupId: string,
-  toolId: string,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    { url: `/api/asset-group/${groupId}/tools/${toolId}`, method: 'DELETE' },
-    options,
-  );
-};
-
-export const getAssetGroupControllerRemoveToolMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
-    TError,
-    { groupId: string; toolId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
-  TError,
-  { groupId: string; toolId: string },
-  TContext
-> => {
-  const mutationKey = ['assetGroupControllerRemoveTool'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
-    { groupId: string; toolId: string }
-  > = (props) => {
-    const { groupId, toolId } = props ?? {};
-
-    return assetGroupControllerRemoveTool(groupId, toolId, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AssetGroupControllerRemoveToolMutationResult = NonNullable<
-  Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>
->;
-
-export type AssetGroupControllerRemoveToolMutationError = unknown;
-
-/**
- * @summary Remove tool from asset group
- */
-export const useAssetGroupControllerRemoveTool = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
-      TError,
-      { groupId: string; toolId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof assetGroupControllerRemoveTool>>,
-  TError,
-  { groupId: string; toolId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getAssetGroupControllerRemoveToolMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
  * Associates multiple tools with the specified asset group.
  * @summary Add multiple tools to asset group
  */
@@ -20087,187 +19899,6 @@ export const useAssetGroupControllerRemoveManyTools = <
 > => {
   const mutationOptions =
     getAssetGroupControllerRemoveManyToolsMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Associates an asset with the specified asset group.
- * @summary Add asset to asset group
- */
-export const assetGroupControllerAddAsset = (
-  groupId: string,
-  assetId: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    {
-      url: `/api/asset-group/${groupId}/assets/${assetId}`,
-      method: 'POST',
-      signal,
-    },
-    options,
-  );
-};
-
-export const getAssetGroupControllerAddAssetMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
-    TError,
-    { groupId: string; assetId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
-  TError,
-  { groupId: string; assetId: string },
-  TContext
-> => {
-  const mutationKey = ['assetGroupControllerAddAsset'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
-    { groupId: string; assetId: string }
-  > = (props) => {
-    const { groupId, assetId } = props ?? {};
-
-    return assetGroupControllerAddAsset(groupId, assetId, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AssetGroupControllerAddAssetMutationResult = NonNullable<
-  Awaited<ReturnType<typeof assetGroupControllerAddAsset>>
->;
-
-export type AssetGroupControllerAddAssetMutationError = unknown;
-
-/**
- * @summary Add asset to asset group
- */
-export const useAssetGroupControllerAddAsset = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
-      TError,
-      { groupId: string; assetId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof assetGroupControllerAddAsset>>,
-  TError,
-  { groupId: string; assetId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getAssetGroupControllerAddAssetMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Disassociates an asset from the asset group.
- * @summary Remove asset from asset group
- */
-export const assetGroupControllerRemoveAsset = (
-  groupId: string,
-  assetId: string,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    { url: `/api/asset-group/${groupId}/assets/${assetId}`, method: 'DELETE' },
-    options,
-  );
-};
-
-export const getAssetGroupControllerRemoveAssetMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
-    TError,
-    { groupId: string; assetId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
-  TError,
-  { groupId: string; assetId: string },
-  TContext
-> => {
-  const mutationKey = ['assetGroupControllerRemoveAsset'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
-    { groupId: string; assetId: string }
-  > = (props) => {
-    const { groupId, assetId } = props ?? {};
-
-    return assetGroupControllerRemoveAsset(groupId, assetId, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AssetGroupControllerRemoveAssetMutationResult = NonNullable<
-  Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>
->;
-
-export type AssetGroupControllerRemoveAssetMutationError = unknown;
-
-/**
- * @summary Remove asset from asset group
- */
-export const useAssetGroupControllerRemoveAsset = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
-      TError,
-      { groupId: string; assetId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof assetGroupControllerRemoveAsset>>,
-  TError,
-  { groupId: string; assetId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getAssetGroupControllerRemoveAssetMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

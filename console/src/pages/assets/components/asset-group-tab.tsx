@@ -6,6 +6,7 @@ import {
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useAsset } from '../context/asset-context';
 
 const columns: ColumnDef<AssetGroupResponseDto>[] = [
@@ -59,12 +60,15 @@ export function AssetGroupTab() {
     queryOptions,
   } = useAsset();
 
+  const navigate = useNavigate();
+
   const { data, isLoading } = useAssetGroupControllerGetAll(
     {
-      limit: queryParams.limit,
-      page,
+      limit: pageSize,
+      page: page,
       sortBy: 'name',
-      sortOrder,
+      sortOrder: sortOrder,
+      targetIds: queryParams.targetIds,
     },
     {
       query: {
@@ -77,7 +81,7 @@ export function AssetGroupTab() {
   const assetGroups = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading targets.</div>;
+  if (!data && !isLoading) return <div>Error loading asset groups.</div>;
 
   return (
     <motion.div
@@ -97,6 +101,7 @@ export function AssetGroupTab() {
         sortBy={sortBy}
         sortOrder={sortOrder}
         isShowBorder={true}
+        onRowClick={(row) => navigate('/asset-group/' + row.id)}
         emptyMessage="No asset groups found"
       />
     </motion.div>
