@@ -1,0 +1,133 @@
+name: Bug Report
+description: Report a bug in the Open Attack Surface Management platform
+title: '[Bug]: '
+labels: ['bug', 'triage']
+projects: []
+assignees: []
+type: bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report for Open Attack Surface Management (OASM)!
+        Your feedback helps us improve the security and reliability of our ASM platform.
+  - type: input
+    id: contact
+    attributes:
+      label: Contact Details (Optional)
+      description: How can we reach you if we need more information?
+      placeholder: ex. email@example.com
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected to happen instead.
+      placeholder: Please describe the issue you encountered while using OASM...
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which component of OASM is experiencing the issue?
+      options:
+        - Console (Frontend UI)
+        - Core API
+        - Worker Service
+        - Database/Storage
+        - Authentication
+        - Asset Management
+        - Vulnerability Scanning
+        - Job Management
+        - Worker Management
+        - MCP Server
+        - Other
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version of OASM are you running?
+      placeholder: ex. 0.0.1 or commit hash
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment Method
+      description: How are you running OASM?
+      options:
+        - Docker Compose
+        - Kubernetes
+        - Development Mode
+        - Production Build
+        - Other
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: browsers
+    attributes:
+      label: Browser (if applicable)
+      description: If this is a UI issue, which browsers are affected?
+      multiple: true
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Microsoft Edge
+        - Other
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Provide information about your environment (OS, Docker version, etc.)
+      placeholder: |
+        OS: Windows 11/Ubuntu 22.04/etc.
+        Docker version: 20.x.x
+        Node version: 18.x.x (if applicable)
+        Other relevant environment information...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Log Output
+      description: Please copy and paste any relevant log output from console, core-api, or worker services
+      placeholder: Paste log output here. This will be automatically formatted as code.
+      render: shell
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Provide clear steps to reproduce the issue
+      placeholder: |
+        1. Navigate to '...'
+        2. Click on '...'
+        3. See error...
+    validations:
+      required: true
+  - type: textarea
+    id: severity
+    attributes:
+      label: Impact on Security Operations
+      description: How does this bug affect your security operations? (e.g., asset discovery fails, vulnerability scanning incomplete, etc.)
+      placeholder: Describe the security impact of this issue...
+    validations:
+      required: true
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmation
+      description: Please confirm the following before submitting
+      options:
+        - label: I have searched existing issues to avoid duplicates
+          required: true
+        - label: I have provided sufficient information for reproduction
+          required: true
+        - label: This bug affects the security or functionality of OASM
+          required: true
