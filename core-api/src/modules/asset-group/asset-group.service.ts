@@ -1,4 +1,5 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
@@ -111,14 +112,14 @@ export class AssetGroupService {
       response.createdAt = assetGroup.createdAt;
       response.updatedAt = assetGroup.updatedAt;
 
-      // Extract assets and tools from the relationships
-      if (assetGroup.assetGroupAssets) {
-        response.assets = assetGroup.assetGroupAssets.map((aga) => aga.asset);
-      }
-
-      if (assetGroup.assetGroupTools) {
-        response.tools = assetGroup.assetGroupTools.map((agt) => agt.tool);
-      }
+      // // Extract assets and tools from the relationships
+      // if (assetGroup.assetGroupAssets) {
+      //   response.assets = assetGroup.assetGroupAssets.map((aga) => aga.asset);
+      // }
+      //
+      // if (assetGroup.assetGroupTools) {
+      //   response.tools = assetGroup.assetGroupTools.map((agt) => agt.tool);
+      // }
 
       return response;
     } catch (error) {
@@ -467,6 +468,239 @@ export class AssetGroupService {
       };
     } catch (error) {
       this.logger.error(`Error deleting asset group with ID ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves assets associated with a specific asset group with pagination
+   */
+  async getAssetsByAssetGroupsId(
+    assetGroupId: string,
+    query: GetManyBaseQueryParams,
+    workspaceId: string,
+  ) {
+    try {
+      const { page, limit, sortBy, sortOrder } = query;
+      const offset = (page - 1) * limit;
+
+      // Find the asset group to ensure it exists and belongs to the workspace
+      const assetGroup = await this.assetGroupRepo.findOne({
+        where: { id: assetGroupId, workspace: { id: workspaceId } },
+      });
+
+      if (!assetGroup) {
+        throw new NotFoundException(
+          `Asset group with ID "${assetGroupId}" not found in workspace "${workspaceId}"`,
+        );
+      }
+
+      // Build query using query builder to get assets associated with the asset group
+      const queryBuilder = this.assetRepo
+        .createQueryBuilder('asset')
+        .innerJoin('assets_group_assets', 'aga', 'aga.asset_id = asset.id')
+        .innerJoin('asset_groups', 'ag', 'ag.id = aga.asset_group_id')
+        .where(
+          'aga.asset_group_id = :assetGroupId AND ag.workspace_id = :workspaceId',
+          {
+            assetGroupId,
+            workspaceId,
+          },
+        );
+
+      const [data, total] = await queryBuilder
+        .orderBy(`asset.${sortBy}`, sortOrder)
+        .skip(offset)
+        .take(limit)
+        .leftJoinAndSelect('asset.assetGroupAssets', 'assetGroupAssets')
+        .leftJoinAndSelect('asset.tags', 'tags')
+        .leftJoinAndSelect('asset.target', 'target')
+        .getManyAndCount();
+
+      return getManyResponse({ query, data, total });
+    } catch (error) {
+      this.logger.error(
+        `Error retrieving assets for asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves tools associated with a specific asset group with pagination
+   */
+  async getToolsByAssetGroupsId(
+    assetGroupId: string,
+    query: GetManyBaseQueryParams,
+    workspaceId: string,
+  ) {
+    try {
+      const { page, limit, sortBy, sortOrder } = query;
+      const offset = (page - 1) * limit;
+
+      // Find the asset group to ensure it exists and belongs to the workspace
+      const assetGroup = await this.assetGroupRepo.findOne({
+        where: { id: assetGroupId, workspace: { id: workspaceId } },
+      });
+
+      if (!assetGroup) {
+        throw new NotFoundException(
+          `Asset group with ID "${assetGroupId}" not found in workspace "${workspaceId}"`,
+        );
+      }
+
+      // Build query using query builder to get tools associated with the asset group
+      const queryBuilder = this.toolRepo
+        .createQueryBuilder('tool')
+        .innerJoin('asset_group_tools', 'agt', 'agt.tool_id = tool.id')
+        .innerJoin('asset_groups', 'ag', 'ag.id = agt.asset_group_id')
+        .where(
+          'agt.asset_group_id = :assetGroupId AND ag.workspace_id = :workspaceId',
+          {
+            assetGroupId,
+            workspaceId,
+          },
+        );
+
+      const [data, total] = await queryBuilder
+        .orderBy(`tool.${sortBy}`, sortOrder)
+        .skip(offset)
+        .take(limit)
+        .leftJoinAndSelect('tool.assetGroupTools', 'assetGroupTools')
+        .leftJoinAndSelect('tool.workspaceTools', 'workspaceTools')
+        .leftJoinAndSelect('tool.provider', 'provider')
+        .getManyAndCount();
+
+      return getManyResponse({ query, data, total });
+    } catch (error) {
+      this.logger.error(
+        `Error retrieving tools for asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves assets not associated with a specific asset group with pagination
+   */
+  async getAssetsNotInAssetGroup(
+    assetGroupId: string,
+    query: GetManyBaseQueryParams,
+    workspaceId: string,
+  ) {
+    try {
+      const { page, limit, sortBy, sortOrder } = query;
+      const offset = (page - 1) * limit;
+
+      // Find the asset group to ensure it exists and belongs to the workspace
+      const assetGroup = await this.assetGroupRepo.findOne({
+        where: { id: assetGroupId, workspace: { id: workspaceId } },
+      });
+
+      if (!assetGroup) {
+        throw new NotFoundException(
+          `Asset group with ID "${assetGroupId}" not found in workspace "${workspaceId}"`,
+        );
+      }
+
+      // Build query using query builder to get assets NOT associated with the asset group
+      const queryBuilder = this.assetRepo
+        .createQueryBuilder('asset')
+        .leftJoin(
+          'assets_group_assets',
+          'aga',
+          'aga.asset_id = asset.id AND aga.asset_group_id = :assetGroupId',
+          { assetGroupId },
+        )
+        .where(
+          'aga.asset_id IS NULL AND asset."targetId" IN (SELECT t.id FROM targets t JOIN workspace_targets wt ON t.id = wt."targetId" WHERE wt."workspaceId" = :workspaceId)',
+          {
+            assetGroupId,
+            workspaceId,
+          },
+        );
+
+      const [data, total] = await queryBuilder
+        .orderBy(`asset.${sortBy}`, sortOrder)
+        .skip(offset)
+        .take(limit)
+        .leftJoinAndSelect('asset.tags', 'tags')
+        .leftJoinAndSelect('asset.target', 'target')
+        .getManyAndCount();
+
+      return getManyResponse({ query, data, total });
+    } catch (error) {
+      this.logger.error(
+        `Error retrieving assets not in asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves tools not associated with a specific asset group but preinstalled in the workspace with pagination
+   */
+  async getToolsNotInAssetGroup(
+    assetGroupId: string,
+    query: GetManyBaseQueryParams,
+    workspaceId: string,
+  ) {
+    try {
+      const { page, limit, sortBy, sortOrder } = query;
+      const offset = (page - 1) * limit;
+
+      // Find the asset group to ensure it exists and belongs to the workspace
+      const assetGroup = await this.assetGroupRepo.findOne({
+        where: { id: assetGroupId, workspace: { id: workspaceId } },
+      });
+
+      if (!assetGroup) {
+        throw new NotFoundException(
+          `Asset group with ID "${assetGroupId}" not found in workspace "${workspaceId}"`,
+        );
+      }
+
+      // Build query using query builder to get tools that are NOT in the asset group but ARE in the workspace
+      const queryBuilder = this.toolRepo
+        .createQueryBuilder('tool')
+        .innerJoin(
+          'workspace_tools',
+          'wt',
+          'wt."toolId" = tool.id AND wt."workspaceId" = :workspaceId',
+          { workspaceId },
+        )
+        .leftJoin(
+          'asset_group_tools',
+          'agt',
+          'agt."tool_id" = tool.id AND agt."asset_group_id" = :assetGroupId',
+          { assetGroupId },
+        )
+        .where('agt."tool_id" IS NULL'); // Only tools not in the asset group
+
+      const [data, total] = await queryBuilder
+        .orderBy(`tool.${sortBy}`, sortOrder)
+        .skip(offset)
+        .take(limit)
+        .leftJoinAndSelect('tool.assetGroupTools', 'assetGroupTools')
+        .leftJoinAndSelect('tool.workspaceTools', 'workspaceTools')
+        .leftJoinAndSelect('tool.provider', 'provider')
+        .getManyAndCount();
+
+      // Add isInstalled flag to each tool
+      const toolsWithInstalledFlag = data.map((tool) => {
+        tool.isInstalled = true; // All these tools are already in the workspace
+        return tool;
+      });
+
+      return getManyResponse({ query, data: toolsWithInstalledFlag, total });
+    } catch (error) {
+      this.logger.error(
+        `Error retrieving tools not in asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
+        error,
+      );
       throw error;
     }
   }

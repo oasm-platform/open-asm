@@ -1015,10 +1015,6 @@ export type AssetGroupResponseDto = {
   createdAt: string;
   /** Date when the asset group was last updated */
   updatedAt: string;
-  /** List of assets in the asset group */
-  assets?: Asset[];
-  /** List of tools in the asset group */
-  tools?: Tool[];
 };
 
 export type GetManyAssetGroupResponseDtoDto = {
@@ -1055,6 +1051,15 @@ export type RemoveManyToolsFromAssetGroupDto = {
 export type RemoveManyAssetsFromAssetGroupDto = {
   /** Array of asset IDs to remove */
   assetIds: string[];
+};
+
+export type GetManyAssetDto = {
+  data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 };
 
 export type McpTool = {
@@ -1307,6 +1312,34 @@ export type AssetGroupControllerGetAllParams = {
   sortBy?: string;
   sortOrder?: string;
   targetIds?: string[];
+};
+
+export type AssetGroupControllerGetAssetsByAssetGroupsIdParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AssetGroupControllerGetToolsByAssetGroupsIdParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AssetGroupControllerGetAssetsNotInAssetGroupParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AssetGroupControllerGetToolsNotInAssetGroupParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -20092,6 +20125,1830 @@ export const useAssetGroupControllerRemoveManyAssets = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * Retrieves assets associated with a specific asset group with pagination.
+ * @summary Get assets by asset group ID
+ */
+export const assetGroupControllerGetAssetsByAssetGroupsId = (
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyAssetDto>(
+    {
+      url: `/api/asset-group/${assetGroupId}/assets`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+) => {
+  return [
+    'infinate',
+    `/api/asset-group/${assetGroupId}/assets`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+) => {
+  return [
+    `/api/asset-group/${assetGroupId}/assets`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+      AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+    >,
+    TError = unknown,
+  >(
+    assetGroupId: string,
+    params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          TData,
+          QueryKey,
+          AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryKey(
+        assetGroupId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+      QueryKey,
+      AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+    > = ({ signal, pageParam }) =>
+      assetGroupControllerGetAssetsByAssetGroupsId(
+        assetGroupId,
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!assetGroupId,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+      TError,
+      TData,
+      QueryKey,
+      AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  >;
+export type AssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryError =
+  unknown;
+
+export function useAssetGroupControllerGetAssetsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+    AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+    AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+    AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets by asset group ID
+ */
+
+export function useAssetGroupControllerGetAssetsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+    AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetAssetsByAssetGroupsIdParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetAssetsByAssetGroupsIdQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey(
+      assetGroupId,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  > = ({ signal }) =>
+    assetGroupControllerGetAssetsByAssetGroupsId(
+      assetGroupId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!assetGroupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetAssetsByAssetGroupsIdQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  >;
+export type AssetGroupControllerGetAssetsByAssetGroupsIdQueryError = unknown;
+
+export function useAssetGroupControllerGetAssetsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets by asset group ID
+ */
+
+export function useAssetGroupControllerGetAssetsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetAssetsByAssetGroupsIdQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves tools associated with a specific asset group with pagination.
+ * @summary Get tools by asset group ID
+ */
+export const assetGroupControllerGetToolsByAssetGroupsId = (
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyToolDto>(
+    {
+      url: `/api/asset-group/${assetGroupId}/tools`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+) => {
+  return [
+    'infinate',
+    `/api/asset-group/${assetGroupId}/tools`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetToolsByAssetGroupsIdQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+) => {
+  return [
+    `/api/asset-group/${assetGroupId}/tools`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+      AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+    >,
+    TError = unknown,
+  >(
+    assetGroupId: string,
+    params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+          >,
+          TError,
+          TData,
+          QueryKey,
+          AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryKey(
+        assetGroupId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+      QueryKey,
+      AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+    > = ({ signal, pageParam }) =>
+      assetGroupControllerGetToolsByAssetGroupsId(
+        assetGroupId,
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!assetGroupId,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+      TError,
+      TData,
+      QueryKey,
+      AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>
+  >;
+export type AssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryError =
+  unknown;
+
+export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+    AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+    AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+    AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tools by asset group ID
+ */
+
+export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+    AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetToolsByAssetGroupsIdQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetToolsByAssetGroupsIdQueryKey(
+      assetGroupId,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>
+  > = ({ signal }) =>
+    assetGroupControllerGetToolsByAssetGroupsId(
+      assetGroupId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!assetGroupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetToolsByAssetGroupsIdQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>
+  >;
+export type AssetGroupControllerGetToolsByAssetGroupsIdQueryError = unknown;
+
+export function useAssetGroupControllerGetToolsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetToolsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetToolsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tools by asset group ID
+ */
+
+export function useAssetGroupControllerGetToolsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetToolsByAssetGroupsIdQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves assets not associated with a specific asset group with pagination.
+ * @summary Get assets not in asset group
+ */
+export const assetGroupControllerGetAssetsNotInAssetGroup = (
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyAssetDto>(
+    {
+      url: `/api/asset-group/${assetGroupId}/assets/not-in-group`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+) => {
+  return [
+    'infinate',
+    `/api/asset-group/${assetGroupId}/assets/not-in-group`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+) => {
+  return [
+    `/api/asset-group/${assetGroupId}/assets/not-in-group`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+      AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+    >,
+    TError = unknown,
+  >(
+    assetGroupId: string,
+    params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          TData,
+          QueryKey,
+          AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryKey(
+        assetGroupId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+      QueryKey,
+      AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+    > = ({ signal, pageParam }) =>
+      assetGroupControllerGetAssetsNotInAssetGroup(
+        assetGroupId,
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!assetGroupId,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+      TError,
+      TData,
+      QueryKey,
+      AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  >;
+export type AssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryError =
+  unknown;
+
+export function useAssetGroupControllerGetAssetsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+    AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+    AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+    AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets not in asset group
+ */
+
+export function useAssetGroupControllerGetAssetsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+    AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetAssetsNotInAssetGroupParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetAssetsNotInAssetGroupQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey(
+      assetGroupId,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  > = ({ signal }) =>
+    assetGroupControllerGetAssetsNotInAssetGroup(
+      assetGroupId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!assetGroupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetAssetsNotInAssetGroupQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  >;
+export type AssetGroupControllerGetAssetsNotInAssetGroupQueryError = unknown;
+
+export function useAssetGroupControllerGetAssetsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets not in asset group
+ */
+
+export function useAssetGroupControllerGetAssetsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetAssetsNotInAssetGroupQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves tools not associated with a specific asset group but preinstalled in the workspace with pagination.
+ * @summary Get tools not in asset group (preinstalled in workspace)
+ */
+export const assetGroupControllerGetToolsNotInAssetGroup = (
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyToolDto>(
+    {
+      url: `/api/asset-group/${assetGroupId}/tools/not-in-group`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+) => {
+  return [
+    'infinate',
+    `/api/asset-group/${assetGroupId}/tools/not-in-group`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetToolsNotInAssetGroupQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+) => {
+  return [
+    `/api/asset-group/${assetGroupId}/tools/not-in-group`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+      AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+    >,
+    TError = unknown,
+  >(
+    assetGroupId: string,
+    params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+          >,
+          TError,
+          TData,
+          QueryKey,
+          AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryKey(
+        assetGroupId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+      QueryKey,
+      AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+    > = ({ signal, pageParam }) =>
+      assetGroupControllerGetToolsNotInAssetGroup(
+        assetGroupId,
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!assetGroupId,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+      TError,
+      TData,
+      QueryKey,
+      AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>
+  >;
+export type AssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryError =
+  unknown;
+
+export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+    AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+    AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+    AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tools not in asset group (preinstalled in workspace)
+ */
+
+export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+    AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetToolsNotInAssetGroupQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetToolsNotInAssetGroupQueryKey(
+      assetGroupId,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>
+  > = ({ signal }) =>
+    assetGroupControllerGetToolsNotInAssetGroup(
+      assetGroupId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!assetGroupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetToolsNotInAssetGroupQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>
+  >;
+export type AssetGroupControllerGetToolsNotInAssetGroupQueryError = unknown;
+
+export function useAssetGroupControllerGetToolsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetToolsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetToolsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tools not in asset group (preinstalled in workspace)
+ */
+
+export function useAssetGroupControllerGetToolsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetToolsNotInAssetGroupQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * @summary Upload a file to storage

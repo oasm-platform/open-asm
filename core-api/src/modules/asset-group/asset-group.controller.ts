@@ -1,6 +1,7 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -12,6 +13,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Asset } from '../assets/entities/assets.entity';
+import { Tool } from '../tools/entities/tools.entity';
 import { AssetGroupService } from './asset-group.service';
 import { AddManyAssetsToAssetGroupDto } from './dto/add-many-assets-to-asset-group.dto';
 import { AddManyToolsToAssetGroupDto } from './dto/add-many-tools-to-asset-group.dto';
@@ -154,5 +157,101 @@ export class AssetGroupController {
   @Delete(':id')
   delete(@Param('id') id: string) {
     return this.assetGroupService.delete(id);
+  }
+
+  @Doc({
+    summary: 'Get assets by asset group ID',
+    description:
+      'Retrieves assets associated with a specific asset group with pagination.',
+    response: {
+      serialization: GetManyResponseDto(Asset),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get(':assetGroupId/assets')
+  getAssetsByAssetGroupsId(
+    @Param('assetGroupId') assetGroupId: string,
+    @Query() query: GetManyBaseQueryParams,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetGroupService.getAssetsByAssetGroupsId(
+      assetGroupId,
+      query,
+      workspaceId,
+    );
+  }
+
+  @Doc({
+    summary: 'Get tools by asset group ID',
+    description:
+      'Retrieves tools associated with a specific asset group with pagination.',
+    response: {
+      serialization: GetManyResponseDto(Tool),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get(':assetGroupId/tools')
+  getToolsByAssetGroupsId(
+    @Param('assetGroupId') assetGroupId: string,
+    @Query() query: GetManyBaseQueryParams,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetGroupService.getToolsByAssetGroupsId(
+      assetGroupId,
+      query,
+      workspaceId,
+    );
+  }
+
+  @Doc({
+    summary: 'Get assets not in asset group',
+    description:
+      'Retrieves assets not associated with a specific asset group with pagination.',
+    response: {
+      serialization: GetManyResponseDto(Asset),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get(':assetGroupId/assets/not-in-group')
+  getAssetsNotInAssetGroup(
+    @Param('assetGroupId') assetGroupId: string,
+    @Query() query: GetManyBaseQueryParams,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetGroupService.getAssetsNotInAssetGroup(
+      assetGroupId,
+      query,
+      workspaceId,
+    );
+  }
+
+  @Doc({
+    summary: 'Get tools not in asset group (preinstalled in workspace)',
+    description:
+      'Retrieves tools not associated with a specific asset group but preinstalled in the workspace with pagination.',
+    response: {
+      serialization: GetManyResponseDto(Tool),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get(':assetGroupId/tools/not-in-group')
+  getToolsNotInAssetGroup(
+    @Param('assetGroupId') assetGroupId: string,
+    @Query() query: GetManyBaseQueryParams,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetGroupService.getToolsNotInAssetGroup(
+      assetGroupId,
+      query,
+      workspaceId,
+    );
   }
 }

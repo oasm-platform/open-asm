@@ -1091,6 +1091,94 @@ export interface RunTemplateDto {
   assetId: string;
 }
 
+export interface AssetGroupResponseDto {
+  /**
+   * ID of the asset group
+   * @example "123e4567-e89b-12d3-a456-426614174000"
+   */
+  id: string;
+  /**
+   * Name of the asset group
+   * @example "Web Servers"
+   */
+  name: string;
+  /**
+   * Date when the asset group was created
+   * @format date-time
+   * @example "2023-01-01T00:00.000Z"
+   */
+  createdAt: string;
+  /**
+   * Date when the asset group was last updated
+   * @format date-time
+   * @example "2023-01-01T00:00:00.000Z"
+   */
+  updatedAt: string;
+}
+
+export interface GetManyAssetGroupResponseDtoDto {
+  data: AssetGroupResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface CreateAssetGroupDto {
+  /**
+   * Name of the asset group
+   * @example "Web Servers"
+   */
+  name: string;
+  /**
+   * ID of the workspace the asset group belongs to
+   * @example "123e4567-e89b-12d3-a456-426614174000"
+   */
+  workspaceId: string;
+}
+
+export interface AddManyToolsToAssetGroupDto {
+  /**
+   * Array of tool IDs to add
+   * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-426614174002"]
+   */
+  toolIds: string[];
+}
+
+export interface AddManyAssetsToAssetGroupDto {
+  /**
+   * Array of asset IDs to add
+   * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-426614174002"]
+   */
+  assetIds: string[];
+}
+
+export interface RemoveManyToolsFromAssetGroupDto {
+  /**
+   * Array of tool IDs to remove
+   * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-42614174002"]
+   */
+  toolIds: string[];
+}
+
+export interface RemoveManyAssetsFromAssetGroupDto {
+  /**
+   * Array of asset IDs to remove
+   * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-42614174002"]
+   */
+  assetIds: string[];
+}
+
+export interface GetManyAssetDto {
+  data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export interface McpTool {
   name: string;
   type: string;
@@ -3009,6 +3097,297 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all asset groups with optional filtering and pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetAll
+   * @summary Get all asset groups
+   * @request GET:/api/asset-group
+   */
+  assetGroupControllerGetAll = (
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      targetIds?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Creates a new asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerCreate
+   * @summary Create asset group
+   * @request POST:/api/asset-group
+   */
+  assetGroupControllerCreate = (
+    data: CreateAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Fetches a specific asset group by its unique identifier.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetById
+   * @summary Get asset group by ID
+   * @request GET:/api/asset-group/{id}
+   */
+  assetGroupControllerGetById = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Permanently removes an asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerDelete
+   * @summary Delete asset group
+   * @request DELETE:/api/asset-group/{id}
+   */
+  assetGroupControllerDelete = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Associates multiple tools with the specified asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerAddManyTools
+   * @summary Add multiple tools to asset group
+   * @request POST:/api/asset-group/{groupId}/tools
+   */
+  assetGroupControllerAddManyTools = (
+    groupId: string,
+    data: AddManyToolsToAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${groupId}/tools`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Disassociates multiple tools from the asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerRemoveManyTools
+   * @summary Remove multiple tools from asset group
+   * @request DELETE:/api/asset-group/{groupId}/tools
+   */
+  assetGroupControllerRemoveManyTools = (
+    groupId: string,
+    data: RemoveManyToolsFromAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${groupId}/tools`,
+      method: "DELETE",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Associates multiple assets with the specified asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerAddManyAssets
+   * @summary Add multiple assets to asset group
+   * @request POST:/api/asset-group/{groupId}/assets
+   */
+  assetGroupControllerAddManyAssets = (
+    groupId: string,
+    data: AddManyAssetsToAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${groupId}/assets`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Disassociates multiple assets from the asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerRemoveManyAssets
+   * @summary Remove multiple assets from asset group
+   * @request DELETE:/api/asset-group/{groupId}/assets
+   */
+  assetGroupControllerRemoveManyAssets = (
+    groupId: string,
+    data: RemoveManyAssetsFromAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${groupId}/assets`,
+      method: "DELETE",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves assets associated with a specific asset group with pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetAssetsByAssetGroupsId
+   * @summary Get assets by asset group ID
+   * @request GET:/api/asset-group/{assetGroupId}/assets
+   */
+  assetGroupControllerGetAssetsByAssetGroupsId = (
+    assetGroupId: string,
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${assetGroupId}/assets`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves tools associated with a specific asset group with pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetToolsByAssetGroupsId
+   * @summary Get tools by asset group ID
+   * @request GET:/api/asset-group/{assetGroupId}/tools
+   */
+  assetGroupControllerGetToolsByAssetGroupsId = (
+    assetGroupId: string,
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${assetGroupId}/tools`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves assets not associated with a specific asset group with pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetAssetsNotInAssetGroup
+   * @summary Get assets not in asset group
+   * @request GET:/api/asset-group/{assetGroupId}/assets/not-in-group
+   */
+  assetGroupControllerGetAssetsNotInAssetGroup = (
+    assetGroupId: string,
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${assetGroupId}/assets/not-in-group`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves tools not associated with a specific asset group but preinstalled in the workspace with pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetToolsNotInAssetGroup
+   * @summary Get tools not in asset group (preinstalled in workspace)
+   * @request GET:/api/asset-group/{assetGroupId}/tools/not-in-group
+   */
+  assetGroupControllerGetToolsNotInAssetGroup = (
+    assetGroupId: string,
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${assetGroupId}/tools/not-in-group`,
+      method: "GET",
+      query: query,
       format: "json",
       ...params,
     });
