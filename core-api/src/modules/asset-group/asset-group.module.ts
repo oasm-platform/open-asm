@@ -8,7 +8,7 @@ import { AssetGroupController } from './asset-group.controller';
 import { AssetGroupService } from './asset-group.service';
 import { AssetGroup } from './entities/asset-groups.entity';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
-import { AssetGroupTool } from './entities/asset-groups-tools.entity';
+import { AssetGroupTool } from './entities/asset-groups-workflows.entity';
 
 @Global()
 @Module({

@@ -11,13 +11,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
-import { Tool } from '../tools/entities/tools.entity';
 import { AssetGroupResponseDto } from './dto/asset-group-response.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
-import { AssetGroupTool } from './entities/asset-groups-tools.entity';
 import { AssetGroup } from './entities/asset-groups.entity';
+import { Workflow } from '../workflows/entities/workflow.entity';
+import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
 
 @Injectable()
 export class AssetGroupService {
@@ -28,12 +28,12 @@ export class AssetGroupService {
     public readonly assetGroupRepo: Repository<AssetGroup>,
     @InjectRepository(AssetGroupAsset)
     public readonly assetGroupAssetRepo: Repository<AssetGroupAsset>,
-    @InjectRepository(AssetGroupTool)
-    public readonly assetGroupToolRepo: Repository<AssetGroupTool>,
+    @InjectRepository(AssetGroupWorkflow)
+    public readonly assetGroupWorkflowRepo: Repository<AssetGroupWorkflow>,
     @InjectRepository(Asset)
     public readonly assetRepo: Repository<Asset>,
-    @InjectRepository(Tool)
-    public readonly toolRepo: Repository<Tool>,
+    @InjectRepository(Workflow)
+    public readonly workflowRepo: Repository<Workflow>,
   ) {}
 
   /**
@@ -66,8 +66,8 @@ export class AssetGroupService {
         take: limit,
         relations: [
           'assetGroupAssets',
-          'assetGroupTools',
-          'assetGroupTools.tool',
+          'assetGroupWorkflows',
+          'assetGroupWorkflows.workflow',
           'assetGroupAssets.asset',
         ],
       });
@@ -94,8 +94,8 @@ export class AssetGroupService {
         where: { id, workspace: { id: workspaceId } },
         relations: [
           'assetGroupAssets',
-          'assetGroupTools',
-          'assetGroupTools.tool',
+          'assetGroupWorkflows',
+          'assetGroupWorkflows.workflow',
           'assetGroupAssets.asset',
         ],
       });
@@ -111,15 +111,6 @@ export class AssetGroupService {
       response.name = assetGroup.name;
       response.createdAt = assetGroup.createdAt;
       response.updatedAt = assetGroup.updatedAt;
-
-      // // Extract assets and tools from the relationships
-      // if (assetGroup.assetGroupAssets) {
-      //   response.assets = assetGroup.assetGroupAssets.map((aga) => aga.asset);
-      // }
-      //
-      // if (assetGroup.assetGroupTools) {
-      //   response.tools = assetGroup.assetGroupTools.map((agt) => agt.tool);
-      // }
 
       return response;
     } catch (error) {
@@ -174,18 +165,17 @@ export class AssetGroupService {
   }
 
   /**
-   * Associates multiple tools with the specified asset group
+   * Associates multiple workflows with the specified asset group
    */
-  async addManyTools(
+  async addManyWorkflows(
     groupId: string,
-    toolIds: string[],
+    workflowIds: string[],
   ): Promise<DefaultMessageResponseDto> {
     try {
       this.logger.log(
-        `Adding ${toolIds.length} tools to asset group with ID: ${groupId}`,
+        `Adding ${workflowIds.length} workflows to asset group with ID: ${groupId}`,
       );
 
-      // Verify that the asset group exists
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id: groupId },
       });
@@ -196,60 +186,60 @@ export class AssetGroupService {
         );
       }
 
-      // Verify that all tools exist
-      const tools = await this.toolRepo.findByIds(toolIds);
-      if (tools.length !== toolIds.length) {
-        const foundToolIds = tools.map((tool) => tool.id);
-        const missingToolIds = toolIds.filter(
-          (id) => !foundToolIds.includes(id),
+      // Verify that all workflows exist
+      const workflows = await this.workflowRepo.findByIds(workflowIds);
+      if (workflows.length !== workflowIds.length) {
+        const foundWorkflowIds = workflows.map((workflow) => workflow.id);
+        const missingWorkflowIds = workflowIds.filter(
+          (id) => !foundWorkflowIds.includes(id),
         );
         this.logger.warn(
-          `Tools with IDs "${missingToolIds.join(', ')}" not found`,
+          `Workflows with IDs "${missingWorkflowIds.join(', ')}" not found`,
         );
         throw new NotFoundException(
-          `One or more tools with IDs "${missingToolIds.join(', ')}" not found`,
+          `One or more workflows with IDs "${missingWorkflowIds.join(', ')}" not found`,
         );
       }
 
       // Find existing associations to avoid duplicates
-      const existingAssociations = await this.assetGroupToolRepo.find({
+      const existingAssociations = await this.assetGroupWorkflowRepo.find({
         where: {
           assetGroup: { id: groupId },
-          tool: { id: In(toolIds) },
+          workflow: { id: In(workflowIds) },
         },
       });
 
-      const existingToolIds = existingAssociations.map(
-        (assoc) => assoc.tool.id,
+      const existingWorkflowIds = existingAssociations.map(
+        (assoc) => assoc.workflow.id,
       );
-      if (existingToolIds.length > 0) {
+      if (existingWorkflowIds.length > 0) {
         this.logger.warn(
-          `Tools with IDs "${existingToolIds.join(', ')}" are already associated with asset group "${groupId}"`,
+          `Workflows with IDs "${existingWorkflowIds.join(', ')}" are already associated with asset group "${groupId}"`,
         );
         throw new BadRequestException(
-          `Tools with IDs "${existingToolIds.join(', ')}" are already associated with asset group "${groupId}"`,
+          `Workflows with IDs "${existingWorkflowIds.join(', ')}" are already associated with asset group "${groupId}"`,
         );
       }
 
       // Create new associations
-      const newAssociations = toolIds.map((toolId) =>
-        this.assetGroupToolRepo.create({
+      const newAssociations = workflowIds.map((workflowId) =>
+        this.assetGroupWorkflowRepo.create({
           assetGroup: { id: groupId },
-          tool: { id: toolId },
+          workflow: { id: workflowId },
         }),
       );
 
-      await this.assetGroupToolRepo.save(newAssociations);
+      await this.assetGroupWorkflowRepo.save(newAssociations);
 
       this.logger.log(
-        `Successfully added ${newAssociations.length} tools to asset group with ID: ${groupId}`,
+        `Successfully added ${newAssociations.length} workflows to asset group with ID: ${groupId}`,
       );
       return {
-        message: `${newAssociations.length} tools successfully added to asset group "${groupId}"`,
+        message: `${newAssociations.length} workflows successfully added to asset group "${groupId}"`,
       };
     } catch (error) {
       this.logger.error(
-        `Error adding tools to asset group with ID ${groupId}:`,
+        `Error adding workflows to asset group with ID ${groupId}:`,
         error,
       );
       throw error;
@@ -336,50 +326,52 @@ export class AssetGroupService {
   }
 
   /**
-   * Disassociates multiple tools from the asset group
+   * Disassociates multiple workflows from the asset group
    */
-  async removeManyTools(
+  async removeManyWorkflows(
     groupId: string,
-    toolIds: string[],
+    workflowIds: string[],
   ): Promise<DefaultMessageResponseDto> {
     try {
       // Find existing associations
-      const associations = await this.assetGroupToolRepo.find({
+      const associations = await this.assetGroupWorkflowRepo.find({
         where: {
           assetGroup: { id: groupId },
-          tool: { id: In(toolIds) },
+          workflow: { id: In(workflowIds) },
         },
       });
 
       if (associations.length === 0) {
         this.logger.warn(
-          `No tools with IDs "${toolIds.join(', ')}" are associated with asset group "${groupId}"`,
+          `No workflows with IDs "${workflowIds.join(', ')}" are associated with asset group "${groupId}"`,
         );
         throw new NotFoundException(
-          `No tools with IDs "${toolIds.join(', ')}" are associated with asset group "${groupId}"`,
+          `No workflows with IDs "${workflowIds.join(', ')}" are associated with asset group "${groupId}"`,
         );
       }
 
       // Check for missing associations
-      const associatedToolIds = associations.map((assoc) => assoc.tool.id);
-      const missingToolIds = toolIds.filter(
-        (id) => !associatedToolIds.includes(id),
+      const associatedWorkflowIds = associations.map(
+        (assoc) => assoc.workflow.id,
       );
-      if (missingToolIds.length > 0) {
+      const missingWorkflowIds = workflowIds.filter(
+        (id) => !associatedWorkflowIds.includes(id),
+      );
+      if (missingWorkflowIds.length > 0) {
         throw new NotFoundException(
-          `Tools with IDs "${missingToolIds.join(', ')}" are not associated with asset group "${groupId}"`,
+          `Workflows with IDs "${missingWorkflowIds.join(', ')}" are not associated with asset group "${groupId}"`,
         );
       }
 
       // Remove the associations
-      await this.assetGroupToolRepo.remove(associations);
+      await this.assetGroupWorkflowRepo.remove(associations);
 
       return {
-        message: `${associations.length} tools successfully removed from asset group "${groupId}"`,
+        message: `${associations.length} workflows successfully removed from asset group "${groupId}"`,
       };
     } catch (error) {
       this.logger.error(
-        `Error removing tools from asset group with ID ${groupId}:`,
+        `Error removing workflows from asset group with ID ${groupId}:`,
         error,
       );
       throw error;
@@ -441,7 +433,7 @@ export class AssetGroupService {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id },
-        relations: ['assetGroupAssets', 'assetGroupTools'],
+        relations: ['assetGroupAssets', 'assetGroupWorkflows'],
       });
 
       if (!assetGroup) {
@@ -456,8 +448,13 @@ export class AssetGroupService {
         await this.assetGroupAssetRepo.remove(assetGroup.assetGroupAssets);
       }
 
-      if (assetGroup.assetGroupTools && assetGroup.assetGroupTools.length > 0) {
-        await this.assetGroupToolRepo.remove(assetGroup.assetGroupTools);
+      if (
+        assetGroup.assetGroupWorkflows &&
+        assetGroup.assetGroupWorkflows.length > 0
+      ) {
+        await this.assetGroupWorkflowRepo.remove(
+          assetGroup.assetGroupWorkflows,
+        );
       }
 
       // Delete the asset group itself
@@ -527,9 +524,9 @@ export class AssetGroupService {
   }
 
   /**
-   * Retrieves tools associated with a specific asset group with pagination
+   * Retrieves workflows associated with a specific asset group with pagination
    */
-  async getToolsByAssetGroupsId(
+  async getWorkflowsByAssetGroupsId(
     assetGroupId: string,
     query: GetManyBaseQueryParams,
     workspaceId: string,
@@ -549,10 +546,14 @@ export class AssetGroupService {
         );
       }
 
-      // Build query using query builder to get tools associated with the asset group
-      const queryBuilder = this.toolRepo
-        .createQueryBuilder('tool')
-        .innerJoin('asset_group_tools', 'agt', 'agt.tool_id = tool.id')
+      // Build query using query builder to get workflows associated with the asset group
+      const queryBuilder = this.workflowRepo
+        .createQueryBuilder('workflow')
+        .innerJoin(
+          'asset_group_workflows',
+          'agt',
+          'agt.workflow_id = workflow.id',
+        )
         .innerJoin('asset_groups', 'ag', 'ag.id = agt.asset_group_id')
         .where(
           'agt.asset_group_id = :assetGroupId AND ag.workspace_id = :workspaceId',
@@ -563,18 +564,21 @@ export class AssetGroupService {
         );
 
       const [data, total] = await queryBuilder
-        .orderBy(`tool.${sortBy}`, sortOrder)
+        .orderBy(`workflow.${sortBy}`, sortOrder)
         .skip(offset)
         .take(limit)
-        .leftJoinAndSelect('tool.assetGroupTools', 'assetGroupTools')
-        .leftJoinAndSelect('tool.workspaceTools', 'workspaceTools')
-        .leftJoinAndSelect('tool.provider', 'provider')
+        .leftJoinAndSelect(
+          'workflow.assetGroupWorkflows',
+          'assetGroupWorkflows',
+        )
+        .leftJoinAndSelect('workflow.workspaceWorkflows', 'workspaceWorkflows')
+        .leftJoinAndSelect('workflow.provider', 'provider')
         .getManyAndCount();
 
       return getManyResponse({ query, data, total });
     } catch (error) {
       this.logger.error(
-        `Error retrieving tools for asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
+        `Error retrieving workflows for asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
         error,
       );
       throw error;
@@ -640,9 +644,9 @@ export class AssetGroupService {
   }
 
   /**
-   * Retrieves tools not associated with a specific asset group but preinstalled in the workspace with pagination
+   * Retrieves workflows not associated with a specific asset group but preinstalled in the workspace with pagination
    */
-  async getToolsNotInAssetGroup(
+  async getWorkflowsNotInAssetGroup(
     assetGroupId: string,
     query: GetManyBaseQueryParams,
     workspaceId: string,
@@ -662,42 +666,43 @@ export class AssetGroupService {
         );
       }
 
-      // Build query using query builder to get tools that are NOT in the asset group but ARE in the workspace
-      const queryBuilder = this.toolRepo
-        .createQueryBuilder('tool')
+      // Build query using query builder to get workflows that are NOT in the asset group but ARE in the workspace
+      const queryBuilder = this.workflowRepo
+        .createQueryBuilder('workflow')
         .innerJoin(
-          'workspace_tools',
+          'workspace_workflows',
           'wt',
-          'wt."toolId" = tool.id AND wt."workspaceId" = :workspaceId',
+          'wt."workflowId" = workflow.id AND wt."workspaceId" = :workspaceId',
           { workspaceId },
         )
         .leftJoin(
-          'asset_group_tools',
+          'asset_group_workflows',
           'agt',
-          'agt."tool_id" = tool.id AND agt."asset_group_id" = :assetGroupId',
+          'agt."workflow_id" = workflow.id AND agt."asset_group_id" = :assetGroupId',
           { assetGroupId },
         )
-        .where('agt."tool_id" IS NULL'); // Only tools not in the asset group
+        .where('agt."workflow_id" IS NULL'); // Only workflows not in the asset group
 
       const [data, total] = await queryBuilder
-        .orderBy(`tool.${sortBy}`, sortOrder)
+        .orderBy(`workflow.${sortBy}`, sortOrder)
         .skip(offset)
         .take(limit)
-        .leftJoinAndSelect('tool.assetGroupTools', 'assetGroupTools')
-        .leftJoinAndSelect('tool.workspaceTools', 'workspaceTools')
-        .leftJoinAndSelect('tool.provider', 'provider')
+        .leftJoinAndSelect(
+          'workflow.assetGroupWorkflows',
+          'assetGroupWorkflows',
+        )
+        .leftJoinAndSelect('workflow.workspaceWorkflows', 'workspaceWorkflows')
+        .leftJoinAndSelect('workflow.provider', 'provider')
         .getManyAndCount();
 
-      // Add isInstalled flag to each tool
-      const toolsWithInstalledFlag = data.map((tool) => {
-        tool.isInstalled = true; // All these tools are already in the workspace
-        return tool;
+      return getManyResponse({
+        query,
+        data,
+        total,
       });
-
-      return getManyResponse({ query, data: toolsWithInstalledFlag, total });
     } catch (error) {
       this.logger.error(
-        `Error retrieving tools not in asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
+        `Error retrieving workflows not in asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
         error,
       );
       throw error;

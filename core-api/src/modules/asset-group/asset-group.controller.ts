@@ -14,15 +14,15 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Asset } from '../assets/entities/assets.entity';
-import { Tool } from '../tools/entities/tools.entity';
+import { Workflow } from '../workflows/entities/workflows.entity';
 import { AssetGroupService } from './asset-group.service';
 import { AddManyAssetsToAssetGroupDto } from './dto/add-many-assets-to-asset-group.dto';
-import { AddManyToolsToAssetGroupDto } from './dto/add-many-tools-to-asset-group.dto';
+import { AddManyWorkflowsToAssetGroupDto } from './dto/add-many-workflows-to-asset-group.dto';
 import { AssetGroupResponseDto } from './dto/asset-group-response.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { RemoveManyAssetsFromAssetGroupDto } from './dto/remove-many-assets-from-asset-group.dto';
-import { RemoveManyToolsFromAssetGroupDto } from './dto/remove-many-tools-from-asset-group.dto';
+import { RemoveManyWorkflowsFromAssetGroupDto } from './dto/remove-many-workflows-from-asset-group.dto';
 
 @ApiTags('Asset Group')
 @Controller('asset-group')
@@ -76,20 +76,21 @@ export class AssetGroupController {
   }
 
   @Doc({
-    summary: 'Add multiple tools to asset group',
-    description: 'Associates multiple tools with the specified asset group.',
+    summary: 'Add multiple workflows to asset group',
+    description:
+      'Associates multiple workflows with the specified asset group.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @Post(':groupId/tools')
-  addManyTools(
+  @Post(':groupId/workflows')
+  addManyWorkflows(
     @Param('groupId') groupId: string,
-    @Body() addManyToolsDto: AddManyToolsToAssetGroupDto,
+    @Body() addManyWorkflowsDto: AddManyWorkflowsToAssetGroupDto,
   ) {
-    return this.assetGroupService.addManyTools(
+    return this.assetGroupService.addManyWorkflows(
       groupId,
-      addManyToolsDto.toolIds,
+      addManyWorkflowsDto.workflowIds,
     );
   }
 
@@ -112,20 +113,20 @@ export class AssetGroupController {
   }
 
   @Doc({
-    summary: 'Remove multiple tools from asset group',
-    description: 'Disassociates multiple tools from the asset group.',
+    summary: 'Remove multiple workflows from asset group',
+    description: 'Disassociates multiple workflows from the asset group.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @Delete(':groupId/tools')
-  removeManyTools(
+  @Delete(':groupId/workflows')
+  removeManyWorkflows(
     @Param('groupId') groupId: string,
-    @Body() removeManyToolsDto: RemoveManyToolsFromAssetGroupDto,
+    @Body() removeManyWorkflowsDto: RemoveManyWorkflowsFromAssetGroupDto,
   ) {
-    return this.assetGroupService.removeManyTools(
+    return this.assetGroupService.removeManyWorkflows(
       groupId,
-      removeManyToolsDto.toolIds,
+      removeManyWorkflowsDto.workflowIds,
     );
   }
 
@@ -184,23 +185,23 @@ export class AssetGroupController {
   }
 
   @Doc({
-    summary: 'Get tools by asset group ID',
+    summary: 'Get workflows by asset group ID',
     description:
-      'Retrieves tools associated with a specific asset group with pagination.',
+      'Retrieves workflows associated with a specific asset group with pagination.',
     response: {
-      serialization: GetManyResponseDto(Tool),
+      serialization: GetManyResponseDto(Workflow),
     },
     request: {
       getWorkspaceId: true,
     },
   })
-  @Get(':assetGroupId/tools')
-  getToolsByAssetGroupsId(
+  @Get(':assetGroupId/workflows')
+  getWorkflowsByAssetGroupsId(
     @Param('assetGroupId') assetGroupId: string,
     @Query() query: GetManyBaseQueryParams,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetGroupService.getToolsByAssetGroupsId(
+    return this.assetGroupService.getWorkflowsByAssetGroupsId(
       assetGroupId,
       query,
       workspaceId,
@@ -232,23 +233,23 @@ export class AssetGroupController {
   }
 
   @Doc({
-    summary: 'Get tools not in asset group (preinstalled in workspace)',
+    summary: 'Get workflows not in asset group (preinstalled in workspace)',
     description:
-      'Retrieves tools not associated with a specific asset group but preinstalled in the workspace with pagination.',
+      'Retrieves workflows not associated with a specific asset group but preinstalled in the workspace with pagination.',
     response: {
-      serialization: GetManyResponseDto(Tool),
+      serialization: GetManyResponseDto(Workflow),
     },
     request: {
       getWorkspaceId: true,
     },
   })
-  @Get(':assetGroupId/tools/not-in-group')
-  getToolsNotInAssetGroup(
+  @Get(':assetGroupId/workflows/not-in-group')
+  getWorkflowsNotInAssetGroup(
     @Param('assetGroupId') assetGroupId: string,
     @Query() query: GetManyBaseQueryParams,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetGroupService.getToolsNotInAssetGroup(
+    return this.assetGroupService.getWorkflowsNotInAssetGroup(
       assetGroupId,
       query,
       workspaceId,

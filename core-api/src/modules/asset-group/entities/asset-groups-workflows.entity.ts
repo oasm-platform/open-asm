@@ -6,8 +6,8 @@ import { AssetGroup } from './asset-groups.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 
 @Entity('asset_group_tools')
-export class AssetGroupTool extends BaseEntity {
-  @ManyToOne(() => AssetGroup, (assetGroup) => assetGroup.assetGroupTools)
+export class AssetGroupWorkflow extends BaseEntity {
+  @ManyToOne(() => AssetGroup, (assetGroup) => assetGroup.assetGroupWorkflows)
   @JoinColumn({ name: 'asset_group_id' })
   assetGroup: AssetGroup;
 

@@ -21,7 +21,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { WorkspaceTool } from './workspace_tools.entity';
-import { AssetGroupTool } from '@/modules/asset-group/entities/asset-groups-tools.entity';
+import { AssetGroupTool } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
 
 @Entity('tools')
 @Unique(['name'])

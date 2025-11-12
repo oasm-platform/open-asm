@@ -10,7 +10,7 @@ import {
 import { BaseEntity } from '@/common/entities/base.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { AssetGroupAsset } from './asset-groups-assets.entity';
-import { AssetGroupTool } from './asset-groups-tools.entity';
+import { AssetGroupWorkflow } from './asset-groups-workflows.entity';
 
 @Unique(['name', 'workspace'])
 @Entity('asset_groups')
@@ -30,8 +30,8 @@ export class AssetGroup extends BaseEntity {
   assetGroupAssets: AssetGroupAsset[];
 
   @OneToMany(
-    () => AssetGroupTool,
-    (assetGroupTool) => assetGroupTool.assetGroup,
+    () => AssetGroupWorkflow,
+    (assetGroupWorkflows) => assetGroupWorkflows.assetGroup,
   )
-  assetGroupTools: AssetGroupTool[];
+  assetGroupWorkflows: AssetGroupWorkflow[];
 }

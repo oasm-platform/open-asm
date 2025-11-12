@@ -1,5 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { AssetGroupTool } from '@/modules/asset-group/entities/asset-groups-tools.entity';
+import { AssetGroupTool } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import {
