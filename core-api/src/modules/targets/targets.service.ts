@@ -1,5 +1,5 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { BullMQName, JobStatus } from '@/common/enums/enum';
+import { BullMQName, CronSchedule, JobStatus } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -9,9 +9,8 @@ import {
   OnModuleInit
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Queue } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -33,7 +32,7 @@ export class TargetsService implements OnModuleInit {
     private readonly workspacesService: WorkspacesService,
     public assetService: AssetsService,
     private eventEmitter: EventEmitter2,
-    @InjectQueue(BullMQName.SCAN_SCHEDULE) private scanScheduleQueue: Queue<Target>
+    @InjectQueue(BullMQName.ASSETS_DISCOVERY_SCHEDULE) private scanScheduleQueue: Queue<Target>
   ) { }
 
   async onModuleInit() {
@@ -124,6 +123,9 @@ export class TargetsService implements OnModuleInit {
     if (workspaceConfigs.isAssetsDiscovery) {
       this.eventEmitter.emit('target.create', target);
     }
+
+    // trigger update schedule to schedule registry
+    await this.updateTarget(target.id, { scanSchedule: target.scanSchedule });
 
     return target;
   }
@@ -242,13 +244,18 @@ export class TargetsService implements OnModuleInit {
       throw new NotFoundException('Target not found');
     }
 
-    // Update the target in the database
-    const result = await this.repo.update(id, dto);
-
+    let jobId: string | undefined;
     // If scanSchedule was updated, also update the job in BullMQ
     if (dto.scanSchedule !== undefined) {
-      await this.updateTargetScanScheduleJob(id, dto.scanSchedule);
+      const job = await this.updateTargetScanScheduleJob(target, dto.scanSchedule);
+      jobId = job.repeatJobKey;
     }
+
+    // Update the target in the database
+    const result = await this.repo.update(id, {
+      ...dto,
+      jobId
+    });
 
     return result;
   }
@@ -269,53 +276,41 @@ export class TargetsService implements OnModuleInit {
    * @param targetId - The ID of the target to update the scan schedule job for
    * @param scanSchedule - The new scan schedule for the target (can be null/undefined)
    */
-  private async updateTargetScanScheduleJob(targetId: string, scanSchedule: string | null | undefined): Promise<void> {
+  private async updateTargetScanScheduleJob(target: Target, scanSchedule: CronSchedule): Promise<Job<Target>> {
     // Remove any existing jobs for this target
-    await this.scanScheduleQueue.remove(targetId);
-    // If there's a new scan schedule, add a new job
-    if (scanSchedule) {
-      await this.scanScheduleQueue.add(
-        targetId, // Job name is the target ID
-        { id: targetId } as Target, // No data needed for this job
-        {
-          repeat: {
-            pattern: scanSchedule,
-          },
-        },
-      );
+    if (target.jobId) {
+      await this.scanScheduleQueue.removeJobScheduler(target.jobId);
     }
+    const job = await this.scanScheduleQueue.add(
+      target.id, // Job name is the target ID
+      { id: target.id } as Target,
+      {
+        repeat: {
+          pattern: scanSchedule,
+        },
+      },
+    );
+
+    return job;
   }
 
   /**
-   * Updates all scan schedule jobs for all targets.
-   * This function is scheduled to run every day at 00:00.
-   * It retrieves all targets with a scan schedule, and adds a new BullMQ job for each target.
-   * The BullMQ job will trigger a rescan of the target every time it runs according to its cron schedule.
+   * Handles updating scan schedules for all targets.
    */
-  @Cron('0 0 */1 * * *')
   async handleUpdateScanSchedule(): Promise<void> {
     const targetSchedules = await this.repo
       .createQueryBuilder('target')
       .select(['target.value', 'target.id', 'target.scanSchedule'])
       .where('target.scanSchedule IS NOT NULL')
+      .andWhere('target.jobId IS NULL')
       .getMany();
 
     if (targetSchedules.length === 0) return;
 
-    // Remove existing jobs from the queue before adding new ones
-    await this.scanScheduleQueue.obliterate({ force: true });
-
     // Add new jobs to the queue with targetId as job name and cron schedule
     for (const target of targetSchedules) {
-      await this.scanScheduleQueue.add(
-        target.id,
-        target,
-        {
-          repeat: {
-            pattern: target.scanSchedule,
-          },
-        },
-      );
+      const job = await this.updateTargetScanScheduleJob(target, target.scanSchedule);
+      await this.repo.update(target.id, { jobId: job.repeatJobKey });
     }
   }
 }

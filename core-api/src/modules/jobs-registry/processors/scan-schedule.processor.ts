@@ -4,7 +4,7 @@ import { Target } from '@/modules/targets/entities/target.entity';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 
-@Processor(BullMQName.SCAN_SCHEDULE)
+@Processor(BullMQName.ASSETS_DISCOVERY_SCHEDULE)
 export class ScheduleConsumer extends WorkerHost {
     constructor(
         private assetService: AssetsService,
@@ -13,6 +13,5 @@ export class ScheduleConsumer extends WorkerHost {
     }
     async process(job: Job<Target>): Promise<void> {
         await this.assetService.reScan(job.data.id);
-        await job.remove();
     }
 }
