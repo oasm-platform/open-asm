@@ -1,4 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { AssetGroupTool } from '@/modules/asset-group/entities/asset-groups-tools.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import {
@@ -40,4 +41,9 @@ export class Workflow extends BaseEntity {
     onDelete: 'CASCADE',
   })
   jobHistories?: JobHistory[];
+
+  @OneToMany(() => AssetGroupTool, (agt) => agt.workflow, {
+    onDelete: 'CASCADE',
+  })
+  assetGroupTools?: AssetGroupTool[];
 }

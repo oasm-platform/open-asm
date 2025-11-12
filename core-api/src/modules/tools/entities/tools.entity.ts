@@ -102,11 +102,6 @@ export class Tool {
   })
   assetTags?: AssetTag[];
 
-  @OneToMany(() => AssetGroupTool, (agt) => agt.tool, {
-    onDelete: 'CASCADE',
-  })
-  assetGroupTools?: AssetGroupTool[];
-
   @ApiProperty()
   @Column({ name: 'providerId', nullable: true })
   providerId?: string;
