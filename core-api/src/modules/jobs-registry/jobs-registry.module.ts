@@ -13,7 +13,7 @@ import { ScheduleConsumer } from './processors/scan-schedule.processor';
   imports: [
     TypeOrmModule.forFeature([Job, JobHistory]),
     BullModule.registerQueue({
-      name: BullMQName.SCAN_SCHEDULE,
+      name: BullMQName.ASSETS_DISCOVERY_SCHEDULE,
     }),
   ],
   controllers: [JobsRegistryController],
