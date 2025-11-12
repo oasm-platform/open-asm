@@ -513,7 +513,6 @@ export class AssetGroupService {
         .skip(offset)
         .take(limit)
         .leftJoinAndSelect('asset.assetGroupAssets', 'assetGroupAssets')
-        .leftJoinAndSelect('asset.tags', 'tags')
         .leftJoinAndSelect('asset.target', 'target')
         .getManyAndCount();
 

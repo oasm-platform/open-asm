@@ -21,6 +21,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { WorkspaceTool } from './workspace_tools.entity';
+import { AssetGroupTool } from '@/modules/asset-group/entities/asset-groups-tools.entity';
 
 @Entity('tools')
 @Unique(['name'])
@@ -100,6 +101,11 @@ export class Tool {
     onDelete: 'CASCADE',
   })
   assetTags?: AssetTag[];
+
+  @OneToMany(() => AssetGroupTool, (agt) => agt.tool, {
+    onDelete: 'CASCADE',
+  })
+  assetGroupTools?: AssetGroupTool[];
 
   @ApiProperty()
   @Column({ name: 'providerId', nullable: true })
