@@ -92,7 +92,7 @@ body:
         Node version: 18.x.x (if applicable)
         Other relevant environment information...
     validations:
-      required: true
+      required: false
   - type: textarea
     id: logs
     attributes:
@@ -110,7 +110,7 @@ body:
         2. Click on '...'
         3. See error...
     validations:
-      required: true
+      required: false
   - type: textarea
     id: severity
     attributes:
@@ -118,7 +118,7 @@ body:
       description: How does this bug affect your security operations? (e.g., asset discovery fails, vulnerability scanning incomplete, etc.)
       placeholder: Describe the security impact of this issue...
     validations:
-      required: true
+      required: false
   - type: checkboxes
     id: terms
     attributes:
