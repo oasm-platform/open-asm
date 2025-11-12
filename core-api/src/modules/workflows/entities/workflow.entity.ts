@@ -1,6 +1,14 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
-import { Column, Entity, Index, OneToMany } from 'typeorm';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm';
 
 export interface WorkflowContent {
   on: On;
@@ -23,6 +31,10 @@ export class Workflow extends BaseEntity {
 
   @Column()
   filePath: string;
+
+  @ManyToOne(() => Workspace, (workspace) => workspace.id)
+  @JoinColumn({ name: 'workspace_id' })
+  workspace: Workspace;
 
   @OneToMany(() => JobHistory, (jobHistory) => jobHistory.workflow, {
     onDelete: 'CASCADE',
