@@ -22,7 +22,8 @@ import {
   LayoutDashboard,
   Radar,
   SquareTerminal,
-  Target
+  Target,
+  Workflow,
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
 
@@ -55,6 +56,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Vulnerabilities',
           icon: <Bug />,
           url: '/vulnerabilities',
+        },
+        {
+          title: 'Workflow',
+          icon: <Workflow />,
+          url: '/workflow',
         },
         {
           title: 'Tools',
