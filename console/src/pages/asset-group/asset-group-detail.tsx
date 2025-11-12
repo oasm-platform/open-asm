@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { useAssetGroupControllerGetById } from '@/services/apis/gen/queries';
 import { AssetSection } from './components/asset-section';
-import { ToolSection } from './components/tool-section';
+import { WorkflowSection } from './components/workflow-section';
 
 export default function AssetGroupDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,7 +21,7 @@ export default function AssetGroupDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <AssetSection assetGroupId={id!} refetch={refetch} />
-        <ToolSection assetGroupId={id!} refetch={refetch} />
+        <WorkflowSection assetGroupId={id!} refetch={refetch} />
       </div>
     </div>
   );

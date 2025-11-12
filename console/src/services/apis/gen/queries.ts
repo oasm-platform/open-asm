@@ -1033,9 +1033,9 @@ export type CreateAssetGroupDto = {
   workspaceId: string;
 };
 
-export type AddManyToolsToAssetGroupDto = {
-  /** Array of tool IDs to add */
-  toolIds: string[];
+export type AddManyWorkflowsToAssetGroupDto = {
+  /** Array of workflow IDs to add */
+  workflowIds: string[];
 };
 
 export type AddManyAssetsToAssetGroupDto = {
@@ -1043,9 +1043,9 @@ export type AddManyAssetsToAssetGroupDto = {
   assetIds: string[];
 };
 
-export type RemoveManyToolsFromAssetGroupDto = {
-  /** Array of tool IDs to remove */
-  toolIds: string[];
+export type RemoveManyWorkflowsFromAssetGroupDto = {
+  /** Array of workflow IDs to remove */
+  workflowIds: string[];
 };
 
 export type RemoveManyAssetsFromAssetGroupDto = {
@@ -1055,6 +1055,21 @@ export type RemoveManyAssetsFromAssetGroupDto = {
 
 export type GetManyAssetDto = {
   data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type Workflow = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GetManyWorkflowDto = {
+  data: Workflow[];
   total: number;
   page: number;
   limit: number;
@@ -1321,7 +1336,7 @@ export type AssetGroupControllerGetAssetsByAssetGroupsIdParams = {
   sortOrder?: string;
 };
 
-export type AssetGroupControllerGetToolsByAssetGroupsIdParams = {
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdParams = {
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1335,7 +1350,7 @@ export type AssetGroupControllerGetAssetsNotInAssetGroupParams = {
   sortOrder?: string;
 };
 
-export type AssetGroupControllerGetToolsNotInAssetGroupParams = {
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupParams = {
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -19747,45 +19762,45 @@ export const useAssetGroupControllerDelete = <
 };
 
 /**
- * Associates multiple tools with the specified asset group.
- * @summary Add multiple tools to asset group
+ * Associates multiple workflows with the specified asset group.
+ * @summary Add multiple workflows to asset group
  */
-export const assetGroupControllerAddManyTools = (
+export const assetGroupControllerAddManyWorkflows = (
   groupId: string,
-  addManyToolsToAssetGroupDto: AddManyToolsToAssetGroupDto,
+  addManyWorkflowsToAssetGroupDto: AddManyWorkflowsToAssetGroupDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<DefaultMessageResponseDto>(
     {
-      url: `/api/asset-group/${groupId}/tools`,
+      url: `/api/asset-group/${groupId}/workflows`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      data: addManyToolsToAssetGroupDto,
+      data: addManyWorkflowsToAssetGroupDto,
       signal,
     },
     options,
   );
 };
 
-export const getAssetGroupControllerAddManyToolsMutationOptions = <
+export const getAssetGroupControllerAddManyWorkflowsMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
+    Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
     TError,
-    { groupId: string; data: AddManyToolsToAssetGroupDto },
+    { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
+  Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
   TError,
-  { groupId: string; data: AddManyToolsToAssetGroupDto },
+  { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
   TContext
 > => {
-  const mutationKey = ['assetGroupControllerAddManyTools'];
+  const mutationKey = ['assetGroupControllerAddManyWorkflows'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -19795,91 +19810,91 @@ export const getAssetGroupControllerAddManyToolsMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
-    { groupId: string; data: AddManyToolsToAssetGroupDto }
+    Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+    { groupId: string; data: AddManyWorkflowsToAssetGroupDto }
   > = (props) => {
     const { groupId, data } = props ?? {};
 
-    return assetGroupControllerAddManyTools(groupId, data, requestOptions);
+    return assetGroupControllerAddManyWorkflows(groupId, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerAddManyToolsMutationResult = NonNullable<
-  Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>
+export type AssetGroupControllerAddManyWorkflowsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>
 >;
-export type AssetGroupControllerAddManyToolsMutationBody =
-  AddManyToolsToAssetGroupDto;
-export type AssetGroupControllerAddManyToolsMutationError = unknown;
+export type AssetGroupControllerAddManyWorkflowsMutationBody =
+  AddManyWorkflowsToAssetGroupDto;
+export type AssetGroupControllerAddManyWorkflowsMutationError = unknown;
 
 /**
- * @summary Add multiple tools to asset group
+ * @summary Add multiple workflows to asset group
  */
-export const useAssetGroupControllerAddManyTools = <
+export const useAssetGroupControllerAddManyWorkflows = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
+      Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
       TError,
-      { groupId: string; data: AddManyToolsToAssetGroupDto },
+      { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof assetGroupControllerAddManyTools>>,
+  Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
   TError,
-  { groupId: string; data: AddManyToolsToAssetGroupDto },
+  { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
   TContext
 > => {
   const mutationOptions =
-    getAssetGroupControllerAddManyToolsMutationOptions(options);
+    getAssetGroupControllerAddManyWorkflowsMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
 
 /**
- * Disassociates multiple tools from the asset group.
- * @summary Remove multiple tools from asset group
+ * Disassociates multiple workflows from the asset group.
+ * @summary Remove multiple workflows from asset group
  */
-export const assetGroupControllerRemoveManyTools = (
+export const assetGroupControllerRemoveManyWorkflows = (
   groupId: string,
-  removeManyToolsFromAssetGroupDto: RemoveManyToolsFromAssetGroupDto,
+  removeManyWorkflowsFromAssetGroupDto: RemoveManyWorkflowsFromAssetGroupDto,
   options?: SecondParameter<typeof orvalClient>,
 ) => {
   return orvalClient<DefaultMessageResponseDto>(
     {
-      url: `/api/asset-group/${groupId}/tools`,
+      url: `/api/asset-group/${groupId}/workflows`,
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      data: removeManyToolsFromAssetGroupDto,
+      data: removeManyWorkflowsFromAssetGroupDto,
     },
     options,
   );
 };
 
-export const getAssetGroupControllerRemoveManyToolsMutationOptions = <
+export const getAssetGroupControllerRemoveManyWorkflowsMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
     TError,
-    { groupId: string; data: RemoveManyToolsFromAssetGroupDto },
+    { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
   TError,
-  { groupId: string; data: RemoveManyToolsFromAssetGroupDto },
+  { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
   TContext
 > => {
-  const mutationKey = ['assetGroupControllerRemoveManyTools'];
+  const mutationKey = ['assetGroupControllerRemoveManyWorkflows'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -19889,49 +19904,53 @@ export const getAssetGroupControllerRemoveManyToolsMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
-    { groupId: string; data: RemoveManyToolsFromAssetGroupDto }
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+    { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto }
   > = (props) => {
     const { groupId, data } = props ?? {};
 
-    return assetGroupControllerRemoveManyTools(groupId, data, requestOptions);
+    return assetGroupControllerRemoveManyWorkflows(
+      groupId,
+      data,
+      requestOptions,
+    );
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type AssetGroupControllerRemoveManyToolsMutationResult = NonNullable<
-  Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>
+export type AssetGroupControllerRemoveManyWorkflowsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>
 >;
-export type AssetGroupControllerRemoveManyToolsMutationBody =
-  RemoveManyToolsFromAssetGroupDto;
-export type AssetGroupControllerRemoveManyToolsMutationError = unknown;
+export type AssetGroupControllerRemoveManyWorkflowsMutationBody =
+  RemoveManyWorkflowsFromAssetGroupDto;
+export type AssetGroupControllerRemoveManyWorkflowsMutationError = unknown;
 
 /**
- * @summary Remove multiple tools from asset group
+ * @summary Remove multiple workflows from asset group
  */
-export const useAssetGroupControllerRemoveManyTools = <
+export const useAssetGroupControllerRemoveManyWorkflows = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
+      Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
       TError,
-      { groupId: string; data: RemoveManyToolsFromAssetGroupDto },
+      { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof assetGroupControllerRemoveManyTools>>,
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
   TError,
-  { groupId: string; data: RemoveManyToolsFromAssetGroupDto },
+  { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
   TContext
 > => {
   const mutationOptions =
-    getAssetGroupControllerRemoveManyToolsMutationOptions(options);
+    getAssetGroupControllerRemoveManyWorkflowsMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
@@ -20592,18 +20611,18 @@ export function useAssetGroupControllerGetAssetsByAssetGroupsId<
 }
 
 /**
- * Retrieves tools associated with a specific asset group with pagination.
- * @summary Get tools by asset group ID
+ * Retrieves workflows associated with a specific asset group with pagination.
+ * @summary Get workflows by asset group ID
  */
-export const assetGroupControllerGetToolsByAssetGroupsId = (
+export const assetGroupControllerGetWorkflowsByAssetGroupsId = (
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyToolDto>(
+  return orvalClient<GetManyWorkflowDto>(
     {
-      url: `/api/asset-group/${assetGroupId}/tools`,
+      url: `/api/asset-group/${assetGroupId}/workflows`,
       method: 'GET',
       params,
       signal,
@@ -20612,47 +20631,50 @@ export const assetGroupControllerGetToolsByAssetGroupsId = (
   );
 };
 
-export const getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryKey = (
+export const getAssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryKey =
+  (
+    assetGroupId?: string,
+    params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  ) => {
+    return [
+      'infinate',
+      `/api/asset-group/${assetGroupId}/workflows`,
+      ...(params ? [params] : []),
+    ] as const;
+  };
+
+export const getAssetGroupControllerGetWorkflowsByAssetGroupsIdQueryKey = (
   assetGroupId?: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
 ) => {
   return [
-    'infinate',
-    `/api/asset-group/${assetGroupId}/tools`,
+    `/api/asset-group/${assetGroupId}/workflows`,
     ...(params ? [params] : []),
   ] as const;
 };
 
-export const getAssetGroupControllerGetToolsByAssetGroupsIdQueryKey = (
-  assetGroupId?: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
-) => {
-  return [
-    `/api/asset-group/${assetGroupId}/tools`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryOptions =
+export const getAssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryOptions =
   <
     TData = InfiniteData<
-      Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
-      AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+      >,
+      AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
     >,
     TError = unknown,
   >(
     assetGroupId: string,
-    params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+    params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
     options?: {
       query?: Partial<
         UseInfiniteQueryOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
           >,
           TError,
           TData,
           QueryKey,
-          AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+          AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
         >
       >;
       request?: SecondParameter<typeof orvalClient>;
@@ -20662,17 +20684,19 @@ export const getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryOptions 
 
     const queryKey =
       queryOptions?.queryKey ??
-      getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryKey(
+      getAssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryKey(
         assetGroupId,
         params,
       );
 
     const queryFn: QueryFunction<
-      Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+      >,
       QueryKey,
-      AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+      AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
     > = ({ signal, pageParam }) =>
-      assetGroupControllerGetToolsByAssetGroupsId(
+      assetGroupControllerGetWorkflowsByAssetGroupsId(
         assetGroupId,
         { ...params, page: pageParam || params?.['page'] },
         requestOptions,
@@ -20685,48 +20709,52 @@ export const getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryOptions 
       enabled: !!assetGroupId,
       ...queryOptions,
     } as UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+      >,
       TError,
       TData,
       QueryKey,
-      AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+      AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
     > & { queryKey: DataTag<QueryKey, TData, TError> };
   };
 
-export type AssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryResult =
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryResult =
   NonNullable<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
   >;
-export type AssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryError =
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryError =
   unknown;
 
-export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsIdInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
-    AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>,
+    AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params: undefined | AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params: undefined | AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
         TError,
         TData,
         QueryKey,
-        AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+        AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
           >,
           TError,
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
           >,
           QueryKey
         >,
@@ -20738,33 +20766,35 @@ export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
 ): DefinedUseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsIdInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
-    AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>,
+    AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
         TError,
         TData,
         QueryKey,
-        AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+        AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
           >,
           TError,
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
           >,
           QueryKey
         >,
@@ -20776,23 +20806,25 @@ export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsIdInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
-    AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>,
+    AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
         TError,
         TData,
         QueryKey,
-        AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+        AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -20802,26 +20834,28 @@ export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get tools by asset group ID
+ * @summary Get workflows by asset group ID
  */
 
-export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsIdInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
-    AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>,
+    AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
         TError,
         TData,
         QueryKey,
-        AssetGroupControllerGetToolsByAssetGroupsIdParams['page']
+        AssetGroupControllerGetWorkflowsByAssetGroupsIdParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -20831,7 +20865,7 @@ export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions =
-    getAssetGroupControllerGetToolsByAssetGroupsIdInfiniteQueryOptions(
+    getAssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryOptions(
       assetGroupId,
       params,
       options,
@@ -20849,18 +20883,20 @@ export function useAssetGroupControllerGetToolsByAssetGroupsIdInfinite<
   return query;
 }
 
-export const getAssetGroupControllerGetToolsByAssetGroupsIdQueryOptions = <
+export const getAssetGroupControllerGetWorkflowsByAssetGroupsIdQueryOptions = <
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
         TError,
         TData
       >
@@ -20872,15 +20908,15 @@ export const getAssetGroupControllerGetToolsByAssetGroupsIdQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getAssetGroupControllerGetToolsByAssetGroupsIdQueryKey(
+    getAssetGroupControllerGetWorkflowsByAssetGroupsIdQueryKey(
       assetGroupId,
       params,
     );
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
   > = ({ signal }) =>
-    assetGroupControllerGetToolsByAssetGroupsId(
+    assetGroupControllerGetWorkflowsByAssetGroupsId(
       assetGroupId,
       params,
       requestOptions,
@@ -20893,30 +20929,32 @@ export const getAssetGroupControllerGetToolsByAssetGroupsIdQueryOptions = <
     enabled: !!assetGroupId,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AssetGroupControllerGetToolsByAssetGroupsIdQueryResult =
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdQueryResult =
   NonNullable<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
   >;
-export type AssetGroupControllerGetToolsByAssetGroupsIdQueryError = unknown;
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdQueryError = unknown;
 
-export function useAssetGroupControllerGetToolsByAssetGroupsId<
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsId<
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params: undefined | AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params: undefined | AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
         TError,
         TData
       >
@@ -20924,11 +20962,11 @@ export function useAssetGroupControllerGetToolsByAssetGroupsId<
       Pick<
         DefinedInitialDataOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
           >,
           TError,
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
           >
         >,
         'initialData'
@@ -20939,18 +20977,20 @@ export function useAssetGroupControllerGetToolsByAssetGroupsId<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetGroupControllerGetToolsByAssetGroupsId<
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsId<
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
         TError,
         TData
       >
@@ -20958,11 +20998,11 @@ export function useAssetGroupControllerGetToolsByAssetGroupsId<
       Pick<
         UndefinedInitialDataOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
           >,
           TError,
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
           >
         >,
         'initialData'
@@ -20973,18 +21013,20 @@ export function useAssetGroupControllerGetToolsByAssetGroupsId<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetGroupControllerGetToolsByAssetGroupsId<
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsId<
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
         TError,
         TData
       >
@@ -20996,21 +21038,23 @@ export function useAssetGroupControllerGetToolsByAssetGroupsId<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get tools by asset group ID
+ * @summary Get workflows by asset group ID
  */
 
-export function useAssetGroupControllerGetToolsByAssetGroupsId<
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsId<
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsByAssetGroupsIdParams,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsByAssetGroupsId>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
         TError,
         TData
       >
@@ -21022,7 +21066,7 @@ export function useAssetGroupControllerGetToolsByAssetGroupsId<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions =
-    getAssetGroupControllerGetToolsByAssetGroupsIdQueryOptions(
+    getAssetGroupControllerGetWorkflowsByAssetGroupsIdQueryOptions(
       assetGroupId,
       params,
       options,
@@ -21504,18 +21548,18 @@ export function useAssetGroupControllerGetAssetsNotInAssetGroup<
 }
 
 /**
- * Retrieves tools not associated with a specific asset group but preinstalled in the workspace with pagination.
- * @summary Get tools not in asset group (preinstalled in workspace)
+ * Retrieves workflows not associated with a specific asset group but preinstalled in the workspace with pagination.
+ * @summary Get workflows not in asset group (preinstalled in workspace)
  */
-export const assetGroupControllerGetToolsNotInAssetGroup = (
+export const assetGroupControllerGetWorkflowsNotInAssetGroup = (
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyToolDto>(
+  return orvalClient<GetManyWorkflowDto>(
     {
-      url: `/api/asset-group/${assetGroupId}/tools/not-in-group`,
+      url: `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
       method: 'GET',
       params,
       signal,
@@ -21524,47 +21568,50 @@ export const assetGroupControllerGetToolsNotInAssetGroup = (
   );
 };
 
-export const getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryKey = (
+export const getAssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryKey =
+  (
+    assetGroupId?: string,
+    params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  ) => {
+    return [
+      'infinate',
+      `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
+      ...(params ? [params] : []),
+    ] as const;
+  };
+
+export const getAssetGroupControllerGetWorkflowsNotInAssetGroupQueryKey = (
   assetGroupId?: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
 ) => {
   return [
-    'infinate',
-    `/api/asset-group/${assetGroupId}/tools/not-in-group`,
+    `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
     ...(params ? [params] : []),
   ] as const;
 };
 
-export const getAssetGroupControllerGetToolsNotInAssetGroupQueryKey = (
-  assetGroupId?: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
-) => {
-  return [
-    `/api/asset-group/${assetGroupId}/tools/not-in-group`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryOptions =
+export const getAssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryOptions =
   <
     TData = InfiniteData<
-      Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
-      AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+      >,
+      AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
     >,
     TError = unknown,
   >(
     assetGroupId: string,
-    params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+    params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
     options?: {
       query?: Partial<
         UseInfiniteQueryOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
           >,
           TError,
           TData,
           QueryKey,
-          AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+          AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
         >
       >;
       request?: SecondParameter<typeof orvalClient>;
@@ -21574,17 +21621,19 @@ export const getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryOptions 
 
     const queryKey =
       queryOptions?.queryKey ??
-      getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryKey(
+      getAssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryKey(
         assetGroupId,
         params,
       );
 
     const queryFn: QueryFunction<
-      Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+      >,
       QueryKey,
-      AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+      AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
     > = ({ signal, pageParam }) =>
-      assetGroupControllerGetToolsNotInAssetGroup(
+      assetGroupControllerGetWorkflowsNotInAssetGroup(
         assetGroupId,
         { ...params, page: pageParam || params?.['page'] },
         requestOptions,
@@ -21597,48 +21646,52 @@ export const getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryOptions 
       enabled: !!assetGroupId,
       ...queryOptions,
     } as UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+      >,
       TError,
       TData,
       QueryKey,
-      AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+      AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
     > & { queryKey: DataTag<QueryKey, TData, TError> };
   };
 
-export type AssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryResult =
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryResult =
   NonNullable<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
   >;
-export type AssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryError =
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryError =
   unknown;
 
-export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroupInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
-    AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>,
+    AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params: undefined | AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params: undefined | AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
         TError,
         TData,
         QueryKey,
-        AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+        AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
           >,
           TError,
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
           >,
           QueryKey
         >,
@@ -21650,33 +21703,35 @@ export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
 ): DefinedUseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroupInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
-    AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>,
+    AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
         TError,
         TData,
         QueryKey,
-        AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+        AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
           >,
           TError,
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
           >,
           QueryKey
         >,
@@ -21688,23 +21743,25 @@ export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroupInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
-    AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>,
+    AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
         TError,
         TData,
         QueryKey,
-        AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+        AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -21714,26 +21771,28 @@ export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get tools not in asset group (preinstalled in workspace)
+ * @summary Get workflows not in asset group (preinstalled in workspace)
  */
 
-export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroupInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
-    AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>,
+    AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
         TError,
         TData,
         QueryKey,
-        AssetGroupControllerGetToolsNotInAssetGroupParams['page']
+        AssetGroupControllerGetWorkflowsNotInAssetGroupParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -21743,7 +21802,7 @@ export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions =
-    getAssetGroupControllerGetToolsNotInAssetGroupInfiniteQueryOptions(
+    getAssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryOptions(
       assetGroupId,
       params,
       options,
@@ -21761,18 +21820,20 @@ export function useAssetGroupControllerGetToolsNotInAssetGroupInfinite<
   return query;
 }
 
-export const getAssetGroupControllerGetToolsNotInAssetGroupQueryOptions = <
+export const getAssetGroupControllerGetWorkflowsNotInAssetGroupQueryOptions = <
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
         TError,
         TData
       >
@@ -21784,15 +21845,15 @@ export const getAssetGroupControllerGetToolsNotInAssetGroupQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getAssetGroupControllerGetToolsNotInAssetGroupQueryKey(
+    getAssetGroupControllerGetWorkflowsNotInAssetGroupQueryKey(
       assetGroupId,
       params,
     );
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
   > = ({ signal }) =>
-    assetGroupControllerGetToolsNotInAssetGroup(
+    assetGroupControllerGetWorkflowsNotInAssetGroup(
       assetGroupId,
       params,
       requestOptions,
@@ -21805,30 +21866,32 @@ export const getAssetGroupControllerGetToolsNotInAssetGroupQueryOptions = <
     enabled: !!assetGroupId,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type AssetGroupControllerGetToolsNotInAssetGroupQueryResult =
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupQueryResult =
   NonNullable<
-    Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
   >;
-export type AssetGroupControllerGetToolsNotInAssetGroupQueryError = unknown;
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupQueryError = unknown;
 
-export function useAssetGroupControllerGetToolsNotInAssetGroup<
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params: undefined | AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params: undefined | AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
         TError,
         TData
       >
@@ -21836,11 +21899,11 @@ export function useAssetGroupControllerGetToolsNotInAssetGroup<
       Pick<
         DefinedInitialDataOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
           >,
           TError,
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
           >
         >,
         'initialData'
@@ -21851,18 +21914,20 @@ export function useAssetGroupControllerGetToolsNotInAssetGroup<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetGroupControllerGetToolsNotInAssetGroup<
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
         TError,
         TData
       >
@@ -21870,11 +21935,11 @@ export function useAssetGroupControllerGetToolsNotInAssetGroup<
       Pick<
         UndefinedInitialDataOptions<
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
           >,
           TError,
           Awaited<
-            ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
           >
         >,
         'initialData'
@@ -21885,18 +21950,20 @@ export function useAssetGroupControllerGetToolsNotInAssetGroup<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useAssetGroupControllerGetToolsNotInAssetGroup<
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
         TError,
         TData
       >
@@ -21908,21 +21975,23 @@ export function useAssetGroupControllerGetToolsNotInAssetGroup<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get tools not in asset group (preinstalled in workspace)
+ * @summary Get workflows not in asset group (preinstalled in workspace)
  */
 
-export function useAssetGroupControllerGetToolsNotInAssetGroup<
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
   TData = Awaited<
-    ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
   >,
   TError = unknown,
 >(
   assetGroupId: string,
-  params?: AssetGroupControllerGetToolsNotInAssetGroupParams,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof assetGroupControllerGetToolsNotInAssetGroup>>,
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
         TError,
         TData
       >
@@ -21934,7 +22003,7 @@ export function useAssetGroupControllerGetToolsNotInAssetGroup<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions =
-    getAssetGroupControllerGetToolsNotInAssetGroupQueryOptions(
+    getAssetGroupControllerGetWorkflowsNotInAssetGroupQueryOptions(
       assetGroupId,
       params,
       options,

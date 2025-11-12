@@ -16,7 +16,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import type { ColumnDef } from '@tanstack/react-table';
 import { PlusIcon, TrashIcon } from 'lucide-react';
@@ -58,9 +57,6 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
     { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
   );
 
-  // Add assets dialog state
-  const [showAddAssetsDialog, setShowAddAssetsDialog] = useState(false);
-  const [assetsToAdd, setAssetsToAdd] = useState('');
   const [showSelectAssetsDialog, setShowSelectAssetsDialog] = useState(false);
 
   // Selected assets for adding to group
@@ -76,35 +72,6 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
     { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
     { query: { enabled: showSelectAssetsDialog } },
   );
-
-  const handleAddAssets = () => {
-    if (!assetsToAdd.trim()) return;
-
-    const assetIds = assetsToAdd
-      .split(',')
-      .map((id) => id.trim())
-      .filter((id) => id);
-
-    addAssetsMutation.mutate(
-      {
-        groupId: assetGroupId,
-        data: { assetIds },
-      },
-      {
-        onSuccess: () => {
-          refetch();
-          queryClient.invalidateQueries({
-            queryKey: ['assetGroupControllerGetAssetsByAssetGroupsId'],
-          });
-          queryClient.invalidateQueries({
-            queryKey: ['assetGroupControllerGetAssetsNotInAssetGroup'],
-          });
-          setAssetsToAdd('');
-          setShowAddAssetsDialog(false);
-        },
-      },
-    );
-  };
 
   const handleRemoveAssets = (assetIds: string[]) => {
     removeAssetsMutation.mutate(
