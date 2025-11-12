@@ -3,6 +3,7 @@ about: Suggest a new feature or enhancement for the OpenASM platform
 title: 'Feature: '
 labels: ['enhancement', 'feature']
 assignees: ''
+description: Suggest a new feature or enhancement for the OpenASM platform
 body:
   - type: markdown
     attributes:
