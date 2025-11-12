@@ -571,8 +571,6 @@ export class AssetGroupService {
           'workflow.assetGroupWorkflows',
           'assetGroupWorkflows',
         )
-        .leftJoinAndSelect('workflow.workspaceWorkflows', 'workspaceWorkflows')
-        .leftJoinAndSelect('workflow.provider', 'provider')
         .getManyAndCount();
 
       return getManyResponse({ query, data, total });
@@ -669,19 +667,13 @@ export class AssetGroupService {
       // Build query using query builder to get workflows that are NOT in the asset group but ARE in the workspace
       const queryBuilder = this.workflowRepo
         .createQueryBuilder('workflow')
-        .innerJoin(
-          'workspace_workflows',
-          'wt',
-          'wt."workflowId" = workflow.id AND wt."workspaceId" = :workspaceId',
-          { workspaceId },
-        )
         .leftJoin(
           'asset_group_workflows',
           'agt',
           'agt."workflow_id" = workflow.id AND agt."asset_group_id" = :assetGroupId',
           { assetGroupId },
         )
-        .where('agt."workflow_id" IS NULL'); // Only workflows not in the asset group
+        .where('agt."workflow_id" IS NULL');
 
       const [data, total] = await queryBuilder
         .orderBy(`workflow.${sortBy}`, sortOrder)
@@ -691,8 +683,6 @@ export class AssetGroupService {
           'workflow.assetGroupWorkflows',
           'assetGroupWorkflows',
         )
-        .leftJoinAndSelect('workflow.workspaceWorkflows', 'workspaceWorkflows')
-        .leftJoinAndSelect('workflow.provider', 'provider')
         .getManyAndCount();
 
       return getManyResponse({
