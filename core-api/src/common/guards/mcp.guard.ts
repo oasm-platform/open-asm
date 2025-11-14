@@ -35,17 +35,30 @@ export class McpGuard implements CanActivate {
     };
 
     const { body } = request;
-    if (body?.method === 'tools/call' && body.params.arguments.workspaceId) {
+    if (body?.method === 'tools/call') {
+      // Check if workspaceId exists in arguments
+      if (!body.params?.arguments?.workspaceId) {
+        throw new UnauthorizedException(
+          'Workspace ID is required for tool calls',
+        );
+      }
+
       const { workspaceId } = body.params.arguments;
       const workspacePermission = permissions.value.find(
         (permission) => permission.workspaceId === workspaceId,
       );
+
       if (!workspacePermission) {
         throw new UnauthorizedException(
           'Workspace ID not found in MCP permissions',
         );
       }
+
       const method = body.params.name;
+      if (!method) {
+        throw new UnauthorizedException('Method name is required');
+      }
+
       if (!workspacePermission.permissions.includes(method)) {
         throw new UnauthorizedException(`Cannot access method ${method}`);
       }
