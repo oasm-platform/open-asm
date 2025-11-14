@@ -9,6 +9,8 @@ import { HttpResponse } from './http-response.entity';
 import { IpAssetsView } from './ip-assets.entity';
 import { Port } from './ports.entity';
 import { StatusCodeAssetsView } from './status-code-assets.entity';
+import { AssetGroup } from '@/modules/asset-group/entities/asset-groups.entity';
+import { AssetGroupAsset } from '@/modules/asset-group/entities/asset-groups-assets.entity';
 
 @Entity('assets')
 @Unique(['value', 'target'])
@@ -63,6 +65,11 @@ export class Asset extends BaseEntity {
     onDelete: 'CASCADE',
   })
   vulnerabilities?: Vulnerability[];
+
+  @OneToMany(() => AssetGroupAsset, (aga) => aga.asset, {
+    onDelete: 'CASCADE',
+  })
+  assetGroupAssets?: AssetGroupAsset[];
 
   @OneToMany(() => IpAssetsView, (ipAssets) => ipAssets.asset)
   ipAssets?: IpAssetsView[];

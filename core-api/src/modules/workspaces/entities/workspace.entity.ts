@@ -18,6 +18,7 @@ import {
   OneToOne,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
+import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 
 @Entity('workspaces')
 export class Workspace extends BaseEntity {
@@ -76,6 +77,9 @@ export class Workspace extends BaseEntity {
 
   @OneToMany(() => Statistic, (statistic) => statistic.workspace)
   statistics: Statistic[];
+
+  @OneToMany(() => Workflow, (workflow) => workflow.workspace)
+  workflows: Workflow[];
 
   @ApiProperty({
     example: true,

@@ -56,6 +56,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: <Bug />,
           url: '/vulnerabilities',
         },
+        // {
+        //   title: 'Workflow',
+        //   icon: <Workflow />,
+        //   url: '/workflow',
+        // },
         {
           title: 'Tools',
           icon: <Cpu />,

@@ -11,7 +11,7 @@ export class WorkflowsService implements OnModuleInit {
   constructor(
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
-  ) { }
+  ) {}
 
   private readonly logger = new Logger(WorkflowsService.name);
   private readonly templatesPath = path.join(__dirname, 'templates');
@@ -101,7 +101,9 @@ export class WorkflowsService implements OnModuleInit {
               filePath: fileName,
             });
             this.logger.log(`Inserted new workflow: ${fileName}`);
-          } else if (JSON.stringify(newContent) !== JSON.stringify(existing.content)) {
+          } else if (
+            JSON.stringify(newContent) !== JSON.stringify(existing.content)
+          ) {
             await this.workflowRepository.update(
               { filePath: fileName },
               { content: newContent },

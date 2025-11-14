@@ -9,9 +9,10 @@ import PortAssetsTab from './components/port-assets-tab';
 import StatusCodeAssetsTab from './components/status-code-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
+import { AssetGroupTab } from './components/asset-group-tab';
 
 export function ListAssets() {
-  const { workspaces } = useWorkspaceSelector()
+  const { workspaces } = useWorkspaceSelector();
 
   const tabList = useMemo(
     () => [
@@ -27,7 +28,7 @@ export function ListAssets() {
       },
       {
         value: 'ip',
-        text: 'IP Adresses',
+        text: 'IP Addresses',
         tab: <IpAssetsTab />,
       },
       {
@@ -40,6 +41,11 @@ export function ListAssets() {
         text: 'Status Code',
         tab: <StatusCodeAssetsTab />,
       },
+      {
+        value: 'group',
+        text: 'Group',
+        tab: <AssetGroupTab />,
+      },
     ],
     [],
   );
@@ -48,7 +54,6 @@ export function ListAssets() {
   if (workspaces.length === 0) return <CreateWorkspace />;
   return (
     <div className="w-full">
-      {/* <FilterForm /> */}
       <FilterFormInfinite />
       <Tabs
         value={selectedTab}

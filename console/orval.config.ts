@@ -14,6 +14,7 @@ export default defineConfig({
         query: {
           useInfinite: true,
           useQuery: true,
+          useInfiniteQueryParam: 'page',
         },
         mutator: {
           path: 'src/services/apis/axios-client.ts',

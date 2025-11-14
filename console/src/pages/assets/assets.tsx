@@ -1,6 +1,6 @@
 import Page from '@/components/common/page';
-import { ListAssets } from './list-assets';
 import AssetProvider from './context/asset-context';
+import { ListAssets } from './list-assets';
 
 const Assets = () => {
   return (
