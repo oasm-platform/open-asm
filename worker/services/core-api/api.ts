@@ -1138,12 +1138,12 @@ export interface CreateAssetGroupDto {
   workspaceId: string;
 }
 
-export interface AddManyToolsToAssetGroupDto {
+export interface AddManyWorkflowsToAssetGroupDto {
   /**
-   * Array of tool IDs to add
+   * Array of workflow IDs to add
    * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-426614174002"]
    */
-  toolIds: string[];
+  workflowIds: string[];
 }
 
 export interface AddManyAssetsToAssetGroupDto {
@@ -1154,12 +1154,12 @@ export interface AddManyAssetsToAssetGroupDto {
   assetIds: string[];
 }
 
-export interface RemoveManyToolsFromAssetGroupDto {
+export interface RemoveManyWorkflowsFromAssetGroupDto {
   /**
-   * Array of tool IDs to remove
+   * Array of workflow IDs to remove
    * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-42614174002"]
    */
-  toolIds: string[];
+  workflowIds: string[];
 }
 
 export interface RemoveManyAssetsFromAssetGroupDto {
@@ -1172,6 +1172,23 @@ export interface RemoveManyAssetsFromAssetGroupDto {
 
 export interface GetManyAssetDto {
   data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface Workflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface GetManyWorkflowDto {
+  data: Workflow[];
   total: number;
   page: number;
   limit: number;
@@ -3185,20 +3202,20 @@ export class Api<
     });
 
   /**
-   * @description Associates multiple tools with the specified asset group.
+   * @description Associates multiple workflows with the specified asset group.
    *
    * @tags Asset Group
-   * @name AssetGroupControllerAddManyTools
-   * @summary Add multiple tools to asset group
-   * @request POST:/api/asset-group/{groupId}/tools
+   * @name AssetGroupControllerAddManyWorkflows
+   * @summary Add multiple workflows to asset group
+   * @request POST:/api/asset-group/{groupId}/workflows
    */
-  assetGroupControllerAddManyTools = (
+  assetGroupControllerAddManyWorkflows = (
     groupId: string,
-    data: AddManyToolsToAssetGroupDto,
+    data: AddManyWorkflowsToAssetGroupDto,
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/asset-group/${groupId}/tools`,
+      path: `/api/asset-group/${groupId}/workflows`,
       method: "POST",
       body: data,
       type: ContentType.Json,
@@ -3207,20 +3224,20 @@ export class Api<
     });
 
   /**
-   * @description Disassociates multiple tools from the asset group.
+   * @description Disassociates multiple workflows from the asset group.
    *
    * @tags Asset Group
-   * @name AssetGroupControllerRemoveManyTools
-   * @summary Remove multiple tools from asset group
-   * @request DELETE:/api/asset-group/{groupId}/tools
+   * @name AssetGroupControllerRemoveManyWorkflows
+   * @summary Remove multiple workflows from asset group
+   * @request DELETE:/api/asset-group/{groupId}/workflows
    */
-  assetGroupControllerRemoveManyTools = (
+  assetGroupControllerRemoveManyWorkflows = (
     groupId: string,
-    data: RemoveManyToolsFromAssetGroupDto,
+    data: RemoveManyWorkflowsFromAssetGroupDto,
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/asset-group/${groupId}/tools`,
+      path: `/api/asset-group/${groupId}/workflows`,
       method: "DELETE",
       body: data,
       type: ContentType.Json,
@@ -3303,14 +3320,14 @@ export class Api<
     });
 
   /**
-   * @description Retrieves tools associated with a specific asset group with pagination.
+   * @description Retrieves workflows associated with a specific asset group with pagination.
    *
    * @tags Asset Group
-   * @name AssetGroupControllerGetToolsByAssetGroupsId
-   * @summary Get tools by asset group ID
-   * @request GET:/api/asset-group/{assetGroupId}/tools
+   * @name AssetGroupControllerGetWorkflowsByAssetGroupsId
+   * @summary Get workflows by asset group ID
+   * @request GET:/api/asset-group/{assetGroupId}/workflows
    */
-  assetGroupControllerGetToolsByAssetGroupsId = (
+  assetGroupControllerGetWorkflowsByAssetGroupsId = (
     assetGroupId: string,
     query?: {
       /** @example 1 */
@@ -3325,7 +3342,7 @@ export class Api<
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/asset-group/${assetGroupId}/tools`,
+      path: `/api/asset-group/${assetGroupId}/workflows`,
       method: "GET",
       query: query,
       format: "json",
@@ -3363,14 +3380,14 @@ export class Api<
     });
 
   /**
-   * @description Retrieves tools not associated with a specific asset group but preinstalled in the workspace with pagination.
+   * @description Retrieves workflows not associated with a specific asset group but preinstalled in the workspace with pagination.
    *
    * @tags Asset Group
-   * @name AssetGroupControllerGetToolsNotInAssetGroup
-   * @summary Get tools not in asset group (preinstalled in workspace)
-   * @request GET:/api/asset-group/{assetGroupId}/tools/not-in-group
+   * @name AssetGroupControllerGetWorkflowsNotInAssetGroup
+   * @summary Get workflows not in asset group (preinstalled in workspace)
+   * @request GET:/api/asset-group/{assetGroupId}/workflows/not-in-group
    */
-  assetGroupControllerGetToolsNotInAssetGroup = (
+  assetGroupControllerGetWorkflowsNotInAssetGroup = (
     assetGroupId: string,
     query?: {
       /** @example 1 */
@@ -3385,7 +3402,7 @@ export class Api<
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/asset-group/${assetGroupId}/tools/not-in-group`,
+      path: `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
       method: "GET",
       query: query,
       format: "json",

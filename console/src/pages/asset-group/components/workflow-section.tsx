@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -7,6 +6,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DataTable } from '@/components/ui/data-table';
 import {
   Dialog,
   DialogContent,
@@ -16,26 +17,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { DataTable } from '@/components/ui/data-table';
-import type { ColumnDef } from '@tanstack/react-table';
-import { PlusIcon, TrashIcon } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   useAssetGroupControllerAddManyWorkflows,
-  useAssetGroupControllerRemoveManyWorkflows,
   useAssetGroupControllerGetWorkflowsByAssetGroupsId,
   useAssetGroupControllerGetWorkflowsNotInAssetGroup,
+  useAssetGroupControllerRemoveManyWorkflows,
+  type Workflow,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
+import type { ColumnDef } from '@tanstack/react-table';
+import { PlusIcon, TrashIcon } from 'lucide-react';
+import { useState } from 'react';
 
-interface Workflow {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
-  isInstalled?: boolean;
-}
+
 
 interface WorkflowSectionProps {
   assetGroupId: string;
@@ -121,7 +115,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   };
 
   // Workflow table columns
-  const workflowColumns: ColumnDef<Workflow>[] = [
+  const workflowColumns: ColumnDef<Workflow, unknown>[] = [
     {
       accessorKey: 'name',
       header: 'Workflow Name',
@@ -137,6 +131,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     },
     {
       id: 'actions',
+      accessorFn: () => undefined,
       header: 'Actions',
       cell: ({ row }) => (
         <Button
@@ -152,9 +147,10 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   ];
 
   // Columns for workflows not in group with selection
-  const workflowsNotInGroupColumns: ColumnDef<Workflow>[] = [
+  const workflowsNotInGroupColumns: ColumnDef<Workflow, unknown>[] = [
     {
       id: 'select',
+      accessorFn: () => undefined,
       header: ({ table }) => (
         <Checkbox
           checked={
@@ -234,7 +230,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                   page={workflowsNotInGroupQuery.data?.page || 1}
                   pageSize={workflowsNotInGroupQuery.data?.limit || 10}
                   totalItems={workflowsNotInGroupQuery.data?.total || 0}
-                  onPageChange={() => {}}
+                  onPageChange={() => { }}
                 />
               </div>
               <DialogFooter className="flex sm:justify-between">
@@ -261,7 +257,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       </CardHeader>
       <CardContent>
         {workflowsInGroupQuery.data &&
-        workflowsInGroupQuery.data.data.length > 0 ? (
+          workflowsInGroupQuery.data.data.length > 0 ? (
           <DataTable
             columns={workflowColumns}
             data={workflowsInGroupQuery.data.data}
@@ -269,7 +265,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
             page={workflowsInGroupQuery.data.page}
             pageSize={workflowsInGroupQuery.data.limit}
             totalItems={workflowsInGroupQuery.data.total}
-            onPageChange={() => {}}
+            onPageChange={() => { }}
           />
         ) : (
           <div className="text-center py-8 text-muted-foreground">

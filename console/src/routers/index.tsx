@@ -1,5 +1,6 @@
 import Layout from '@/components/common/layout/layout';
 import Splash from '@/components/common/layout/splash';
+import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
 import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
@@ -19,13 +20,12 @@ import ToolDetail from '@/pages/tools/components/tool-detail';
 import Tools from '@/pages/tools/tools';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 import Workers from '@/pages/workers/workers';
+import Workflow from '@/pages/workflow/workflow';
 import { createBrowserRouter } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
 import ProtectedRoute from './ProtectedRoute';
 import RegisterRoute from './RegisterRoute';
-import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
-import Workflow from '@/pages/workflow/workflow';
 
 export const router = createBrowserRouter([
   {
