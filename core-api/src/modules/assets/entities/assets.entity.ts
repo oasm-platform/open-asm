@@ -1,16 +1,16 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { AssetGroupAsset } from '@/modules/asset-group/entities/asset-groups-assets.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
+import { AssetService } from './asset-services.entity';
 import { AssetTag } from './asset-tags.entity';
 import { HttpResponse } from './http-response.entity';
 import { IpAssetsView } from './ip-assets.entity';
 import { Port } from './ports.entity';
 import { StatusCodeAssetsView } from './status-code-assets.entity';
-import { AssetGroup } from '@/modules/asset-group/entities/asset-groups.entity';
-import { AssetGroupAsset } from '@/modules/asset-group/entities/asset-groups-assets.entity';
 
 @Entity('assets')
 @Unique(['value', 'target'])
@@ -60,6 +60,11 @@ export class Asset extends BaseEntity {
     onDelete: 'CASCADE',
   })
   httpResponses?: HttpResponse[];
+
+  @OneToMany(() => AssetService, (assetService) => assetService.asset, {
+    onDelete: 'CASCADE',
+  })
+  assetServices?: AssetService[];
 
   @OneToMany(() => Vulnerability, (vulnerability) => vulnerability.asset, {
     onDelete: 'CASCADE',
