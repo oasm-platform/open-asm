@@ -1,4 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { Asset } from './assets.entity';
@@ -28,4 +29,9 @@ export class AssetService extends BaseEntity {
         onDelete: 'CASCADE',
     })
     httpResponses?: HttpResponse[];
+
+    @OneToMany(() => Job, (job) => job.assetService, {
+        onDelete: 'CASCADE',
+    })
+    jobs?: Job[];
 }

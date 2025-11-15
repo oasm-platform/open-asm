@@ -4,6 +4,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { DataSource, InsertResult } from 'typeorm';
 import { JobStatus, ToolCategory } from '../../common/enums/enum';
+import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
@@ -155,16 +156,50 @@ export class DataAdapterService {
     data,
     job,
   }: DataAdapterInput<number[]>): Promise<void> {
-    await this.dataSource
-      .createQueryBuilder()
-      .insert()
-      .into(Port)
-      .values({
-        ports: data,
-        assetId: job.asset.id,
-        jobHistoryId: job.jobHistory.id,
-      })
-      .execute();
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Insert ports data
+      await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(Port)
+        .values({
+          ports: data,
+          assetId: job.asset.id,
+          jobHistoryId: job.jobHistory.id,
+        })
+        .execute();
+
+      // Insert asset services data
+      if (data && data.length > 0) {
+        const assetServices = data.map(port => ({
+          value: `${job.asset.value}:${port}`,
+          port: port,
+          assetId: job.asset.id,
+        }));
+
+        await queryRunner.manager
+          .createQueryBuilder()
+          .insert()
+          .into(AssetService)
+          .values(assetServices)
+          .orUpdate({
+            conflict_target: ['assetId', 'port'],
+            overwrite: ['value'],
+          })
+          .execute();
+      }
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
 
     return;
   }
