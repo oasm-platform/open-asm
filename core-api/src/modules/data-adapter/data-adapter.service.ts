@@ -148,9 +148,9 @@ export class DataAdapterService {
   }
 
   /**
-   * Ports data normalization
-   * @param param0
-   * @returns
+   * 
+   * @param param0 
+   * @returns 
    */
   public async portsScanner({
     data,
@@ -160,6 +160,9 @@ export class DataAdapterService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
+    // Filter out NaN values from the port array
+    const filteredPorts = data.filter(port => !isNaN(port));
+
     try {
       // Insert ports data
       await queryRunner.manager
@@ -167,15 +170,15 @@ export class DataAdapterService {
         .insert()
         .into(Port)
         .values({
-          ports: data,
+          ports: filteredPorts,
           assetId: job.asset.id,
           jobHistoryId: job.jobHistory.id,
         })
         .execute();
 
       // Insert asset services data
-      if (data && data.length > 0) {
-        const assetServices = data.map(port => ({
+      if (filteredPorts && filteredPorts.length > 0) {
+        const assetServices = filteredPorts.map(port => ({
           value: `${job.asset.value}:${port}`,
           port: port,
           assetId: job.asset.id,

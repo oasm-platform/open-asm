@@ -160,9 +160,11 @@ export class JobsRegistryService {
     let filteredAssets: Asset[];
     if (tool.category === ToolCategory.SUBDOMAINS) {
       filteredAssets = assets.filter((asset) => asset.isPrimary);
-    } else if (tool.category === ToolCategory.PORTS_SCANNER) {
-      filteredAssets = assets.filter((asset) => asset.isPrimary);
-    } else {
+    }
+    // else if (tool.category === ToolCategory.PORTS_SCANNER) {
+    //   filteredAssets = assets.filter((asset) => asset.isPrimary);
+    // } 
+    else {
       filteredAssets = assets;
     }
 
