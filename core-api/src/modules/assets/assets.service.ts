@@ -1,5 +1,8 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyBaseResponseDto, SortOrder } from '@/common/dtos/get-many-base.dto';
+import {
+  GetManyBaseResponseDto,
+  SortOrder,
+} from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
@@ -54,7 +57,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all assets associated with a specified target.
@@ -98,14 +101,21 @@ export class AssetsService {
 
     const queryBuilder = this.assetRepo
       .createQueryBuilder('assets')
-      .leftJoin('assets.httpResponses', 'httpResponses', 'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetId" = assets.id)')
+      .leftJoin(
+        'assets.httpResponses',
+        'httpResponses',
+        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetId" = assets.id)',
+      )
       .leftJoin('assets.ports', 'ports')
       .leftJoin('assets.target', 'targets')
       .leftJoinAndSelect('assets.tags', 'tags')
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoin('assets.ipAssets', 'ipAssets')
       .leftJoin('assets.statusCodeAssets', 'statusCodeAssets')
-      .where('assets."isErrorPage" = false').andWhere('"workspaceTargets"."workspaceId" = :workspaceId', { workspaceId });
+      .where('assets."isErrorPage" = false')
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+        workspaceId,
+      });
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -225,6 +235,18 @@ export class AssetsService {
     target: Target;
     value: string;
   }): Promise<Asset> {
+    // Check if asset already exists
+    const existingAsset = await this.assetRepo.findOne({
+      where: {
+        value,
+        target: { id: target.id },
+      },
+    });
+
+    if (existingAsset) {
+      return existingAsset;
+    }
+
     return this.assetRepo.save({
       id: randomUUID(),
       target,
@@ -256,7 +278,8 @@ export class AssetsService {
         id: targetId,
       },
     });
-    const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(targetId);
+    const workspaceId =
+      await this.workspaceService.getWorkspaceIdByTargetId(targetId);
 
     if (!workspaceId) {
       throw new NotFoundException('Workspace not found');
@@ -294,8 +317,14 @@ export class AssetsService {
    * @returns A promise that resolves to the found asset.
    * @throws NotFoundException if the asset with the given ID is not found.
    */
-  public async getAssetById(id: string, workspaceId: string): Promise<GetAssetsResponseDto> {
-    const queryBuilder = this.buildBaseQuery(new GetAssetsQueryDto(), workspaceId)
+  public async getAssetById(
+    id: string,
+    workspaceId: string,
+  ): Promise<GetAssetsResponseDto> {
+    const queryBuilder = this.buildBaseQuery(
+      new GetAssetsQueryDto(),
+      workspaceId,
+    )
       .select([
         'assets.value',
         'assets.id',
@@ -528,8 +557,8 @@ export class AssetsService {
         ),
       );
 
-    const data = list
-      .map((item: { technology: string; assetCount: number }) => {
+    const data = list.map(
+      (item: { technology: string; assetCount: number }) => {
         const obj = new GetTechnologyAssetsDTO();
         obj.assetCount = item.assetCount;
 
@@ -553,7 +582,8 @@ export class AssetsService {
         }
 
         return obj;
-      });
+      },
+    );
 
     // Use the database total since we want to show the actual count of distinct technologies
     // even if some have missing enrichment data
@@ -699,11 +729,21 @@ export class AssetsService {
       .createQueryBuilder()
       .select('COUNT(DISTINCT("httpResponses"."tls"))', 'count')
       .from('http_responses', 'httpResponses')
-      .innerJoin('assets', 'assets', '"httpResponses"."assetId" = "assets"."id"')
+      .innerJoin(
+        'assets',
+        'assets',
+        '"httpResponses"."assetId" = "assets"."id"',
+      )
       .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
-      .innerJoin('workspace_targets', 'workspaceTargets', '"targets"."id" = "workspaceTargets"."targetId"')
+      .innerJoin(
+        'workspace_targets',
+        'workspaceTargets',
+        '"targets"."id" = "workspaceTargets"."targetId"',
+      )
       .where('"httpResponses"."tls" IS NOT NULL')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', { workspaceId })
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+        workspaceId,
+      })
       .getRawOne<{ count: number }>();
 
     // Main query ordered by expiry date (earliest first)
@@ -712,16 +752,25 @@ export class AssetsService {
       .createQueryBuilder()
       .select(['"httpResponses"."tls"'])
       .from('http_responses', 'httpResponses')
-      .innerJoin('assets', 'assets', '"httpResponses"."assetId" = "assets"."id"')
+      .innerJoin(
+        'assets',
+        'assets',
+        '"httpResponses"."assetId" = "assets"."id"',
+      )
       .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
-      .innerJoin('workspace_targets', 'workspaceTargets', '"targets"."id" = "workspaceTargets"."targetId"')
+      .innerJoin(
+        'workspace_targets',
+        'workspaceTargets',
+        '"targets"."id" = "workspaceTargets"."targetId"',
+      )
       .where('"httpResponses"."tls" IS NOT NULL')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', { workspaceId })
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+        workspaceId,
+      })
       .groupBy('"httpResponses"."tls"')
-      .orderBy("(\"httpResponses\".\"tls\"->>'not_after')::timestamp", 'ASC')
+      .orderBy('("httpResponses"."tls"->>\'not_after\')::timestamp', 'ASC')
       .limit(limit)
       .getRawMany<TlsRawQueryItem>();
-
 
     const data = queryResult.map((item): GetTlsResponseDto => {
       const obj = new GetTlsResponseDto();
@@ -746,10 +795,17 @@ export class AssetsService {
       sortOrder: SortOrder.ASC,
     };
 
-    return getManyResponse({ query: queryObj, data, total: totalResult?.count ?? 0 });
+    return getManyResponse({
+      query: queryObj,
+      data,
+      total: totalResult?.count ?? 0,
+    });
   }
 
-  public async switchAsset(assetId: string, isEnabled: boolean): Promise<Asset> {
+  public async switchAsset(
+    assetId: string,
+    isEnabled: boolean,
+  ): Promise<Asset> {
     const asset = await this.assetRepo.findOne({
       where: { id: assetId },
     });
