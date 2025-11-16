@@ -132,6 +132,7 @@ export class DataAdapterService {
         .values({
           ...data,
           assetId: job.asset.id,
+          assetServiceId: job.assetService?.id,
           jobHistoryId: job.jobHistory.id,
         })
         .execute();
