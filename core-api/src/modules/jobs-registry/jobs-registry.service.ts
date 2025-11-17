@@ -724,6 +724,7 @@ export class JobsRegistryService {
           workflow: true,
         },
         tool: true,
+        assetService: true,
       },
     });
   }
