@@ -146,6 +146,13 @@ export class WorkflowsService implements OnModuleInit {
     return parsed as unknown;
   }
 
+  /**
+   * Creates a new workflow in the specified workspace
+   * @param createWorkflowDto The data transfer object containing workflow details
+   * @param createdBy The user creating the workflow
+   * @param workspace The workspace where the workflow will be created
+   * @returns The created Workflow entity
+   */
   async createWorkflow(
     createWorkflowDto: CreateWorkflowDto,
     createdBy: { id: string },
@@ -161,5 +168,70 @@ export class WorkflowsService implements OnModuleInit {
     workflow.workspace = { id: workspace.id } as Workspace;
 
     return await this.workflowRepository.save(workflow);
+  }
+
+  /**
+   * Retrieves a specific workflow by its ID within a workspace
+   * @param id The ID of the workflow to retrieve
+   * @param workspace The workspace containing the workflow
+   * @returns The Workflow entity if found
+   * @throws Error if workflow is not found in the workspace
+   */
+  async getWorkspaceWorkflow(id: string, workspace: { id: string }): Promise<Workflow> {
+    const workflow = await this.workflowRepository.findOne({
+      where: {
+        id, workspace: { id: workspace.id },
+      },
+      relations: ['createdBy', 'workspace'],
+    });
+
+    if (!workflow) {
+      throw new Error('Workflow not found in this workspace');
+    }
+
+    return workflow;
+  }
+
+  /**
+   * Updates an existing workflow with new data
+   * @param id The ID of the workflow to update
+   * @param updateData The partial data to update
+   * @param workspace The workspace containing the workflow
+   * @returns The updated Workflow entity
+   * @throws Error if workflow is not found in the workspace
+   */
+  async updateWorkflow(id: string, updateData: Partial<CreateWorkflowDto>, workspace: { id: string }): Promise<Workflow> {
+    const workflow = await this.getWorkspaceWorkflow(id, workspace);
+
+    if (updateData.name) workflow.name = updateData.name;
+    if (updateData.content) workflow.content = updateData.content;
+    if (updateData.filePath) workflow.filePath = updateData.filePath;
+
+    return await this.workflowRepository.save(workflow);
+  }
+
+  /**
+   * Deletes a workflow by its ID from the specified workspace
+   * @param id The ID of the workflow to delete
+   * @param workspace The workspace containing the workflow
+   * @throws Error if workflow is not found in the workspace
+   */
+  async deleteWorkflow(id: string, workspace: { id: string }): Promise<void> {
+    const workflow = await this.getWorkspaceWorkflow(id, workspace);
+    await this.workflowRepository.remove(workflow);
+  }
+
+  /**
+   * Retrieves all workflows within a specific workspace
+   * @param workspace The workspace to retrieve workflows from
+   * @returns Array of Workflow entities in the workspace
+   */
+  async getWorkflowsByWorkspace(workspace: { id: string }): Promise<Workflow[]> {
+    return await this.workflowRepository.find({
+      where: {
+        workspace: { id: workspace.id },
+      },
+      relations: ['createdBy', 'workspace'],
+    });
   }
 }
