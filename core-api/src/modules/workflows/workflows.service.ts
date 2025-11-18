@@ -4,6 +4,9 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import * as path from 'path';
 import { Repository } from 'typeorm';
+import { User } from '../auth/entities/user.entity';
+import { Workspace } from '../workspaces/entities/workspace.entity';
+import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { Workflow } from './entities/workflow.entity';
 
 @Injectable()
@@ -11,7 +14,7 @@ export class WorkflowsService implements OnModuleInit {
   constructor(
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
-  ) {}
+  ) { }
 
   private readonly logger = new Logger(WorkflowsService.name);
   private readonly templatesPath = path.join(__dirname, 'templates');
@@ -141,5 +144,22 @@ export class WorkflowsService implements OnModuleInit {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const parsed = yaml.load(fileContent);
     return parsed as unknown;
+  }
+
+  async createWorkflow(
+    createWorkflowDto: CreateWorkflowDto,
+    createdBy: { id: string },
+    workspace: { id: string },
+  ): Promise<Workflow> {
+    const { name, content, filePath } = createWorkflowDto;
+
+    const workflow = new Workflow();
+    workflow.name = name;
+    workflow.content = content;
+    workflow.filePath = filePath || `${name.toLowerCase().replace(/\s+/g, '-')}.yaml`;
+    workflow.createdBy = { id: createdBy.id } as User;
+    workflow.workspace = { id: workspace.id } as Workspace;
+
+    return await this.workflowRepository.save(workflow);
   }
 }
