@@ -16,7 +16,10 @@ import { DataAdapterInput } from './data-adapter.interface';
 
 @Injectable()
 export class DataAdapterService {
-  constructor(private readonly dataSource: DataSource, private workspaceService: WorkspacesService) { }
+  constructor(
+    private readonly dataSource: DataSource,
+    private workspaceService: WorkspacesService,
+  ) {}
 
   public async validateData<T extends object>(
     data: object | object[],
@@ -64,8 +67,11 @@ export class DataAdapterService {
         .where({ id: job.id })
         .execute();
 
-      const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(job.asset.target.id);
-      const workspaceConfigs = await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
+      const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(
+        job.asset.target.id,
+      );
+      const workspaceConfigs =
+        await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
 
       // const workspaceId =
       // Insert Assets
@@ -116,12 +122,12 @@ export class DataAdapterService {
     await queryRunner.startTransaction();
 
     try {
-      if (data.failed) {
+      if (data.failed && job.assetServiceId) {
         await queryRunner.manager
           .createQueryBuilder()
-          .update(Asset)
+          .update(AssetService)
           .set({ isErrorPage: true })
-          .where({ id: job.asset.id })
+          .where({ id: job.assetServiceId })
           .execute();
       }
 
@@ -131,7 +137,6 @@ export class DataAdapterService {
         .into(HttpResponse)
         .values({
           ...data,
-          assetId: job.asset.id,
           assetServiceId: job.assetService?.id,
           jobHistoryId: job.jobHistory.id,
         })
@@ -149,9 +154,9 @@ export class DataAdapterService {
   }
 
   /**
-   * 
-   * @param param0 
-   * @returns 
+   *
+   * @param param0
+   * @returns
    */
   public async portsScanner({
     data,
@@ -162,7 +167,7 @@ export class DataAdapterService {
     await queryRunner.startTransaction();
 
     // Filter out NaN values from the port array
-    const filteredPorts = data.filter(port => !isNaN(port));
+    const filteredPorts = data.filter((port) => !isNaN(port));
 
     try {
       // Insert ports data
@@ -179,7 +184,7 @@ export class DataAdapterService {
 
       // Insert asset services data
       if (filteredPorts && filteredPorts.length > 0) {
-        const assetServices = filteredPorts.map(port => ({
+        const assetServices = filteredPorts.map((port) => ({
           value: `${job.asset.value}:${port}`,
           port: port,
           assetId: job.asset.id,

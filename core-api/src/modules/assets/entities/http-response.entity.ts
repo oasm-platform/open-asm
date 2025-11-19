@@ -185,10 +185,6 @@ export class HttpResponse extends BaseEntity {
 
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })
-  assetId: string;
-
-  @ApiProperty()
-  @Column({ type: 'varchar', nullable: true })
   assetServiceId: string;
 
   @ManyToOne(() => AssetService, (assetService) => assetService.httpResponses, {
