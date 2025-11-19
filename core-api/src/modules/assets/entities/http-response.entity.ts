@@ -4,7 +4,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { AssetService } from './asset-services.entity';
-import { Asset } from './assets.entity';
 
 class TlsInfo {
   @ApiProperty()
@@ -187,12 +186,6 @@ export class HttpResponse extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })
   assetId: string;
-
-  @ManyToOne(() => Asset, (asset) => asset.httpResponses, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'assetId' })
-  asset: Asset;
 
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })

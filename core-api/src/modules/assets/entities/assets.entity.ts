@@ -7,10 +7,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 import { AssetTag } from './asset-tags.entity';
-import { HttpResponse } from './http-response.entity';
 import { IpAssetsView } from './ip-assets.entity';
 import { Port } from './ports.entity';
-import { StatusCodeAssetsView } from './status-code-assets.entity';
 
 @Entity('assets')
 @Unique(['value', 'target'])
@@ -56,11 +54,6 @@ export class Asset extends BaseEntity {
   @Column({ default: false })
   isErrorPage?: boolean;
 
-  @OneToMany(() => HttpResponse, (httpResponse) => httpResponse.asset, {
-    onDelete: 'CASCADE',
-  })
-  httpResponses?: HttpResponse[];
-
   @OneToMany(() => AssetService, (assetService) => assetService.asset, {
     onDelete: 'CASCADE',
   })
@@ -78,12 +71,6 @@ export class Asset extends BaseEntity {
 
   @OneToMany(() => IpAssetsView, (ipAssets) => ipAssets.asset)
   ipAssets?: IpAssetsView[];
-
-  @OneToMany(
-    () => StatusCodeAssetsView,
-    (statusCodeAssets) => statusCodeAssets.asset,
-  )
-  statusCodeAssets?: StatusCodeAssetsView[];
 
   @ApiProperty()
   @Column({ default: true })

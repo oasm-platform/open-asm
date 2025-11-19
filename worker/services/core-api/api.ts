@@ -225,6 +225,7 @@ export interface Job {
   /** @format date-time */
   completedAt: string;
   command: string;
+  assetServiceId: string;
 }
 
 export interface GetManyJobDto {
@@ -362,6 +363,7 @@ export interface HttpResponseDTO {
   resolvers: string[];
   chain_status_codes: string[];
   assetId: string;
+  assetServiceId: string;
   jobHistoryId: string;
   techList: string[];
 }
