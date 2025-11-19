@@ -176,7 +176,6 @@ export class AssetsService {
       .skip(offset)
       .take(query.limit)
       .getManyAndCount();
-    console.log(queryBuilder.getQueryAndParameters());
 
     const assets = list.map(async (item) => {
       const asset = new GetAssetsResponseDto();
