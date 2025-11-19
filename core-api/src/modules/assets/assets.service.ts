@@ -113,7 +113,7 @@ export class AssetsService {
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoin('asset.ipAssets', 'ipAssets')
       .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
-      // .where('"assetServices"."isErrorPage" = false')
+      .where('"assetServices"."isErrorPage" = false')
       .where('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       });
@@ -338,6 +338,7 @@ export class AssetsService {
     asset.createdAt = item.createdAt;
     asset.dnsRecords = item.asset.dnsRecords;
     asset.isEnabled = item.asset.isEnabled;
+    asset.port = item.port;
 
     // asset.tags = item.asset.tags || [];
 
@@ -387,7 +388,7 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
         '"ipAssets"."ip"',
-        'COUNT(DISTINCT "assets"."id") as "assetCount"',
+        'COUNT(DISTINCT "asset"."id") as "assetCount"',
       ])
       .andWhere('"ipAssets"."ip" IS NOT NULL')
       .andWhere('"ipAssets"."ip" ILIKE :value', {
@@ -452,7 +453,7 @@ export class AssetsService {
         'sq',
         '"sq"."assetId" = "asset"."id"',
       )
-      .select(['"sq"."port"', 'COUNT(DISTINCT "assets"."id") as "assetCount"'])
+      .select(['"sq"."port"', 'COUNT(DISTINCT "asset"."id") as "assetCount"'])
       .andWhere('"sq"."port" IS NOT NULL')
       .andWhere('"sq"."port"::text ILIKE :value', {
         value: `%${query.value}%`,
@@ -723,9 +724,14 @@ export class AssetsService {
       .select('COUNT(DISTINCT("httpResponses"."tls"))', 'count')
       .from('http_responses', 'httpResponses')
       .innerJoin(
+        'asset_services',
+        'assetServices',
+        '"httpResponses"."assetServiceId" = "assetServices"."id"',
+      )
+      .innerJoin(
         'assets',
         'assets',
-        '"httpResponses"."assetId" = "assets"."id"',
+        '"assetServices"."assetId" = "assets"."id"',
       )
       .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
       .innerJoin(
@@ -746,9 +752,14 @@ export class AssetsService {
       .select(['"httpResponses"."tls"'])
       .from('http_responses', 'httpResponses')
       .innerJoin(
+        'asset_services',
+        'assetServices',
+        '"httpResponses"."assetServiceId" = "assetServices"."id"',
+      )
+      .innerJoin(
         'assets',
         'assets',
-        '"httpResponses"."assetId" = "assets"."id"',
+        '"assetServices"."assetId" = "assets"."id"',
       )
       .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
       .innerJoin(
