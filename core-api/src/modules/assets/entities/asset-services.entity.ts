@@ -12,6 +12,7 @@ import {
 import { Asset } from './assets.entity';
 import { HttpResponse } from './http-response.entity';
 import { StatusCodeAssetsView } from './status-code-assets.entity';
+import { AssetTag } from './asset-tags.entity';
 
 @Entity('asset_services')
 @Unique(['assetId', 'port'])
@@ -49,4 +50,13 @@ export class AssetService extends BaseEntity {
     (statusCodeAssets) => statusCodeAssets.assetService,
   )
   statusCodeAssets?: StatusCodeAssetsView[];
+
+  @OneToMany(() => AssetTag, (assetTag) => assetTag.assetService, {
+    onDelete: 'CASCADE',
+  })
+  tags: AssetTag[];
+
+  @ApiProperty()
+  @Column({ default: false })
+  isErrorPage?: boolean;
 }

@@ -40,7 +40,7 @@ export class GetAssetsResponseDto {
   @ApiProperty({ required: false })
   httpResponses?: HttpResponseDTO;
   @ApiProperty({ required: false })
-  ports?: Port;
+  port: number;
   @ApiProperty()
   isEnabled?: boolean;
 }

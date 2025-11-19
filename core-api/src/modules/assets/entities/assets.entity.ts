@@ -6,7 +6,6 @@ import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { AssetService } from './asset-services.entity';
-import { AssetTag } from './asset-tags.entity';
 import { IpAssetsView } from './ip-assets.entity';
 import { Port } from './ports.entity';
 
@@ -44,15 +43,6 @@ export class Asset extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'json', nullable: true })
   dnsRecords?: object;
-
-  @OneToMany(() => AssetTag, (assetTag) => assetTag.asset, {
-    onDelete: 'CASCADE',
-  })
-  tags: AssetTag[];
-
-  @ApiProperty()
-  @Column({ default: false })
-  isErrorPage?: boolean;
 
   @OneToMany(() => AssetService, (assetService) => assetService.asset, {
     onDelete: 'CASCADE',
