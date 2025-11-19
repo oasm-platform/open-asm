@@ -26,7 +26,6 @@ import { GetTlsResponseDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
-import { Port } from './entities/ports.entity';
 import { AssetService } from './entities/asset-services.entity';
 
 // Type cho raw database response từ TLS query
@@ -93,7 +92,7 @@ export class AssetsService {
       },
       ports: {
         value: ports,
-        whereClause: `"ports"."ports" && :param`,
+        whereClause: `"assetServices"."port" = ANY(:param)`,
       },
       statusCodes: {
         value: statusCodes,
@@ -444,25 +443,15 @@ export class AssetsService {
     }
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
-      .innerJoin(
-        (subQuery) =>
-          subQuery
-            .select('"ports"."assetId"', 'assetId')
-            .addSelect('unnest("ports"."ports")', 'port')
-            .from(Port, 'ports'),
-        'sq',
-        '"sq"."assetId" = "asset"."id"',
-      )
-      .select(['"sq"."port"', 'COUNT(DISTINCT "asset"."id") as "assetCount"'])
-      .andWhere('"sq"."port" IS NOT NULL')
-      .andWhere('"sq"."port"::text ILIKE :value', {
-        value: `%${query.value}%`,
-      })
+      .select([
+        'assetServices.port as port',
+        'COUNT(DISTINCT "asset"."id") as "assetCount"',
+      ])
       .distinct(true)
-      .groupBy('"sq"."port"');
+      .groupBy('assetServices.port');
 
     if (query.value) {
-      queryBuilder.andWhere('"sq"."port"::text ILIKE :value', {
+      queryBuilder.andWhere('"assetServices".port::text ILIKE :value', {
         value: `%${query.value}%`,
       });
     }

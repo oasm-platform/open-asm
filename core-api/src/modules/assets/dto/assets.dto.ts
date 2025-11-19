@@ -5,7 +5,6 @@ import { Transform } from 'class-transformer';
 import { IsOptional, IsString, IsUUID } from 'class-validator';
 import { AssetTag } from '../entities/asset-tags.entity';
 import { HttpResponse } from '../entities/http-response.entity';
-import { Port } from '../entities/ports.entity';
 
 export type PickTechnologyDetailDTO = Pick<
   TechnologyDetailDTO,

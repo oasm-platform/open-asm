@@ -7,7 +7,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 import { IpAssetsView } from './ip-assets.entity';
-import { Port } from './ports.entity';
 
 @Entity('assets')
 @Unique(['value', 'target'])
@@ -34,11 +33,6 @@ export class Asset extends BaseEntity {
     onDelete: 'CASCADE',
   })
   jobs?: Job[];
-
-  @OneToMany(() => Port, (port) => port.asset, {
-    onDelete: 'CASCADE',
-  })
-  ports?: Port[];
 
   @ApiProperty()
   @Column({ type: 'json', nullable: true })

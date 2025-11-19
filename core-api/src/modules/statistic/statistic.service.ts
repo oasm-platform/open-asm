@@ -7,11 +7,11 @@ import { AssetsService } from '../assets/assets.service';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
-import { Port } from '../assets/entities/ports.entity';
 import { Target } from '../targets/entities/target.entity';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import { AssetService } from '../assets/entities/asset-services.entity';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import {
   GetStatisticQueryDto,
@@ -493,9 +493,9 @@ export class StatisticService {
     const subQuery = this.dataSource
       .createQueryBuilder()
       .select('wt.workspaceId', 'workspaceId')
-      .addSelect('unnest(port.ports)', 'port') // Unnest the 'ports' array
-      .from(Port, 'port')
-      .leftJoin('port.asset', 'asset')
+      .addSelect('assetService.port', 'port')
+      .from(AssetService, 'assetService')
+      .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspaceTargets', 'wt')
       .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });

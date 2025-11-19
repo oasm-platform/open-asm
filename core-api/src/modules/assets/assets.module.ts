@@ -9,20 +9,12 @@ import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
-import { Port } from './entities/ports.entity';
 import { AssetService } from './entities/asset-services.entity';
 
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Asset,
-      Job,
-      Target,
-      Port,
-      HttpResponse,
-      AssetService,
-    ]),
+    TypeOrmModule.forFeature([Asset, Job, Target, HttpResponse, AssetService]),
     TechnologyModule,
     WorkspacesModule,
   ],
