@@ -2,7 +2,6 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { Asset } from './assets.entity';
 
 @Entity('ports')
 export class Port extends BaseEntity {
@@ -14,11 +13,11 @@ export class Port extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   assetId: string;
 
-  @ManyToOne(() => Asset, (asset) => asset.ports, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'assetId' })
-  asset: Asset;
+  // @ManyToOne(() => Asset, (asset) => asset.ports, {
+  //   onDelete: 'CASCADE',
+  // })
+  // @JoinColumn({ name: 'assetId' })
+  // asset: Asset;
 
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })

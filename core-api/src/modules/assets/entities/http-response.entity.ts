@@ -3,7 +3,7 @@ import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity'
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { Asset } from './assets.entity';
+import { AssetService } from './asset-services.entity';
 
 class TlsInfo {
   @ApiProperty()
@@ -185,13 +185,13 @@ export class HttpResponse extends BaseEntity {
 
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })
-  assetId: string;
+  assetServiceId: string;
 
-  @ManyToOne(() => Asset, (asset) => asset.httpResponses, {
+  @ManyToOne(() => AssetService, (assetService) => assetService.httpResponses, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'assetId' })
-  asset: Asset;
+  @JoinColumn({ name: 'assetServiceId' })
+  assetService: AssetService;
 
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })

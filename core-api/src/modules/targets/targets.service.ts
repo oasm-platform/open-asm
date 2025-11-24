@@ -163,7 +163,7 @@ export class TargetsService implements OnModuleInit {
       .innerJoin('targets.workspaceTargets', 'workspaceTarget')
       .innerJoin('workspaceTarget.workspace', 'workspace')
       .innerJoin('workspace.workspaceMembers', 'workspaceMember')
-      .leftJoin('targets.assets', 'asset', 'asset.isErrorPage = false')
+      .leftJoin('targets.assets', 'asset')
       .leftJoin('asset.jobs', 'job')
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([

@@ -130,7 +130,7 @@ export default function AssetDetail({ id }: { id: string }) {
             )}
           </div>
         </section>
-        <div className="flex flex-wrap gap-2 mt-4">
+        {/*<div className="flex flex-wrap gap-2 mt-4">
           {data.tags.map((tag) => (
             <Badge
               key={tag.id}
@@ -141,7 +141,7 @@ export default function AssetDetail({ id }: { id: string }) {
             </Badge>
           ))}
           <AddTagDialog id={id} tags={tags} refetch={refetch} />
-        </div>
+        </div>*/}
         <Separator className="my-5" />
 
         <section>
