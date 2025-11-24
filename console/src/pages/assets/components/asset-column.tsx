@@ -8,10 +8,8 @@ import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import {
   BriefcaseBusiness,
-  EthernetPort,
   Globe,
-  Network,
-  Tag,
+  Network
 } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
@@ -22,7 +20,7 @@ import { TechnologyTooltip } from './technology-tooltip';
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
     accessorKey: 'value',
-    header: 'Value',
+    header: 'Service',
     enableHiding: false,
     size: 500,
     cell: ({ row }) => {

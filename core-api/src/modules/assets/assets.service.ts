@@ -162,6 +162,8 @@ export class AssetsService {
       'httpResponses.tls',
       'httpResponses.chain_status_codes',
       'httpResponses.status_code',
+      'httpResponses.url',
+      'httpResponses.favicon_url',
     ]);
 
     if (query.value) {
