@@ -685,10 +685,15 @@ export class JobsRegistryService {
     if (!workflow) return;
 
     const currentTool = job.tool.name;
-    const nextTool = workflow?.content.jobs[currentTool];
+    const { jobs } = workflow.content;
 
+    const curretJobMetadata = jobs.find(j => j.run === currentTool);
+    if (!curretJobMetadata) return null;
+
+    const indexCurrentTool = workflow?.content.jobs.findIndex(j => j.name === curretJobMetadata.name);
+    const nextTool = workflow?.content.jobs[indexCurrentTool + 1]?.run;
     if (nextTool) {
-      const tools = await this.toolsService.getToolByNames(nextTool);
+      const tools = await this.toolsService.getToolByNames([nextTool]);
       await Promise.all(
         tools.map((tool) =>
           this.createNewJob({

@@ -24,9 +24,9 @@ import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { GetTlsResponseDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
-import { AssetService } from './entities/asset-services.entity';
 
 // Type cho raw database response từ TLS query
 interface TlsRawData {
@@ -58,7 +58,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all assets services associated with a specified target.
@@ -288,7 +288,7 @@ export class AssetsService {
       lastDiscoveredAt: new Date(),
     });
 
-    this.eventEmitter.emit('target.re_scan', target);
+    this.eventEmitter.emit('target.re-scan', target);
 
     return {
       message: 'Scan started',

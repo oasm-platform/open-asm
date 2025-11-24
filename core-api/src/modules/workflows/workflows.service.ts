@@ -11,7 +11,7 @@ export class WorkflowsService implements OnModuleInit {
   constructor(
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
-  ) {}
+  ) { }
 
   private readonly logger = new Logger(WorkflowsService.name);
   private readonly templatesPath = path.join(__dirname, 'templates');
