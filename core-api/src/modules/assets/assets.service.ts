@@ -327,6 +327,8 @@ export class AssetsService {
         'httpResponses.status_code',
         'asset.targetId',
         'httpResponses.raw_header',
+        'httpResponses.url',
+        'httpResponses.favicon_url',
       ])
       .andWhere('assetServices.id = :id', { id });
 
