@@ -29,14 +29,28 @@ export const Optional = () => SetMetadata('OPTIONAL', true);
  */
 export const UserContext = createParamDecorator(
   (_data: unknown, context: ExecutionContext) => {
-    const request = context
-      .switchToHttp()
-      .getRequest<RequestWithMetadata>();
+    const request = context.switchToHttp().getRequest<RequestWithMetadata>();
 
     return request.user;
   },
 );
 
+/**
+ * Parameter decorator that extracts the user ID from the request.
+ * Provides easy access to the authenticated user's ID in controller methods.
+ */
+export const UserId = createParamDecorator(
+  (_data: unknown, context: ExecutionContext) => {
+    const request = context.switchToHttp().getRequest<RequestWithMetadata>();
+
+    return request.user?.id;
+  },
+);
+
+/**
+ * Parameter decorator that extracts the user session from the request.
+ * Provides easy access to the authenticated user's session data in controller methods.
+ */
 export const SessionContext = createParamDecorator(
   (_data: unknown, context: ExecutionContext) => {
     const request = context
@@ -77,4 +91,3 @@ export const Roles = (...roles: Role[]) => {
 };
 
 export { WorkspaceId };
-

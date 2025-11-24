@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseModule } from './database/database.module';
+import { GrpcClientModule } from './grpc-client/grpc-client.module';
 import { McpServerModule } from './mcp/mcp.module';
 import { CombineModule } from './modules/combine.module';
 import { StorageModule } from './modules/storage/storage.module';
@@ -30,10 +31,11 @@ import { ServicesModule } from './services/services.module';
       inject: [ConfigService],
     }),
     DatabaseModule,
+    GrpcClientModule,
     CombineModule,
     StorageModule,
     ServicesModule,
-    McpServerModule
+    McpServerModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}

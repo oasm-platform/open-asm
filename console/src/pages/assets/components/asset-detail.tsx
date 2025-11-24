@@ -140,7 +140,7 @@ export default function AssetDetail({ id }: { id: string }) {
               <Tag size={16} /> {tag.tag}
             </Badge>
           ))}
-          <AddTagDialog id={id} tags={tags} refetch={refetch} />
+          <AddTagDialog id={id} domain={value} tags={tags} refetch={refetch} />
         </div>
         <Separator className="my-5" />
 

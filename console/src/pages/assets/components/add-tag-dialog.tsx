@@ -8,25 +8,34 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { useAssetsControllerUpdateAssetById, type AssetTag } from '@/services/apis/gen/queries';
-import { Plus, Sparkles, Tag } from 'lucide-react';
+import {
+    useAiAssistantControllerGenerateTags,
+    useAssetsControllerUpdateAssetById,
+    type AssetTag,
+} from '@/services/apis/gen/queries';
+import { useAsset } from '@/pages/assets/context/asset-context';
+import { Loader2, Plus, Sparkles, Tag } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface AddTagDialogProps {
     id: string,
+    domain: string,
     tags: AssetTag[],
     refetch: () => void,
 }
 const AddTagDialog = (props: AddTagDialogProps) => {
-    const { tags, refetch } = props
+    const { tags, refetch, domain } = props
     const [isOpen, setIsOpen] = useState(false);
     const [inputValue, setInputValue] = useState('');
     const [tagList, setTagList] = useState<string[]>(tags.map(tag => tag.tag));
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const { mutate } = useAssetsControllerUpdateAssetById()
+    const { startGenerating, stopGenerating, isGenerating } = useAsset();
+    const { mutate } = useAssetsControllerUpdateAssetById();
+    const { mutateAsync: generateTagsMutation } = useAiAssistantControllerGenerateTags();
+
+    const isCurrentAssetGenerating = isGenerating(props.id);
 
     useLayoutEffect(() => {
         if (isOpen && inputRef.current) {
@@ -106,6 +115,36 @@ const AddTagDialog = (props: AddTagDialogProps) => {
         })
     };
 
+    const handleGenerateTags = async () => {
+        if (!domain) {
+            toast.error("Domain is required to generate tags");
+            return;
+        }
+
+        startGenerating(props.id);
+        try {
+            const response = await generateTagsMutation({ data: { domain } });
+            const generatedTags = response.tags || [];
+            const newTags = generatedTags.filter((tag) => !tagList.includes(tag));
+
+            if (newTags.length > 0) {
+                const updatedTagList = [...tagList, ...newTags];
+                setTagList(updatedTagList);
+                toast.success(`Generated ${newTags.length} new tags`);
+
+                // Automatically save the generated tags
+                handleSave(updatedTagList);
+            } else {
+                toast.info("No new tags generated");
+            }
+        } catch (error) {
+            console.error("Failed to generate tags:", error);
+            toast.error("Failed to generate tags. Please try again.");
+        } finally {
+            stopGenerating(props.id);
+        }
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
@@ -143,11 +182,22 @@ const AddTagDialog = (props: AddTagDialogProps) => {
                     </div>
                     <div className='flex flex-row items-center gap-2'>
                         <p className="text-xs text-gray-500">Type tags and press ',' to add. Or use</p>
-                        <Link to={`/tools?category=classifier&assetId=${props.id}&stage=marketplace`}  >
-                            <Button variant="ghost" >
-                                <Sparkles />AI generate
-                            </Button>
-                        </Link>
+                        <Button
+                            variant="ghost"
+                            onClick={handleGenerateTags}
+                            disabled={isCurrentAssetGenerating || !domain}
+                        >
+                            {isCurrentAssetGenerating ? (
+                                <>
+                                    <Loader2 className="animate-spin" />
+                                    Generating...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles />AI generate
+                                </>
+                            )}
+                        </Button>
                     </div>
                 </div>
                 <DialogFooter className="flex justify-between items-center">
