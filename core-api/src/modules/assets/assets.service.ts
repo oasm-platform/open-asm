@@ -58,7 +58,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all assets services associated with a specified target.
@@ -113,9 +113,10 @@ export class AssetsService {
       .leftJoin('asset.ipAssets', 'ipAssets')
       .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
       .where('"assetServices"."isErrorPage" = false')
-      .where('"workspaceTargets"."workspaceId" = :workspaceId', {
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
-      });
+      })
+      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL');
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -611,7 +612,6 @@ export class AssetsService {
         '"statusCodeAssets"."statusCode"',
         'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
       ])
-      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
       .andWhere('"statusCodeAssets"."statusCode"::text ILIKE :value', {
         value: `%${query.value}%`,
       })
