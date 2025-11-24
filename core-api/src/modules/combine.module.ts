@@ -18,6 +18,7 @@ import { ApiKeysModule } from './apikeys/apikeys.module';
 import { ProvidersModule } from './providers/providers.module';
 import { TemplatesModule } from './templates/templates.module';
 import { AssetGroupModule } from './asset-group/asset-group.module';
+import { AiAssistantModule } from './ai-assistant/ai-assistant.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AssetGroupModule } from './asset-group/asset-group.module';
     ProvidersModule,
     TemplatesModule,
     AssetGroupModule,
+    AiAssistantModule,
   ],
 })
 export class CombineModule {}

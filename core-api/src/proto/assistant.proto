@@ -1,0 +1,210 @@
+syntax = "proto3";
+
+package app;
+
+import "google/protobuf/struct.proto";
+
+// ----------------
+// Health Check
+// ----------------
+service HealthCheck {
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string message = 1;
+}
+
+// ----------------
+// Domain Classify
+// ----------------
+service DomainClassify {
+  rpc DomainClassify(DomainClassifyRequest) returns (DomainClassifyResponse);
+}
+
+message DomainClassifyRequest {
+  string domain = 1;
+}
+message DomainClassifyResponse {
+  repeated string labels = 1;
+}
+
+// ----------------
+// Nuclei template gen 
+// ----------------
+service NucleiTemplateService {
+  rpc CreateTemplate(CreateTemplateRequest) returns (CreateTemplateResponse);
+}
+message CreateTemplateRequest {
+  string question = 1;
+}
+message CreateTemplateResponse {
+  string answer = 1;
+}
+
+// ----------------
+// Conversation
+// ----------------
+service ConversationService {
+  rpc GetConversations(GetConversationsRequest) returns (GetConversationsResponse);
+  rpc UpdateConversation(UpdateConversationRequest) returns (UpdateConversationResponse);
+  rpc DeleteConversation(DeleteConversationRequest) returns (DeleteConversationResponse);
+  rpc DeleteConversations(DeleteConversationsRequest) returns (DeleteConversationsResponse);
+}
+
+message Conversation {
+  string conversation_id = 1;
+  string title = 2;
+  string description = 3;
+  string created_at = 4;
+  string updated_at = 5;
+}
+
+message GetConversationsRequest {
+}
+
+message GetConversationsResponse {
+  repeated Conversation conversations = 1;
+}
+
+message UpdateConversationRequest {
+  string conversation_id = 1;
+  string title = 2;
+  string description = 3;
+}
+
+message UpdateConversationResponse {
+  Conversation conversation = 1;
+}
+
+message DeleteConversationRequest {
+  string conversation_id = 1;
+}
+
+message DeleteConversationResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+message DeleteConversationsRequest {
+}
+
+message DeleteConversationsResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+// ----------------
+// Message
+// ----------------
+service MessageService {
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
+  rpc CreateMessage(CreateMessageRequest) returns (stream CreateMessageResponse);
+  rpc UpdateMessage(UpdateMessageRequest) returns (stream UpdateMessageResponse);
+  rpc DeleteMessage(DeleteMessageRequest) returns (DeleteMessageResponse);
+}
+
+message Message {
+  string message_id = 1;
+  string question = 2;
+  // type = ["message_start","delta","message_end","thinking","tool_start",
+  // "tool_output","tool_end","state","error","done","system","event"]
+  string type = 3;
+  string content = 4;  // JSON string containing message-specific data
+  string conversation_id = 5;
+  string created_at = 6;
+  string updated_at = 7;
+}
+
+message GetMessagesRequest {
+  string conversation_id = 1;
+}
+
+message GetMessagesResponse {
+  repeated Message messages = 1;
+}
+
+message CreateMessageRequest {
+  string question = 1;
+  string conversation_id = 2;
+  bool is_create_conversation = 3;
+}
+
+message CreateMessageResponse {
+  Message message = 1;
+}
+
+message UpdateMessageRequest {
+  string message_id = 1;
+  string question = 2;
+}
+
+message UpdateMessageResponse {
+  Message message = 1;
+}
+
+message DeleteMessageRequest {
+  string message = 1;
+}
+
+message DeleteMessageResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+// ----------------
+// MCP Server
+// ----------------
+service MCPServerService {
+  rpc AddMCPServers(AddMCPServersRequest) returns (AddMCPServersResponse);
+  rpc GetMCPServers(GetMCPServersRequest) returns (GetMCPServersResponse);
+  rpc UpdateMCPServers(UpdateMCPServersRequest) returns (UpdateMCPServersResponse);
+  rpc DeleteMCPServers(DeleteMCPServersRequest) returns (DeleteMCPServersResponse);
+}
+
+message MCPServer {
+  google.protobuf.Struct config = 1;  // Server config (url/command, args, env, headers, disabled, etc.)
+  oneof status {
+    bool active = 2;      // true if server is connected and operational
+    string error = 3;     // error message if connection failed or server disabled
+  }
+}
+
+// Add one or more servers
+message AddMCPServersRequest {
+  google.protobuf.Struct mcp_config = 1;  // Claude Desktop format: {"mcpServers": {"name": {...}}}
+}
+
+message AddMCPServersResponse {
+  repeated MCPServer servers = 1;
+  bool success = 2;
+}
+
+// Get all servers for workspace/user
+message GetMCPServersRequest {
+}
+
+message GetMCPServersResponse {
+  repeated MCPServer servers = 1; 
+}
+
+// Update one or more servers (full replace)
+message UpdateMCPServersRequest {
+  google.protobuf.Struct mcp_config = 1;  
+}
+
+message UpdateMCPServersResponse {
+  repeated MCPServer servers = 1;
+  bool success = 2;
+}
+
+// Delete one or more servers by name
+message DeleteMCPServersRequest {
+  repeated string server_names = 1;  // List of server names to delete
+}
+
+message DeleteMCPServersResponse {
+  bool success = 1;
+}
