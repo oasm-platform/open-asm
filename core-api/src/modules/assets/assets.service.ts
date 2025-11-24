@@ -58,7 +58,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all assets services associated with a specified target.
@@ -234,6 +234,18 @@ export class AssetsService {
     target: Target;
     value: string;
   }): Promise<Asset> {
+    // Check if asset already exists
+    const existingAsset = await this.assetRepo.findOne({
+      where: {
+        value,
+        target: { id: target.id },
+      },
+    });
+
+    if (existingAsset) {
+      return existingAsset;
+    }
+
     return this.assetRepo.save({
       id: randomUUID(),
       target,

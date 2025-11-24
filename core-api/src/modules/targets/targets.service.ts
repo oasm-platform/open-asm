@@ -95,20 +95,31 @@ export class TargetsService implements OnModuleInit {
     userContext: UserContextPayload,
   ): Promise<Target> {
     const { workspaceId, value } = dto;
-
     // Check if the workspace exists and the user is the owner
     const workspace = await this.workspacesService.getWorkspaceByIdAndOwner(
       workspaceId,
       userContext,
     );
+    // Upsert target
+    await this.repo.upsert({ value }, ['value']);
 
-    const target = await this.repo.save({ value });
-
-    await this.workspaceTargetRepository.save({
-      workspace,
-      target,
+    // Find target
+    const target = await this.repo.findOne({
+      where: { value },
+      relations: ['workspaceTargets'],
     });
 
+    // Check if target exists in workspace
+    if (!target) {
+      throw new NotFoundException('Target not found after creation');
+    }
+    // Upsert workspace target
+    await this.workspaceTargetRepository.upsert({ workspace, target }, [
+      'workspace',
+      'target',
+    ]);
+
+    // Create primary asset
     await this.assetService.createPrimaryAsset({
       target,
       value,
