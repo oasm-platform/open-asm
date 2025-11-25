@@ -362,21 +362,9 @@ export interface HttpResponseDTO {
   knowledgebase: KnowledgebaseInfo;
   resolvers: string[];
   chain_status_codes: string[];
-  assetId: string;
   assetServiceId: string;
   jobHistoryId: string;
   techList: string[];
-}
-
-export interface Port {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  ports: string[];
-  assetId: string;
-  jobHistoryId: string;
 }
 
 export interface GetAssetsResponseDto {
@@ -392,7 +380,7 @@ export interface GetAssetsResponseDto {
   dnsRecords?: object;
   ipAddresses: string[];
   httpResponses?: HttpResponseDTO;
-  ports?: Port;
+  port?: number;
   isEnabled: boolean;
 }
 
@@ -576,7 +564,6 @@ export interface Asset {
   targetId: string;
   isPrimary: boolean;
   dnsRecords: object;
-  isErrorPage: boolean;
   isEnabled: boolean;
 }
 

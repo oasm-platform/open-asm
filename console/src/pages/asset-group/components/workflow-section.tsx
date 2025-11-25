@@ -29,16 +29,12 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { PlusIcon, TrashIcon } from 'lucide-react';
 import { useState } from 'react';
 
-
-
 interface WorkflowSectionProps {
   assetGroupId: string;
-  refetch: () => void;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   assetGroupId,
-  refetch,
 }) => {
   const queryClient = useQueryClient();
 
@@ -77,7 +73,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       },
       {
         onSuccess: () => {
-          refetch();
+          workflowsInGroupQuery.refetch();
           queryClient.invalidateQueries({
             queryKey: ['assetGroupControllerGetWorkflowsByAssetGroupsId'],
           });
@@ -100,7 +96,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       },
       {
         onSuccess: () => {
-          refetch();
+          workflowsInGroupQuery.refetch();
           setSelectedWorkflows([]);
           setShowSelectWorkflowsDialog(false);
           queryClient.invalidateQueries({
@@ -230,7 +226,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                   page={workflowsNotInGroupQuery.data?.page || 1}
                   pageSize={workflowsNotInGroupQuery.data?.limit || 10}
                   totalItems={workflowsNotInGroupQuery.data?.total || 0}
-                  onPageChange={() => { }}
+                  onPageChange={() => {}}
                 />
               </div>
               <DialogFooter className="flex sm:justify-between">
@@ -257,7 +253,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       </CardHeader>
       <CardContent>
         {workflowsInGroupQuery.data &&
-          workflowsInGroupQuery.data.data.length > 0 ? (
+        workflowsInGroupQuery.data.data.length > 0 ? (
           <DataTable
             columns={workflowColumns}
             data={workflowsInGroupQuery.data.data}
@@ -265,7 +261,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
             page={workflowsInGroupQuery.data.page}
             pageSize={workflowsInGroupQuery.data.limit}
             totalItems={workflowsInGroupQuery.data.total}
-            onPageChange={() => { }}
+            onPageChange={() => {}}
           />
         ) : (
           <div className="text-center py-8 text-muted-foreground">

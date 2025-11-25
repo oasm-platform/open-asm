@@ -42,13 +42,9 @@ interface Asset {
 
 interface AssetSectionProps {
   assetGroupId: string;
-  refetch: () => void;
 }
 
-export const AssetSection: React.FC<AssetSectionProps> = ({
-  assetGroupId,
-  refetch,
-}) => {
+export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
   const queryClient = useQueryClient();
 
   // Queries for assets in the asset group
@@ -81,7 +77,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
       },
       {
         onSuccess: () => {
-          refetch();
+          assetsInGroupQuery.refetch();
           queryClient.invalidateQueries({
             queryKey: ['assetGroupControllerGetAssetsByAssetGroupsId'],
           });
@@ -104,7 +100,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
       },
       {
         onSuccess: () => {
-          refetch();
+          assetsInGroupQuery.refetch();
           setSelectedAssets([]);
           setShowSelectAssetsDialog(false);
           queryClient.invalidateQueries({
