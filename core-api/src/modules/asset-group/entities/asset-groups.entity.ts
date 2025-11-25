@@ -1,3 +1,5 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -7,8 +9,6 @@ import {
   OneToMany,
   Unique,
 } from 'typeorm';
-import { BaseEntity } from '@/common/entities/base.entity';
-import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { AssetGroupAsset } from './asset-groups-assets.entity';
 import { AssetGroupWorkflow } from './asset-groups-workflows.entity';
 
@@ -20,7 +20,7 @@ export class AssetGroup extends BaseEntity {
   name: string;
 
   @ManyToOne(() => Workspace, (workspace) => workspace.id)
-  @JoinColumn({ name: 'workspace_id' })
+  @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 
   @OneToMany(

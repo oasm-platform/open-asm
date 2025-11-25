@@ -1,5 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
+import { User } from '@/modules/auth/entities/user.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import {
@@ -39,8 +40,12 @@ export class Workflow extends BaseEntity {
   @Column()
   filePath: string;
 
+  @ManyToOne(() => User, (user) => user.id, { nullable: true })
+  @JoinColumn({ name: 'createdBy' })
+  createdBy?: User;
+
   @ManyToOne(() => Workspace, (workspace) => workspace.id)
-  @JoinColumn({ name: 'workspace_id' })
+  @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 
   @OneToMany(() => JobHistory, (jobHistory) => jobHistory.workflow, {
