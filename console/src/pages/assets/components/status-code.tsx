@@ -7,6 +7,9 @@ export default function HTTPXStatusCode({
 }: {
   httpResponse: HttpResponseDTO | undefined;
 }) {
+  if (!httpResponse || httpResponse.status_code === 0) {
+    return <></>
+  }
   return httpResponse?.chain_status_codes ? (
     <div className="flex items-center gap-1">
       <StatusCode code={httpResponse?.chain_status_codes[0].toString()} />

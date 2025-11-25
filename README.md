@@ -48,6 +48,41 @@ The system runs on a distributed architecture consisting of:
 - Distributed workers for high-performance scanning tasks with auto-scaling capabilities.
 - PostgreSQL database for data storage and Better Auth for authentication.
 
+```mermaid
+graph TD
+    %% Actors & External
+    User[User / Security Team]
+    AI[AI Assistant / LLM]
+    Internet[Internet / Attack Surface]
+
+    %% Core Components
+    subgraph "OASM Platform"
+        Console[Web Console]
+        API[Core API Service]
+        DB[(PostgreSQL)]
+        MCP[MCP Server]
+        
+        subgraph "Execution Plane"
+            Worker[Distributed Workers]
+        end
+    end
+
+    %% Relationships
+    User -->|Manage & Monitor| Console
+    Console <-->|REST API| API
+    
+    API <-->|Persist Data| DB
+    
+    %% Job Flow
+    API -->|Dispatch Scan Jobs| Worker
+    Worker -->|Report Results| API
+    Worker -->|Scan & Discovery| Internet
+    
+    %% AI Flow
+    AI <-->|Query Context| MCP
+    MCP <-->|Fetch Asset Data| API
+
+```
 ## Project Structure
 
 The project is organized in a modular structure for easy development and scalability:

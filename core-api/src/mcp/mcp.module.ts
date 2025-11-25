@@ -1,4 +1,5 @@
 import { McpGuard } from '@/common/guards/mcp.guard';
+import { AssetsModule } from '@/modules/assets/assets.module';
 import { StatisticModule } from '@/modules/statistic/statistic.module';
 import { TargetsModule } from '@/modules/targets/targets.module';
 import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
@@ -16,6 +17,7 @@ import { McpTools } from './mcp.tools';
 @Module({
     controllers: [McpController],
     imports: [
+        AssetsModule,
         WorkspacesModule,
         TargetsModule,
         StatisticModule,

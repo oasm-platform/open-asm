@@ -3,11 +3,7 @@ import { BullMQName, CronSchedule, JobStatus } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
-import {
-  Injectable,
-  NotFoundException,
-  OnModuleInit
-} from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job, Queue } from 'bullmq';
@@ -32,8 +28,9 @@ export class TargetsService implements OnModuleInit {
     private readonly workspacesService: WorkspacesService,
     public assetService: AssetsService,
     private eventEmitter: EventEmitter2,
-    @InjectQueue(BullMQName.ASSETS_DISCOVERY_SCHEDULE) private scanScheduleQueue: Queue<Target>
-  ) { }
+    @InjectQueue(BullMQName.ASSETS_DISCOVERY_SCHEDULE)
+    private scanScheduleQueue: Queue<Target>,
+  ) {}
 
   async onModuleInit() {
     await this.handleUpdateScanSchedule();
@@ -98,27 +95,39 @@ export class TargetsService implements OnModuleInit {
     userContext: UserContextPayload,
   ): Promise<Target> {
     const { workspaceId, value } = dto;
-
     // Check if the workspace exists and the user is the owner
     const workspace = await this.workspacesService.getWorkspaceByIdAndOwner(
       workspaceId,
       userContext,
     );
+    // Upsert target
+    await this.repo.upsert({ value }, ['value']);
 
-    const target = await this.repo.save({ value });
-
-    await this.workspaceTargetRepository.save({
-      workspace,
-      target,
+    // Find target
+    const target = await this.repo.findOne({
+      where: { value },
+      relations: ['workspaceTargets'],
     });
 
+    // Check if target exists in workspace
+    if (!target) {
+      throw new NotFoundException('Target not found after creation');
+    }
+    // Upsert workspace target
+    await this.workspaceTargetRepository.upsert({ workspace, target }, [
+      'workspace',
+      'target',
+    ]);
+
+    // Create primary asset
     await this.assetService.createPrimaryAsset({
       target,
       value,
     });
 
     // Trigger workflow run assets discovery
-    const workspaceConfigs = await this.workspacesService.getWorkspaceConfigValue(workspaceId);
+    const workspaceConfigs =
+      await this.workspacesService.getWorkspaceConfigValue(workspaceId);
 
     if (workspaceConfigs.isAssetsDiscovery) {
       this.eventEmitter.emit('target.create', target);
@@ -154,7 +163,7 @@ export class TargetsService implements OnModuleInit {
       .innerJoin('targets.workspaceTargets', 'workspaceTarget')
       .innerJoin('workspaceTarget.workspace', 'workspace')
       .innerJoin('workspace.workspaceMembers', 'workspaceMember')
-      .leftJoin('targets.assets', 'asset', 'asset.isErrorPage = false')
+      .leftJoin('targets.assets', 'asset')
       .leftJoin('asset.jobs', 'job')
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([
@@ -247,14 +256,17 @@ export class TargetsService implements OnModuleInit {
     let jobId: string | undefined;
     // If scanSchedule was updated, also update the job in BullMQ
     if (dto.scanSchedule !== undefined) {
-      const job = await this.updateTargetScanScheduleJob(target, dto.scanSchedule);
+      const job = await this.updateTargetScanScheduleJob(
+        target,
+        dto.scanSchedule,
+      );
       jobId = job.repeatJobKey;
     }
 
     // Update the target in the database
     const result = await this.repo.update(id, {
       ...dto,
-      jobId
+      jobId,
     });
 
     return result;
@@ -276,7 +288,10 @@ export class TargetsService implements OnModuleInit {
    * @param targetId - The ID of the target to update the scan schedule job for
    * @param scanSchedule - The new scan schedule for the target (can be null/undefined)
    */
-  private async updateTargetScanScheduleJob(target: Target, scanSchedule: CronSchedule): Promise<Job<Target>> {
+  private async updateTargetScanScheduleJob(
+    target: Target,
+    scanSchedule: CronSchedule,
+  ): Promise<Job<Target>> {
     // Remove any existing jobs for this target
     if (target.jobId) {
       await this.scanScheduleQueue.removeJobScheduler(target.jobId);
@@ -309,7 +324,10 @@ export class TargetsService implements OnModuleInit {
 
     // Add new jobs to the queue with targetId as job name and cron schedule
     for (const target of targetSchedules) {
-      const job = await this.updateTargetScanScheduleJob(target, target.scanSchedule);
+      const job = await this.updateTargetScanScheduleJob(
+        target,
+        target.scanSchedule,
+      );
       await this.repo.update(target.id, { jobId: job.repeatJobKey });
     }
   }

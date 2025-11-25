@@ -7,13 +7,16 @@ import { AssetsService } from '../assets/assets.service';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
-import { Port } from '../assets/entities/ports.entity';
 import { Target } from '../targets/entities/target.entity';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import { AssetService } from '../assets/entities/asset-services.entity';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
-import { GetStatisticQueryDto, StatisticResponseDto } from './dto/statistic.dto';
+import {
+  GetStatisticQueryDto,
+  StatisticResponseDto,
+} from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
 import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
@@ -35,8 +38,8 @@ export class StatisticService {
   constructor(
     private readonly dataSource: DataSource,
     private assetService: AssetsService,
-    private geoIpService: GeoIpService
-  ) { }
+    private geoIpService: GeoIpService,
+  ) {}
 
   /**
    * Retrieves the total count of targets in a workspace directly from the database.
@@ -63,7 +66,6 @@ export class StatisticService {
       .innerJoin('asset.target', 'target')
       .innerJoin('target.workspaceTargets', 'workspaceTarget')
       .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
-      .andWhere('asset."isErrorPage" = false')
       .getCount();
   }
 
@@ -74,15 +76,17 @@ export class StatisticService {
    * @returns A promise that resolves to the total count of vulnerabilities.
    */
   private async countVulnerabilities(workspaceId: string): Promise<number> {
-    return this.dataSource
-      .getRepository(Vulnerability)
-      .createQueryBuilder('vulnerability')
-      .innerJoin('vulnerability.asset', 'asset')
-      .innerJoin('asset.target', 'target')
-      .innerJoin('target.workspaceTargets', 'workspaceTarget')
-      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
-      .andWhere('asset."isErrorPage" = false')
-      .getCount();
+    return (
+      this.dataSource
+        .getRepository(Vulnerability)
+        .createQueryBuilder('vulnerability')
+        .innerJoin('vulnerability.asset', 'asset')
+        .innerJoin('asset.target', 'target')
+        .innerJoin('target.workspaceTargets', 'workspaceTarget')
+        .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
+        // .andWhere('asset."isErrorPage" = false')
+        .getCount()
+    );
   }
 
   /**
@@ -96,11 +100,12 @@ export class StatisticService {
       .getRepository(HttpResponse)
       .createQueryBuilder('httpResponse')
       .select('DISTINCT UNNEST(httpResponse.tech)', 'technology')
-      .innerJoin('httpResponse.asset', 'asset')
+      .innerJoin('httpResponse.assetService', 'assetService')
+      .innerJoin('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
       .innerJoin('target.workspaceTargets', 'workspaceTarget')
       .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
-      .andWhere('asset."isErrorPage" = false')
+      // .andWhere('asset."isErrorPage" = false')
       .getRawMany();
 
     return result.length;
@@ -116,20 +121,25 @@ export class StatisticService {
     const result = await this.dataSource
       .createQueryBuilder()
       .select('COUNT(DISTINCT unnest_port)', 'count')
-      .from(subQuery => {
+      .from((subQuery) => {
         return subQuery
           .select('unnest(port.ports)', 'unnest_port')
           .from('ports', 'port')
           .innerJoin('assets', 'asset', 'port."assetId" = asset.id')
           .innerJoin('targets', 'target', 'asset."targetId" = target.id')
-          .innerJoin('workspace_targets', 'workspaceTarget', '"workspaceTarget"."targetId" = target.id')
-          .where('"workspaceTarget"."workspaceId" = :workspaceId', { workspaceId })
-          .andWhere('asset."isErrorPage" = false');
+          .innerJoin(
+            'workspace_targets',
+            'workspaceTarget',
+            '"workspaceTarget"."targetId" = target.id',
+          )
+          .where('"workspaceTarget"."workspaceId" = :workspaceId', {
+            workspaceId,
+          });
+        // .andWhere('asset."isErrorPage" = false');
       }, 'unnested')
       .getRawOne<{ count: string }>();
     return Number(result?.count || 0);
   }
-
 
   /**
    * Retrieves the total count of targets in a workspace.
@@ -167,7 +177,9 @@ export class StatisticService {
    * @param query - The query parameters containing workspaceId.
    * @returns A promise that resolves to the total count of unique technologies.
    */
-  async getTotalUniqueTechnologies(query: GetStatisticQueryDto): Promise<number> {
+  async getTotalUniqueTechnologies(
+    query: GetStatisticQueryDto,
+  ): Promise<number> {
     return this.countUniqueTechnologies(query.workspaceId);
   }
 
@@ -187,7 +199,9 @@ export class StatisticService {
    * @param query - The query parameters containing workspaceId.
    * @returns A promise that resolves to an object containing all statistics.
    */
-  async getStatistics(query: GetStatisticQueryDto): Promise<StatisticResponseDto> {
+  async getStatistics(
+    query: GetStatisticQueryDto,
+  ): Promise<StatisticResponseDto> {
     const statistics = await this.calculateStatistics([query.workspaceId]);
     if (statistics.length === 0) {
       // Return default values if no statistics found for the workspace
@@ -229,7 +243,9 @@ export class StatisticService {
    * @param query - The query parameters containing workspaceId
    * @returns A promise that resolves to timeline statistics
    */
-  async getTimelineStatistics(workspaceId: string): Promise<TimelineResponseDto> {
+  async getTimelineStatistics(
+    workspaceId: string,
+  ): Promise<TimelineResponseDto> {
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
@@ -255,14 +271,21 @@ export class StatisticService {
    * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to issues timeline statistics.
    */
-  async getIssuesTimeline(workspaceId: string): Promise<IssuesTimelineResponseDto> {
-    const rawResults: { vuls: number; createdAt: Date }[] = await this.dataSource
-      .getRepository(Statistic)
-      .createQueryBuilder('workspace_statistics')
-      .select('vuls, "createdAt"')
-      .where('"workspaceId" = :workspaceId', { workspaceId })
-      .andWhere('"createdAt" >= :threeMonthsAgo', { threeMonthsAgo: new Date(new Date().setMonth(new Date().getMonth() - 3)) })
-      .getRawMany();
+  async getIssuesTimeline(
+    workspaceId: string,
+  ): Promise<IssuesTimelineResponseDto> {
+    const rawResults: { vuls: number; createdAt: Date }[] =
+      await this.dataSource
+        .getRepository(Statistic)
+        .createQueryBuilder('workspace_statistics')
+        .select('vuls, "createdAt"')
+        .where('"workspaceId" = :workspaceId', { workspaceId })
+        .andWhere('"createdAt" >= :threeMonthsAgo', {
+          threeMonthsAgo: new Date(
+            new Date().setMonth(new Date().getMonth() - 3),
+          ),
+        })
+        .getRawMany();
 
     return {
       data: rawResults,
@@ -270,19 +293,18 @@ export class StatisticService {
     };
   }
 
-  async getTopTagsAssets(
-    workspaceId: string,
-  ): Promise<TopTagAsset[]> {
+  async getTopTagsAssets(workspaceId: string): Promise<TopTagAsset[]> {
     const rawResults: { tag: string; count: string }[] = await this.dataSource
       .getRepository(AssetTag)
       .createQueryBuilder('asset_tag')
       .select('asset_tag.tag', 'tag')
       .addSelect('COUNT(asset_tag.id)', 'count')
-      .innerJoin('asset_tag.asset', 'asset')
+      .innerJoin('asset_tag.assetService', 'assetService')
+      .innerJoin('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
       .innerJoin('target.workspaceTargets', 'workspaceTarget')
       .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
-      .andWhere('asset."isErrorPage" = false')
+      // .andWhere('asset."isErrorPage" = false')
       .groupBy('asset_tag.tag')
       .orderBy('count', 'DESC')
       .limit(10)
@@ -302,17 +324,32 @@ export class StatisticService {
       .createQueryBuilder('asset')
       .select('asset.id', 'id')
       .addSelect('asset.value', 'value')
-      .addSelect('COUNT(CASE WHEN v.severity = \'critical\' THEN 1 ELSE NULL END)', 'critical')
-      .addSelect('COUNT(CASE WHEN v.severity = \'high\' THEN 1 ELSE NULL END)', 'high')
-      .addSelect('COUNT(CASE WHEN v.severity = \'medium\' THEN 1 ELSE NULL END)', 'medium')
-      .addSelect('COUNT(CASE WHEN v.severity = \'low\' THEN 1 ELSE NULL END)', 'low')
-      .addSelect('COUNT(CASE WHEN v.severity = \'info\' THEN 1 ELSE NULL END)', 'info')
+      .addSelect(
+        "COUNT(CASE WHEN v.severity = 'critical' THEN 1 ELSE NULL END)",
+        'critical',
+      )
+      .addSelect(
+        "COUNT(CASE WHEN v.severity = 'high' THEN 1 ELSE NULL END)",
+        'high',
+      )
+      .addSelect(
+        "COUNT(CASE WHEN v.severity = 'medium' THEN 1 ELSE NULL END)",
+        'medium',
+      )
+      .addSelect(
+        "COUNT(CASE WHEN v.severity = 'low' THEN 1 ELSE NULL END)",
+        'low',
+      )
+      .addSelect(
+        "COUNT(CASE WHEN v.severity = 'info' THEN 1 ELSE NULL END)",
+        'info',
+      )
       .addSelect('COUNT(v.id)', 'total')
       .leftJoin('asset.vulnerabilities', 'v')
       .innerJoin('asset.target', 'target')
       .innerJoin('target.workspaceTargets', 'workspaceTarget')
       .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
-      .andWhere('asset."isErrorPage" = false')
+      // .andWhere('asset."isErrorPage" = false')
       .groupBy('asset.id, asset.value')
       .orderBy('total', 'DESC')
       .limit(10)
@@ -332,24 +369,28 @@ export class StatisticService {
 
   /**
    * Retrieves the location of assets in a workspace.
-   * @param workspaceId 
-   * @returns 
+   * @param workspaceId
+   * @returns
    */
   async getAssetLocations(workspaceId: string): Promise<GeoIp[]> {
-    const assets = await this.assetService.getIpAssets({
-      page: 1, limit: 1000,
-      sortBy: 'createdAt',
-      value: '',
-      sortOrder: SortOrder.DESC
-    }, workspaceId);
-    const ips = assets.data.map(i => i.ip);
+    const assets = await this.assetService.getIpAssets(
+      {
+        page: 1,
+        limit: 1000,
+        sortBy: 'createdAt',
+        value: '',
+        sortOrder: SortOrder.DESC,
+      },
+      workspaceId,
+    );
+    const ips = assets.data.map((i) => i.ip);
     if (ips.length === 0) {
       return [];
     }
 
     const geoIps = await this.geoIpService.getGeoIp(ips);
 
-    return geoIps.filter(i => i.lat && i.lon);
+    return geoIps.filter((i) => i.lat && i.lon);
   }
 
   /**
@@ -359,17 +400,19 @@ export class StatisticService {
    * @returns An array of objects containing the workspaceId and asset count.
    */
   async getAssetCounts(workspaceIds: string[]) {
-    return this.dataSource
-      .getRepository(Asset)
-      .createQueryBuilder('asset')
-      .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .select('wt.workspaceId', 'workspaceId')
-      .addSelect('COUNT(asset.id)', 'count')
-      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
-      .andWhere('asset.isErrorPage = false') // Only count assets that are not error pages
-      .groupBy('wt.workspaceId')
-      .getRawMany<{ workspaceId: string; count: string }>();
+    return (
+      this.dataSource
+        .getRepository(Asset)
+        .createQueryBuilder('asset')
+        .leftJoin('asset.target', 'target')
+        .leftJoin('target.workspaceTargets', 'wt')
+        .select('wt.workspaceId', 'workspaceId')
+        .addSelect('COUNT(asset.id)', 'count')
+        .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
+        // .andWhere('asset.isErrorPage = false') // Only count assets that are not error pages
+        .groupBy('wt.workspaceId')
+        .getRawMany<{ workspaceId: string; count: string }>()
+    );
   }
 
   /**
@@ -422,7 +465,8 @@ export class StatisticService {
       .select('wt.workspaceId', 'workspaceId')
       .addSelect('unnest(http.tech)', 'tech') // Unnest the 'tech' array
       .from(HttpResponse, 'http')
-      .leftJoin('http.asset', 'asset')
+      .leftJoin('http.assetService', 'assetService')
+      .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspaceTargets', 'wt')
       .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
@@ -449,9 +493,9 @@ export class StatisticService {
     const subQuery = this.dataSource
       .createQueryBuilder()
       .select('wt.workspaceId', 'workspaceId')
-      .addSelect('unnest(port.ports)', 'port') // Unnest the 'ports' array
-      .from(Port, 'port')
-      .leftJoin('port.asset', 'asset')
+      .addSelect('assetService.port', 'port')
+      .from(AssetService, 'assetService')
+      .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspaceTargets', 'wt')
       .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
@@ -481,12 +525,18 @@ export class StatisticService {
     }
 
     // Fetch counts for each data type concurrently using Promise.all
-    const [assetCounts, targetCounts, vulnerabilityCounts, techCounts, portCounts] = await Promise.all([
+    const [
+      assetCounts,
+      targetCounts,
+      vulnerabilityCounts,
+      techCounts,
+      portCounts,
+    ] = await Promise.all([
       this.getAssetCounts(workspaceIds),
       this.getTargetCounts(workspaceIds),
       this.getVulnerabilityCounts(workspaceIds),
       this.getTechCounts(workspaceIds),
-      this.getPortCounts(workspaceIds)
+      this.getPortCounts(workspaceIds),
     ]);
 
     // Initialize a Map to store statistics for each workspace
@@ -561,15 +611,27 @@ export class StatisticService {
 
     // Calculate scores for each workspace
     const alpha = 0.3; // asset weight
-    const beta = 0.7;  // vuln weight
+    const beta = 0.7; // vuln weight
 
     for (const [, stat] of statisticsMap) {
-      const { criticalVuls, highVuls, mediumVuls, lowVuls, infoVuls, assets: totalAssets } = stat;
+      const {
+        criticalVuls,
+        highVuls,
+        mediumVuls,
+        lowVuls,
+        infoVuls,
+        assets: totalAssets,
+      } = stat;
 
       // Only calculate score if there are assets to avoid division by zero
       if (totalAssets > 0) {
         // Total risk score of vulnerabilities
-        const vulRisk = (criticalVuls * 5 + highVuls * 3 + mediumVuls * 2 + lowVuls * 1 + infoVuls * 0.5);
+        const vulRisk =
+          criticalVuls * 5 +
+          highVuls * 3 +
+          mediumVuls * 2 +
+          lowVuls * 1 +
+          infoVuls * 0.5;
 
         // Normalize risk to 0-10 scale according to workspace size
         const Rvuln = Math.min(10, vulRisk / totalAssets);
@@ -596,7 +658,9 @@ export class StatisticService {
    * @returns An array of workspace IDs
    */
   async getWorkspaceIds(): Promise<string[]> {
-    const workspaces = await this.dataSource.getRepository(Workspace).find({ select: ['id'] });
+    const workspaces = await this.dataSource
+      .getRepository(Workspace)
+      .find({ select: ['id'] });
     return workspaces.map((workspace) => workspace.id);
   }
 

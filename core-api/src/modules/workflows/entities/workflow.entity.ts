@@ -12,9 +12,15 @@ import {
   OneToMany,
 } from 'typeorm';
 
+
+
+interface WorkflowJob {
+  name: string;
+  run: string
+}
 export interface WorkflowContent {
   on: On;
-  jobs: Record<string, string[]>;
+  jobs: WorkflowJob[];
   name: string;
 }
 
