@@ -14,8 +14,7 @@ export default function AssetGroupDetail() {
       <div>
         <h1 className="text-3xl font-bold">{data.name}</h1>
         <p className="text-muted-foreground">
-          Asset Group ID: {data.id} | Created:{' '}
-          {new Date(data.createdAt).toLocaleDateString()}
+          Created: {new Date(data.createdAt).toLocaleDateString()}
         </p>
       </div>
 

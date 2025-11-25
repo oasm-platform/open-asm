@@ -1,5 +1,6 @@
 import { DataTable } from '@/components/ui/data-table';
 import {
+  useAssetGroupControllerDelete,
   useAssetGroupControllerGetAll,
   type AssetGroupResponseDto,
 } from '@/services/apis/gen/queries';
@@ -7,49 +8,16 @@ import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { useAsset } from '../context/asset-context';
-
-const columns: ColumnDef<AssetGroupResponseDto>[] = [
-  {
-    accessorKey: 'name',
-    header: 'Name',
-    cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
-  },
-  {
-    accessorKey: 'createdAt',
-    header: 'Created Date',
-    enableSorting: false,
-    cell: ({ row }) => (
-      <div>{dayjs(row.original.createdAt).format('YYYY-MM-DD HH:mm')}</div>
-    ),
-  },
-  // {
-  //   id: 'actions',
-  //   header: 'Actions',
-  //   cell: ({ row }) => {
-  //     const assetGroup = row.original;
-  //     const {mutate} = useAssetGroupControllerDelete()
-  //
-  //     return (
-  //       <DropdownMenu>
-  //         <DropdownMenuTrigger asChild>
-  //           <Button variant="ghost" className="h-8 w-8 p-0">
-  //             <span className="sr-only">Open menu</span>
-  //             <MoreHorizontal className="h-4 w-4" />
-  //           </Button>
-  //         </DropdownMenuTrigger>
-  //         <DropdownMenuContent align="end">
-  //           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-  //           <DropdownMenuItem
-  //             onClick={() => navigator.clipboard.writeText(assetGroup.id)}
-  //           >
-  //             Delete
-  //           </DropdownMenuItem>
-  //         </DropdownMenuContent>
-  //       </DropdownMenu>
-  //     );
-  //   },
-  // },
-];
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { MoreHorizontal } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function AssetGroupTab() {
   const {
@@ -59,9 +27,63 @@ export function AssetGroupTab() {
     queryOptions,
   } = useAsset();
 
+  const { mutate } = useAssetGroupControllerDelete();
+
+  const columns: ColumnDef<AssetGroupResponseDto>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Created Date',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <div>{dayjs(row.original.createdAt).format('YYYY-MM-DD HH:mm')}</div>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const assetGroup = row.original;
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  mutate(
+                    { id: assetGroup.id },
+                    {
+                      onSuccess: () => {
+                        refetch();
+                        toast('Asset group deleted successfully');
+                      },
+                    },
+                  );
+                }}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
   const navigate = useNavigate();
 
-  const { data, isLoading } = useAssetGroupControllerGetAll(
+  const { data, isLoading, refetch } = useAssetGroupControllerGetAll(
     {
       limit: pageSize,
       page: page,

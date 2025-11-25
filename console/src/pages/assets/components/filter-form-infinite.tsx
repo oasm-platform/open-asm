@@ -1,10 +1,12 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import useDebounce from '@/hooks/use-debounce';
+import { useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAsset } from '../context/asset-context';
+import { CreateAssetGroupDialog } from './create-asset-group-dialog';
 import {
   IpFacetedFilter,
   PortFacetedFilter,
@@ -12,7 +14,11 @@ import {
   TechsFacetedFilter,
 } from './faceted-filter';
 
-export default function FilterFormInfinite() {
+export default function FilterFormInfinite({
+  selectedTab,
+}: {
+  selectedTab: string;
+}) {
   const [params, setParams] = useSearchParams();
   const {
     tableParams: { filter },
@@ -21,7 +27,12 @@ export default function FilterFormInfinite() {
 
   const [searchValue, setSearchValue] = useState(filter ?? '');
   const debouncedValue = useDebounce(searchValue, 500);
+  const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
 
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['asset-group'] });
+  };
   useEffect(() => {
     setFilter(debouncedValue);
   }, [debouncedValue, setFilter]);
@@ -60,6 +71,18 @@ export default function FilterFormInfinite() {
           </Button>
         )}
       </div>
+      {selectedTab == 'group' && (
+        <div>
+          <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+            Create Asset Group
+          </Button>
+          <CreateAssetGroupDialog
+            open={isCreateDialogOpen}
+            onOpenChange={setCreateDialogOpen}
+            onSuccess={handleSuccess}
+          />
+        </div>
+      )}
     </div>
   );
 }
