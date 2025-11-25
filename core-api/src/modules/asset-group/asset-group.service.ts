@@ -11,13 +11,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
+import { Workflow } from '../workflows/entities/workflow.entity';
 import { AssetGroupResponseDto } from './dto/asset-group-response.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
-import { AssetGroup } from './entities/asset-groups.entity';
-import { Workflow } from '../workflows/entities/workflow.entity';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
+import { AssetGroup } from './entities/asset-groups.entity';
 
 @Injectable()
 export class AssetGroupService {
@@ -34,7 +34,7 @@ export class AssetGroupService {
     public readonly assetRepo: Repository<Asset>,
     @InjectRepository(Workflow)
     public readonly workflowRepo: Repository<Workflow>,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all asset groups with optional filtering and pagination
@@ -125,15 +125,15 @@ export class AssetGroupService {
   /**
    * Creates a new asset group
    */
-  async create(createAssetGroupDto: CreateAssetGroupDto) {
+  async create(createAssetGroupDto: CreateAssetGroupDto, workspaceId: string) {
     try {
       // Validate the workspace exists
       const workspace = await this.assetGroupRepo.manager.findOneBy(Workspace, {
-        id: createAssetGroupDto.workspaceId,
+        id: workspaceId,
       });
       if (!workspace) {
         throw new NotFoundException(
-          `Workspace with ID "${createAssetGroupDto.workspaceId}" not found`,
+          `Workspace with ID "${workspaceId}" not found`,
         );
       }
 
@@ -141,7 +141,7 @@ export class AssetGroupService {
       const existingAssetGroup = await this.assetGroupRepo.findOne({
         where: {
           name: createAssetGroupDto.name,
-          workspace: { id: createAssetGroupDto.workspaceId },
+          workspace: { id: workspaceId },
         },
       });
 
@@ -153,7 +153,7 @@ export class AssetGroupService {
 
       const assetGroup = this.assetGroupRepo.create({
         name: createAssetGroupDto.name,
-        workspace: { id: createAssetGroupDto.workspaceId },
+        workspace: { id: workspaceId },
       });
 
       const savedAssetGroup = await this.assetGroupRepo.save(assetGroup);
@@ -627,7 +627,6 @@ export class AssetGroupService {
         .orderBy(`asset.${sortBy}`, sortOrder)
         .skip(offset)
         .take(limit)
-        .leftJoinAndSelect('asset.tags', 'tags')
         .leftJoinAndSelect('asset.target', 'target')
         .getManyAndCount();
 
@@ -673,7 +672,7 @@ export class AssetGroupService {
           'agt."workflow_id" = workflow.id AND agt."asset_group_id" = :assetGroupId',
           { assetGroupId },
         )
-        .where('agt."workflow_id" IS NULL');
+        .where('agt."workflow_id" IS NULL AND workflow."workspaceId" = :workspaceId', { workspaceId });
 
       const [data, total] = await queryBuilder
         .orderBy(`workflow.${sortBy}`, sortOrder)

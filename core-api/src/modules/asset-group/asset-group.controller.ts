@@ -14,20 +14,20 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Asset } from '../assets/entities/assets.entity';
+import { Workflow } from '../workflows/entities/workflow.entity';
 import { AssetGroupService } from './asset-group.service';
 import { AddManyAssetsToAssetGroupDto } from './dto/add-many-assets-to-asset-group.dto';
+import { AddManyWorkflowsToAssetGroupDto } from './dto/add-many-workflows-to-asset-group.dto';
 import { AssetGroupResponseDto } from './dto/asset-group-response.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { RemoveManyAssetsFromAssetGroupDto } from './dto/remove-many-assets-from-asset-group.dto';
-import { AddManyWorkflowsToAssetGroupDto } from './dto/add-many-workflows-to-asset-group.dto';
 import { RemoveManyWorkflowsFromAssetGroupDto } from './dto/remove-many-workflows-from-asset-group.dto';
-import { Workflow } from '../workflows/entities/workflow.entity';
 
 @ApiTags('Asset Group')
 @Controller('asset-group')
 export class AssetGroupController {
-  constructor(private readonly assetGroupService: AssetGroupService) {}
+  constructor(private readonly assetGroupService: AssetGroupService) { }
 
   @Doc({
     summary: 'Get all asset groups',
@@ -69,10 +69,13 @@ export class AssetGroupController {
     response: {
       serialization: AssetGroupResponseDto,
     },
+    request: {
+      getWorkspaceId: true
+    }
   })
   @Post()
-  create(@Body() createAssetGroupDto: CreateAssetGroupDto) {
-    return this.assetGroupService.create(createAssetGroupDto);
+  create(@Body() createAssetGroupDto: CreateAssetGroupDto, @WorkspaceId() workspaceId) {
+    return this.assetGroupService.create(createAssetGroupDto, workspaceId);
   }
 
   @Doc({

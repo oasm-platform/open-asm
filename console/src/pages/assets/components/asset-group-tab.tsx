@@ -5,7 +5,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
-import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAsset } from '../context/asset-context';
 
@@ -84,26 +83,20 @@ export function AssetGroupTab() {
   if (!data && !isLoading) return <div>Error loading asset groups.</div>;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <DataTable
-        data={assetGroups}
-        columns={columns}
-        isLoading={isLoading}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        totalItems={total}
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        isShowBorder={true}
-        onRowClick={(row) => navigate('/asset-group/' + row.id)}
-        emptyMessage="No asset groups found"
-      />
-    </motion.div>
+    <DataTable
+      data={assetGroups}
+      columns={columns}
+      isLoading={isLoading}
+      page={page}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={setPageSize}
+      totalItems={total}
+      sortBy={sortBy}
+      sortOrder={sortOrder}
+      isShowBorder={true}
+      onRowClick={(row) => navigate('/asset-group/' + row.id)}
+      emptyMessage="No asset groups found"
+    />
   );
 }

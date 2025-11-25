@@ -58,7 +58,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         },
         // {
         //   title: 'Workflow',
-        //   icon: <Workflow />,
+        //   icon: <WorkflowIcon />,
         //   url: '/workflow',
         // },
         {

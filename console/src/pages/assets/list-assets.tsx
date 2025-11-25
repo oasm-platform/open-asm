@@ -2,6 +2,7 @@ import { Tabs } from '@/components/ui/tabs';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useMemo, useState } from 'react';
 import CreateWorkspace from '../workspaces/create-workspace';
+import { AssetGroupTab } from './components/asset-group-tab';
 import AssetTabContent from './components/asset-tab';
 import FilterFormInfinite from './components/filter-form-infinite';
 import IpAssetsTab from './components/ip-assets-tab';
@@ -9,7 +10,6 @@ import PortAssetsTab from './components/port-assets-tab';
 import StatusCodeAssetsTab from './components/status-code-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
-import { AssetGroupTab } from './components/asset-group-tab';
 
 export function ListAssets() {
   const { workspaces } = useWorkspaceSelector();
@@ -20,6 +20,11 @@ export function ListAssets() {
         value: 'asset',
         text: 'All Services',
         tab: <AssetTabContent />,
+      },
+      {
+        value: 'group',
+        text: 'Group',
+        tab: <AssetGroupTab />,
       },
       {
         value: 'tech',
@@ -40,11 +45,6 @@ export function ListAssets() {
         value: 'statusCode',
         text: 'Status Code',
         tab: <StatusCodeAssetsTab />,
-      },
-      {
-        value: 'group',
-        text: 'Group',
-        tab: <AssetGroupTab />,
       },
     ],
     [],

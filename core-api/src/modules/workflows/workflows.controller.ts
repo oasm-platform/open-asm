@@ -68,7 +68,6 @@ export class WorkflowsController {
   @Get(':id')
   async getWorkspaceWorkflow(
     @Param('id') id: string,
-    @UserContext() userContextPayload: UserContextPayload,
     @WorkspaceId() workspaceId: string,
   ) {
     return this.workflowsService.getWorkspaceWorkflow(id, { id: workspaceId });
@@ -90,7 +89,6 @@ export class WorkflowsController {
   async updateWorkflow(
     @Param('id') id: string,
     @Body() updateWorkflowDto: UpdateWorkflowDto,
-    @UserContext() userContextPayload: UserContextPayload,
     @WorkspaceId() workspaceId: string,
   ) {
     return this.workflowsService.updateWorkflow(id, updateWorkflowDto, { id: workspaceId });
@@ -110,7 +108,6 @@ export class WorkflowsController {
   @Delete(':id')
   async deleteWorkflow(
     @Param('id') id: string,
-    @UserContext() userContextPayload: UserContextPayload,
     @WorkspaceId() workspaceId: string,
   ) {
     await this.workflowsService.deleteWorkflow(id, { id: workspaceId });
