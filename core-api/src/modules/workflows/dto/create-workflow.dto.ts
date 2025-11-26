@@ -13,15 +13,6 @@ export class CreateWorkflowDto {
 
     @ApiProperty({
         description: 'Content of the workflow in JSON format',
-        example: {
-            on: {
-                schedule: '0 0 * * *',
-            },
-            jobs: {
-                'nessus': [],
-            },
-            name: 'Vulnerability Scan Workflow',
-        },
     })
     @IsObject()
     @IsNotEmpty()

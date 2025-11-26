@@ -253,7 +253,7 @@ export class ToolsService implements OnModuleInit {
     }
   }
 
-  async getInstalledTools(dto: GetInstalledToolsDto) {
+  async getInstalledTools(dto: GetInstalledToolsDto, workspaceId?: string) {
     const builtInTools = await this.toolsRepository.find({
       where: {
         type: WorkerType.BUILT_IN,
@@ -263,7 +263,7 @@ export class ToolsService implements OnModuleInit {
 
     const workspaceTools = await this.workspaceToolRepository.find({
       where: {
-        workspace: { id: dto.workspaceId },
+        workspace: { id: workspaceId },
         ...(dto.category && { tool: { category: dto.category } }),
       },
       relations: ['tool'],
