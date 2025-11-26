@@ -27,7 +27,7 @@ import { RemoveManyWorkflowsFromAssetGroupDto } from './dto/remove-many-workflow
 @ApiTags('Asset Group')
 @Controller('asset-group')
 export class AssetGroupController {
-  constructor(private readonly assetGroupService: AssetGroupService) { }
+  constructor(private readonly assetGroupService: AssetGroupService) {}
 
   @Doc({
     summary: 'Get all asset groups',
@@ -70,11 +70,14 @@ export class AssetGroupController {
       serialization: AssetGroupResponseDto,
     },
     request: {
-      getWorkspaceId: true
-    }
+      getWorkspaceId: true,
+    },
   })
   @Post()
-  create(@Body() createAssetGroupDto: CreateAssetGroupDto, @WorkspaceId() workspaceId) {
+  create(
+    @Body() createAssetGroupDto: CreateAssetGroupDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.assetGroupService.create(createAssetGroupDto, workspaceId);
   }
 

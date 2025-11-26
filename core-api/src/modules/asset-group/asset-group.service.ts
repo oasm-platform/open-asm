@@ -34,7 +34,7 @@ export class AssetGroupService {
     public readonly assetRepo: Repository<Asset>,
     @InjectRepository(Workflow)
     public readonly workflowRepo: Repository<Workflow>,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all asset groups with optional filtering and pagination
@@ -339,6 +339,7 @@ export class AssetGroupService {
           assetGroup: { id: groupId },
           workflow: { id: In(workflowIds) },
         },
+        relations: ['workflow', 'assetGroup'],
       });
 
       if (associations.length === 0) {
@@ -392,6 +393,7 @@ export class AssetGroupService {
           assetGroup: { id: groupId },
           asset: { id: In(assetIds) },
         },
+        relations: ['asset', 'assetGroup'],
       });
 
       if (associations.length === 0) {
@@ -495,10 +497,10 @@ export class AssetGroupService {
       // Build query using query builder to get assets associated with the asset group
       const queryBuilder = this.assetRepo
         .createQueryBuilder('asset')
-        .innerJoin('assets_group_assets', 'aga', 'aga.asset_id = asset.id')
-        .innerJoin('asset_groups', 'ag', 'ag.id = aga.asset_group_id')
+        .innerJoin('assets_group_assets', 'aga', 'aga.assetId = asset.id')
+        .innerJoin('asset_groups', 'ag', 'ag.id = aga.assetGroupId')
         .where(
-          'aga.asset_group_id = :assetGroupId AND ag.workspace_id = :workspaceId',
+          'aga.assetGroupId = :assetGroupId AND ag.workspaceId = :workspaceId',
           {
             assetGroupId,
             workspaceId,
@@ -546,17 +548,16 @@ export class AssetGroupService {
         );
       }
 
-      // Build query using query builder to get workflows associated with the asset group
       const queryBuilder = this.workflowRepo
         .createQueryBuilder('workflow')
         .innerJoin(
           'asset_group_workflows',
           'agt',
-          'agt.workflow_id = workflow.id',
+          'agt.workflowId = workflow.id',
         )
-        .innerJoin('asset_groups', 'ag', 'ag.id = agt.asset_group_id')
+        .innerJoin('asset_groups', 'ag', 'ag.id = agt.assetGroupId')
         .where(
-          'agt.asset_group_id = :assetGroupId AND ag.workspace_id = :workspaceId',
+          'agt.assetGroupId = :assetGroupId AND ag.workspaceId = :workspaceId',
           {
             assetGroupId,
             workspaceId,
@@ -612,11 +613,11 @@ export class AssetGroupService {
         .leftJoin(
           'assets_group_assets',
           'aga',
-          'aga.asset_id = asset.id AND aga.asset_group_id = :assetGroupId',
+          'aga.assetId = asset.id AND aga.assetGroupId = :assetGroupId',
           { assetGroupId },
         )
         .where(
-          'aga.asset_id IS NULL AND asset."targetId" IN (SELECT t.id FROM targets t JOIN workspace_targets wt ON t.id = wt."targetId" WHERE wt."workspaceId" = :workspaceId)',
+          'aga.assetId IS NULL AND asset."targetId" IN (SELECT t.id FROM targets t JOIN workspace_targets wt ON t.id = wt."targetId" WHERE wt."workspaceId" = :workspaceId)',
           {
             assetGroupId,
             workspaceId,
@@ -669,10 +670,13 @@ export class AssetGroupService {
         .leftJoin(
           'asset_group_workflows',
           'agt',
-          'agt."workflow_id" = workflow.id AND agt."asset_group_id" = :assetGroupId',
+          'agt.workflowId = workflow.id AND agt.assetGroupId = :assetGroupId',
           { assetGroupId },
         )
-        .where('agt."workflow_id" IS NULL AND workflow."workspaceId" = :workspaceId', { workspaceId });
+        .where(
+          'agt.workflowId IS NULL AND workflow.workspaceId = :workspaceId',
+          { workspaceId },
+        );
 
       const [data, total] = await queryBuilder
         .orderBy(`workflow.${sortBy}`, sortOrder)

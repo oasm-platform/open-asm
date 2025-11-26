@@ -11,13 +11,12 @@ import dayjs from 'dayjs';
 import {
   ChartNoAxesGantt,
   Copy,
-  EthernetPort,
   Globe,
   Layers,
   Loader2Icon,
   Lock,
   Network,
-  ShieldCheck,
+  ShieldCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AssetValue from './asset-value';
@@ -36,8 +35,7 @@ export default function AssetDetail({ id }: { id: string }) {
     );
   }
 
-  const { value, httpResponses, ports, ipAddresses } = data;
-  const ports_scanner = ports;
+  const { value, httpResponses, ipAddresses } = data;
   const tls = httpResponses?.tls;
 
   // Calculate days left for SSL certificate
@@ -158,22 +156,6 @@ export default function AssetDetail({ id }: { id: string }) {
               <div>
                 <span className="block mb-1">Port</span>
                 <span className="">{tls.port}</span>
-              </div>
-            )}
-            {ports_scanner && ports_scanner.ports.length > 0 ? (
-              <div>
-                <span className="block mb-1">Open Ports</span>
-                <BadgeList
-                  list={ports_scanner.ports.sort(
-                    (a: string, b: string) => parseInt(a) - parseInt(b),
-                  )}
-                  Icon={EthernetPort}
-                />
-              </div>
-            ) : (
-              <div>
-                <span className="block mb-1">Open Ports</span>
-                <span className="italic">No open ports detected.</span>
               </div>
             )}
           </div>

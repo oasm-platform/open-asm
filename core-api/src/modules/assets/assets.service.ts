@@ -116,7 +116,8 @@ export class AssetsService {
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       })
-      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL');
+      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
+      .andWhere('"statusCodeAssets"."statusCode" != 0');
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -150,22 +151,24 @@ export class AssetsService {
 
     const offset = (query.page - 1) * query.limit;
 
-    const queryBuilder = this.buildBaseQuery(query, workspaceId).select([
-      'assetServices.value',
-      'assetServices.port',
-      'assetServices.id',
-      'asset.isEnabled',
-      'asset.targetId',
-      'assetServices.createdAt',
-      'ipAssets.ipAddress',
-      'httpResponses.tech',
-      'httpResponses.title',
-      'httpResponses.tls',
-      'httpResponses.chain_status_codes',
-      'httpResponses.status_code',
-      'httpResponses.url',
-      'httpResponses.favicon_url',
-    ]);
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
+      .andWhere('"statusCodeAssets"."statusCode" != 0')
+      .select([
+        'assetServices.value',
+        'assetServices.port',
+        'assetServices.id',
+        'asset.isEnabled',
+        'asset.targetId',
+        'assetServices.createdAt',
+        'ipAssets.ipAddress',
+        'httpResponses.tech',
+        'httpResponses.title',
+        'httpResponses.tls',
+        'httpResponses.chain_status_codes',
+        'httpResponses.status_code',
+        'httpResponses.url',
+        'httpResponses.favicon_url',
+      ]);
 
     if (query.value) {
       queryBuilder.andWhere('assetServices.value ILIKE :value', {
@@ -325,6 +328,7 @@ export class AssetsService {
       new GetAssetsQueryDto(),
       workspaceId,
     )
+      .andWhere('"statusCodeAssets"."statusCode" != 0')
       .select([
         'assetServices.value',
         'assetServices.port',
@@ -401,17 +405,35 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.buildBaseQuery(query, workspaceId)
+    const queryBuilder = this.assetServiceRepo
+      .createQueryBuilder('assetServices')
+      .leftJoin('assetServices.asset', 'asset')
+      .leftJoin('asset.target', 'targets')
+      .leftJoin(
+        'assetServices.httpResponses',
+        'httpResponses',
+        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
+      )
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .leftJoin('asset.ipAssets', 'ipAssets')
+      .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
+      .where('"assetServices"."isErrorPage" = false')
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+        workspaceId,
+      })
       .select([
         '"ipAssets"."ip"',
         'COUNT(DISTINCT "asset"."id") as "assetCount"',
       ])
       .andWhere('"ipAssets"."ip" IS NOT NULL')
-      .andWhere('"ipAssets"."ip" ILIKE :value', {
-        value: `%${query.value}%`,
-      })
       .distinct(true)
       .groupBy('"ipAssets"."ip"');
+
+    if (query.value) {
+      queryBuilder.andWhere('"ipAssets"."ip"::text ILIKE :value', {
+        value: `%${query.value}%`,
+      });
+    }
 
     if (query.value) {
       queryBuilder.andWhere('"ipAssets"."ip"::text ILIKE :value', {
@@ -459,7 +481,22 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.buildBaseQuery(query, workspaceId)
+    const queryBuilder = this.assetServiceRepo
+      .createQueryBuilder('assetServices')
+      .leftJoin('assetServices.asset', 'asset')
+      .leftJoin('asset.target', 'targets')
+      .leftJoin(
+        'assetServices.httpResponses',
+        'httpResponses',
+        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
+      )
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .leftJoin('asset.ipAssets', 'ipAssets')
+      .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
+      .where('"assetServices"."isErrorPage" = false')
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+        workspaceId,
+      })
       .select([
         'assetServices.port as port',
         'COUNT(DISTINCT "asset"."id") as "assetCount"',
@@ -513,7 +550,22 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.buildBaseQuery(query, workspaceId)
+    const queryBuilder = this.assetServiceRepo
+      .createQueryBuilder('assetServices')
+      .leftJoin('assetServices.asset', 'asset')
+      .leftJoin('asset.target', 'targets')
+      .leftJoin(
+        'assetServices.httpResponses',
+        'httpResponses',
+        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
+      )
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .leftJoin('asset.ipAssets', 'ipAssets')
+      .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
+      .where('"assetServices"."isErrorPage" = false')
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+        workspaceId,
+      })
       .innerJoin(
         (subQuery) =>
           subQuery
@@ -607,16 +659,39 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.buildBaseQuery(query, workspaceId)
+    const queryBuilder = this.assetServiceRepo
+      .createQueryBuilder('assetServices')
+      .leftJoin('assetServices.asset', 'asset')
+      .leftJoin('asset.target', 'targets')
+      .leftJoin(
+        'assetServices.httpResponses',
+        'httpResponses',
+        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
+      )
+      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
+      .leftJoin('asset.ipAssets', 'ipAssets')
+      .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
+      .where('"assetServices"."isErrorPage" = false')
+      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
+        workspaceId,
+      })
+      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
+      .andWhere('"statusCodeAssets"."statusCode" != 0')
       .select([
         '"statusCodeAssets"."statusCode"',
         'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
       ])
-      .andWhere('"statusCodeAssets"."statusCode"::text ILIKE :value', {
-        value: `%${query.value}%`,
-      })
       .distinct(true)
       .groupBy('"statusCodeAssets"."statusCode"');
+
+    if (query.value) {
+      queryBuilder.andWhere(
+        '"statusCodeAssets"."statusCode"::text ILIKE :value',
+        {
+          value: `%${query.value}%`,
+        },
+      );
+    }
 
     if (query.value) {
       queryBuilder.andWhere(

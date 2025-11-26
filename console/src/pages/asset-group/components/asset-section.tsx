@@ -1,12 +1,6 @@
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DataTable } from '@/components/ui/data-table';
 import {
   Dialog,
   DialogContent,
@@ -16,17 +10,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { DataTable } from '@/components/ui/data-table';
-import type { ColumnDef } from '@tanstack/react-table';
-import { PlusIcon, TrashIcon } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   useAssetGroupControllerAddManyAssets,
-  useAssetGroupControllerRemoveManyAssets,
   useAssetGroupControllerGetAssetsByAssetGroupsId,
   useAssetGroupControllerGetAssetsNotInAssetGroup,
+  useAssetGroupControllerRemoveManyAssets,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
+import type { ColumnDef } from '@tanstack/react-table';
+import { PlusIcon, TrashIcon } from 'lucide-react';
+import { useState } from 'react';
 
 interface Asset {
   id: string;
@@ -42,19 +36,20 @@ interface Asset {
 
 interface AssetSectionProps {
   assetGroupId: string;
-  refetch: () => void;
 }
 
-export const AssetSection: React.FC<AssetSectionProps> = ({
-  assetGroupId,
-  refetch,
-}) => {
+export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
   const queryClient = useQueryClient();
 
   // Queries for assets in the asset group
+  const {
+    tableParams: { page, pageSize, sortBy, sortOrder },
+    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+  } = useServerDataTable();
+
   const assetsInGroupQuery = useAssetGroupControllerGetAssetsByAssetGroupsId(
     assetGroupId,
-    { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
+    { page, limit: pageSize, sortBy, sortOrder },
   );
 
   const [showSelectAssetsDialog, setShowSelectAssetsDialog] = useState(false);
@@ -67,9 +62,14 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
   const removeAssetsMutation = useAssetGroupControllerRemoveManyAssets();
 
   // Queries for assets not in asset group
+  const {
+    tableParams: { page: pageNotInGroup, pageSize: pageSizeNotInGroup, sortBy: sortByNotInGroup, sortOrder: sortOrderNotInGroup },
+    tableHandlers: { setPage: setPageNotInGroup, setPageSize: setPageSizeNotInGroup, setSortBy: setSortByNotInGroup, setSortOrder: setSortOrderNotInGroup },
+  } = useServerDataTable();
+
   const assetsNotInGroupQuery = useAssetGroupControllerGetAssetsNotInAssetGroup(
     assetGroupId,
-    { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
+    { page: pageNotInGroup, limit: pageSizeNotInGroup, sortBy: sortByNotInGroup, sortOrder: sortOrderNotInGroup },
     { query: { enabled: showSelectAssetsDialog } },
   );
 
@@ -81,7 +81,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
       },
       {
         onSuccess: () => {
-          refetch();
+          assetsInGroupQuery.refetch();
           queryClient.invalidateQueries({
             queryKey: ['assetGroupControllerGetAssetsByAssetGroupsId'],
           });
@@ -104,7 +104,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
       },
       {
         onSuccess: () => {
-          refetch();
+          assetsInGroupQuery.refetch();
           setSelectedAssets([]);
           setShowSelectAssetsDialog(false);
           queryClient.invalidateQueries({
@@ -122,11 +122,11 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
   const assetColumns: ColumnDef<Asset>[] = [
     {
       accessorKey: 'value',
-      header: 'Asset Value',
+      header: 'Asset value',
     },
     {
       accessorKey: 'createdAt',
-      header: 'Created At',
+      header: 'Created at',
       cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
     },
     {
@@ -134,7 +134,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
       header: 'Actions',
       cell: ({ row }) => (
         <Button
-          variant="destructive"
+          variant="outline"
           size="sm"
           onClick={() => handleRemoveAssets([row.original.id])}
           disabled={removeAssetsMutation.isPending}
@@ -187,13 +187,13 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
   ];
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <div className="w-full space-y-4">
+      <div className="flex flex-row items-center justify-between space-y-0 pb-2 mb-4">
         <div>
-          <CardTitle>Assets</CardTitle>
-          <CardDescription>
+          <h2 className="text-xl font-semibold">Assets</h2>
+          <p className="text-sm text-muted-foreground">
             {assetsInGroupQuery.data?.total || 0} assets in this group
-          </CardDescription>
+          </p>
         </div>
         <div className="flex space-x-2">
           <Dialog
@@ -202,13 +202,13 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
           >
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Add More Assets
+                <PlusIcon className="h-4 w-4" />
+                Add
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-auto">
               <DialogHeader>
-                <DialogTitle>Select Assets to Add</DialogTitle>
+                <DialogTitle>Select assets to add</DialogTitle>
                 <DialogDescription>
                   Choose assets not currently in this asset group to add
                 </DialogDescription>
@@ -220,8 +220,15 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
                   isLoading={assetsNotInGroupQuery.isLoading}
                   page={assetsNotInGroupQuery.data?.page || 1}
                   pageSize={assetsNotInGroupQuery.data?.limit || 10}
+                  sortBy={sortByNotInGroup}
+                  sortOrder={sortOrderNotInGroup}
+                  onPageChange={setPageNotInGroup}
+                  onPageSizeChange={setPageSizeNotInGroup}
+                  onSortChange={(col, order) => {
+                    setSortByNotInGroup(col);
+                    setSortOrderNotInGroup(order);
+                  }}
                   totalItems={assetsNotInGroupQuery.data?.total || 0}
-                  onPageChange={() => {}}
                 />
               </div>
               <DialogFooter className="flex sm:justify-between">
@@ -244,24 +251,23 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
             </DialogContent>
           </Dialog>
         </div>
-      </CardHeader>
-      <CardContent>
-        {assetsInGroupQuery.data && assetsInGroupQuery.data.data.length > 0 ? (
-          <DataTable
-            columns={assetColumns}
-            data={assetsInGroupQuery.data.data}
-            isLoading={assetsInGroupQuery.isLoading}
-            page={assetsInGroupQuery.data.page}
-            pageSize={assetsInGroupQuery.data.limit}
-            totalItems={assetsInGroupQuery.data.total}
-            onPageChange={() => {}}
-          />
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            No assets in this group
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+      <DataTable
+        columns={assetColumns}
+        data={assetsInGroupQuery.data?.data ?? []}
+        isLoading={assetsInGroupQuery.isLoading}
+        page={assetsInGroupQuery.data?.page ?? 1}
+        pageSize={assetsInGroupQuery.data?.limit ?? 10}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        onSortChange={(col, order) => {
+          setSortBy(col);
+          setSortOrder(order);
+        }}
+        totalItems={assetsInGroupQuery.data?.total ?? 0}
+      />
+    </div>
   );
 };
