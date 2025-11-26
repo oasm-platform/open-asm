@@ -70,7 +70,7 @@ export default function FilterFormInfinite({
           </Button>
         )}
       </div>
-      {selectedTab == 'group' && (
+      {(selectedTab === 'group' || selectedTab === 'groups') && (
         <div>
           <CreateAssetGroupDialog
             onSuccess={handleSuccess}

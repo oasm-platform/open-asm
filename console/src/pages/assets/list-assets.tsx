@@ -14,7 +14,14 @@ import TechnologyAssetsTab from './components/technology-assets-tab';
 export function ListAssets() {
   const { workspaces } = useWorkspaceSelector();
 
-  const tabList = useMemo(
+  type TabItem = {
+    value: string;
+    text: string;
+    tab: React.ReactNode;
+    isNew?: boolean;
+  }
+
+  const tabList = useMemo<TabItem[]>(
     () => [
       {
         value: 'asset',
@@ -22,9 +29,10 @@ export function ListAssets() {
         tab: <AssetTabContent />,
       },
       {
-        value: 'group',
-        text: 'Group',
+        value: 'groups',
+        text: 'Groups',
         tab: <AssetGroupTab />,
+        isNew: true,
       },
       {
         value: 'tech',
