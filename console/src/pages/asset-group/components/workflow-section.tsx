@@ -196,7 +196,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
-          <CardTitle>Workflows</CardTitle>
+          <CardTitle>Tools</CardTitle>
           <CardDescription>
             {workflowsInGroupQuery.data?.total || 0} workflows in this group
           </CardDescription>
@@ -255,7 +255,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       </CardHeader>
       <CardContent>
         {workflowsInGroupQuery.data &&
-        workflowsInGroupQuery.data.data.length > 0 ? (
+          workflowsInGroupQuery.data.data.length > 0 ? (
           <DataTable
             columns={workflowColumns}
             data={workflowsInGroupQuery.data.data}

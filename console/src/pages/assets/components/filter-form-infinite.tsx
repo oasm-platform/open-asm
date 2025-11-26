@@ -27,7 +27,6 @@ export default function FilterFormInfinite({
 
   const [searchValue, setSearchValue] = useState(filter ?? '');
   const debouncedValue = useDebounce(searchValue, 500);
-  const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const handleSuccess = () => {
@@ -73,12 +72,7 @@ export default function FilterFormInfinite({
       </div>
       {selectedTab == 'group' && (
         <div>
-          <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
-            Create Asset Group
-          </Button>
           <CreateAssetGroupDialog
-            open={isCreateDialogOpen}
-            onOpenChange={setCreateDialogOpen}
             onSuccess={handleSuccess}
           />
         </div>
