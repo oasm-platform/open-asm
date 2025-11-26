@@ -62,7 +62,11 @@ export function ListAssets() {
   if (workspaces.length === 0) return <CreateWorkspace />;
   return (
     <div className="w-full">
-      <FilterFormInfinite selectedTab={selectedTab} />
+      {/* FilterFormInfinite always on top */}
+      <div className="mb-4">
+        <FilterFormInfinite selectedTab={selectedTab} />
+      </div>
+
       <Tabs
         value={selectedTab}
         onValueChange={setSelectedTab}
