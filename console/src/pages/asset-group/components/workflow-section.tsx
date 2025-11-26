@@ -37,11 +37,13 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   assetGroupId,
 }) => {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [page2, setPage2] = useState(1);
 
   // Queries for workflows in the asset group
   const workflowsInGroupQuery =
     useAssetGroupControllerGetWorkflowsByAssetGroupsId(assetGroupId, {
-      page: 1,
+      page: page,
       limit: 10,
       sortBy: 'createdAt',
       sortOrder: 'DESC',
@@ -61,7 +63,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const workflowsNotInGroupQuery =
     useAssetGroupControllerGetWorkflowsNotInAssetGroup(
       assetGroupId,
-      { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
+      { page: page2, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
       { query: { enabled: showSelectWorkflowsDialog } },
     );
 
@@ -226,7 +228,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                   page={workflowsNotInGroupQuery.data?.page || 1}
                   pageSize={workflowsNotInGroupQuery.data?.limit || 10}
                   totalItems={workflowsNotInGroupQuery.data?.total || 0}
-                  onPageChange={() => {}}
+                  onPageChange={setPage2}
                 />
               </div>
               <DialogFooter className="flex sm:justify-between">
@@ -261,7 +263,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
             page={workflowsInGroupQuery.data.page}
             pageSize={workflowsInGroupQuery.data.limit}
             totalItems={workflowsInGroupQuery.data.total}
-            onPageChange={() => {}}
+            onPageChange={setPage}
           />
         ) : (
           <div className="text-center py-8 text-muted-foreground">

@@ -46,11 +46,13 @@ interface AssetSectionProps {
 
 export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [page2, setPage2] = useState(1);
 
   // Queries for assets in the asset group
   const assetsInGroupQuery = useAssetGroupControllerGetAssetsByAssetGroupsId(
     assetGroupId,
-    { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
+    { page: page, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
   );
 
   const [showSelectAssetsDialog, setShowSelectAssetsDialog] = useState(false);
@@ -62,10 +64,9 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
   const addAssetsMutation = useAssetGroupControllerAddManyAssets();
   const removeAssetsMutation = useAssetGroupControllerRemoveManyAssets();
 
-  // Queries for assets not in asset group
   const assetsNotInGroupQuery = useAssetGroupControllerGetAssetsNotInAssetGroup(
     assetGroupId,
-    { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
+    { page: page2, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
     { query: { enabled: showSelectAssetsDialog } },
   );
 
@@ -217,7 +218,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
                   page={assetsNotInGroupQuery.data?.page || 1}
                   pageSize={assetsNotInGroupQuery.data?.limit || 10}
                   totalItems={assetsNotInGroupQuery.data?.total || 0}
-                  onPageChange={() => {}}
+                  onPageChange={setPage2}
                 />
               </div>
               <DialogFooter className="flex sm:justify-between">
@@ -247,10 +248,10 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
             columns={assetColumns}
             data={assetsInGroupQuery.data.data}
             isLoading={assetsInGroupQuery.isLoading}
-            page={assetsInGroupQuery.data.page}
+            page={page}
             pageSize={assetsInGroupQuery.data.limit}
             totalItems={assetsInGroupQuery.data.total}
-            onPageChange={() => {}}
+            onPageChange={setPage}
           />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
