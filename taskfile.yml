@@ -47,6 +47,9 @@ tasks:
     deps:
       - install
       - worker:tools
+  proto:
+    cmds:
+      - task: api:proto
   clean:
     cmds:
       - rm -rf ./node_modules

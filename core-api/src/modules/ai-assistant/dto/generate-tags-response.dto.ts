@@ -1,16 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+/**
+ * Response DTO for generating tags
+ */
 export class GenerateTagsResponseDto {
   @ApiProperty({
-    description: 'The domain that was analyzed',
+    description: 'Domain that tags were generated for',
     example: 'example.com',
   })
   domain: string;
 
   @ApiProperty({
-    description: 'Array of generated tags for the domain',
-    type: [String],
-    example: ['technology', 'business', 'web'],
+    description: 'Generated tags',
+    example: ['web', 'technology', 'blog'],
   })
   tags: string[];
 }

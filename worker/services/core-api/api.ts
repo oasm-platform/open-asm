@@ -1196,6 +1196,137 @@ export interface GetManyWorkflowDto {
   pageCount: number;
 }
 
+export interface GenerateTagsResponseDto {
+  /**
+   * The domain that was analyzed
+   * @example "example.com"
+   */
+  domain: string;
+  /**
+   * Array of generated tags for the domain
+   * @example ["technology","business","web"]
+   */
+  tags: string[];
+}
+
+export interface GenerateTagsDto {
+  /**
+   * Domain name to generate tags for
+   * @example "example.com"
+   */
+  domain: string;
+}
+
+export interface AddMcpServersResponseDto {
+  servers: object[];
+  success: boolean;
+}
+
+export interface AddMcpServersDto {
+  /**
+   * MCP server configuration in Claude Desktop format
+   * @example {"mcpServers":{"example-server":{"command":"node","args":["path/to/server.js"],"env":{"API_KEY":"xxx"}}}}
+   */
+  mcpConfig: object;
+}
+
+export interface UpdateMcpServersResponseDto {
+  servers: object[];
+  success: boolean;
+}
+
+export interface UpdateMcpServersDto {
+  /**
+   * MCP server configuration to update
+   * @example {"mcpServers":{"example-server":{"command":"node","args":["path/to/updated-server.js"]}}}
+   */
+  mcpConfig: object;
+}
+
+export interface DeleteMcpServersResponseDto {
+  success: boolean;
+}
+
+export interface DeleteMcpServersDto {
+  /**
+   * Array of server names to delete
+   * @example ["server1","server2"]
+   */
+  serverNames: string[];
+}
+
+export interface ConversationDto {
+  conversationId: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetConversationsResponseDto {
+  conversations: ConversationDto[];
+}
+
+export interface UpdateConversationResponseDto {
+  conversation: ConversationDto;
+}
+
+export interface UpdateConversationDto {
+  title: string;
+  description?: string;
+}
+
+export interface DeleteConversationResponseDto {
+  message: string;
+  success: boolean;
+}
+
+export interface DeleteConversationsResponseDto {
+  message: string;
+  success: boolean;
+}
+
+export interface MessageDto {
+  messageId: string;
+  question: string;
+  /** Message type: message_start, delta, message_end, etc. */
+  type: string;
+  /** JSON string containing message-specific data */
+  content: string;
+  conversationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetMessagesResponseDto {
+  messages: MessageDto[];
+}
+
+export interface CreateMessageResponseDto {
+  message: MessageDto;
+  conversation?: ConversationDto;
+}
+
+export interface CreateMessageDto {
+  question: string;
+  conversationId?: string;
+  /** @default false */
+  isCreateConversation?: boolean;
+}
+
+export interface UpdateMessageResponseDto {
+  message: MessageDto;
+}
+
+export interface UpdateMessageDto {
+  question: string;
+}
+
+export interface DeleteMessageResponseDto {
+  message: string;
+  success: boolean;
+}
+
 export interface McpTool {
   name: string;
   type: string;
@@ -1267,6 +1398,7 @@ export enum ToolCategoryEnum {
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
+  Assistant = "assistant",
 }
 
 export enum VulnerabilityStatisticsDtoSeverityEnum {
@@ -1283,6 +1415,7 @@ export enum CreateToolDtoCategoryEnum {
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
+  Assistant = "assistant",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -1296,6 +1429,7 @@ export enum ToolsControllerGetManyToolsParamsCategoryEnum {
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
+  Assistant = "assistant",
 }
 
 export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
@@ -1304,6 +1438,7 @@ export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
+  Assistant = "assistant",
 }
 
 import type {
@@ -3405,6 +3540,260 @@ export class Api<
       path: `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGenerateTags
+   * @summary Generate tags for a domain using AI
+   * @request POST:/api/ai-assistant/generate-tags
+   */
+  aiAssistantControllerGenerateTags = (
+    data: GenerateTagsDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/generate-tags`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all MCP servers for the current workspace and user
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetMcpServers
+   * @summary Get all MCP servers
+   * @request GET:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerGetMcpServers = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Adds one or more MCP servers to the workspace
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerAddMcpServers
+   * @summary Add MCP servers
+   * @request POST:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerAddMcpServers = (
+    data: AddMcpServersDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates one or more MCP servers
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerUpdateMcpServers
+   * @summary Update MCP servers
+   * @request PATCH:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerUpdateMcpServers = (
+    data: UpdateMcpServersDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes one or more MCP servers by name
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteMcpServers
+   * @summary Delete MCP servers
+   * @request DELETE:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerDeleteMcpServers = (
+    data: DeleteMcpServersDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "DELETE",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all conversations for the current workspace and user
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetConversations
+   * @summary Get all conversations
+   * @request GET:/api/ai-assistant/conversations
+   */
+  aiAssistantControllerGetConversations = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes all conversations for the current workspace and user
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteConversations
+   * @summary Delete all conversations
+   * @request DELETE:/api/ai-assistant/conversations
+   */
+  aiAssistantControllerDeleteConversations = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates a conversation title and/or description
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerUpdateConversation
+   * @summary Update conversation
+   * @request PATCH:/api/ai-assistant/conversations/{id}
+   */
+  aiAssistantControllerUpdateConversation = (
+    id: string,
+    data: UpdateConversationDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a single conversation by ID
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteConversation
+   * @summary Delete conversation
+   * @request DELETE:/api/ai-assistant/conversations/{id}
+   */
+  aiAssistantControllerDeleteConversation = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all messages for a specific conversation
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetMessages
+   * @summary Get all messages in a conversation
+   * @request GET:/api/ai-assistant/messages/{conversationId}
+   */
+  aiAssistantControllerGetMessages = (
+    conversationId: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/messages/${conversationId}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Creates a new message in a conversation. Supports streaming response.
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerCreateMessage
+   * @summary Create a new message
+   * @request POST:/api/ai-assistant/messages
+   */
+  aiAssistantControllerCreateMessage = (
+    data: CreateMessageDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/messages`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates a message question and regenerates the answer. Supports streaming response.
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerUpdateMessage
+   * @summary Update a message
+   * @request PATCH:/api/ai-assistant/messages/{id}
+   */
+  aiAssistantControllerUpdateMessage = (
+    id: string,
+    data: UpdateMessageDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/messages/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a single message by ID
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteMessage
+   * @summary Delete a message
+   * @request DELETE:/api/ai-assistant/messages/{id}
+   */
+  aiAssistantControllerDeleteMessage = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/messages/${id}`,
+      method: "DELETE",
       format: "json",
       ...params,
     });

@@ -1,12 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsString } from 'class-validator';
 
+/**
+ * DTO for generating tags
+ */
 export class GenerateTagsDto {
   @ApiProperty({
-    description: 'Domain name to generate tags for',
+    description: 'Domain to generate tags for',
     example: 'example.com',
   })
   @IsString()
-  @IsNotEmpty()
   domain: string;
 }

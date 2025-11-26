@@ -15,6 +15,7 @@ tasks:
     env:
       NODE_ENV: 'production'
   install: npm install
+  proto: npm run proto:generate
   clean:
     cmds:
       - rm -rf ./husky

@@ -134,6 +134,7 @@ message CreateMessageRequest {
 
 message CreateMessageResponse {
   Message message = 1;
+  Conversation conversation = 2;
 }
 
 message UpdateMessageRequest {
@@ -158,8 +159,8 @@ message DeleteMessageResponse {
 // MCP Server
 // ----------------
 service MCPServerService {
-  rpc AddMCPServers(AddMCPServersRequest) returns (AddMCPServersResponse);
   rpc GetMCPServers(GetMCPServersRequest) returns (GetMCPServersResponse);
+  rpc AddMCPServers(AddMCPServersRequest) returns (AddMCPServersResponse);
   rpc UpdateMCPServers(UpdateMCPServersRequest) returns (UpdateMCPServersResponse);
   rpc DeleteMCPServers(DeleteMCPServersRequest) returns (DeleteMCPServersResponse);
 }
@@ -172,39 +173,44 @@ message MCPServer {
   }
 }
 
-// Add one or more servers
-message AddMCPServersRequest {
-  google.protobuf.Struct mcp_config = 1;  // Claude Desktop format: {"mcpServers": {"name": {...}}}
-}
-
-message AddMCPServersResponse {
-  repeated MCPServer servers = 1;
-  bool success = 2;
-}
-
 // Get all servers for workspace/user
 message GetMCPServersRequest {
 }
 
 message GetMCPServersResponse {
-  repeated MCPServer servers = 1; 
+  repeated MCPServer servers = 1;
+  string mcp_config_json = 2;  // JSON string of config with status embedded in each server
 }
 
-// Update one or more servers (full replace)
+// Add servers - fails if exists
+message AddMCPServersRequest {
+  google.protobuf.Struct mcp_config = 1;
+}
+
+message AddMCPServersResponse {
+  repeated MCPServer servers = 1;
+  bool success = 2;
+  string error = 3;
+  string mcp_config_json = 4;  // JSON string of config with metadata and status
+}
+
+// Update/Upsert servers - creates if not exists, updates if exists
 message UpdateMCPServersRequest {
-  google.protobuf.Struct mcp_config = 1;  
+  google.protobuf.Struct mcp_config = 1;  // Claude Desktop format: {"mcpServers": {"name": {...}}}
 }
 
 message UpdateMCPServersResponse {
   repeated MCPServer servers = 1;
   bool success = 2;
+  string mcp_config_json = 3;  // JSON string of config with metadata and status
 }
 
-// Delete one or more servers by name
+// Delete MCP servers by config ID
 message DeleteMCPServersRequest {
-  repeated string server_names = 1;  // List of server names to delete
+  string id = 1;  // MCP Config ID (UUID)
 }
 
 message DeleteMCPServersResponse {
   bool success = 1;
+  string message = 2;
 }
