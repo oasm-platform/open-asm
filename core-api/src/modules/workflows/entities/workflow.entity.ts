@@ -1,9 +1,11 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { CronSchedule } from '@/common/enums/enum';
 import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsOptional } from 'class-validator';
 import {
   Column,
   Entity,
@@ -17,7 +19,11 @@ import {
 
 export class On {
   @ApiProperty()
-  target: string[];
+  target?: string[];
+  @ApiProperty({ enum: CronSchedule })
+  @IsEnum(CronSchedule)
+  @IsOptional()
+  schedule?: CronSchedule;
 }
 
 export class WorkflowJob {
@@ -45,6 +51,7 @@ export class Workflow extends BaseEntity {
   @Column()
   name: string;
 
+  @ApiProperty({ type: () => WorkflowContent })
   @Column({ type: 'jsonb' })
   content: WorkflowContent;
 
