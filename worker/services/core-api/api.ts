@@ -960,6 +960,50 @@ export interface GetManyStringDto {
   pageCount: number;
 }
 
+export interface Workflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface CreateWorkflowDto {
+  /**
+   * Name of the workflow
+   * @example "Vulnerability Scan Workflow"
+   */
+  name: string;
+  /**
+   * Content of the workflow in JSON format
+   * @example {"on":{"schedule":"0 0 * * *"},"jobs":{"nessus":[]},"name":"Vulnerability Scan Workflow"}
+   */
+  content: object;
+  /**
+   * File path for the workflow
+   * @example "workflows/vulnerability-scan.yaml"
+   */
+  filePath?: string;
+}
+
+export interface UpdateWorkflowDto {
+  /**
+   * Name of the workflow
+   * @example "Vulnerability Scan Workflow"
+   */
+  name?: string;
+  /**
+   * Content of the workflow in JSON format
+   * @example {"on":{"schedule":"0 0 * * *"},"jobs":{"nessus":[]},"name":"Vulnerability Scan Workflow"}
+   */
+  content?: object;
+  /**
+   * File path for the workflow
+   * @example "workflows/vulnerability-scan.yaml"
+   */
+  filePath?: string;
+}
+
 export interface ToolProvider {
   id: string;
   /** @format date-time */
@@ -1120,11 +1164,6 @@ export interface CreateAssetGroupDto {
    * @example "Web Servers"
    */
   name: string;
-  /**
-   * ID of the workspace the asset group belongs to
-   * @example "123e4567-e89b-12d3-a456-426614174000"
-   */
-  workspaceId: string;
 }
 
 export interface AddManyWorkflowsToAssetGroupDto {
@@ -1166,14 +1205,6 @@ export interface GetManyAssetDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-}
-
-export interface Workflow {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
 }
 
 export interface GetManyWorkflowDto {
@@ -2841,6 +2872,87 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows/templates`,
       method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Creates a new workflow with the provided data.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerCreateWorkflow
+   * @summary Create workflow
+   * @request POST:/api/workflows
+   */
+  workflowsControllerCreateWorkflow = (
+    data: CreateWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a specific workflow by its ID within the specified workspace.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerGetWorkspaceWorkflow
+   * @summary Get workflow by ID
+   * @request GET:/api/workflows/{id}
+   */
+  workflowsControllerGetWorkspaceWorkflow = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates an existing workflow with the provided data.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerUpdateWorkflow
+   * @summary Update workflow
+   * @request PATCH:/api/workflows/{id}
+   */
+  workflowsControllerUpdateWorkflow = (
+    id: string,
+    data: UpdateWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a workflow by its ID.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerDeleteWorkflow
+   * @summary Delete workflow
+   * @request DELETE:/api/workflows/{id}
+   */
+  workflowsControllerDeleteWorkflow = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "DELETE",
       format: "json",
       ...params,
     });
