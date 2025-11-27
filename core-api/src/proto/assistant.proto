@@ -138,8 +138,9 @@ message CreateMessageResponse {
 }
 
 message UpdateMessageRequest {
-  string message_id = 1;
-  string question = 2;
+  string conversation_id = 1;
+  string message_id = 2;
+  string question = 3;
 }
 
 message UpdateMessageResponse {
@@ -147,7 +148,8 @@ message UpdateMessageResponse {
 }
 
 message DeleteMessageRequest {
-  string message = 1;
+  string conversation_id = 1;
+  string message_id = 2;
 }
 
 message DeleteMessageResponse {

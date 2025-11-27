@@ -3,10 +3,11 @@ import {
   Controller,
   Delete,
   Get,
-  Logger,
   Patch,
   Post,
   UseGuards,
+  Sse,
+  Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AiAssistantService } from './ai-assistant.service';
@@ -33,12 +34,19 @@ import {
   DeleteConversationResponseDto,
   DeleteConversationsResponseDto,
 } from './dto/conversation.dto';
+import {
+  GetMessagesResponseDto,
+  CreateMessageDto,
+  UpdateMessageDto,
+  DeleteMessageDto,
+  DeleteMessageResponseDto,
+} from './dto/message.dto';
+import { map, Observable } from 'rxjs';
 
 @ApiTags('AI Assistant')
 @Controller('ai-assistant')
+@UseGuards(AssistantGuard)
 export class AiAssistantController {
-  private readonly logger = new Logger(AiAssistantController.name);
-
   constructor(private readonly aiAssistantService: AiAssistantService) {}
 
   @Doc({
@@ -53,7 +61,6 @@ export class AiAssistantController {
     },
   })
   @Post('generate-tags')
-  @UseGuards(AssistantGuard)
   async generateTags(
     @Body() generateTagsDto: GenerateTagsDto,
     @UserId() userId: string,
@@ -78,7 +85,6 @@ export class AiAssistantController {
     },
   })
   @Get('mcp-servers')
-  @UseGuards(AssistantGuard)
   async getMcpServers(
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
@@ -97,7 +103,6 @@ export class AiAssistantController {
     },
   })
   @Post('mcp-servers')
-  @UseGuards(AssistantGuard)
   async addMcpServers(
     @Body() addMcpServersDto: AddMcpServersDto,
     @UserId() userId: string,
@@ -121,7 +126,6 @@ export class AiAssistantController {
     },
   })
   @Patch('mcp-servers')
-  @UseGuards(AssistantGuard)
   async updateMcpServers(
     @Body() updateMcpServersDto: UpdateMcpServersDto,
     @UserId() userId: string,
@@ -145,7 +149,6 @@ export class AiAssistantController {
     },
   })
   @Delete('mcp-servers')
-  @UseGuards(AssistantGuard)
   async deleteMcpServers(
     @Body() deleteMcpServersDto: DeleteMcpServersDto,
     @UserId() userId: string,
@@ -170,7 +173,6 @@ export class AiAssistantController {
     },
   })
   @Get('conversations')
-  @UseGuards(AssistantGuard)
   async getConversations(
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
@@ -189,7 +191,6 @@ export class AiAssistantController {
     },
   })
   @Patch('conversations')
-  @UseGuards(AssistantGuard)
   async updateConversation(
     @Body() updateConversationDto: UpdateConversationDto,
     @UserId() userId: string,
@@ -213,7 +214,6 @@ export class AiAssistantController {
     },
   })
   @Delete('conversations/:id')
-  @UseGuards(AssistantGuard)
   async deleteConversation(
     @Body() deleteConversationDto: DeleteConversationDto,
     @UserId() userId: string,
@@ -237,11 +237,102 @@ export class AiAssistantController {
     },
   })
   @Delete('conversations')
-  @UseGuards(AssistantGuard)
   async deleteConversations(
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Promise<DeleteConversationsResponseDto> {
     return this.aiAssistantService.deleteConversations(workspaceId, userId);
+  }
+
+  @Doc({
+    summary: 'Get messages in a conversation',
+    description: 'Retrieves all messages in a specific conversation',
+    response: {
+      serialization: GetMessagesResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('messages')
+  async getMessages(
+    @Query('conversationId') conversationId: string,
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetMessagesResponseDto> {
+    return this.aiAssistantService.getMessages(
+      conversationId,
+      workspaceId,
+      userId,
+    );
+  }
+
+  @Doc({
+    summary: 'Create a message with streaming response',
+    description:
+      'Creates a new message and streams the AI response using Server-Sent Events (SSE)',
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Sse('messages/stream')
+  createMessageStream(
+    @Body() createMessageDto: CreateMessageDto,
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Observable<{ data: string }> {
+    return this.aiAssistantService
+      .createMessage(createMessageDto, workspaceId, userId)
+      .pipe(
+        map((data) => ({
+          data: JSON.stringify(data),
+        })),
+      );
+  }
+
+  @Doc({
+    summary: 'Update a message with streaming response',
+    description:
+      'Updates a message and streams the regenerated AI response using Server-Sent Events (SSE)',
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Sse('messages/update-stream')
+  updateMessageStream(
+    @Body() updateMessageDto: UpdateMessageDto,
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Observable<{ data: string }> {
+    return this.aiAssistantService
+      .updateMessage(updateMessageDto, workspaceId, userId)
+      .pipe(
+        map((data) => ({
+          data: JSON.stringify(data),
+        })),
+      );
+  }
+
+  @Doc({
+    summary: 'Delete a message',
+    description: 'Deletes a specific message by ID',
+    response: {
+      serialization: DeleteMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete('messages')
+  async deleteMessage(
+    @Body() deleteMessageDto: DeleteMessageDto,
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DeleteMessageResponseDto> {
+    return this.aiAssistantService.deleteMessage(
+      deleteMessageDto,
+      workspaceId,
+      userId,
+    );
   }
 }

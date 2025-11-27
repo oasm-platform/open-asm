@@ -5,10 +5,8 @@
 
 import type { Observable } from 'rxjs';
 import type {
-  // Domain Classify
   DomainClassifyRequest,
   DomainClassifyResponse,
-  // MCP Server
   GetMCPServersRequest,
   GetMCPServersResponse,
   AddMCPServersRequest,
@@ -17,7 +15,6 @@ import type {
   UpdateMCPServersResponse,
   DeleteMCPServersRequest,
   DeleteMCPServersResponse,
-  // Conversation
   GetConversationsRequest,
   GetConversationsResponse,
   UpdateConversationRequest,
@@ -26,7 +23,6 @@ import type {
   DeleteConversationResponse,
   DeleteConversationsRequest,
   DeleteConversationsResponse,
-  // Message
   GetMessagesRequest,
   GetMessagesResponse,
   CreateMessageRequest,
@@ -112,40 +108,3 @@ export interface MessageService {
     metadata?: unknown,
   ): Observable<DeleteMessageResponse>;
 }
-
-// Re-export all types
-export type {
-  // Domain Classify
-  DomainClassifyRequest,
-  DomainClassifyResponse,
-  // MCP Server
-  GetMCPServersRequest,
-  GetMCPServersResponse,
-  AddMCPServersRequest,
-  AddMCPServersResponse,
-  UpdateMCPServersRequest,
-  UpdateMCPServersResponse,
-  DeleteMCPServersRequest,
-  DeleteMCPServersResponse,
-  // Conversation
-  GetConversationsRequest,
-  GetConversationsResponse,
-  UpdateConversationRequest,
-  UpdateConversationResponse,
-  DeleteConversationRequest,
-  DeleteConversationResponse,
-  DeleteConversationsRequest,
-  DeleteConversationsResponse,
-  // Message
-  GetMessagesRequest,
-  GetMessagesResponse,
-  CreateMessageRequest,
-  CreateMessageResponse,
-  UpdateMessageRequest,
-  UpdateMessageResponse,
-  DeleteMessageRequest,
-  DeleteMessageResponse,
-};
-
-// Re-export other commonly used types
-export type { MCPServer, Conversation, Message } from '@/types/assistant';

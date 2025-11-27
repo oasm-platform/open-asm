@@ -28,6 +28,10 @@ import {
   DeleteConversationResponseDto,
   DeleteConversationsResponseDto,
 } from './dto/conversation.dto';
+import {
+  GetMessagesResponseDto,
+  DeleteMessageResponseDto,
+} from './dto/message.dto';
 
 @Injectable()
 export class AiAssistantService implements OnModuleInit {
@@ -367,6 +371,103 @@ export class AiAssistantService implements OnModuleInit {
       };
     } catch (error: unknown) {
       this.logger.error('Failed to delete all conversations', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all messages in a conversation
+   */
+  async getMessages(
+    conversationId: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<GetMessagesResponseDto> {
+    try {
+      const metadata = this.createMetadata(workspaceId, userId);
+      const response = await firstValueFrom(
+        this.messageService.getMessages({ conversationId }, metadata),
+      );
+      return {
+        messages: response.messages || [],
+      };
+    } catch (error: unknown) {
+      this.logger.error('Failed to get messages', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a message (returns Observable for SSE streaming)
+   */
+  createMessage(
+    createMessageDto: {
+      question: string;
+      conversationId?: string;
+      isCreateConversation?: boolean;
+    },
+    workspaceId: string,
+    userId: string,
+  ) {
+    const metadata = this.createMetadata(workspaceId, userId);
+    return this.messageService.createMessage(
+      {
+        question: createMessageDto.question,
+        conversationId: createMessageDto.conversationId || '',
+        isCreateConversation: createMessageDto.isCreateConversation || false,
+      },
+      metadata,
+    );
+  }
+
+  /**
+   * Update a message (returns Observable for SSE streaming)
+   */
+  updateMessage(
+    updateMessageDto: {
+      conversationId: string;
+      messageId: string;
+      question: string;
+    },
+    workspaceId: string,
+    userId: string,
+  ) {
+    const metadata = this.createMetadata(workspaceId, userId);
+    return this.messageService.updateMessage(
+      {
+        conversationId: updateMessageDto.conversationId,
+        messageId: updateMessageDto.messageId,
+        question: updateMessageDto.question,
+      },
+      metadata,
+    );
+  }
+
+  /**
+   * Delete a message
+   */
+  async deleteMessage(
+    deleteMessageDto: { conversationId: string; messageId: string },
+    workspaceId: string,
+    userId: string,
+  ): Promise<DeleteMessageResponseDto> {
+    try {
+      const metadata = this.createMetadata(workspaceId, userId);
+      const response = await firstValueFrom(
+        this.messageService.deleteMessage(
+          {
+            conversationId: deleteMessageDto.conversationId,
+            messageId: deleteMessageDto.messageId,
+          },
+          metadata,
+        ),
+      );
+      return {
+        success: response.success || false,
+        message: response.message || '',
+      };
+    } catch (error: unknown) {
+      this.logger.error('Failed to delete message', error);
       throw error;
     }
   }

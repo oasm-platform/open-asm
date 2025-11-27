@@ -114,6 +114,7 @@ export interface CreateMessageResponse {
 }
 
 export interface UpdateMessageRequest {
+  conversationId: string;
   messageId: string;
   question: string;
 }
@@ -123,7 +124,8 @@ export interface UpdateMessageResponse {
 }
 
 export interface DeleteMessageRequest {
-  message: string;
+  conversationId: string;
+  messageId: string;
 }
 
 export interface DeleteMessageResponse {
@@ -1088,16 +1090,19 @@ export const CreateMessageResponse: MessageFns<CreateMessageResponse> = {
 };
 
 function createBaseUpdateMessageRequest(): UpdateMessageRequest {
-  return { messageId: "", question: "" };
+  return { conversationId: "", messageId: "", question: "" };
 }
 
 export const UpdateMessageRequest: MessageFns<UpdateMessageRequest> = {
   encode(message: UpdateMessageRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.conversationId !== "") {
+      writer.uint32(10).string(message.conversationId);
+    }
     if (message.messageId !== "") {
-      writer.uint32(10).string(message.messageId);
+      writer.uint32(18).string(message.messageId);
     }
     if (message.question !== "") {
-      writer.uint32(18).string(message.question);
+      writer.uint32(26).string(message.question);
     }
     return writer;
   },
@@ -1114,11 +1119,19 @@ export const UpdateMessageRequest: MessageFns<UpdateMessageRequest> = {
             break;
           }
 
-          message.messageId = reader.string();
+          message.conversationId = reader.string();
           continue;
         }
         case 2: {
           if (tag !== 18) {
+            break;
+          }
+
+          message.messageId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
             break;
           }
 
@@ -1173,13 +1186,16 @@ export const UpdateMessageResponse: MessageFns<UpdateMessageResponse> = {
 };
 
 function createBaseDeleteMessageRequest(): DeleteMessageRequest {
-  return { message: "" };
+  return { conversationId: "", messageId: "" };
 }
 
 export const DeleteMessageRequest: MessageFns<DeleteMessageRequest> = {
   encode(message: DeleteMessageRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.message !== "") {
-      writer.uint32(10).string(message.message);
+    if (message.conversationId !== "") {
+      writer.uint32(10).string(message.conversationId);
+    }
+    if (message.messageId !== "") {
+      writer.uint32(18).string(message.messageId);
     }
     return writer;
   },
@@ -1196,7 +1212,15 @@ export const DeleteMessageRequest: MessageFns<DeleteMessageRequest> = {
             break;
           }
 
-          message.message = reader.string();
+          message.conversationId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.messageId = reader.string();
           continue;
         }
       }
