@@ -34,7 +34,7 @@ export class AssetGroupService {
     public readonly assetRepo: Repository<Asset>,
     @InjectRepository(Workflow)
     public readonly workflowRepo: Repository<Workflow>,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all asset groups with optional filtering and pagination
@@ -511,8 +511,6 @@ export class AssetGroupService {
         .orderBy(`asset.${sortBy}`, sortOrder)
         .skip(offset)
         .take(limit)
-        .leftJoinAndSelect('asset.assetGroupAssets', 'assetGroupAssets')
-        .leftJoinAndSelect('asset.target', 'target')
         .getManyAndCount();
 
       return getManyResponse({ query, data, total });
@@ -628,7 +626,6 @@ export class AssetGroupService {
         .orderBy(`asset.${sortBy}`, sortOrder)
         .skip(offset)
         .take(limit)
-        .leftJoinAndSelect('asset.target', 'target')
         .getManyAndCount();
 
       return getManyResponse({ query, data, total });
