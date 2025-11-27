@@ -1,7 +1,9 @@
+import { ScanScheduleSelect } from '@/components/scan-schedule-select';
 import { Image } from '@/components/ui/image';
 import {
     OnSchedule,
     ToolCategory,
+    UpdateTargetDtoScanSchedule,
     useAssetGroupControllerAddManyWorkflows,
     useAssetGroupControllerGetWorkflowsByAssetGroupsId,
     useAssetGroupControllerRemoveManyWorkflows,
@@ -31,8 +33,6 @@ export default function AssetGroupWorkflow({
     const addWorkflowsMutation = useAssetGroupControllerAddManyWorkflows();
     const removeWorkflowsMutation = useAssetGroupControllerRemoveManyWorkflows();
 
-    console.log(groupWorkflows);
-
 
     // Filter tools with category "vulnerabilities"
     const vulnerabilityTools = workspaceToolsInstalled?.data?.filter(
@@ -43,7 +43,7 @@ export default function AssetGroupWorkflow({
     const isToolInGroup = (toolName: string) => {
         // Get all jobs from all workflows in the group
         const allJobs = groupWorkflows?.data?.flatMap(
-            workflow => workflow.content?.jobs || []
+            groupWorkflow => groupWorkflow.workflow.content?.jobs || []
         ) || [];
 
         // Extract all run values from jobs
@@ -55,8 +55,8 @@ export default function AssetGroupWorkflow({
 
     // Get the workflow that contains a specific tool
     const getWorkflowContainingTool = (toolName: string) => {
-        return groupWorkflows?.data?.find(workflow => {
-            const jobs = workflow.content?.jobs || [];
+        return groupWorkflows?.data?.find(groupWorkflow => {
+            const jobs = groupWorkflow.workflow.content?.jobs || [];
             const toolsName = jobs.map((job: { run: string }) => job.run) || [];
             return toolsName.includes(toolName);
         });
@@ -75,7 +75,7 @@ export default function AssetGroupWorkflow({
 
         if (isInGroup) {
             // If tool is in group, find the workflow containing it and remove the tool
-            const workflow = getWorkflowContainingTool(tool.name);
+            const workflow = getWorkflowContainingTool(tool.name)?.workflow;
 
             if (!workflow) {
                 toast.error('Workflow not found');
@@ -131,7 +131,7 @@ export default function AssetGroupWorkflow({
             }
         } else {
             // If tool is not in group, check if group already has a workflow
-            const existingWorkflow = getCurrentWorkflow();
+            const existingWorkflow = getCurrentWorkflow()?.workflow;
 
             try {
                 setIsProcessing(true);
@@ -207,20 +207,13 @@ export default function AssetGroupWorkflow({
     };
 
     return (
-        <div className='mb-4'>
+        <div className='space-y-4 mb-4'>
             <h2 className="text-xl font-semibold">Tools</h2>
-            <div style={{
-                display: 'flex',
-                gap: '16px',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                marginTop: '16px'
-            }}>
-                {vulnerabilityTools.length > 0 ? (
-                    vulnerabilityTools.map((tool) => {
+            <div className='flex justify-between items-center' >
+                <div className='flex gap-4'>
+                    {vulnerabilityTools.map((tool) => {
                         const isAdded = isToolInGroup(tool.name);
                         const isHovered = hoveredToolId === tool.id;
-
                         return (
                             <div
                                 key={tool.id}
@@ -293,11 +286,16 @@ export default function AssetGroupWorkflow({
                                 )}
                             </div>
                         );
-                    })
-                ) : (
-                    <p>No vulnerability scanning tools installed</p>
-                )}
+                    })}
+                </div>
+                <ScanScheduleSelect
+                    value={groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule}
+                    onChange={(value: UpdateTargetDtoScanSchedule) => {
+                        console.log(value);
+                    }}
+                />
             </div>
+
         </div>
     );
 }

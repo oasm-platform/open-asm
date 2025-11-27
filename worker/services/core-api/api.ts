@@ -1169,33 +1169,17 @@ export interface RunTemplateDto {
   assetId: string;
 }
 
-export interface AssetGroupResponseDto {
-  /**
-   * ID of the asset group
-   * @example "123e4567-e89b-12d3-a456-426614174000"
-   */
+export interface AssetGroup {
   id: string;
-  /**
-   * Name of the asset group
-   * @example "Web Servers"
-   */
-  name: string;
-  /**
-   * Date when the asset group was created
-   * @format date-time
-   * @example "2023-01-01T00:00.000Z"
-   */
+  /** @format date-time */
   createdAt: string;
-  /**
-   * Date when the asset group was last updated
-   * @format date-time
-   * @example "2023-01-01T00:00:00.000Z"
-   */
+  /** @format date-time */
   updatedAt: string;
+  name: string;
 }
 
-export interface GetManyAssetGroupResponseDtoDto {
-  data: AssetGroupResponseDto[];
+export interface GetManyAssetGroupDto {
+  data: AssetGroup[];
   total: number;
   page: number;
   limit: number;
@@ -1245,6 +1229,27 @@ export interface RemoveManyAssetsFromAssetGroupDto {
 
 export interface GetManyAssetDto {
   data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface AssetGroupWorkflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  assetGroup: AssetGroup;
+  workflow: Workflow;
+  schedule: AssetGroupWorkflowScheduleEnum;
+  job: Job;
+}
+
+export interface GetManyAssetGroupWorkflowDto {
+  data: AssetGroupWorkflow[];
   total: number;
   page: number;
   limit: number;
@@ -1351,6 +1356,14 @@ export enum CreateToolDtoCategoryEnum {
 }
 
 export enum OnScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum AssetGroupWorkflowScheduleEnum {
   Value00 = "0 0 * * *",
   Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",

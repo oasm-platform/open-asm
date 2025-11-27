@@ -1092,19 +1092,15 @@ export type RunTemplateDto = {
   assetId: string;
 };
 
-export type AssetGroupResponseDto = {
-  /** ID of the asset group */
+export type AssetGroup = {
   id: string;
-  /** Name of the asset group */
-  name: string;
-  /** Date when the asset group was created */
   createdAt: string;
-  /** Date when the asset group was last updated */
   updatedAt: string;
+  name: string;
 };
 
-export type GetManyAssetGroupResponseDtoDto = {
-  data: AssetGroupResponseDto[];
+export type GetManyAssetGroupDto = {
+  data: AssetGroup[];
   total: number;
   page: number;
   limit: number;
@@ -1139,6 +1135,37 @@ export type RemoveManyAssetsFromAssetGroupDto = {
 
 export type GetManyAssetDto = {
   data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type AssetGroupWorkflowSchedule =
+  (typeof AssetGroupWorkflowSchedule)[keyof typeof AssetGroupWorkflowSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const AssetGroupWorkflowSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type AssetGroupWorkflow = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  assetGroup: AssetGroup;
+  workflow: Workflow;
+  schedule: AssetGroupWorkflowSchedule;
+  job: Job;
+};
+
+export type GetManyAssetGroupWorkflowDto = {
+  data: AssetGroupWorkflow[];
   total: number;
   page: number;
   limit: number;
@@ -19470,7 +19497,7 @@ export const assetGroupControllerGetAll = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyAssetGroupResponseDtoDto>(
+  return orvalClient<GetManyAssetGroupDto>(
     { url: `/api/asset-group`, method: 'GET', params, signal },
     options,
   );
@@ -19798,7 +19825,7 @@ export const assetGroupControllerCreate = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AssetGroupResponseDto>(
+  return orvalClient<AssetGroup>(
     {
       url: `/api/asset-group`,
       method: 'POST',
@@ -19891,7 +19918,7 @@ export const assetGroupControllerGetById = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AssetGroupResponseDto>(
+  return orvalClient<AssetGroup>(
     { url: `/api/asset-group/${id}`, method: 'GET', signal },
     options,
   );
@@ -21135,7 +21162,7 @@ export const assetGroupControllerGetWorkflowsByAssetGroupsId = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyWorkflowDto>(
+  return orvalClient<GetManyAssetGroupWorkflowDto>(
     {
       url: `/api/asset-group/${assetGroupId}/workflows`,
       method: 'GET',

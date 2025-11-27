@@ -12,7 +12,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
-import { AssetGroupResponseDto } from './dto/asset-group-response.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
@@ -85,10 +84,10 @@ export class AssetGroupService {
   /**
    * Fetches a specific asset group by its unique identifier
    */
-  async getById(
+  async getAssetGroupById(
     id: string,
     workspaceId: string,
-  ): Promise<AssetGroupResponseDto> {
+  ): Promise<AssetGroup> {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id, workspace: { id: workspaceId } },
@@ -106,7 +105,7 @@ export class AssetGroupService {
         );
       }
 
-      const response = new AssetGroupResponseDto();
+      const response = new AssetGroup();
       response.id = assetGroup.id;
       response.name = assetGroup.name;
       response.createdAt = assetGroup.createdAt;
@@ -546,16 +545,12 @@ export class AssetGroupService {
         );
       }
 
-      const queryBuilder = this.workflowRepo
-        .createQueryBuilder('workflow')
-        .innerJoin(
-          'asset_group_workflows',
-          'agt',
-          'agt.workflowId = workflow.id',
-        )
-        .innerJoin('asset_groups', 'ag', 'ag.id = agt.assetGroupId')
+      const queryBuilder = this.assetGroupWorkflowRepo
+        .createQueryBuilder('assetGroupWorkflow')
+        .innerJoinAndSelect('assetGroupWorkflow.workflow', 'workflow')
+        .innerJoin('assetGroupWorkflow.assetGroup', 'ag')
         .where(
-          'agt.assetGroupId = :assetGroupId AND ag.workspaceId = :workspaceId',
+          'assetGroupWorkflow.assetGroupId = :assetGroupId AND ag.workspaceId = :workspaceId',
           {
             assetGroupId,
             workspaceId,
@@ -566,10 +561,6 @@ export class AssetGroupService {
         .orderBy(`workflow.${sortBy}`, sortOrder)
         .skip(offset)
         .take(limit)
-        .leftJoinAndSelect(
-          'workflow.assetGroupWorkflows',
-          'assetGroupWorkflows',
-        )
         .getManyAndCount();
 
       return getManyResponse({ query, data, total });
