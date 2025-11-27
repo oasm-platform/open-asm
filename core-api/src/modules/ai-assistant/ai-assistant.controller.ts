@@ -16,17 +16,23 @@ import { Doc } from '@/common/doc/doc.decorator';
 import {
   AddMcpServersDto,
   AddMcpServersResponseDto,
-} from './dto/add-mcp-servers.dto';
-import { GenerateTagsResponseDto } from './dto/generate-tags-response.dto';
-import { GenerateTagsDto } from './dto/generate-tags.dto';
-import {
   UpdateMcpServersDto,
   UpdateMcpServersResponseDto,
-} from './dto/update-mcp-servers.dto';
-import {
   DeleteMcpServersDto,
   DeleteMcpServersResponseDto,
-} from './dto/delete-mcp-servers.dto';
+} from './dto/mcp-servers.dto';
+import {
+  GenerateTagsDto,
+  GenerateTagsResponseDto,
+} from './dto/generate-tags.dto';
+import {
+  GetConversationsResponseDto,
+  UpdateConversationDto,
+  UpdateConversationResponseDto,
+  DeleteConversationDto,
+  DeleteConversationResponseDto,
+  DeleteConversationsResponseDto,
+} from './dto/conversation.dto';
 
 @ApiTags('AI Assistant')
 @Controller('ai-assistant')
@@ -150,5 +156,92 @@ export class AiAssistantController {
       workspaceId,
       userId,
     );
+  }
+
+  @Doc({
+    summary: 'Get all conversations',
+    description:
+      'Retrieves all conversations for the current workspace and user',
+    response: {
+      serialization: GetConversationsResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('conversations')
+  @UseGuards(AssistantGuard)
+  async getConversations(
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetConversationsResponseDto> {
+    return this.aiAssistantService.getConversations(workspaceId, userId);
+  }
+
+  @Doc({
+    summary: 'Update a conversation',
+    description: 'Updates the title and/or description of a conversation',
+    response: {
+      serialization: UpdateConversationResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Patch('conversations')
+  @UseGuards(AssistantGuard)
+  async updateConversation(
+    @Body() updateConversationDto: UpdateConversationDto,
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<UpdateConversationResponseDto> {
+    return this.aiAssistantService.updateConversation(
+      updateConversationDto,
+      workspaceId,
+      userId,
+    );
+  }
+
+  @Doc({
+    summary: 'Delete a conversation',
+    description: 'Deletes a specific conversation by ID',
+    response: {
+      serialization: DeleteConversationResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete('conversations/:id')
+  @UseGuards(AssistantGuard)
+  async deleteConversation(
+    @Body() deleteConversationDto: DeleteConversationDto,
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DeleteConversationResponseDto> {
+    return this.aiAssistantService.deleteConversation(
+      deleteConversationDto,
+      workspaceId,
+      userId,
+    );
+  }
+
+  @Doc({
+    summary: 'Delete all conversations',
+    description: 'Deletes all conversations for the current workspace and user',
+    response: {
+      serialization: DeleteConversationsResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete('conversations')
+  @UseGuards(AssistantGuard)
+  async deleteConversations(
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DeleteConversationsResponseDto> {
+    return this.aiAssistantService.deleteConversations(workspaceId, userId);
   }
 }

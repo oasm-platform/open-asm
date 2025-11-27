@@ -6,8 +6,13 @@ import {
   AddMcpServersDto,
   AddMcpServersResponseDto,
   McpServerConfig,
-} from './dto/add-mcp-servers.dto';
-import { McpServerConfigWithStatus } from './dto/get-mcp-servers.dto';
+  UpdateMcpServersDto,
+  UpdateMcpServersResponseDto,
+  DeleteMcpServersDto,
+  DeleteMcpServersResponseDto,
+  GetMcpServersResponseDto,
+  McpServerConfigWithStatus,
+} from './dto/mcp-servers.dto';
 import {
   DomainClassifyService,
   MCPServerService,
@@ -16,15 +21,13 @@ import {
 } from './ai-assistant.interface';
 import { Struct } from '@/types';
 import { GenerateTagsDto } from './dto/generate-tags.dto';
+
 import {
-  UpdateMcpServersDto,
-  UpdateMcpServersResponseDto,
-} from './dto/update-mcp-servers.dto';
-import {
-  DeleteMcpServersDto,
-  DeleteMcpServersResponseDto,
-} from './dto/delete-mcp-servers.dto';
-import { GetMcpServersResponseDto } from './dto/get-mcp-servers.dto';
+  GetConversationsResponseDto,
+  UpdateConversationResponseDto,
+  DeleteConversationResponseDto,
+  DeleteConversationsResponseDto,
+} from './dto/conversation.dto';
 
 @Injectable()
 export class AiAssistantService implements OnModuleInit {
@@ -168,10 +171,7 @@ export class AiAssistantService implements OnModuleInit {
       }
 
       return {
-        mcpServers: mcpServers as Record<
-          string,
-          McpServerConfigWithStatus
-        >,
+        mcpServers: mcpServers as Record<string, McpServerConfigWithStatus>,
         success: response.success || false,
         error: response.error,
       };
@@ -230,10 +230,7 @@ export class AiAssistantService implements OnModuleInit {
       }
 
       return {
-        mcpServers: mcpServers as Record<
-          string,
-          McpServerConfigWithStatus
-        >,
+        mcpServers: mcpServers as Record<string, McpServerConfigWithStatus>,
         success: response.success || false,
       };
     } catch (error: unknown) {
@@ -266,6 +263,110 @@ export class AiAssistantService implements OnModuleInit {
       };
     } catch (error: unknown) {
       this.logger.error('Failed to delete MCP config', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all conversations for the user
+   */
+  async getConversations(
+    workspaceId: string,
+    userId: string,
+  ): Promise<GetConversationsResponseDto> {
+    try {
+      const metadata = this.createMetadata(workspaceId, userId);
+      const response = await firstValueFrom(
+        this.conversationService.getConversations({}, metadata),
+      );
+      return {
+        conversations: response.conversations || [],
+      };
+    } catch (error: unknown) {
+      this.logger.error('Failed to get conversations', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update a conversation
+   */
+  async updateConversation(
+    updateConversationDto: {
+      conversationId: string;
+      title?: string;
+      description?: string;
+    },
+    workspaceId: string,
+    userId: string,
+  ): Promise<UpdateConversationResponseDto> {
+    try {
+      const metadata = this.createMetadata(workspaceId, userId);
+      const response = await firstValueFrom(
+        this.conversationService.updateConversation(
+          {
+            conversationId: updateConversationDto.conversationId,
+            title: updateConversationDto.title || '',
+            description: updateConversationDto.description || '',
+          },
+          metadata,
+        ),
+      );
+      return {
+        conversation: response.conversation!,
+      };
+    } catch (error: unknown) {
+      this.logger.error('Failed to update conversation', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a conversation
+   */
+  async deleteConversation(
+    deleteConversationDto: { conversationId: string },
+    workspaceId: string,
+    userId: string,
+  ): Promise<DeleteConversationResponseDto> {
+    try {
+      const metadata = this.createMetadata(workspaceId, userId);
+      const response = await firstValueFrom(
+        this.conversationService.deleteConversation(
+          {
+            conversationId: deleteConversationDto.conversationId,
+          },
+          metadata,
+        ),
+      );
+      return {
+        success: response.success || false,
+        message: response.message || '',
+      };
+    } catch (error: unknown) {
+      this.logger.error('Failed to delete conversation', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete all conversations for the user
+   */
+  async deleteConversations(
+    workspaceId: string,
+    userId: string,
+  ): Promise<DeleteConversationsResponseDto> {
+    try {
+      const metadata = this.createMetadata(workspaceId, userId);
+      const response = await firstValueFrom(
+        this.conversationService.deleteConversations({}, metadata),
+      );
+      return {
+        success: response.success || false,
+        message: response.message || '',
+      };
+    } catch (error: unknown) {
+      this.logger.error('Failed to delete all conversations', error);
       throw error;
     }
   }
