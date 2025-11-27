@@ -56,7 +56,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
     const {
         tableParams: { page, pageSize, sortBy, sortOrder },
         tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
-    } = useServerDataTable();
+    } = useServerDataTable({ isUpdateSearchQueryParam: false, defaultPageSize: 10 });
 
     const assetsNotInGroupQuery = useAssetGroupControllerGetAssetsNotInAssetGroup(
         assetGroupId,
