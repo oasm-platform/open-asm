@@ -1,5 +1,7 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { CronSchedule } from '@/common/enums/enum';
+import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
@@ -171,9 +173,6 @@ export class AssetGroupService {
     workflowIds: string[],
   ): Promise<DefaultMessageResponseDto> {
     try {
-      this.logger.log(
-        `Adding ${workflowIds.length} workflows to asset group with ID: ${groupId}`,
-      );
 
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id: groupId },
@@ -230,9 +229,6 @@ export class AssetGroupService {
 
       await this.assetGroupWorkflowRepo.save(newAssociations);
 
-      this.logger.log(
-        `Successfully added ${newAssociations.length} workflows to asset group with ID: ${groupId}`,
-      );
       return {
         message: `${newAssociations.length} workflows successfully added to asset group "${groupId}"`,
       };
@@ -309,9 +305,6 @@ export class AssetGroupService {
 
       await this.assetGroupAssetRepo.save(newAssociations);
 
-      this.logger.log(
-        `Successfully added ${newAssociations.length} assets to asset group with ID: ${groupId}`,
-      );
       return {
         message: `${newAssociations.length} assets successfully added to asset group "${groupId}"`,
       };
@@ -684,6 +677,57 @@ export class AssetGroupService {
     } catch (error) {
       this.logger.error(
         `Error retrieving workflows not in asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Updates an asset group workflow relationship (schedule, job, etc.)
+   */
+  async updateAssetGroupWorkflow(
+    assetGroupWorkflowId: string,
+    updateData: Partial<{
+      schedule?: CronSchedule;
+      jobId?: string;
+    }>,
+  ): Promise<AssetGroupWorkflow> {
+    try {
+      // Find the existing relationship by ID
+      const existingRelationship = await this.assetGroupWorkflowRepo.findOne({
+        where: { id: assetGroupWorkflowId },
+        relations: ['assetGroup', 'workflow', 'job'],
+      });
+
+      if (!existingRelationship) {
+        throw new NotFoundException(
+          `Asset group workflow relationship with ID "${assetGroupWorkflowId}" not found`,
+        );
+      }
+
+      // Update the relationship with provided data
+      if (updateData.schedule !== undefined) {
+        existingRelationship.schedule = updateData.schedule;
+      }
+
+      if (updateData.jobId !== undefined) {
+        // Update jobId by setting the foreign key directly
+        if (updateData.jobId) {
+          existingRelationship.job = { id: updateData.jobId } as Job;
+        } else {
+          // Set job to null to remove the relationship
+          existingRelationship.job = null;
+        }
+      }
+
+      // Save the updated relationship
+      const updatedRelationship = await this.assetGroupWorkflowRepo.save(existingRelationship);
+
+      return updatedRelationship;
+    } catch (error) {
+      this.logger.error(
+        `Error updating asset group workflow relationship with ID ${assetGroupWorkflowId}:`,
         error,
       );
       throw error;

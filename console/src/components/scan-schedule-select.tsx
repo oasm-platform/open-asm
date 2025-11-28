@@ -10,6 +10,7 @@ import { UpdateTargetDtoScanSchedule } from "@/services/apis/gen/queries";
 interface ScanScheduleSelectProps {
     value: UpdateTargetDtoScanSchedule;
     onChange: (value: UpdateTargetDtoScanSchedule) => void;
+    disabled?: boolean
 }
 
 const scheduleOptions = [{
@@ -29,9 +30,9 @@ const scheduleOptions = [{
     label: "Monthly"
 }];
 
-export const ScanScheduleSelect = ({ value, onChange }: ScanScheduleSelectProps) => {
+export const ScanScheduleSelect = ({ value, onChange, disabled }: ScanScheduleSelectProps) => {
     return (
-        <Select value={value} onValueChange={onChange}>
+        <Select disabled={disabled} value={value} onValueChange={onChange}>
             <SelectTrigger id="scan-frequency" className="w-[160px] h-9 text-sm">
                 <SelectValue placeholder="Select frequency" />
             </SelectTrigger>

@@ -1245,7 +1245,7 @@ export interface AssetGroupWorkflow {
   assetGroup: AssetGroup;
   workflow: Workflow;
   schedule: AssetGroupWorkflowScheduleEnum;
-  job: Job;
+  job: object;
 }
 
 export interface GetManyAssetGroupWorkflowDto {
@@ -1264,6 +1264,10 @@ export interface GetManyWorkflowDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+}
+
+export interface UpdateAssetGroupWorkflowDto {
+  schedule: UpdateAssetGroupWorkflowDtoScheduleEnum;
 }
 
 export interface McpTool {
@@ -1364,6 +1368,14 @@ export enum OnScheduleEnum {
 }
 
 export enum AssetGroupWorkflowScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
   Value00 = "0 0 * * *",
   Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
@@ -3601,6 +3613,28 @@ export class Api<
       path: `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates the relationship between an asset group and workflow, primarily to change the schedule.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerUpdateAssetGroupWorkflow
+   * @summary Update asset group workflow relationship
+   * @request PATCH:/api/asset-group/workflows/{id}
+   */
+  assetGroupControllerUpdateAssetGroupWorkflow = (
+    id: string,
+    data: UpdateAssetGroupWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/workflows/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });

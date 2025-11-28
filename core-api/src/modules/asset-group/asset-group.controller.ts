@@ -9,6 +9,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -22,8 +23,9 @@ import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { RemoveManyAssetsFromAssetGroupDto } from './dto/remove-many-assets-from-asset-group.dto';
 import { RemoveManyWorkflowsFromAssetGroupDto } from './dto/remove-many-workflows-from-asset-group.dto';
-import { AssetGroup } from './entities/asset-groups.entity';
+import { UpdateAssetGroupWorkflowDto } from './dto/update-asset-group-workflow.dto';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
+import { AssetGroup } from './entities/asset-groups.entity';
 
 @ApiTags('Asset Group')
 @Controller('asset-group')
@@ -260,6 +262,26 @@ export class AssetGroupController {
       assetGroupId,
       query,
       workspaceId,
+    );
+  }
+
+  @Doc({
+    summary: 'Update asset group workflow relationship',
+    description: 'Updates the relationship between an asset group and workflow, primarily to change the schedule.',
+    response: {
+      serialization: AssetGroupWorkflow,
+    },
+  })
+  @Patch('workflows/:id')
+  updateAssetGroupWorkflow(
+    @Param('id') assetGroupWorkflowId: string,
+    @Body() updateDto: UpdateAssetGroupWorkflowDto,
+  ) {
+    return this.assetGroupService.updateAssetGroupWorkflow(
+      assetGroupWorkflowId,
+      {
+        schedule: updateDto.schedule,
+      }
     );
   }
 }

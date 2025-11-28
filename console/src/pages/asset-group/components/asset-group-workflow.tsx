@@ -7,6 +7,7 @@ import {
     useAssetGroupControllerAddManyWorkflows,
     useAssetGroupControllerGetWorkflowsByAssetGroupsId,
     useAssetGroupControllerRemoveManyWorkflows,
+    useAssetGroupControllerUpdateAssetGroupWorkflow,
     useToolsControllerGetInstalledTools,
     useWorkflowsControllerCreateWorkflow,
     useWorkflowsControllerDeleteWorkflow,
@@ -25,8 +26,8 @@ export default function AssetGroupWorkflow({
     const { data: workspaceToolsInstalled } = useToolsControllerGetInstalledTools()
     const [hoveredToolId, setHoveredToolId] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
-
-    // Create/update/delete workflow mutations
+    const { mutate: updateAssetGroupWorkflowMutation, isPending: isPendingUpdateSchedule } = useAssetGroupControllerUpdateAssetGroupWorkflow()
+    // Create/update/delete workflow mutation
     const createWorkflowMutation = useWorkflowsControllerCreateWorkflow();
     const updateWorkflowMutation = useWorkflowsControllerUpdateWorkflow();
     const deleteWorkflowMutation = useWorkflowsControllerDeleteWorkflow();
@@ -289,9 +290,22 @@ export default function AssetGroupWorkflow({
                     })}
                 </div>
                 <ScanScheduleSelect
+                    disabled={isPendingUpdateSchedule}
                     value={groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule}
                     onChange={(value: UpdateTargetDtoScanSchedule) => {
                         console.log(value);
+                        updateAssetGroupWorkflowMutation({
+                            id: groupWorkflows?.data[0]?.id as string,
+                            data: {
+                                schedule: value
+                            }
+                        }, {
+                            onSuccess: async () => {
+                                await refetchWorkflows()
+                                toast.success('Update schedule successfuly')
+                            }
+                        })
+
                     }}
                 />
             </div>

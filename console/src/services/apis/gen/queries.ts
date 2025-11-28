@@ -1154,6 +1154,8 @@ export const AssetGroupWorkflowSchedule = {
   '0_0_1_*_*': '0 0 1 * *',
 } as const;
 
+export type AssetGroupWorkflowJob = { [key: string]: unknown };
+
 export type AssetGroupWorkflow = {
   id: string;
   createdAt: string;
@@ -1161,7 +1163,7 @@ export type AssetGroupWorkflow = {
   assetGroup: AssetGroup;
   workflow: Workflow;
   schedule: AssetGroupWorkflowSchedule;
-  job: Job;
+  job: AssetGroupWorkflowJob;
 };
 
 export type GetManyAssetGroupWorkflowDto = {
@@ -1180,6 +1182,22 @@ export type GetManyWorkflowDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type UpdateAssetGroupWorkflowDtoSchedule =
+  (typeof UpdateAssetGroupWorkflowDtoSchedule)[keyof typeof UpdateAssetGroupWorkflowDtoSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UpdateAssetGroupWorkflowDtoSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type UpdateAssetGroupWorkflowDto = {
+  schedule: UpdateAssetGroupWorkflowDtoSchedule;
 };
 
 export type McpTool = {
@@ -22497,6 +22515,105 @@ export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
 
   return query;
 }
+
+/**
+ * Updates the relationship between an asset group and workflow, primarily to change the schedule.
+ * @summary Update asset group workflow relationship
+ */
+export const assetGroupControllerUpdateAssetGroupWorkflow = (
+  id: string,
+  updateAssetGroupWorkflowDto: UpdateAssetGroupWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AssetGroupWorkflow>(
+    {
+      url: `/api/asset-group/workflows/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAssetGroupWorkflowDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+    TError,
+    { id: string; data: UpdateAssetGroupWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerUpdateAssetGroupWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+    { id: string; data: UpdateAssetGroupWorkflowDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetGroupControllerUpdateAssetGroupWorkflow(
+      id,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>
+  >;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationBody =
+  UpdateAssetGroupWorkflowDto;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationError = unknown;
+
+/**
+ * @summary Update asset group workflow relationship
+ */
+export const useAssetGroupControllerUpdateAssetGroupWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+      TError,
+      { id: string; data: UpdateAssetGroupWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * @summary Upload a file to storage

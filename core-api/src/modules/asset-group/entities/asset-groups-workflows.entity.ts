@@ -3,6 +3,7 @@ import { CronSchedule } from '@/common/enums/enum';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum } from 'class-validator';
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { AssetGroup } from './asset-groups.entity';
 
@@ -20,10 +21,11 @@ export class AssetGroupWorkflow extends BaseEntity {
 
   @ApiProperty({ enum: CronSchedule })
   @Column({ type: 'enum', enum: CronSchedule, default: CronSchedule.DAILY })
+  @IsEnum(CronSchedule)
   schedule: CronSchedule;
 
   @ApiProperty()
-  @OneToOne(() => Job)
-  @JoinColumn({ name: 'jobId' })
-  job: Job;
+  @OneToOne(() => Job, { nullable: true })
+  @JoinColumn({ name: 'jobId', referencedColumnName: 'id' })
+  job: Job | null;
 }
