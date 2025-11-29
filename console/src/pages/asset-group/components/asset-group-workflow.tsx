@@ -290,7 +290,7 @@ export default function AssetGroupWorkflow({
                     })}
                 </div>
                 <ScanScheduleSelect
-                    disabled={isPendingUpdateSchedule}
+                    disabled={isPendingUpdateSchedule || !groupWorkflows?.data[0]?.id}
                     value={groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule}
                     onChange={(value: UpdateTargetDtoScanSchedule) => {
                         console.log(value);

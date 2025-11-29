@@ -120,4 +120,5 @@ export enum ApiKeyType {
 
 export enum BullMQName {
   ASSETS_DISCOVERY_SCHEDULE = 'assets-discovery-schedule',
+  ASSET_GROUPS_SCHEDULE = 'asset-groups-schedule',
 }

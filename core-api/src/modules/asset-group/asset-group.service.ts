@@ -1,7 +1,6 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { CronSchedule } from '@/common/enums/enum';
-import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
@@ -35,7 +34,7 @@ export class AssetGroupService {
     public readonly assetRepo: Repository<Asset>,
     @InjectRepository(Workflow)
     public readonly workflowRepo: Repository<Workflow>,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all asset groups with optional filtering and pagination
@@ -173,7 +172,6 @@ export class AssetGroupService {
     workflowIds: string[],
   ): Promise<DefaultMessageResponseDto> {
     try {
-
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id: groupId },
       });
@@ -697,7 +695,7 @@ export class AssetGroupService {
       // Find the existing relationship by ID
       const existingRelationship = await this.assetGroupWorkflowRepo.findOne({
         where: { id: assetGroupWorkflowId },
-        relations: ['assetGroup', 'workflow', 'job'],
+        relations: ['assetGroup', 'workflow'],
       });
 
       if (!existingRelationship) {
@@ -711,18 +709,9 @@ export class AssetGroupService {
         existingRelationship.schedule = updateData.schedule;
       }
 
-      if (updateData.jobId !== undefined) {
-        // Update jobId by setting the foreign key directly
-        if (updateData.jobId) {
-          existingRelationship.job = { id: updateData.jobId } as Job;
-        } else {
-          // Set job to null to remove the relationship
-          existingRelationship.job = null;
-        }
-      }
-
       // Save the updated relationship
-      const updatedRelationship = await this.assetGroupWorkflowRepo.save(existingRelationship);
+      const updatedRelationship =
+        await this.assetGroupWorkflowRepo.save(existingRelationship);
 
       return updatedRelationship;
     } catch (error) {
