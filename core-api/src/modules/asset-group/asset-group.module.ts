@@ -1,3 +1,5 @@
+import { BullMQName } from '@/common/enums/enum';
+import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Job } from 'bullmq';
@@ -14,6 +16,9 @@ import { AssetGroup } from './entities/asset-groups.entity';
 @Global()
 @Module({
   imports: [
+    BullModule.registerQueue({
+      name: BullMQName.ASSET_GROUPS_WORKFLOW_SCHEDULE,
+    }),
     TypeOrmModule.forFeature([
       Asset,
       Job,
@@ -28,4 +33,4 @@ import { AssetGroup } from './entities/asset-groups.entity';
   providers: [AssetGroupService, AssetGroupWorkflowSubscriber],
   exports: [AssetGroupService],
 })
-export class AssetGroupModule { }
+export class AssetGroupModule {}
