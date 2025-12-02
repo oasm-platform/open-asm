@@ -225,11 +225,11 @@ export class AssetGroupService {
 
       const assetGroupWorkflowRecords: AssetGroupWorkflow[] = [];
 
-      for (const workspaceId of workflowIds) {
-        const assetGroupWorkspaceId = randomUUID();
+      for (const workflowId of workflowIds) {
+        const assetGroupWorkflowId = randomUUID();
         const job = await this.scanScheduleQueue.add(
-          workspaceId,
-          { id: assetGroupWorkspaceId } as AssetGroupWorkflow,
+          assetGroupWorkflowId,
+          { id: assetGroupWorkflowId } as AssetGroupWorkflow,
           {
             repeat: {
               pattern: defaultCron,
@@ -238,9 +238,9 @@ export class AssetGroupService {
         );
 
         const record = this.assetGroupWorkflowRepo.create({
-          id: assetGroupWorkspaceId,
+          id: assetGroupWorkflowId,
           assetGroup: { id: groupId },
-          workflow: { id: workspaceId },
+          workflow: { id: workflowId },
           schedule: defaultCron,
           jobId: job.repeatJobKey,
         });
