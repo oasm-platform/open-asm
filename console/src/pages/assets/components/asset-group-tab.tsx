@@ -1,13 +1,5 @@
+import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
-import {
-  useAssetGroupControllerDelete,
-  useAssetGroupControllerGetAll,
-  type AssetGroupResponseDto,
-} from '@/services/apis/gen/queries';
-import { type ColumnDef } from '@tanstack/react-table';
-import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
-import { useAsset } from '../context/asset-context';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,9 +7,17 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
+import {
+  useAssetGroupControllerDelete,
+  useAssetGroupControllerGetAll,
+  type AssetGroup,
+} from '@/services/apis/gen/queries';
+import { type ColumnDef } from '@tanstack/react-table';
+import dayjs from 'dayjs';
 import { MoreHorizontal } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useAsset } from '../context/asset-context';
 
 export function AssetGroupTab() {
   const {
@@ -29,7 +29,7 @@ export function AssetGroupTab() {
 
   const { mutate } = useAssetGroupControllerDelete();
 
-  const columns: ColumnDef<AssetGroupResponseDto>[] = [
+  const columns: ColumnDef<AssetGroup>[] = [
     {
       accessorKey: 'name',
       header: 'Name',

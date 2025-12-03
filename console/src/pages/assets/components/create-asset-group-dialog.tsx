@@ -59,7 +59,6 @@ export function CreateAssetGroupDialog({
       {
         data: {
           name: values.name,
-          workspaceId: selectedWorkspace,
         },
       },
       {
@@ -74,11 +73,15 @@ export function CreateAssetGroupDialog({
 
   return (
     <div>
-      <Button variant="outline" size="sm" onClick={() => setCreateDialogOpen(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setCreateDialogOpen(true)}
+      >
         <Plus />
         Create
       </Button>
-      <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen} >
+      <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create asset group</DialogTitle>
@@ -95,9 +98,7 @@ export function CreateAssetGroupDialog({
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                      />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

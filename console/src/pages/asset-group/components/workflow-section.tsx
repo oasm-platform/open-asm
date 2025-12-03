@@ -255,10 +255,10 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       </CardHeader>
       <CardContent>
         {workflowsInGroupQuery.data &&
-          workflowsInGroupQuery.data.data.length > 0 ? (
+        workflowsInGroupQuery.data.data.length > 0 ? (
           <DataTable
             columns={workflowColumns}
-            data={workflowsInGroupQuery.data.data}
+            data={workflowsInGroupQuery.data.data.map((afw) => afw.workflow)}
             isLoading={workflowsInGroupQuery.isLoading}
             page={workflowsInGroupQuery.data.page}
             pageSize={workflowsInGroupQuery.data.limit}
