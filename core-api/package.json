@@ -45,7 +45,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.5.0",
     "ioredis": "^5.7.0",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "mongodb": "^6.16.0",
     "multer": "^2.0.2",
     "nanoid": "^3.3.8",
