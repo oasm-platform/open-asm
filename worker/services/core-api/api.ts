@@ -960,12 +960,63 @@ export interface GetManyStringDto {
   pageCount: number;
 }
 
+export interface GetManyWorkflowsResponseDto {
+  /** The unique identifier of the workflow */
+  id: string;
+  /** The name of the workflow */
+  name: string;
+  /** The file path of the workflow */
+  filePath: string;
+  /** The workflow content */
+  content: object;
+  /**
+   * When the workflow was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the workflow was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The user who created this workflow */
+  createdBy?: object;
+  /** The workspace this workflow belongs to */
+  workspace?: object;
+}
+
+export interface GetManyGetManyWorkflowsResponseDtoDto {
+  data: GetManyWorkflowsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface On {
+  target: string[];
+  schedule: OnScheduleEnum;
+}
+
+export interface WorkflowJob {
+  name: string;
+  run: string;
+}
+
+export interface WorkflowContent {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+}
+
 export interface Workflow {
   id: string;
   /** @format date-time */
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
+  content: WorkflowContent;
 }
 
 export interface CreateWorkflowDto {
@@ -974,11 +1025,8 @@ export interface CreateWorkflowDto {
    * @example "Vulnerability Scan Workflow"
    */
   name: string;
-  /**
-   * Content of the workflow in JSON format
-   * @example {"on":{"schedule":"0 0 * * *"},"jobs":{"nessus":[]},"name":"Vulnerability Scan Workflow"}
-   */
-  content: object;
+  /** Content of the workflow in JSON format */
+  content: WorkflowContent;
   /**
    * File path for the workflow
    * @example "workflows/vulnerability-scan.yaml"
@@ -992,11 +1040,8 @@ export interface UpdateWorkflowDto {
    * @example "Vulnerability Scan Workflow"
    */
   name?: string;
-  /**
-   * Content of the workflow in JSON format
-   * @example {"on":{"schedule":"0 0 * * *"},"jobs":{"nessus":[]},"name":"Vulnerability Scan Workflow"}
-   */
-  content?: object;
+  /** Content of the workflow in JSON format */
+  content?: WorkflowContent;
   /**
    * File path for the workflow
    * @example "workflows/vulnerability-scan.yaml"
@@ -1124,33 +1169,17 @@ export interface RunTemplateDto {
   assetId: string;
 }
 
-export interface AssetGroupResponseDto {
-  /**
-   * ID of the asset group
-   * @example "123e4567-e89b-12d3-a456-426614174000"
-   */
+export interface AssetGroup {
   id: string;
-  /**
-   * Name of the asset group
-   * @example "Web Servers"
-   */
-  name: string;
-  /**
-   * Date when the asset group was created
-   * @format date-time
-   * @example "2023-01-01T00:00.000Z"
-   */
+  /** @format date-time */
   createdAt: string;
-  /**
-   * Date when the asset group was last updated
-   * @format date-time
-   * @example "2023-01-01T00:00:00.000Z"
-   */
+  /** @format date-time */
   updatedAt: string;
+  name: string;
 }
 
-export interface GetManyAssetGroupResponseDtoDto {
-  data: AssetGroupResponseDto[];
+export interface GetManyAssetGroupDto {
+  data: AssetGroup[];
   total: number;
   page: number;
   limit: number;
@@ -1207,6 +1236,27 @@ export interface GetManyAssetDto {
   pageCount: number;
 }
 
+export interface AssetGroupWorkflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  assetGroup: AssetGroup;
+  workflow: Workflow;
+  schedule: AssetGroupWorkflowScheduleEnum;
+  job: object;
+}
+
+export interface GetManyAssetGroupWorkflowDto {
+  data: AssetGroupWorkflow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export interface GetManyWorkflowDto {
   data: Workflow[];
   total: number;
@@ -1214,6 +1264,10 @@ export interface GetManyWorkflowDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+}
+
+export interface UpdateAssetGroupWorkflowDto {
+  schedule: UpdateAssetGroupWorkflowDtoScheduleEnum;
 }
 
 export interface McpTool {
@@ -1303,6 +1357,30 @@ export enum CreateToolDtoCategoryEnum {
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
+}
+
+export enum OnScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum AssetGroupWorkflowScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -2797,9 +2875,7 @@ export class Api<
    * @request GET:/api/tools/installed
    */
   toolsControllerGetInstalledTools = (
-    query: {
-      /** The ID of the workspace */
-      workspaceId: string;
+    query?: {
       category?: ToolsControllerGetInstalledToolsParamsCategoryEnum;
     },
     params: RequestParams = {},
@@ -2872,6 +2948,37 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows/templates`,
       method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerGetManyWorkflows
+   * @summary Get many workflows
+   * @request GET:/api/workflows
+   */
+  workflowsControllerGetManyWorkflows = (
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      /** Filter by workflow name */
+      name?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows`,
+      method: "GET",
+      query: query,
       format: "json",
       ...params,
     });
@@ -3506,6 +3613,28 @@ export class Api<
       path: `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates the relationship between an asset group and workflow, primarily to change the schedule.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerUpdateAssetGroupWorkflow
+   * @summary Update asset group workflow relationship
+   * @request PATCH:/api/asset-group/workflows/{id}
+   */
+  assetGroupControllerUpdateAssetGroupWorkflow = (
+    id: string,
+    data: UpdateAssetGroupWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/workflows/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });

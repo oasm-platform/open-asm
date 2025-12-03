@@ -881,36 +881,97 @@ export type GetManyStringDto = {
   pageCount: number;
 };
 
+/**
+ * The workflow content
+ */
+export type GetManyWorkflowsResponseDtoContent = { [key: string]: unknown };
+
+/**
+ * The user who created this workflow
+ */
+export type GetManyWorkflowsResponseDtoCreatedBy = { [key: string]: unknown };
+
+/**
+ * The workspace this workflow belongs to
+ */
+export type GetManyWorkflowsResponseDtoWorkspace = { [key: string]: unknown };
+
+export type GetManyWorkflowsResponseDto = {
+  /** The unique identifier of the workflow */
+  id: string;
+  /** The name of the workflow */
+  name: string;
+  /** The file path of the workflow */
+  filePath: string;
+  /** The workflow content */
+  content: GetManyWorkflowsResponseDtoContent;
+  /** When the workflow was created */
+  createdAt: string;
+  /** When the workflow was last updated */
+  updatedAt: string;
+  /** The user who created this workflow */
+  createdBy?: GetManyWorkflowsResponseDtoCreatedBy;
+  /** The workspace this workflow belongs to */
+  workspace?: GetManyWorkflowsResponseDtoWorkspace;
+};
+
+export type GetManyGetManyWorkflowsResponseDtoDto = {
+  data: GetManyWorkflowsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type OnSchedule = (typeof OnSchedule)[keyof typeof OnSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const OnSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type On = {
+  target: string[];
+  schedule: OnSchedule;
+};
+
+export type WorkflowJob = {
+  name: string;
+  run: string;
+};
+
+export type WorkflowContent = {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+};
+
 export type Workflow = {
   id: string;
   createdAt: string;
   updatedAt: string;
+  content: WorkflowContent;
 };
-
-/**
- * Content of the workflow in JSON format
- */
-export type CreateWorkflowDtoContent = { [key: string]: unknown };
 
 export type CreateWorkflowDto = {
   /** Name of the workflow */
   name: string;
   /** Content of the workflow in JSON format */
-  content: CreateWorkflowDtoContent;
+  content: WorkflowContent;
   /** File path for the workflow */
   filePath?: string;
 };
-
-/**
- * Content of the workflow in JSON format
- */
-export type UpdateWorkflowDtoContent = { [key: string]: unknown };
 
 export type UpdateWorkflowDto = {
   /** Name of the workflow */
   name?: string;
   /** Content of the workflow in JSON format */
-  content?: UpdateWorkflowDtoContent;
+  content?: WorkflowContent;
   /** File path for the workflow */
   filePath?: string;
 };
@@ -1031,19 +1092,15 @@ export type RunTemplateDto = {
   assetId: string;
 };
 
-export type AssetGroupResponseDto = {
-  /** ID of the asset group */
+export type AssetGroup = {
   id: string;
-  /** Name of the asset group */
-  name: string;
-  /** Date when the asset group was created */
   createdAt: string;
-  /** Date when the asset group was last updated */
   updatedAt: string;
+  name: string;
 };
 
-export type GetManyAssetGroupResponseDtoDto = {
-  data: AssetGroupResponseDto[];
+export type GetManyAssetGroupDto = {
+  data: AssetGroup[];
   total: number;
   page: number;
   limit: number;
@@ -1085,6 +1142,39 @@ export type GetManyAssetDto = {
   pageCount: number;
 };
 
+export type AssetGroupWorkflowSchedule =
+  (typeof AssetGroupWorkflowSchedule)[keyof typeof AssetGroupWorkflowSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const AssetGroupWorkflowSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type AssetGroupWorkflowJob = { [key: string]: unknown };
+
+export type AssetGroupWorkflow = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  assetGroup: AssetGroup;
+  workflow: Workflow;
+  schedule: AssetGroupWorkflowSchedule;
+  job: AssetGroupWorkflowJob;
+};
+
+export type GetManyAssetGroupWorkflowDto = {
+  data: AssetGroupWorkflow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type GetManyWorkflowDto = {
   data: Workflow[];
   total: number;
@@ -1092,6 +1182,22 @@ export type GetManyWorkflowDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type UpdateAssetGroupWorkflowDtoSchedule =
+  (typeof UpdateAssetGroupWorkflowDtoSchedule)[keyof typeof UpdateAssetGroupWorkflowDtoSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UpdateAssetGroupWorkflowDtoSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type UpdateAssetGroupWorkflowDto = {
+  schedule: UpdateAssetGroupWorkflowDtoSchedule;
 };
 
 export type McpTool = {
@@ -1303,10 +1409,6 @@ export const ToolsControllerGetManyToolsCategory = {
 } as const;
 
 export type ToolsControllerGetInstalledToolsParams = {
-  /**
-   * The ID of the workspace
-   */
-  workspaceId: string;
   category?: ToolsControllerGetInstalledToolsCategory;
 };
 
@@ -1321,6 +1423,17 @@ export const ToolsControllerGetInstalledToolsCategory = {
   vulnerabilities: 'vulnerabilities',
   classifier: 'classifier',
 } as const;
+
+export type WorkflowsControllerGetManyWorkflowsParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * Filter by workflow name
+   */
+  name?: string;
+};
 
 export type ProvidersControllerGetManyProvidersParams = {
   page?: number;
@@ -14923,7 +15036,7 @@ export function useToolsControllerGetBuiltInTools<
  * @summary Get installed tools for a workspace
  */
 export const toolsControllerGetInstalledTools = (
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -14955,7 +15068,7 @@ export const getToolsControllerGetInstalledToolsInfiniteQueryOptions = <
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -14996,7 +15109,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params: undefined | ToolsControllerGetInstalledToolsParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -15025,7 +15138,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -15054,7 +15167,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -15079,7 +15192,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -15115,7 +15228,7 @@ export const getToolsControllerGetInstalledToolsQueryOptions = <
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15154,7 +15267,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params: undefined | ToolsControllerGetInstalledToolsParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -15181,7 +15294,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15208,7 +15321,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15231,7 +15344,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -16319,6 +16432,342 @@ export function useWorkflowsControllerListTemplates<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getWorkflowsControllerListTemplatesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
+ * @summary Get many workflows
+ */
+export const workflowsControllerGetManyWorkflows = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetManyWorkflowsResponseDtoDto>(
+    { url: `/api/workflows`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+) => {
+  return ['infinate', `/api/workflows`, ...(params ? [params] : [])] as const;
+};
+
+export const getWorkflowsControllerGetManyWorkflowsQueryKey = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+) => {
+  return [`/api/workflows`, ...(params ? [params] : [])] as const;
+};
+
+export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  > = ({ signal }) =>
+    workflowsControllerGetManyWorkflows(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetManyWorkflowsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>>;
+export type WorkflowsControllerGetManyWorkflowsInfiniteQueryError = unknown;
+
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many workflows
+ */
+
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkflowsControllerGetManyWorkflowsQueryOptions = <
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetManyWorkflowsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  > = ({ signal }) =>
+    workflowsControllerGetManyWorkflows(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetManyWorkflowsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+>;
+export type WorkflowsControllerGetManyWorkflowsQueryError = unknown;
+
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many workflows
+ */
+
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkflowsControllerGetManyWorkflowsQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -19066,7 +19515,7 @@ export const assetGroupControllerGetAll = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyAssetGroupResponseDtoDto>(
+  return orvalClient<GetManyAssetGroupDto>(
     { url: `/api/asset-group`, method: 'GET', params, signal },
     options,
   );
@@ -19394,7 +19843,7 @@ export const assetGroupControllerCreate = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AssetGroupResponseDto>(
+  return orvalClient<AssetGroup>(
     {
       url: `/api/asset-group`,
       method: 'POST',
@@ -19487,7 +19936,7 @@ export const assetGroupControllerGetById = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AssetGroupResponseDto>(
+  return orvalClient<AssetGroup>(
     { url: `/api/asset-group/${id}`, method: 'GET', signal },
     options,
   );
@@ -20731,7 +21180,7 @@ export const assetGroupControllerGetWorkflowsByAssetGroupsId = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyWorkflowDto>(
+  return orvalClient<GetManyAssetGroupWorkflowDto>(
     {
       url: `/api/asset-group/${assetGroupId}/workflows`,
       method: 'GET',
@@ -22066,6 +22515,105 @@ export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
 
   return query;
 }
+
+/**
+ * Updates the relationship between an asset group and workflow, primarily to change the schedule.
+ * @summary Update asset group workflow relationship
+ */
+export const assetGroupControllerUpdateAssetGroupWorkflow = (
+  id: string,
+  updateAssetGroupWorkflowDto: UpdateAssetGroupWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AssetGroupWorkflow>(
+    {
+      url: `/api/asset-group/workflows/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAssetGroupWorkflowDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+    TError,
+    { id: string; data: UpdateAssetGroupWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerUpdateAssetGroupWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+    { id: string; data: UpdateAssetGroupWorkflowDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetGroupControllerUpdateAssetGroupWorkflow(
+      id,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>
+  >;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationBody =
+  UpdateAssetGroupWorkflowDto;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationError = unknown;
+
+/**
+ * @summary Update asset group workflow relationship
+ */
+export const useAssetGroupControllerUpdateAssetGroupWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+      TError,
+      { id: string; data: UpdateAssetGroupWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * @summary Upload a file to storage

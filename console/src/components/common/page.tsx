@@ -19,8 +19,8 @@ const Page = ({
   const navigate = useNavigate();
 
   return (
-    <div className={className + " h-full flex flex-col"}>
-      <div className="flex items-center justify-between gap-3 mb-4">
+    <div className={className + " h-full flex flex-col gap-4"}>
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {isShowButtonGoBack && (
             <Button variant="outline" size="icon" onClick={() => navigate(-1)}>

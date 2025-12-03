@@ -61,6 +61,9 @@ interface DataTableProps<TData, TValue> {
   filterComponents?: React.JSX.Element[];
   isShowHeader?: boolean;
   isShowBorder?: boolean;
+  tableState?: {
+    rowSelection?: Record<string, boolean>;
+  };
 }
 
 export function DataTable<TData, TValue>({
@@ -86,9 +89,11 @@ export function DataTable<TData, TValue>({
   filterComponents,
   isShowHeader = true,
   isShowBorder = true,
+  tableState,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
 
   const [searchValue, setSearchValue] = React.useState(filterValue);
   const debouncedSearchValue = useDebounce(searchValue, 500);
@@ -97,11 +102,19 @@ export function DataTable<TData, TValue>({
     onFilterChange?.(debouncedSearchValue);
   }, [debouncedSearchValue, onFilterChange]);
 
+  // Sync external tableState.rowSelection with internal rowSelection state
+  React.useEffect(() => {
+    if (tableState?.rowSelection) {
+      setRowSelection(tableState.rowSelection);
+    }
+  }, [tableState?.rowSelection]);
+
   const table = useReactTable({
     data,
     columns,
     state: {
       columnVisibility,
+      rowSelection: tableState?.rowSelection || rowSelection,
       pagination: { pageIndex: page - 1, pageSize }, // 0-based index for react-table
       sorting: sortBy ? [{ id: sortBy, desc: sortOrder === 'DESC' }] : [],
     },
@@ -109,6 +122,8 @@ export function DataTable<TData, TValue>({
     manualPagination: true,
     manualFiltering: true,
     manualSorting: true,
+    enableRowSelection: true,
+    onRowSelectionChange: tableState?.rowSelection ? setRowSelection : setRowSelection,
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
   });

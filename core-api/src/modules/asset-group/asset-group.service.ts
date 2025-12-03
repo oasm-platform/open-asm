@@ -1,7 +1,9 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { BullMQName, CronSchedule } from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   Injectable,
@@ -9,10 +11,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Queue } from 'bullmq';
+import { randomUUID } from 'crypto';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
-import { AssetGroupResponseDto } from './dto/asset-group-response.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
@@ -34,6 +37,8 @@ export class AssetGroupService {
     public readonly assetRepo: Repository<Asset>,
     @InjectRepository(Workflow)
     public readonly workflowRepo: Repository<Workflow>,
+    @InjectQueue(BullMQName.ASSET_GROUPS_WORKFLOW_SCHEDULE)
+    private scanScheduleQueue: Queue<AssetGroupWorkflow>,
   ) {}
 
   /**
@@ -85,10 +90,10 @@ export class AssetGroupService {
   /**
    * Fetches a specific asset group by its unique identifier
    */
-  async getById(
+  async getAssetGroupById(
     id: string,
     workspaceId: string,
-  ): Promise<AssetGroupResponseDto> {
+  ): Promise<AssetGroup> {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id, workspace: { id: workspaceId } },
@@ -106,7 +111,7 @@ export class AssetGroupService {
         );
       }
 
-      const response = new AssetGroupResponseDto();
+      const response = new AssetGroup();
       response.id = assetGroup.id;
       response.name = assetGroup.name;
       response.createdAt = assetGroup.createdAt;
@@ -172,10 +177,6 @@ export class AssetGroupService {
     workflowIds: string[],
   ): Promise<DefaultMessageResponseDto> {
     try {
-      this.logger.log(
-        `Adding ${workflowIds.length} workflows to asset group with ID: ${groupId}`,
-      );
-
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id: groupId },
       });
@@ -220,22 +221,37 @@ export class AssetGroupService {
           `Workflows with IDs "${existingWorkflowIds.join(', ')}" are already associated with asset group "${groupId}"`,
         );
       }
+      const defaultCron = CronSchedule.EVERY_3_DAYS;
 
-      // Create new associations
-      const newAssociations = workflowIds.map((workflowId) =>
-        this.assetGroupWorkflowRepo.create({
+      const assetGroupWorkflowRecords: AssetGroupWorkflow[] = [];
+
+      for (const workflowId of workflowIds) {
+        const assetGroupWorkflowId = randomUUID();
+        const job = await this.scanScheduleQueue.add(
+          assetGroupWorkflowId,
+          { id: assetGroupWorkflowId } as AssetGroupWorkflow,
+          {
+            repeat: {
+              pattern: defaultCron,
+            },
+          },
+        );
+
+        const record = this.assetGroupWorkflowRepo.create({
+          id: assetGroupWorkflowId,
           assetGroup: { id: groupId },
           workflow: { id: workflowId },
-        }),
-      );
+          schedule: defaultCron,
+          jobId: job.repeatJobKey,
+        });
 
-      await this.assetGroupWorkflowRepo.save(newAssociations);
+        assetGroupWorkflowRecords.push(record);
+      }
 
-      this.logger.log(
-        `Successfully added ${newAssociations.length} workflows to asset group with ID: ${groupId}`,
-      );
+      await this.assetGroupWorkflowRepo.save(assetGroupWorkflowRecords);
+
       return {
-        message: `${newAssociations.length} workflows successfully added to asset group "${groupId}"`,
+        message: `${assetGroupWorkflowRecords.length} workflows successfully added to asset group "${groupId}"`,
       };
     } catch (error) {
       this.logger.error(
@@ -310,9 +326,6 @@ export class AssetGroupService {
 
       await this.assetGroupAssetRepo.save(newAssociations);
 
-      this.logger.log(
-        `Successfully added ${newAssociations.length} assets to asset group with ID: ${groupId}`,
-      );
       return {
         message: `${newAssociations.length} assets successfully added to asset group "${groupId}"`,
       };
@@ -364,6 +377,11 @@ export class AssetGroupService {
         );
       }
 
+      await Promise.all(
+        associations.map((a) =>
+          this.scanScheduleQueue.removeJobScheduler(a.jobId),
+        ),
+      );
       // Remove the associations
       await this.assetGroupWorkflowRepo.remove(associations);
 
@@ -511,8 +529,6 @@ export class AssetGroupService {
         .orderBy(`asset.${sortBy}`, sortOrder)
         .skip(offset)
         .take(limit)
-        .leftJoinAndSelect('asset.assetGroupAssets', 'assetGroupAssets')
-        .leftJoinAndSelect('asset.target', 'target')
         .getManyAndCount();
 
       return getManyResponse({ query, data, total });
@@ -548,16 +564,12 @@ export class AssetGroupService {
         );
       }
 
-      const queryBuilder = this.workflowRepo
-        .createQueryBuilder('workflow')
-        .innerJoin(
-          'asset_group_workflows',
-          'agt',
-          'agt.workflowId = workflow.id',
-        )
-        .innerJoin('asset_groups', 'ag', 'ag.id = agt.assetGroupId')
+      const queryBuilder = this.assetGroupWorkflowRepo
+        .createQueryBuilder('assetGroupWorkflow')
+        .innerJoinAndSelect('assetGroupWorkflow.workflow', 'workflow')
+        .innerJoin('assetGroupWorkflow.assetGroup', 'ag')
         .where(
-          'agt.assetGroupId = :assetGroupId AND ag.workspaceId = :workspaceId',
+          'assetGroupWorkflow.assetGroupId = :assetGroupId AND ag.workspaceId = :workspaceId',
           {
             assetGroupId,
             workspaceId,
@@ -568,10 +580,6 @@ export class AssetGroupService {
         .orderBy(`workflow.${sortBy}`, sortOrder)
         .skip(offset)
         .take(limit)
-        .leftJoinAndSelect(
-          'workflow.assetGroupWorkflows',
-          'assetGroupWorkflows',
-        )
         .getManyAndCount();
 
       return getManyResponse({ query, data, total });
@@ -628,7 +636,6 @@ export class AssetGroupService {
         .orderBy(`asset.${sortBy}`, sortOrder)
         .skip(offset)
         .take(limit)
-        .leftJoinAndSelect('asset.target', 'target')
         .getManyAndCount();
 
       return getManyResponse({ query, data, total });
@@ -696,6 +703,64 @@ export class AssetGroupService {
     } catch (error) {
       this.logger.error(
         `Error retrieving workflows not in asset group with ID ${assetGroupId} in workspace ${workspaceId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Updates an asset group workflow relationship (schedule, job, etc.)
+   */
+  async updateAssetGroupWorkflow(
+    assetGroupWorkflowId: string,
+    updateData: Partial<{
+      schedule?: CronSchedule;
+      jobId?: string;
+    }>,
+  ): Promise<AssetGroupWorkflow> {
+    try {
+      // Find the existing relationship by ID
+      const assetGroupWorkspace = await this.assetGroupWorkflowRepo.findOne({
+        where: { id: assetGroupWorkflowId },
+        relations: ['assetGroup', 'workflow'],
+      });
+
+      if (!assetGroupWorkspace) {
+        throw new NotFoundException(
+          `Asset group workflow relationship with ID "${assetGroupWorkflowId}" not found`,
+        );
+      }
+
+      // Update the relationship with provided data
+      if (updateData.schedule !== undefined) {
+        assetGroupWorkspace.schedule = updateData.schedule;
+
+        await this.scanScheduleQueue.removeJobScheduler(
+          assetGroupWorkspace.jobId,
+        );
+        const newJob = await this.scanScheduleQueue.add(
+          assetGroupWorkspace.id,
+          { id: assetGroupWorkspace.id } as AssetGroupWorkflow,
+          {
+            repeat: {
+              pattern: assetGroupWorkspace.schedule,
+            },
+          },
+        );
+        if (newJob.repeatJobKey) {
+          assetGroupWorkspace.jobId = newJob.repeatJobKey;
+        }
+      }
+
+      // Save the updated relationship
+      const updatedRelationship =
+        await this.assetGroupWorkflowRepo.save(assetGroupWorkspace);
+
+      return updatedRelationship;
+    } catch (error) {
+      this.logger.error(
+        `Error updating asset group workflow relationship with ID ${assetGroupWorkflowId}:`,
         error,
       );
       throw error;

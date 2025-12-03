@@ -1,12 +1,6 @@
+import { ScanScheduleSelect } from "@/components/scan-schedule-select";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import {
     Sheet,
     SheetContent,
@@ -73,22 +67,7 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
         },
     });
 
-    const scheduleOptions = [{
-        value: UpdateTargetDtoScanSchedule['0_0_*_*_*'],
-        label: "Daily"
-    }, {
-        value: UpdateTargetDtoScanSchedule['0_0_*/3_*_*'],
-        label: "Every 3 days"
-    }, {
-        value: UpdateTargetDtoScanSchedule['0_0_*_*_0'],
-        label: "Weekly"
-    }, {
-        value: UpdateTargetDtoScanSchedule['0_0_*/14_*_*'],
-        label: "Every 2 weeks"
-    }, {
-        value: UpdateTargetDtoScanSchedule['0_0_1_*_*'],
-        label: "Monthly"
-    }]
+
     return (
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
@@ -121,25 +100,20 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
                                         </div>
                                         <div className="flex-1 flex items-center justify-between gap-2">
                                             <label htmlFor="scan-frequency" className="text-sm font-medium">Scan Schedule</label>
-                                            <Select value={frequency} onValueChange={(value: UpdateTargetDtoScanSchedule) => {
-                                                setFrequency(value);
-                                                updateTargetScanSchedule({
-                                                    id: target.id,
-                                                    data: {
-                                                        scanSchedule: value,
-                                                    }
-                                                });
-                                            }}>
-                                                <SelectTrigger id="scan-frequency" className="w-[160px] h-9 text-sm">
-                                                    <SelectValue placeholder="Select frequency" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {scheduleOptions.map((option) => (
-                                                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                            <ScanScheduleSelect
+                                                value={frequency}
+                                                onChange={(value: UpdateTargetDtoScanSchedule) => {
+                                                    setFrequency(value);
+                                                    updateTargetScanSchedule({
+                                                        id: target.id,
+                                                        data: {
+                                                            scanSchedule: value,
+                                                        }
+                                                    });
+                                                }}
+                                            />
                                         </div>
+
                                     </div>
                                 </div>
                             </div>
@@ -238,4 +212,3 @@ const SettingTarget = ({ target, refetch }: { target: Target, refetch: () => voi
 };
 
 export default SettingTarget;
-

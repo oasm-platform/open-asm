@@ -1,11 +1,12 @@
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserContext, WorkspaceId } from '../../common/decorators/app.decorator';
 import { WorkspaceOwnerGuard } from '../../common/guards/workspace-owner.guard';
 import { UserContextPayload } from '../../common/interfaces/app.interface';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
+import { GetManyWorkflowsQueryDto, GetManyWorkflowsResponseDto } from './dto/get-many-workflows.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import { Workflow } from './entities/workflow.entity';
 import { WorkflowsService } from './workflows.service';
@@ -26,6 +27,26 @@ export class WorkflowsController {
   @Get('templates')
   listTemplates() {
     return this.workflowsService.listTemplates();
+  }
+
+  @Doc({
+    summary: 'Get many workflows',
+    description: 'Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.',
+    response: {
+      serialization: GetManyResponseDto(GetManyWorkflowsResponseDto),
+      description: 'Paginated list of workflows',
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @UseGuards(WorkspaceOwnerGuard)
+  @Get()
+  async getManyWorkflows(
+    @Query() query: GetManyWorkflowsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.workflowsService.getManyWorkflows(query, workspaceId);
   }
 
   @Doc({

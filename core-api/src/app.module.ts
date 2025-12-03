@@ -16,10 +16,6 @@ import { ServicesModule } from './services/services.module';
       isGlobal: true,
     }),
     EventEmitterModule.forRoot({ wildcard: true }),
-    // ServeStaticModule.forRoot({
-    //   rootPath: join(__dirname, '..', 'public'),
-    //   serveRoot: '/api/static',
-    // }),
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       useFactory: (config: ConfigService) => ({
@@ -33,7 +29,7 @@ import { ServicesModule } from './services/services.module';
     CombineModule,
     StorageModule,
     ServicesModule,
-    McpServerModule
+    McpServerModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}

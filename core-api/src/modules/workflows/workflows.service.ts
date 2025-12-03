@@ -1,3 +1,4 @@
+import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
@@ -7,6 +8,7 @@ import { Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
+import { GetManyWorkflowsQueryDto } from './dto/get-many-workflows.dto';
 import { Workflow } from './entities/workflow.entity';
 
 @Injectable()
@@ -219,6 +221,52 @@ export class WorkflowsService implements OnModuleInit {
   async deleteWorkflow(id: string, workspace: { id: string }): Promise<void> {
     const workflow = await this.getWorkspaceWorkflow(id, workspace);
     await this.workflowRepository.remove(workflow);
+  }
+
+  /**
+   * Retrieves many workflows with pagination and filtering
+   * @param query Query parameters for pagination, sorting, and filtering
+   * @param workspaceId The workspace ID to filter workflows
+   * @returns Paginated response with workflows data
+   */
+  async getManyWorkflows(
+    query: GetManyWorkflowsQueryDto,
+    workspaceId: string,
+  ): Promise<GetManyBaseResponseDto<Workflow>> {
+    const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'ASC', name } = query;
+
+    const queryBuilder = this.workflowRepository
+      .createQueryBuilder('workflow')
+      .leftJoinAndSelect('workflow.createdBy', 'createdBy')
+      .leftJoinAndSelect('workflow.workspace', 'workspace')
+      .where('workflow.workspaceId = :workspaceId', { workspaceId });
+
+    // Apply filters
+    if (name) {
+      queryBuilder.andWhere('workflow.name LIKE :name', { name: `%${name}%` });
+    }
+
+    // Apply sorting
+    queryBuilder.orderBy(`workflow.${sortBy}`, sortOrder);
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    queryBuilder.skip(skip).take(limit);
+
+    // Execute query
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    const pageCount = Math.ceil(total / limit);
+    const hasNextPage = page < pageCount;
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      pageCount,
+      hasNextPage,
+    };
   }
 
   /**
