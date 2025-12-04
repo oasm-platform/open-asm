@@ -15,6 +15,8 @@ import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
+import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { ToolsService } from '../tools/tools.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
@@ -25,7 +27,6 @@ import { AssetGroup } from './entities/asset-groups.entity';
 @Injectable()
 export class AssetGroupService {
   private readonly logger = new Logger(AssetGroupService.name);
-
   constructor(
     @InjectRepository(AssetGroup)
     public readonly assetGroupRepo: Repository<AssetGroup>,
@@ -39,6 +40,8 @@ export class AssetGroupService {
     public readonly workflowRepo: Repository<Workflow>,
     @InjectQueue(BullMQName.ASSET_GROUPS_WORKFLOW_SCHEDULE)
     private scanScheduleQueue: Queue<AssetGroupWorkflow>,
+    private toolsService: ToolsService,
+    private jobRegistryService: JobsRegistryService,
   ) {}
 
   /**
@@ -765,5 +768,50 @@ export class AssetGroupService {
       );
       throw error;
     }
+  }
+
+  public async runGroupWorkflowScheduler(
+    assetGroupWorkflowId: string,
+  ): Promise<void> {
+    // Get the asset group workflow to access the workflow
+    const assetGroupWorkflow = await this.assetGroupWorkflowRepo
+      .createQueryBuilder('assetGroupWorkflow')
+      .innerJoinAndSelect('assetGroupWorkflow.workflow', 'workflow')
+      .innerJoin('assetGroupWorkflow.assetGroup', 'assetGroup')
+      .where('assetGroupWorkflow.id = :assetGroupWorkflowId', {
+        assetGroupWorkflowId,
+      })
+      .getOne();
+
+    if (!assetGroupWorkflow) {
+      throw new NotFoundException(
+        `Asset group workflow with ID "${assetGroupWorkflowId}" not found`,
+      );
+    }
+
+    const workflow = assetGroupWorkflow.workflow;
+
+    // Get all assets associated with the specific asset group workflow
+    const assets = await this.assetRepo
+      .createQueryBuilder('assets')
+      .innerJoin('assets_group_assets', 'aga', 'aga."assetId" = assets.id')
+      .innerJoin('asset_groups', 'ag', 'ag.id = aga."assetGroupId"')
+      .innerJoin('asset_group_workflows', 'agw', 'agw."assetGroupId" = ag.id')
+      .where('agw.id = :assetGroupWorkflowId', { assetGroupWorkflowId })
+      .getMany();
+
+    const firstJobs = workflow.content.jobs.map((j) => j.run)[0];
+    const tools = await this.toolsService.getToolByNames([firstJobs]);
+    await Promise.all(
+      tools.map((tool) =>
+        this.jobRegistryService.createNewJob({
+          tool,
+          assetIds: assets.map((a) => a.id),
+          workflow: workflow,
+          priority: tool.priority,
+        }),
+      ),
+    );
+    return;
   }
 }
