@@ -1,3 +1,4 @@
+import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import {
@@ -7,6 +8,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   useAssetGroupControllerDelete,
   useAssetGroupControllerGetAll,
@@ -17,17 +19,16 @@ import dayjs from 'dayjs';
 import { MoreHorizontal } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useAsset } from '../context/asset-context';
+import { CreateAssetGroupDialog } from '../assets/components/create-asset-group-dialog';
 
-export function AssetGroupTab() {
+export function AssetGroups() {
   const {
-    tableHandlers: { setPage, setPageSize },
     tableParams: { page, pageSize, sortBy, sortOrder },
-    queryParams,
-    queryOptions,
-  } = useAsset();
+    tableHandlers: { setPage, setPageSize },
+  } = useServerDataTable();
 
   const { mutate } = useAssetGroupControllerDelete();
+  const navigate = useNavigate();
 
   const columns: ColumnDef<AssetGroup>[] = [
     {
@@ -81,7 +82,6 @@ export function AssetGroupTab() {
       },
     },
   ];
-  const navigate = useNavigate();
 
   const { data, isLoading, refetch } = useAssetGroupControllerGetAll(
     {
@@ -89,12 +89,10 @@ export function AssetGroupTab() {
       page: page,
       sortBy: 'name',
       sortOrder: sortOrder,
-      targetIds: queryParams.targetIds,
     },
     {
       query: {
-        ...queryOptions.query,
-        queryKey: ['asset-group', ...queryOptions.query.queryKey],
+        queryKey: ['asset-group'],
       },
     },
   );
@@ -105,20 +103,29 @@ export function AssetGroupTab() {
   if (!data && !isLoading) return <div>Error loading asset groups.</div>;
 
   return (
-    <DataTable
-      data={assetGroups}
-      columns={columns}
-      isLoading={isLoading}
-      page={page}
-      pageSize={pageSize}
-      onPageChange={setPage}
-      onPageSizeChange={setPageSize}
-      totalItems={total}
-      sortBy={sortBy}
-      sortOrder={sortOrder}
-      isShowBorder={true}
-      onRowClick={(row) => navigate('/asset-group/' + row.id)}
-      emptyMessage="No asset groups found"
-    />
+    <Page
+      title="Groups"
+      header={
+        <div className="flex justify-end">
+          <CreateAssetGroupDialog />
+        </div>
+      }
+    >
+      <DataTable
+        data={assetGroups}
+        columns={columns}
+        isLoading={isLoading}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        totalItems={total}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        isShowBorder={true}
+        onRowClick={(row) => navigate('/assets/groups/' + row.id)}
+        emptyMessage="No asset groups found"
+      />
+    </Page>
   );
 }

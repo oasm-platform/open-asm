@@ -1,27 +1,33 @@
-import Page from "@/components/common/page";
+import Page from '@/components/common/page';
 import { ToolApiKeyDialog } from '@/components/tools/tool-api-key-dialog';
-import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from '@/components/ui/image';
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { ToolsControllerGetManyToolsType, useToolsControllerGetToolById } from "@/services/apis/gen/queries";
-import { Verified } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import ToolInstallButton from "./tool-install-button";
-import ToolRunButton from "./tool-run-button";
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import {
+  ToolsControllerGetManyToolsType,
+  useToolsControllerGetToolById,
+} from '@/services/apis/gen/queries';
+import { Group, Verified } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import ToolInstallButton from './tool-install-button';
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
   const { selectedWorkspace } = useWorkspaceSelector();
 
-  const { data: toolResponse, isLoading, error, refetch } = useToolsControllerGetToolById(
-    id || "", {
+  const {
+    data: toolResponse,
+    isLoading,
+    error,
+    refetch,
+  } = useToolsControllerGetToolById(id || '', {
     query: {
-      queryKey: [selectedWorkspace, id]
-    }
-  },
-  );
+      queryKey: [selectedWorkspace, id],
+    },
+  });
 
   // Local state to track installation status
   const [isInstalled, setIsInstalled] = useState(false);
@@ -35,7 +41,7 @@ export default function ToolDetail() {
 
   // Callback function to update installation status
   const handleInstallChange = () => {
-    setIsInstalled(prev => !prev);
+    setIsInstalled((prev) => !prev);
     refetch();
   };
 
@@ -59,11 +65,11 @@ export default function ToolDetail() {
 
   // Format category name for display
   const formatCategory = (category: string | undefined) => {
-    if (!category) return "N/A";
+    if (!category) return 'N/A';
     return category
-      .split("_")
+      .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+      .join(' ');
   };
 
   return (
@@ -73,7 +79,12 @@ export default function ToolDetail() {
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Logo section - moved to the left */}
 
-            <Image url={tool?.logoUrl} width={140} height={140} className='rounded-2xl' />
+            <Image
+              url={tool?.logoUrl}
+              width={140}
+              height={140}
+              className="rounded-2xl"
+            />
             {/* Content section */}
             <div className="flex-1">
               <div className="space-y-4">
@@ -88,26 +99,26 @@ export default function ToolDetail() {
                     )}
                   </div>
                   <div className="flex-shrink-0 flex items-center gap-2">
-                    <ToolApiKeyDialog
-                      tool={tool}
-                    />
+                    <ToolApiKeyDialog tool={tool} />
                     <ToolInstallButton
                       tool={tool}
-                      workspaceId={selectedWorkspace || ""}
+                      workspaceId={selectedWorkspace || ''}
                       onInstallChange={handleInstallChange}
                     />
-                    {(isInstalled || tool.isInstalled) && tool.type !== ToolsControllerGetManyToolsType.built_in && (
-                      <ToolRunButton
-                        tool={tool}
-                        workspaceId={selectedWorkspace || ""}
-                      />
-                    )}
-
+                    {(isInstalled || tool.isInstalled) &&
+                      tool.type !==
+                        ToolsControllerGetManyToolsType.built_in && (
+                        <Link to={`/assets/groups?toolId=${tool.id}`}>
+                          <Button>
+                            <Group /> Add to group
+                          </Button>
+                        </Link>
+                      )}
                   </div>
                 </div>
 
                 <p className="text-muted-foreground">
-                  {tool.description || "No description available."}
+                  {tool.description || 'No description available.'}
                 </p>
 
                 <div className="flex flex-wrap gap-2">
@@ -119,7 +130,10 @@ export default function ToolDetail() {
                     Category: {formatCategory(tool.category)}
                   </Badge>
                   <Badge variant="secondary" className="gap-1">
-                    Type: {tool.type === ToolsControllerGetManyToolsType.built_in ? "Built-in" : "Provider"}
+                    Type:{' '}
+                    {tool.type === ToolsControllerGetManyToolsType.built_in
+                      ? 'Built-in'
+                      : 'Provider'}
                   </Badge>
                 </div>
               </div>
@@ -127,7 +141,6 @@ export default function ToolDetail() {
           </div>
         </CardHeader>
       </Card>
-
     </Page>
   );
 }

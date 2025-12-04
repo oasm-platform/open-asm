@@ -2,7 +2,6 @@ import { Tabs } from '@/components/ui/tabs';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useMemo, useState } from 'react';
 import CreateWorkspace from '../workspaces/create-workspace';
-import { AssetGroupTab } from './components/asset-group-tab';
 import AssetTabContent from './components/asset-tab';
 import FilterFormInfinite from './components/filter-form-infinite';
 import IpAssetsTab from './components/ip-assets-tab';
@@ -19,7 +18,7 @@ export function ListAssets() {
     text: string;
     tab: React.ReactNode;
     isNew?: boolean;
-  }
+  };
 
   const tabList = useMemo<TabItem[]>(
     () => [
@@ -27,12 +26,6 @@ export function ListAssets() {
         value: 'asset',
         text: 'All Services',
         tab: <AssetTabContent />,
-      },
-      {
-        value: 'groups',
-        text: 'Groups',
-        tab: <AssetGroupTab />,
-        isNew: true,
       },
       {
         value: 'tech',
@@ -64,7 +57,7 @@ export function ListAssets() {
     <div className="w-full">
       {/* FilterFormInfinite always on top */}
       <div className="mb-4">
-        <FilterFormInfinite selectedTab={selectedTab} />
+        <FilterFormInfinite />
       </div>
 
       <Tabs
