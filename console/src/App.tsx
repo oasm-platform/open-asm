@@ -1,18 +1,18 @@
-import { Toaster } from "@/components/ui/sonner";
-import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { persistQueryClient } from "@tanstack/react-query-persist-client";
-import { RouterProvider } from "react-router-dom";
-import { ThemeProvider } from "./components/ui/theme-provider";
+import { Toaster } from '@/components/ui/sonner';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { persistQueryClient } from '@tanstack/react-query-persist-client';
+import { RouterProvider } from 'react-router-dom';
+import { ThemeProvider } from './components/ui/theme-provider';
 
-import { router } from "./routers";
+import { router } from './routers';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 0,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
       refetchInterval: false,
       refetchIntervalInBackground: false,
       retry: false,
@@ -22,7 +22,7 @@ const queryClient = new QueryClient({
 
 const localStoragePersister = createAsyncStoragePersister({
   storage: window.localStorage,
-  key: "rq-persist",
+  key: 'rq-persist',
 });
 
 persistQueryClient({

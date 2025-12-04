@@ -8,7 +8,7 @@ export default function AssetGroupDetail() {
   const { id } = useParams<{ id: string }>();
   const { data } = useAssetGroupControllerGetById(id!);
 
-  if (!data) return <div>Loading...</div>;
+  if (!data) return <div></div>;
 
   return (
     <Page title={data.name} isShowButtonGoBack>

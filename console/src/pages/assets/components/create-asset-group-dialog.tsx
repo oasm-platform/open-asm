@@ -17,11 +17,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { useAssetGroupControllerCreate } from '@/services/apis/gen/queries';
+import {
+  useAssetGroupControllerCreate,
+  type AssetGroup,
+} from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
 const formSchema = z.object({
@@ -46,6 +50,7 @@ export function CreateAssetGroupDialog({
     },
   });
 
+  const navigate = useNavigate();
   const { mutate: createAssetGroup, isPending } =
     useAssetGroupControllerCreate();
 
@@ -62,9 +67,10 @@ export function CreateAssetGroupDialog({
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (response: AssetGroup) => {
           setCreateDialogOpen(false);
           onSuccess?.();
+          navigate(`/assets/groups/${response.id}`);
           form.reset();
         },
       },
