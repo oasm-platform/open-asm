@@ -13,7 +13,7 @@ export class TriggerWorkflowService implements OnModuleInit {
     private toolsService: ToolsService,
     private dataSource: DataSource,
     private eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   onModuleInit() {
     // Listen all events with wildcard
@@ -21,14 +21,18 @@ export class TriggerWorkflowService implements OnModuleInit {
       this.getWorkflowByEvent(event)
         .then(async (workflow: Workflow | null) => {
           if (workflow) {
-            const firstJobs = workflow.content.jobs.map(j => j.run)[0];
+            const firstJobs = workflow.content.jobs.map((j) => j.run)[0];
             const tools = await this.toolsService.getToolByNames([firstJobs]);
-            await Promise.all(tools.map(tool => this.jobRegistryService.createNewJob({
-              tool,
-              targetIds: [payload.id],
-              workflow: workflow,
-              priority: tool.priority,
-            })));
+            await Promise.all(
+              tools.map((tool) =>
+                this.jobRegistryService.createNewJob({
+                  tool,
+                  targetIds: [payload.id],
+                  workflow: workflow,
+                  priority: tool.priority,
+                }),
+              ),
+            );
           }
         })
         .catch((error) => {
