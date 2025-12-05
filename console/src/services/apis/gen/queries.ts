@@ -836,11 +836,6 @@ export type CreateToolDto = {
   providerId: string;
 };
 
-export type RunToolDto = {
-  targetIds?: string[];
-  assetIds?: string[];
-};
-
 export type WorkspaceTool = {
   id: string;
   createdAt: string;
@@ -1154,8 +1149,6 @@ export const AssetGroupWorkflowSchedule = {
   '0_0_1_*_*': '0 0 1 * *',
 } as const;
 
-export type AssetGroupWorkflowJob = { [key: string]: unknown };
-
 export type AssetGroupWorkflow = {
   id: string;
   createdAt: string;
@@ -1163,7 +1156,6 @@ export type AssetGroupWorkflow = {
   assetGroup: AssetGroup;
   workflow: Workflow;
   schedule: AssetGroupWorkflowSchedule;
-  job: AssetGroupWorkflowJob;
 };
 
 export type GetManyAssetGroupWorkflowDto = {
@@ -14348,97 +14340,6 @@ export function useToolsControllerGetManyTools<
 }
 
 /**
- * Executes a security assessment tool with specified parameters in the designated workspace.
- * @summary Run a tool
- */
-export const toolsControllerRunTool = (
-  id: string,
-  runToolDto: RunToolDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    {
-      url: `/api/tools/${id}/run`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: runToolDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getToolsControllerRunToolMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof toolsControllerRunTool>>,
-    TError,
-    { id: string; data: RunToolDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof toolsControllerRunTool>>,
-  TError,
-  { id: string; data: RunToolDto },
-  TContext
-> => {
-  const mutationKey = ['toolsControllerRunTool'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof toolsControllerRunTool>>,
-    { id: string; data: RunToolDto }
-  > = (props) => {
-    const { id, data } = props ?? {};
-
-    return toolsControllerRunTool(id, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ToolsControllerRunToolMutationResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerRunTool>>
->;
-export type ToolsControllerRunToolMutationBody = RunToolDto;
-export type ToolsControllerRunToolMutationError = unknown;
-
-/**
- * @summary Run a tool
- */
-export const useToolsControllerRunTool = <TError = unknown, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof toolsControllerRunTool>>,
-      TError,
-      { id: string; data: RunToolDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof toolsControllerRunTool>>,
-  TError,
-  { id: string; data: RunToolDto },
-  TContext
-> => {
-  const mutationOptions = getToolsControllerRunToolMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
  * Associates an existing security tool with a specific workspace for targeted assessments.
  * @summary Add tool to workspace
  */
@@ -22611,6 +22512,96 @@ export const useAssetGroupControllerUpdateAssetGroupWorkflow = <
 > => {
   const mutationOptions =
     getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Runs the scheduler for a specific asset group workflow.
+ * @summary Runs the scheduler for a specific asset group workflow.
+ */
+export const assetGroupControllerRunGroupWorkflowScheduler = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/asset-group/workflows/${id}/run`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getAssetGroupControllerRunGroupWorkflowSchedulerMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRunGroupWorkflowScheduler'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return assetGroupControllerRunGroupWorkflowScheduler(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerRunGroupWorkflowSchedulerMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>
+  >;
+
+export type AssetGroupControllerRunGroupWorkflowSchedulerMutationError =
+  unknown;
+
+/**
+ * @summary Runs the scheduler for a specific asset group workflow.
+ */
+export const useAssetGroupControllerRunGroupWorkflowScheduler = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerRunGroupWorkflowSchedulerMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

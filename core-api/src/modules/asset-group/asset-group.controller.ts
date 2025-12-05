@@ -2,6 +2,8 @@ import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -12,6 +14,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Asset } from '../assets/entities/assets.entity';
@@ -30,7 +33,7 @@ import { AssetGroup } from './entities/asset-groups.entity';
 @ApiTags('Asset Group')
 @Controller('asset-group')
 export class AssetGroupController {
-  constructor(private readonly assetGroupService: AssetGroupService) { }
+  constructor(private readonly assetGroupService: AssetGroupService) {}
 
   @Doc({
     summary: 'Get all asset groups',
@@ -267,7 +270,8 @@ export class AssetGroupController {
 
   @Doc({
     summary: 'Update asset group workflow relationship',
-    description: 'Updates the relationship between an asset group and workflow, primarily to change the schedule.',
+    description:
+      'Updates the relationship between an asset group and workflow, primarily to change the schedule.',
     response: {
       serialization: AssetGroupWorkflow,
     },
@@ -281,7 +285,23 @@ export class AssetGroupController {
       assetGroupWorkflowId,
       {
         schedule: updateDto.schedule,
-      }
+      },
     );
+  }
+
+  @Doc({
+    summary: 'Runs the scheduler for a specific asset group workflow.',
+    description: 'Runs the scheduler for a specific asset group workflow.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @UseGuards(WorkspaceOwnerGuard)
+  @Post('workflows/:id/run')
+  runGroupWorkflowScheduler(@Param() queryParams: IdQueryParamDto) {
+    return this.assetGroupService.runGroupWorkflowScheduler(queryParams.id);
   }
 }

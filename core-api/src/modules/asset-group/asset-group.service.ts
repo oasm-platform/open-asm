@@ -772,7 +772,7 @@ export class AssetGroupService {
 
   public async runGroupWorkflowScheduler(
     assetGroupWorkflowId: string,
-  ): Promise<void> {
+  ): Promise<DefaultMessageResponseDto> {
     // Get the asset group workflow to access the workflow
     const assetGroupWorkflow = await this.assetGroupWorkflowRepo
       .createQueryBuilder('assetGroupWorkflow')
@@ -812,6 +812,8 @@ export class AssetGroupService {
         }),
       ),
     );
-    return;
+    return {
+      message: `Run scheduler for asset group workflow with ID ${assetGroupWorkflowId}`,
+    };
   }
 }
