@@ -1092,6 +1092,7 @@ export type AssetGroup = {
   createdAt: string;
   updatedAt: string;
   name: string;
+  hexColor?: string;
 };
 
 export type GetManyAssetGroupDto = {
@@ -1101,6 +1102,13 @@ export type GetManyAssetGroupDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type UpdateAssetGroupDto = {
+  /** Name of the asset group */
+  name?: string;
+  /** Hex color of the asset group */
+  hexColor?: string;
 };
 
 export type CreateAssetGroupDto = {
@@ -20156,6 +20164,101 @@ export function useAssetGroupControllerGetById<
 
   return query;
 }
+
+/**
+ * Updates an existing asset group by ID.
+ * @summary Update asset group
+ */
+export const assetGroupControllerUpdateAssetGroupById = (
+  id: string,
+  updateAssetGroupDto: UpdateAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AssetGroup>(
+    {
+      url: `/api/asset-group/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAssetGroupDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerUpdateAssetGroupByIdMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+    TError,
+    { id: string; data: UpdateAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+  TError,
+  { id: string; data: UpdateAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerUpdateAssetGroupById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+    { id: string; data: UpdateAssetGroupDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetGroupControllerUpdateAssetGroupById(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerUpdateAssetGroupByIdMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>
+  >;
+export type AssetGroupControllerUpdateAssetGroupByIdMutationBody =
+  UpdateAssetGroupDto;
+export type AssetGroupControllerUpdateAssetGroupByIdMutationError = unknown;
+
+/**
+ * @summary Update asset group
+ */
+export const useAssetGroupControllerUpdateAssetGroupById = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+      TError,
+      { id: string; data: UpdateAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+  TError,
+  { id: string; data: UpdateAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerUpdateAssetGroupByIdMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * Permanently removes an asset group.

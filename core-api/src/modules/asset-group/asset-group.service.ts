@@ -20,6 +20,7 @@ import { ToolsService } from '../tools/tools.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
+import { UpdateAssetGroupDto } from './dto/update-asset-group.dto';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
 import { AssetGroup } from './entities/asset-groups.entity';
@@ -100,12 +101,6 @@ export class AssetGroupService {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id, workspace: { id: workspaceId } },
-        relations: [
-          'assetGroupAssets',
-          'assetGroupWorkflows',
-          'assetGroupWorkflows.workflow',
-          'assetGroupAssets.asset',
-        ],
       });
 
       if (!assetGroup) {
@@ -114,13 +109,7 @@ export class AssetGroupService {
         );
       }
 
-      const response = new AssetGroup();
-      response.id = assetGroup.id;
-      response.name = assetGroup.name;
-      response.createdAt = assetGroup.createdAt;
-      response.updatedAt = assetGroup.updatedAt;
-
-      return response;
+      return assetGroup;
     } catch (error) {
       this.logger.error(
         `Error retrieving asset group with ID ${id} for workspace ${workspaceId}:`,
@@ -800,6 +789,12 @@ export class AssetGroupService {
       .where('agw.id = :assetGroupWorkflowId', { assetGroupWorkflowId })
       .getMany();
 
+    if (assets.length === 0) {
+      throw new BadRequestException(
+        'Asset group workflow does not have any assets associated with it.',
+      );
+    }
+
     const firstJobs = workflow.content.jobs.map((j) => j.run)[0];
     const tools = await this.toolsService.getToolByNames([firstJobs]);
     await Promise.all(
@@ -815,5 +810,46 @@ export class AssetGroupService {
     return {
       message: `Run scheduler for asset group workflow with ID ${assetGroupWorkflowId}`,
     };
+  }
+
+  /**
+   * Updates an existing asset group
+   */
+  async updateAssetGroupById(
+    id: string,
+    updateAssetGroupDto: UpdateAssetGroupDto,
+    workspaceId: string,
+  ): Promise<AssetGroup> {
+    try {
+      // Find the asset group
+      const assetGroup = await this.assetGroupRepo.findOne({
+        where: { id, workspace: { id: workspaceId } },
+      });
+
+      if (!assetGroup) {
+        throw new NotFoundException(
+          `Asset group with ID "${id}" not found in workspace "${workspaceId}"`,
+        );
+      }
+
+      // Update fields if provided
+      if (updateAssetGroupDto.name !== undefined) {
+        assetGroup.name = updateAssetGroupDto.name;
+      }
+      if (updateAssetGroupDto.hexColor !== undefined) {
+        assetGroup.hexColor = updateAssetGroupDto.hexColor;
+      }
+
+      // Save the updated asset group
+      const updatedAssetGroup = await this.assetGroupRepo.save(assetGroup);
+
+      return updatedAssetGroup;
+    } catch (error) {
+      this.logger.error(
+        `Error updating asset group with ID ${id} in workspace ${workspaceId}:`,
+        error,
+      );
+      throw error;
+    }
   }
 }

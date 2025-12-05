@@ -1171,6 +1171,8 @@ export interface AssetGroup {
   /** @format date-time */
   updatedAt: string;
   name: string;
+  /** @example "#78716C" */
+  hexColor?: string;
 }
 
 export interface GetManyAssetGroupDto {
@@ -1180,6 +1182,19 @@ export interface GetManyAssetGroupDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+}
+
+export interface UpdateAssetGroupDto {
+  /**
+   * Name of the asset group
+   * @example "Web Servers"
+   */
+  name?: string;
+  /**
+   * Hex color of the asset group
+   * @example "#78716C"
+   */
+  hexColor?: string;
 }
 
 export interface CreateAssetGroupDto {
@@ -3361,6 +3376,28 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${id}`,
       method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates an existing asset group by ID.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerUpdateAssetGroupById
+   * @summary Update asset group
+   * @request PATCH:/api/asset-group/{id}
+   */
+  assetGroupControllerUpdateAssetGroupById = (
+    id: string,
+    data: UpdateAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });

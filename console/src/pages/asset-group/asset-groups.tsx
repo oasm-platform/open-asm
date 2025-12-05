@@ -34,7 +34,15 @@ export function AssetGroups() {
     {
       accessorKey: 'name',
       header: 'Name',
-      cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
+      cell: ({ row }) => (
+        <div className="font-medium flex gap-2">
+          <div
+            className={`h-5 w-5 rounded-full`}
+            style={{ background: row.original.hexColor }}
+          ></div>
+          <span>{row.original.name}</span>
+        </div>
+      ),
     },
     {
       accessorKey: 'createdAt',
