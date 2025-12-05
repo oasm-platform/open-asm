@@ -27,6 +27,7 @@ import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { RemoveManyAssetsFromAssetGroupDto } from './dto/remove-many-assets-from-asset-group.dto';
 import { RemoveManyWorkflowsFromAssetGroupDto } from './dto/remove-many-workflows-from-asset-group.dto';
 import { UpdateAssetGroupWorkflowDto } from './dto/update-asset-group-workflow.dto';
+import { UpdateAssetGroupDto } from './dto/update-asset-group.dto';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
 import { AssetGroup } from './entities/asset-groups.entity';
 
@@ -67,6 +68,29 @@ export class AssetGroupController {
   @Get(':id')
   getById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
     return this.assetGroupService.getAssetGroupById(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Update asset group',
+    description: 'Updates an existing asset group by ID.',
+    response: {
+      serialization: AssetGroup,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Patch(':id')
+  updateAssetGroupById(
+    @Param() param: IdQueryParamDto,
+    @Body() updateAssetGroupDto: UpdateAssetGroupDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetGroupService.updateAssetGroupById(
+      param.id,
+      updateAssetGroupDto,
+      workspaceId,
+    );
   }
 
   @Doc({

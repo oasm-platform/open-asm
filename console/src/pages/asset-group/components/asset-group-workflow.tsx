@@ -223,7 +223,7 @@ export default function AssetGroupWorkflow({
   return (
     <div className="space-y-4 mb-4">
       <h2 className="text-xl font-semibold">Tools</h2>
-      <div className="flex justify-between items-center">
+      <div className="flex-col md:flex-row flex justify-start md:justify-between md:items-center gap-2">
         <div className="flex gap-4">
           {vulnerabilityTools.map((tool) => {
             const isAdded = isToolInGroup(tool.name);
@@ -306,7 +306,7 @@ export default function AssetGroupWorkflow({
             );
           })}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 justify-between">
           <ScanScheduleSelect
             disabled={isPendingUpdateSchedule || !groupWorkflows?.data[0]?.id}
             value={

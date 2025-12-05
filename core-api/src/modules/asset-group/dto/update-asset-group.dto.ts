@@ -10,4 +10,13 @@ export class UpdateAssetGroupDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @ApiProperty({
+    description: 'Hex color of the asset group',
+    example: '#78716C',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  hexColor?: string;
 }
