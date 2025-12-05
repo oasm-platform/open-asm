@@ -43,4 +43,7 @@ export class AssetGroup extends BaseEntity {
     (assetGroupWorkflows) => assetGroupWorkflows.assetGroup,
   )
   assetGroupWorkflows: AssetGroupWorkflow[];
+
+  @ApiProperty()
+  totalAssets: number;
 }

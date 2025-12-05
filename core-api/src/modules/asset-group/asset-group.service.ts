@@ -13,7 +13,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
-import { FindOptionsWhere, In, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { ToolsService } from '../tools/tools.service';
@@ -48,40 +48,97 @@ export class AssetGroupService {
   /**
    * Retrieves all asset groups with optional filtering and pagination
    */
-  async getAll(query: GetAllAssetGroupsQueryDto, workspaceId: string) {
+  async getManyAssetGroups(
+    query: GetAllAssetGroupsQueryDto,
+    workspaceId: string,
+  ) {
     try {
       const { page, limit, sortBy, sortOrder } = query;
       const offset = (page - 1) * limit;
 
-      const whereConditions:
-        | FindOptionsWhere<AssetGroup>
-        | FindOptionsWhere<AssetGroup>[]
-        | undefined = {
-        workspace: { id: workspaceId },
-      };
+      // Build query using query builder to get asset groups with asset counts
+      const queryBuilder = this.assetGroupRepo
+        .createQueryBuilder('assetGroup')
+        .leftJoin('assetGroup.workspace', 'workspace')
+        .where('workspace.id = :workspaceId', { workspaceId });
 
-      if (query.targetIds && query.targetIds.length > 0) {
-        whereConditions.assetGroupAssets = {
-          asset: {
-            targetId: In(query.targetIds || []),
-          },
-        };
+      // Add search filter if provided
+      if (query.search && query.search.trim() !== '') {
+        queryBuilder.andWhere('assetGroup.name ILIKE :search', {
+          search: `%${query.search.trim()}%`,
+        });
       }
 
-      const [data, total] = await this.assetGroupRepo.findAndCount({
-        where: whereConditions,
-        order: { [sortBy]: sortOrder },
-        skip: offset,
-        take: limit,
-        relations: [
-          'assetGroupAssets',
-          'assetGroupWorkflows',
-          'assetGroupWorkflows.workflow',
-          'assetGroupAssets.asset',
-        ],
-      });
+      // Add targetIds filter if provided
+      if (query.targetIds && query.targetIds.length > 0) {
+        queryBuilder
+          .leftJoin('assetGroup.assetGroupAssets', 'aga')
+          .leftJoin('aga.asset', 'asset')
+          .andWhere('asset.targetId IN (:...targetIds)', {
+            targetIds: query.targetIds,
+          });
+      }
 
-      return getManyResponse({ query, data, total });
+      // Add asset count subquery
+      queryBuilder.addSelect(
+        (subQuery) =>
+          subQuery
+            .select('COUNT(aga_sub.id)', 'count')
+            .from('assets_group_assets', 'aga_sub')
+            .where('aga_sub."assetGroupId" = assetGroup.id'),
+        'totalAssets',
+      );
+
+      // Get total count with the same base conditions (without pagination)
+      const countQueryBuilder = this.assetGroupRepo
+        .createQueryBuilder('assetGroup')
+        .leftJoin('assetGroup.workspace', 'workspace')
+        .where('workspace.id = :workspaceId', { workspaceId });
+
+      if (query.search && query.search.trim() !== '') {
+        countQueryBuilder.andWhere('assetGroup.name ILIKE :search', {
+          search: `%${query.search.trim()}%`,
+        });
+      }
+
+      if (query.targetIds && query.targetIds.length > 0) {
+        countQueryBuilder
+          .leftJoin('assetGroup.assetGroupAssets', 'aga')
+          .leftJoin('aga.asset', 'asset')
+          .andWhere('asset.targetId IN (:...targetIds)', {
+            targetIds: query.targetIds,
+          });
+      }
+
+      const total = await countQueryBuilder.getCount();
+
+      // Apply ordering, pagination to main query
+      queryBuilder
+        .orderBy(`assetGroup.${sortBy}`, sortOrder)
+        .offset(offset)
+        .limit(limit);
+
+      const results: {
+        entities: AssetGroup[];
+        raw: Array<{ totalAssets: string }>;
+      } = await queryBuilder.getRawAndEntities();
+
+      // Map results to include totalAssets in the entity
+      const assetGroupsWithTotalAssets = results.entities.map(
+        (assetGroup, index) => {
+          const rawResult = results.raw[index];
+          return {
+            ...assetGroup,
+            totalAssets: parseInt(rawResult.totalAssets) || 0,
+          };
+        },
+      );
+
+      return getManyResponse({
+        query,
+        data: assetGroupsWithTotalAssets,
+        total,
+      });
     } catch (error) {
       this.logger.error(
         `Error retrieving asset groups for workspace ${workspaceId}:`,

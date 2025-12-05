@@ -1093,6 +1093,7 @@ export type AssetGroup = {
   updatedAt: string;
   name: string;
   hexColor?: string;
+  totalAssets: number;
 };
 
 export type GetManyAssetGroupDto = {
@@ -1237,6 +1238,7 @@ export type GetManyMcpPermissionDto = {
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1245,6 +1247,7 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
 };
 
 export type WorkspacesControllerGetWorkspacesParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1256,6 +1259,7 @@ export type WorkspacesControllerGetWorkspacesParams = {
 };
 
 export type JobsRegistryControllerGetManyJobsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1263,6 +1267,7 @@ export type JobsRegistryControllerGetManyJobsParams = {
 };
 
 export type AssetsControllerGetAssetsInWorkspaceParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1276,6 +1281,7 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
 };
 
 export type AssetsControllerGetIpAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1289,6 +1295,7 @@ export type AssetsControllerGetIpAssetsParams = {
 };
 
 export type AssetsControllerGetPortAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1302,6 +1309,7 @@ export type AssetsControllerGetPortAssetsParams = {
 };
 
 export type AssetsControllerGetTechnologyAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1315,6 +1323,7 @@ export type AssetsControllerGetTechnologyAssetsParams = {
 };
 
 export type AssetsControllerGetStatusCodeAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1328,6 +1337,7 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
 };
 
 export type WorkersControllerGetWorkersParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1336,6 +1346,7 @@ export type WorkersControllerGetWorkersParams = {
 };
 
 export type SearchControllerSearchAssetsTargetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1346,6 +1357,7 @@ export type SearchControllerSearchAssetsTargetsParams = {
 };
 
 export type SearchControllerGetSearchHistoryParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1362,6 +1374,7 @@ export type StatisticControllerGetStatisticsParams = {
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1377,6 +1390,7 @@ export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
 };
 
 export type ToolsControllerGetManyToolsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1425,6 +1439,7 @@ export const ToolsControllerGetInstalledToolsCategory = {
 } as const;
 
 export type WorkflowsControllerGetManyWorkflowsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1436,6 +1451,7 @@ export type WorkflowsControllerGetManyWorkflowsParams = {
 };
 
 export type ProvidersControllerGetManyProvidersParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1444,6 +1460,7 @@ export type ProvidersControllerGetManyProvidersParams = {
 };
 
 export type TemplatesControllerGetAllTemplatesParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1452,6 +1469,7 @@ export type TemplatesControllerGetAllTemplatesParams = {
 };
 
 export type AssetGroupControllerGetAllParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1460,6 +1478,7 @@ export type AssetGroupControllerGetAllParams = {
 };
 
 export type AssetGroupControllerGetAssetsByAssetGroupsIdParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1467,6 +1486,7 @@ export type AssetGroupControllerGetAssetsByAssetGroupsIdParams = {
 };
 
 export type AssetGroupControllerGetWorkflowsByAssetGroupsIdParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1474,6 +1494,7 @@ export type AssetGroupControllerGetWorkflowsByAssetGroupsIdParams = {
 };
 
 export type AssetGroupControllerGetAssetsNotInAssetGroupParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1481,6 +1502,7 @@ export type AssetGroupControllerGetAssetsNotInAssetGroupParams = {
 };
 
 export type AssetGroupControllerGetWorkflowsNotInAssetGroupParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1507,6 +1529,7 @@ export type StorageControllerForwardImageParams = {
 };
 
 export type McpControllerGetMcpPermissionsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;

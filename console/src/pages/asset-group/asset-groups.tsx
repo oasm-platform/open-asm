@@ -23,8 +23,8 @@ import { CreateAssetGroupDialog } from '../assets/components/create-asset-group-
 
 export function AssetGroups() {
   const {
-    tableParams: { page, pageSize, sortBy, sortOrder },
-    tableHandlers: { setPage, setPageSize },
+    tableParams: { page, pageSize, sortBy, sortOrder, filter },
+    tableHandlers: { setPage, setPageSize, setFilter },
   } = useServerDataTable();
 
   const { mutate } = useAssetGroupControllerDelete();
@@ -42,6 +42,13 @@ export function AssetGroups() {
           ></div>
           <span>{row.original.name}</span>
         </div>
+      ),
+    },
+    {
+      accessorKey: 'totalAssets',
+      header: 'Total Assets',
+      cell: ({ row }) => (
+        <div className="font-medium">{row.original.totalAssets || 0}</div>
       ),
     },
     {
@@ -97,10 +104,11 @@ export function AssetGroups() {
       page: page,
       sortBy: 'name',
       sortOrder: sortOrder,
+      search: filter,
     },
     {
       query: {
-        queryKey: ['asset-group'],
+        queryKey: ['asset-group', pageSize, page, sortBy, sortOrder, filter],
       },
     },
   );
@@ -133,6 +141,9 @@ export function AssetGroups() {
         isShowBorder={true}
         onRowClick={(row) => navigate('/assets/groups/' + row.id)}
         emptyMessage="No asset groups found"
+        filterColumnKey="name"
+        filterValue={filter}
+        onFilterChange={setFilter}
       />
     </Page>
   );
