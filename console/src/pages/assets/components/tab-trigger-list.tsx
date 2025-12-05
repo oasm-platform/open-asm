@@ -1,9 +1,11 @@
+import { NewBadge } from "@/components/common/new-badge";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Prop = {
   tabTriggerList: {
     value: string;
     text: string;
+    isNew?: boolean;
   }[];
 };
 
@@ -17,6 +19,9 @@ export default function TriggerList({ tabTriggerList }: Prop) {
           className="hover:cursor-pointer"
         >
           {e.text}
+          {e.isNew && (
+            <NewBadge className="ml-2" />
+          )}
         </TabsTrigger>
       ))}
     </TabsList>

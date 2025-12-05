@@ -8,7 +8,6 @@ import {
   McpServerConfig,
   UpdateMcpServersDto,
   UpdateMcpServersResponseDto,
-  DeleteMcpServersDto,
   DeleteMcpServersResponseDto,
   GetMcpServersResponseDto,
   McpServerConfigWithStatus,
@@ -247,7 +246,7 @@ export class AiAssistantService implements OnModuleInit {
    * Delete MCP config by ID
    */
   async deleteMcpServers(
-    deleteMcpServersDto: DeleteMcpServersDto,
+    id: string,
     workspaceId: string,
     userId: string,
   ): Promise<DeleteMcpServersResponseDto> {
@@ -256,7 +255,7 @@ export class AiAssistantService implements OnModuleInit {
       const response = await firstValueFrom(
         this.mcpServerService.deleteMcpServers(
           {
-            id: deleteMcpServersDto.id,
+            id,
           },
           metadata,
         ),
@@ -296,8 +295,8 @@ export class AiAssistantService implements OnModuleInit {
    * Update a conversation
    */
   async updateConversation(
+    conversationId: string,
     updateConversationDto: {
-      conversationId: string;
       title?: string;
       description?: string;
     },
@@ -309,7 +308,7 @@ export class AiAssistantService implements OnModuleInit {
       const response = await firstValueFrom(
         this.conversationService.updateConversation(
           {
-            conversationId: updateConversationDto.conversationId,
+            conversationId,
             title: updateConversationDto.title || '',
             description: updateConversationDto.description || '',
           },
@@ -329,7 +328,7 @@ export class AiAssistantService implements OnModuleInit {
    * Delete a conversation
    */
   async deleteConversation(
-    deleteConversationDto: { conversationId: string },
+    conversationId: string,
     workspaceId: string,
     userId: string,
   ): Promise<DeleteConversationResponseDto> {
@@ -338,7 +337,7 @@ export class AiAssistantService implements OnModuleInit {
       const response = await firstValueFrom(
         this.conversationService.deleteConversation(
           {
-            conversationId: deleteConversationDto.conversationId,
+            conversationId,
           },
           metadata,
         ),
@@ -424,9 +423,9 @@ export class AiAssistantService implements OnModuleInit {
    * Update a message (returns Observable for SSE streaming)
    */
   updateMessage(
+    conversationId: string,
+    messageId: string,
     updateMessageDto: {
-      conversationId: string;
-      messageId: string;
       question: string;
     },
     workspaceId: string,
@@ -435,8 +434,8 @@ export class AiAssistantService implements OnModuleInit {
     const metadata = this.createMetadata(workspaceId, userId);
     return this.messageService.updateMessage(
       {
-        conversationId: updateMessageDto.conversationId,
-        messageId: updateMessageDto.messageId,
+        conversationId,
+        messageId,
         question: updateMessageDto.question,
       },
       metadata,
@@ -447,7 +446,8 @@ export class AiAssistantService implements OnModuleInit {
    * Delete a message
    */
   async deleteMessage(
-    deleteMessageDto: { conversationId: string; messageId: string },
+    conversationId: string,
+    messageId: string,
     workspaceId: string,
     userId: string,
   ): Promise<DeleteMessageResponseDto> {
@@ -456,8 +456,8 @@ export class AiAssistantService implements OnModuleInit {
       const response = await firstValueFrom(
         this.messageService.deleteMessage(
           {
-            conversationId: deleteMessageDto.conversationId,
-            messageId: deleteMessageDto.messageId,
+            conversationId,
+            messageId,
           },
           metadata,
         ),

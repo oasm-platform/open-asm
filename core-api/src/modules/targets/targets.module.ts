@@ -22,4 +22,4 @@ import { TargetsService } from './targets.service';
   providers: [TargetsService, TriggerWorkflowService],
   exports: [TargetsService],
 })
-export class TargetsModule { }
+export class TargetsModule {}

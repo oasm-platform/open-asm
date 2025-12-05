@@ -1,27 +1,19 @@
+import Page from '@/components/common/page';
 import { useAssetGroupControllerGetById } from '@/services/apis/gen/queries';
 import { useParams } from 'react-router-dom';
+import AssetGroupWorkflow from './components/asset-group-workflow';
 import { AssetSection } from './components/asset-section';
 
 export default function AssetGroupDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data, refetch } = useAssetGroupControllerGetById(id!);
+  const { data } = useAssetGroupControllerGetById(id!);
 
-  if (!data) return <div>Loading...</div>;
+  if (!data) return <div></div>;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">{data.name}</h1>
-        <p className="text-muted-foreground">
-          Asset Group ID: {data.id} | Created:{' '}
-          {new Date(data.createdAt).toLocaleDateString()}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <AssetSection assetGroupId={id!} refetch={refetch} />
-        {/* <WorkflowSection assetGroupId={id!} refetch={refetch} /> */}
-      </div>
-    </div>
+    <Page title={data.name} isShowButtonGoBack>
+      <AssetGroupWorkflow assetGroupId={id!} />
+      <AssetSection assetGroupId={id!} />
+    </Page>
   );
 }

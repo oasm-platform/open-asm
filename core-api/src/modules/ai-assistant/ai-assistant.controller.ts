@@ -1,13 +1,13 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
+  Param,
   Patch,
   Post,
   UseGuards,
   Sse,
-  Query,
+  Delete,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AiAssistantService } from './ai-assistant.service';
@@ -19,7 +19,6 @@ import {
   AddMcpServersResponseDto,
   UpdateMcpServersDto,
   UpdateMcpServersResponseDto,
-  DeleteMcpServersDto,
   DeleteMcpServersResponseDto,
 } from './dto/mcp-servers.dto';
 import {
@@ -30,7 +29,6 @@ import {
   GetConversationsResponseDto,
   UpdateConversationDto,
   UpdateConversationResponseDto,
-  DeleteConversationDto,
   DeleteConversationResponseDto,
   DeleteConversationsResponseDto,
 } from './dto/conversation.dto';
@@ -38,7 +36,6 @@ import {
   GetMessagesResponseDto,
   CreateMessageDto,
   UpdateMessageDto,
-  DeleteMessageDto,
   DeleteMessageResponseDto,
 } from './dto/message.dto';
 import { map, Observable } from 'rxjs';
@@ -148,17 +145,13 @@ export class AiAssistantController {
       getWorkspaceId: true,
     },
   })
-  @Delete('mcp-servers')
+  @Delete('mcp-servers/:id')
   async deleteMcpServers(
-    @Body() deleteMcpServersDto: DeleteMcpServersDto,
+    @Param('id') id: string,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Promise<DeleteMcpServersResponseDto> {
-    return this.aiAssistantService.deleteMcpServers(
-      deleteMcpServersDto,
-      workspaceId,
-      userId,
-    );
+    return this.aiAssistantService.deleteMcpServers(id, workspaceId, userId);
   }
 
   @Doc({
@@ -190,13 +183,15 @@ export class AiAssistantController {
       getWorkspaceId: true,
     },
   })
-  @Patch('conversations')
+  @Patch('conversations/:id')
   async updateConversation(
+    @Param('id') conversationId: string,
     @Body() updateConversationDto: UpdateConversationDto,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Promise<UpdateConversationResponseDto> {
     return this.aiAssistantService.updateConversation(
+      conversationId,
       updateConversationDto,
       workspaceId,
       userId,
@@ -215,12 +210,12 @@ export class AiAssistantController {
   })
   @Delete('conversations/:id')
   async deleteConversation(
-    @Body() deleteConversationDto: DeleteConversationDto,
+    @Param('id') conversationId: string,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Promise<DeleteConversationResponseDto> {
     return this.aiAssistantService.deleteConversation(
-      deleteConversationDto,
+      conversationId,
       workspaceId,
       userId,
     );
@@ -254,9 +249,9 @@ export class AiAssistantController {
       getWorkspaceId: true,
     },
   })
-  @Get('messages')
+  @Get('conversations/:id/messages')
   async getMessages(
-    @Query('conversationId') conversationId: string,
+    @Param('id') conversationId: string,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Promise<GetMessagesResponseDto> {
@@ -298,14 +293,22 @@ export class AiAssistantController {
       getWorkspaceId: true,
     },
   })
-  @Sse('messages/update-stream')
+  @Sse('conversations/:conversationId/messages/:messageId/stream')
   updateMessageStream(
+    @Param('conversationId') conversationId: string,
+    @Param('messageId') messageId: string,
     @Body() updateMessageDto: UpdateMessageDto,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Observable<{ data: string }> {
     return this.aiAssistantService
-      .updateMessage(updateMessageDto, workspaceId, userId)
+      .updateMessage(
+        conversationId,
+        messageId,
+        updateMessageDto,
+        workspaceId,
+        userId,
+      )
       .pipe(
         map((data) => ({
           data: JSON.stringify(data),
@@ -323,14 +326,16 @@ export class AiAssistantController {
       getWorkspaceId: true,
     },
   })
-  @Delete('messages')
+  @Delete('conversations/:conversationId/messages/:messageId')
   async deleteMessage(
-    @Body() deleteMessageDto: DeleteMessageDto,
+    @Param('conversationId') conversationId: string,
+    @Param('messageId') messageId: string,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Promise<DeleteMessageResponseDto> {
     return this.aiAssistantService.deleteMessage(
-      deleteMessageDto,
+      conversationId,
+      messageId,
       workspaceId,
       userId,
     );

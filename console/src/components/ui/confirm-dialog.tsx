@@ -61,7 +61,7 @@ export const ConfirmDialog = ({
                     <Button variant="outline" onClick={() => setOpen(false)} disabled={disabled}>
                         {cancelText}
                     </Button>
-                    <Button onClick={handleConfirm} disabled={disabled}>{confirmText}</Button>
+                    <Button onClick={handleConfirm} disabled={disabled} autoFocus>{confirmText}</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

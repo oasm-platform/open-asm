@@ -225,6 +225,7 @@ export interface Job {
   /** @format date-time */
   completedAt: string;
   command: string;
+  assetServiceId: string;
 }
 
 export interface GetManyJobDto {
@@ -361,20 +362,9 @@ export interface HttpResponseDTO {
   knowledgebase: KnowledgebaseInfo;
   resolvers: string[];
   chain_status_codes: string[];
-  assetId: string;
+  assetServiceId: string;
   jobHistoryId: string;
   techList: string[];
-}
-
-export interface Port {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  ports: string[];
-  assetId: string;
-  jobHistoryId: string;
 }
 
 export interface GetAssetsResponseDto {
@@ -390,7 +380,7 @@ export interface GetAssetsResponseDto {
   dnsRecords?: object;
   ipAddresses: string[];
   httpResponses?: HttpResponseDTO;
-  ports?: Port;
+  port?: number;
   isEnabled: boolean;
 }
 
@@ -574,7 +564,6 @@ export interface Asset {
   targetId: string;
   isPrimary: boolean;
   dnsRecords: object;
-  isErrorPage: boolean;
   isEnabled: boolean;
 }
 
@@ -971,6 +960,95 @@ export interface GetManyStringDto {
   pageCount: number;
 }
 
+export interface GetManyWorkflowsResponseDto {
+  /** The unique identifier of the workflow */
+  id: string;
+  /** The name of the workflow */
+  name: string;
+  /** The file path of the workflow */
+  filePath: string;
+  /** The workflow content */
+  content: object;
+  /**
+   * When the workflow was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the workflow was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The user who created this workflow */
+  createdBy?: object;
+  /** The workspace this workflow belongs to */
+  workspace?: object;
+}
+
+export interface GetManyGetManyWorkflowsResponseDtoDto {
+  data: GetManyWorkflowsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface On {
+  target: string[];
+  schedule: OnScheduleEnum;
+}
+
+export interface WorkflowJob {
+  name: string;
+  run: string;
+}
+
+export interface WorkflowContent {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+}
+
+export interface Workflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  content: WorkflowContent;
+}
+
+export interface CreateWorkflowDto {
+  /**
+   * Name of the workflow
+   * @example "Vulnerability Scan Workflow"
+   */
+  name: string;
+  /** Content of the workflow in JSON format */
+  content: WorkflowContent;
+  /**
+   * File path for the workflow
+   * @example "workflows/vulnerability-scan.yaml"
+   */
+  filePath?: string;
+}
+
+export interface UpdateWorkflowDto {
+  /**
+   * Name of the workflow
+   * @example "Vulnerability Scan Workflow"
+   */
+  name?: string;
+  /** Content of the workflow in JSON format */
+  content?: WorkflowContent;
+  /**
+   * File path for the workflow
+   * @example "workflows/vulnerability-scan.yaml"
+   */
+  filePath?: string;
+}
+
 export interface ToolProvider {
   id: string;
   /** @format date-time */
@@ -1091,33 +1169,17 @@ export interface RunTemplateDto {
   assetId: string;
 }
 
-export interface AssetGroupResponseDto {
-  /**
-   * ID of the asset group
-   * @example "123e4567-e89b-12d3-a456-426614174000"
-   */
+export interface AssetGroup {
   id: string;
-  /**
-   * Name of the asset group
-   * @example "Web Servers"
-   */
-  name: string;
-  /**
-   * Date when the asset group was created
-   * @format date-time
-   * @example "2023-01-01T00:00.000Z"
-   */
+  /** @format date-time */
   createdAt: string;
-  /**
-   * Date when the asset group was last updated
-   * @format date-time
-   * @example "2023-01-01T00:00:00.000Z"
-   */
+  /** @format date-time */
   updatedAt: string;
+  name: string;
 }
 
-export interface GetManyAssetGroupResponseDtoDto {
-  data: AssetGroupResponseDto[];
+export interface GetManyAssetGroupDto {
+  data: AssetGroup[];
   total: number;
   page: number;
   limit: number;
@@ -1131,11 +1193,6 @@ export interface CreateAssetGroupDto {
    * @example "Web Servers"
    */
   name: string;
-  /**
-   * ID of the workspace the asset group belongs to
-   * @example "123e4567-e89b-12d3-a456-426614174000"
-   */
-  workspaceId: string;
 }
 
 export interface AddManyWorkflowsToAssetGroupDto {
@@ -1179,12 +1236,24 @@ export interface GetManyAssetDto {
   pageCount: number;
 }
 
-export interface Workflow {
+export interface AssetGroupWorkflow {
   id: string;
   /** @format date-time */
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
+  assetGroup: AssetGroup;
+  workflow: Workflow;
+  schedule: AssetGroupWorkflowScheduleEnum;
+}
+
+export interface GetManyAssetGroupWorkflowDto {
+  data: AssetGroupWorkflow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 }
 
 export interface GetManyWorkflowDto {
@@ -1196,135 +1265,202 @@ export interface GetManyWorkflowDto {
   pageCount: number;
 }
 
+export interface UpdateAssetGroupWorkflowDto {
+  schedule: UpdateAssetGroupWorkflowDtoScheduleEnum;
+}
+
 export interface GenerateTagsResponseDto {
   /**
-   * The domain that was analyzed
+   * Domain that tags were generated for
    * @example "example.com"
    */
   domain: string;
   /**
-   * Array of generated tags for the domain
-   * @example ["technology","business","web"]
+   * Generated tags
+   * @example ["web","technology","blog"]
    */
   tags: string[];
 }
 
 export interface GenerateTagsDto {
   /**
-   * Domain name to generate tags for
+   * Domain to generate tags for
    * @example "example.com"
    */
   domain: string;
 }
 
 export interface AddMcpServersResponseDto {
-  servers: object[];
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** MCP servers configuration with status */
+  mcpServers: object;
+  /** Whether the operation succeeded */
   success: boolean;
+  /** Error message if operation failed */
+  error?: string;
 }
 
 export interface AddMcpServersDto {
   /**
-   * MCP server configuration in Claude Desktop format
-   * @example {"mcpServers":{"example-server":{"command":"node","args":["path/to/server.js"],"env":{"API_KEY":"xxx"}}}}
+   * MCP servers configuration object
+   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"5cN3KVQ9..."},"disabled":false},"searxng":{"command":"npx","args":["-y","mcp-searxng"],"env":{"SEARXNG_URL":"http://localhost:8081"},"disabled":false}}
    */
-  mcpConfig: object;
+  mcpServers: object;
 }
 
 export interface UpdateMcpServersResponseDto {
-  servers: object[];
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** Updated MCP servers configuration with status */
+  mcpServers: object;
+  /** Whether the operation succeeded */
   success: boolean;
 }
 
 export interface UpdateMcpServersDto {
   /**
-   * MCP server configuration to update
-   * @example {"mcpServers":{"example-server":{"command":"node","args":["path/to/updated-server.js"]}}}
+   * MCP servers configuration object
+   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"updated-key"},"disabled":false}}
    */
-  mcpConfig: object;
+  mcpServers: object;
 }
 
 export interface DeleteMcpServersResponseDto {
+  /** Whether the operation succeeded */
   success: boolean;
-}
-
-export interface DeleteMcpServersDto {
-  /**
-   * Array of server names to delete
-   * @example ["server1","server2"]
-   */
-  serverNames: string[];
-}
-
-export interface ConversationDto {
-  conversationId: string;
-  title: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
+  /** Response message */
+  message?: string;
 }
 
 export interface GetConversationsResponseDto {
-  conversations: ConversationDto[];
+  /** List of conversations */
+  conversations: {
+    conversationId?: string;
+    title?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }[];
 }
 
 export interface UpdateConversationResponseDto {
-  conversation: ConversationDto;
+  /** Updated conversation */
+  conversation: {
+    conversationId?: string;
+    title?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
 }
 
 export interface UpdateConversationDto {
-  title: string;
+  /**
+   * New title for the conversation
+   * @example "Updated Conversation Title"
+   */
+  title?: string;
+  /**
+   * New description for the conversation
+   * @example "Updated description"
+   */
   description?: string;
 }
 
 export interface DeleteConversationResponseDto {
-  message: string;
+  /**
+   * Success status
+   * @example true
+   */
   success: boolean;
+  /**
+   * Response message
+   * @example "Conversation deleted successfully"
+   */
+  message: string;
 }
 
 export interface DeleteConversationsResponseDto {
-  message: string;
+  /**
+   * Success status
+   * @example true
+   */
   success: boolean;
-}
-
-export interface MessageDto {
-  messageId: string;
-  question: string;
-  /** Message type: message_start, delta, message_end, etc. */
-  type: string;
-  /** JSON string containing message-specific data */
-  content: string;
-  conversationId: string;
-  createdAt: string;
-  updatedAt: string;
+  /**
+   * Response message
+   * @example "All conversations deleted successfully"
+   */
+  message: string;
 }
 
 export interface GetMessagesResponseDto {
-  messages: MessageDto[];
-}
-
-export interface CreateMessageResponseDto {
-  message: MessageDto;
-  conversation?: ConversationDto;
+  /** List of messages in the conversation */
+  messages: {
+    messageId?: string;
+    question?: string;
+    type?: string;
+    content?: string;
+    conversationId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }[];
 }
 
 export interface CreateMessageDto {
+  /**
+   * Question/prompt to send
+   * @example "What is the security status of my system?"
+   */
   question: string;
+  /**
+   * Conversation ID (if continuing existing conversation)
+   * @example "123e4567-e89b-12d3-a456-426614174000"
+   */
   conversationId?: string;
-  /** @default false */
+  /**
+   * Whether to create a new conversation
+   * @default false
+   * @example false
+   */
   isCreateConversation?: boolean;
 }
 
-export interface UpdateMessageResponseDto {
-  message: MessageDto;
-}
-
 export interface UpdateMessageDto {
+  /**
+   * Updated question/prompt
+   * @example "What is the security status of my system?"
+   */
   question: string;
 }
 
 export interface DeleteMessageResponseDto {
-  message: string;
+  /**
+   * Success status
+   * @example true
+   */
   success: boolean;
+  /**
+   * Response message
+   * @example "Message deleted successfully"
+   */
+  message: string;
 }
 
 export interface McpTool {
@@ -1416,6 +1552,30 @@ export enum CreateToolDtoCategoryEnum {
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
   Assistant = "assistant",
+}
+
+export enum OnScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum AssetGroupWorkflowScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -2912,9 +3072,7 @@ export class Api<
    * @request GET:/api/tools/installed
    */
   toolsControllerGetInstalledTools = (
-    query: {
-      /** The ID of the workspace */
-      workspaceId: string;
+    query?: {
       category?: ToolsControllerGetInstalledToolsParamsCategoryEnum;
     },
     params: RequestParams = {},
@@ -2987,6 +3145,118 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows/templates`,
       method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerGetManyWorkflows
+   * @summary Get many workflows
+   * @request GET:/api/workflows
+   */
+  workflowsControllerGetManyWorkflows = (
+    query?: {
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      /** Filter by workflow name */
+      name?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Creates a new workflow with the provided data.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerCreateWorkflow
+   * @summary Create workflow
+   * @request POST:/api/workflows
+   */
+  workflowsControllerCreateWorkflow = (
+    data: CreateWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a specific workflow by its ID within the specified workspace.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerGetWorkspaceWorkflow
+   * @summary Get workflow by ID
+   * @request GET:/api/workflows/{id}
+   */
+  workflowsControllerGetWorkspaceWorkflow = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates an existing workflow with the provided data.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerUpdateWorkflow
+   * @summary Update workflow
+   * @request PATCH:/api/workflows/{id}
+   */
+  workflowsControllerUpdateWorkflow = (
+    id: string,
+    data: UpdateWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a workflow by its ID.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerDeleteWorkflow
+   * @summary Delete workflow
+   * @request DELETE:/api/workflows/{id}
+   */
+  workflowsControllerDeleteWorkflow = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "DELETE",
       format: "json",
       ...params,
     });
@@ -3545,6 +3815,28 @@ export class Api<
     });
 
   /**
+   * @description Updates the relationship between an asset group and workflow, primarily to change the schedule.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerUpdateAssetGroupWorkflow
+   * @summary Update asset group workflow relationship
+   * @request PATCH:/api/asset-group/workflows/{id}
+   */
+  assetGroupControllerUpdateAssetGroupWorkflow = (
+    id: string,
+    data: UpdateAssetGroupWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/workflows/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
    *
    * @tags AI Assistant
@@ -3624,22 +3916,20 @@ export class Api<
     });
 
   /**
-   * @description Deletes one or more MCP servers by name
+   * @description Deletes MCP config by ID
    *
    * @tags AI Assistant
    * @name AiAssistantControllerDeleteMcpServers
-   * @summary Delete MCP servers
-   * @request DELETE:/api/ai-assistant/mcp-servers
+   * @summary Delete MCP config
+   * @request DELETE:/api/ai-assistant/mcp-servers/{id}
    */
   aiAssistantControllerDeleteMcpServers = (
-    data: DeleteMcpServersDto,
+    id: string,
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers`,
+      path: `/api/ai-assistant/mcp-servers/${id}`,
       method: "DELETE",
-      body: data,
-      type: ContentType.Json,
       format: "json",
       ...params,
     });
@@ -3677,11 +3967,11 @@ export class Api<
     });
 
   /**
-   * @description Updates a conversation title and/or description
+   * @description Updates the title and/or description of a conversation
    *
    * @tags AI Assistant
    * @name AiAssistantControllerUpdateConversation
-   * @summary Update conversation
+   * @summary Update a conversation
    * @request PATCH:/api/ai-assistant/conversations/{id}
    */
   aiAssistantControllerUpdateConversation = (
@@ -3699,11 +3989,11 @@ export class Api<
     });
 
   /**
-   * @description Deletes a single conversation by ID
+   * @description Deletes a specific conversation by ID
    *
    * @tags AI Assistant
    * @name AiAssistantControllerDeleteConversation
-   * @summary Delete conversation
+   * @summary Delete a conversation
    * @request DELETE:/api/ai-assistant/conversations/{id}
    */
   aiAssistantControllerDeleteConversation = (
@@ -3718,39 +4008,36 @@ export class Api<
     });
 
   /**
-   * @description Retrieves all messages for a specific conversation
+   * @description Retrieves all messages in a specific conversation
    *
    * @tags AI Assistant
    * @name AiAssistantControllerGetMessages
-   * @summary Get all messages in a conversation
-   * @request GET:/api/ai-assistant/messages/{conversationId}
+   * @summary Get messages in a conversation
+   * @request GET:/api/ai-assistant/conversations/{id}/messages
    */
-  aiAssistantControllerGetMessages = (
-    conversationId: string,
-    params: RequestParams = {},
-  ) =>
+  aiAssistantControllerGetMessages = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/messages/${conversationId}`,
+      path: `/api/ai-assistant/conversations/${id}/messages`,
       method: "GET",
       format: "json",
       ...params,
     });
 
   /**
-   * @description Creates a new message in a conversation. Supports streaming response.
+   * @description Creates a new message and streams the AI response using Server-Sent Events (SSE)
    *
    * @tags AI Assistant
-   * @name AiAssistantControllerCreateMessage
-   * @summary Create a new message
-   * @request POST:/api/ai-assistant/messages
+   * @name AiAssistantControllerCreateMessageStream
+   * @summary Create a message with streaming response
+   * @request GET:/api/ai-assistant/messages/stream
    */
-  aiAssistantControllerCreateMessage = (
+  aiAssistantControllerCreateMessageStream = (
     data: CreateMessageDto,
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/messages`,
-      method: "POST",
+      path: `/api/ai-assistant/messages/stream`,
+      method: "GET",
       body: data,
       type: ContentType.Json,
       format: "json",
@@ -3758,21 +4045,22 @@ export class Api<
     });
 
   /**
-   * @description Updates a message question and regenerates the answer. Supports streaming response.
+   * @description Updates a message and streams the regenerated AI response using Server-Sent Events (SSE)
    *
    * @tags AI Assistant
-   * @name AiAssistantControllerUpdateMessage
-   * @summary Update a message
-   * @request PATCH:/api/ai-assistant/messages/{id}
+   * @name AiAssistantControllerUpdateMessageStream
+   * @summary Update a message with streaming response
+   * @request GET:/api/ai-assistant/conversations/{conversationId}/messages/{messageId}/stream
    */
-  aiAssistantControllerUpdateMessage = (
-    id: string,
+  aiAssistantControllerUpdateMessageStream = (
+    conversationId: string,
+    messageId: string,
     data: UpdateMessageDto,
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/messages/${id}`,
-      method: "PATCH",
+      path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}/stream`,
+      method: "GET",
       body: data,
       type: ContentType.Json,
       format: "json",
@@ -3780,19 +4068,20 @@ export class Api<
     });
 
   /**
-   * @description Deletes a single message by ID
+   * @description Deletes a specific message by ID
    *
    * @tags AI Assistant
    * @name AiAssistantControllerDeleteMessage
    * @summary Delete a message
-   * @request DELETE:/api/ai-assistant/messages/{id}
+   * @request DELETE:/api/ai-assistant/conversations/{conversationId}/messages/{messageId}
    */
   aiAssistantControllerDeleteMessage = (
-    id: string,
+    conversationId: string,
+    messageId: string,
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/messages/${id}`,
+      path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
       method: "DELETE",
       format: "json",
       ...params,

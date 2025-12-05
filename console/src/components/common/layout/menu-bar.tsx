@@ -19,12 +19,14 @@ import {
   Bug,
   CloudCheck,
   Cpu,
+  Group,
   LayoutDashboard,
   Radar,
   SquareTerminal,
-  Target
+  Target,
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
+import { NewBadge } from '../new-badge';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
@@ -40,32 +42,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: <LayoutDashboard />,
           url: '',
         },
-        {
-          title: 'Targets',
-          icon: <Target />,
-          url: '/targets',
-        },
-        {
-          title: 'Assets',
-          icon: <CloudCheck />,
-          url: '/assets',
-        },
-
-        {
-          title: 'Vulnerabilities',
-          icon: <Bug />,
-          url: '/vulnerabilities',
-        },
-        // {
-        //   title: 'Workflow',
-        //   icon: <Workflow />,
-        //   url: '/workflow',
-        // },
-        {
-          title: 'Tools',
-          icon: <Cpu />,
-          url: '/tools',
-        },
         // {
         //   title: 'Studio',
         //   icon: <BookDashed />,
@@ -74,14 +50,47 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       ],
     },
     {
+      title: 'Attack surface',
+      url: '#',
+      items: [
+        {
+          title: 'Targets',
+          icon: <Target />,
+          url: '/targets',
+        },
+        {
+          title: 'Groups',
+          icon: <Group />,
+          url: 'assets/groups',
+          isNew: true,
+        },
+        {
+          title: 'Assets',
+          icon: <CloudCheck />,
+          url: '/assets',
+        },
+      ],
+    },
+    {
+      title: 'Security',
+      url: '#',
+      items: [
+        {
+          title: 'Vulnerabilities',
+          icon: <Bug />,
+          url: '/vulnerabilities',
+        },
+      ],
+    },
+    {
       title: 'Management',
       url: '#',
       items: [
-        // {
-        //   title: 'Providers',
-        //   icon: <MessageSquareCode />,
-        //   url: '/providers',
-        // },
+        {
+          title: 'Tools',
+          icon: <Cpu />,
+          url: '/tools',
+        },
         {
           title: 'Workers',
           icon: <SquareTerminal />,
@@ -122,9 +131,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       >
                         <Link
                           to={toUrl}
-                          className="flex items-center justify-start gap-2 w-full h-full text-base"
+                          className="flex items-center justify-start w-full h-full text-base"
                         >
-                          {item.icon} {item.title}
+                          {item.icon} {item.title} {item.isNew && <NewBadge />}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

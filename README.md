@@ -61,7 +61,7 @@ graph TD
         API[Core API Service]
         DB[(PostgreSQL)]
         MCP[MCP Server]
-        
+
         subgraph "Execution Plane"
             Worker[Distributed Workers]
         end
@@ -70,19 +70,20 @@ graph TD
     %% Relationships
     User -->|Manage & Monitor| Console
     Console <-->|REST API| API
-    
+
     API <-->|Persist Data| DB
-    
+
     %% Job Flow
     API -->|Dispatch Scan Jobs| Worker
     Worker -->|Report Results| API
     Worker -->|Scan & Discovery| Internet
-    
+
     %% AI Flow
     AI <-->|Query Context| MCP
     MCP <-->|Fetch Asset Data| API
 
 ```
+
 ## Project Structure
 
 The project is organized in a modular structure for easy development and scalability:
@@ -111,7 +112,7 @@ To quickly get started with OASM using Docker:
 2. Rename the example environment file:
 
    ```bash
-   mv example.env .env
+   cp example.env .env
    ```
 
 3. Start the services:

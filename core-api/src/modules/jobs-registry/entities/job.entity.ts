@@ -1,9 +1,10 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { JobPriority, JobStatus, ToolCategory } from '@/common/enums/enum';
+import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { JobHistory } from './job-history.entity';
 
 @Entity('jobs')
@@ -108,5 +109,18 @@ export class Job extends BaseEntity {
   @ApiProperty()
   @Column({ nullable: true })
   command?: string;
+
+  /**
+   * The asset service this job belongs to.
+   */
+  @ApiProperty()
+  @Column({ type: 'varchar', nullable: true })
+  assetServiceId?: string;
+
+  @ManyToOne(() => AssetService, (assetService) => assetService.jobs, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'assetServiceId' })
+  assetService?: AssetService;
 
 }

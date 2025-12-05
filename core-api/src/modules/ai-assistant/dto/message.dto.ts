@@ -82,22 +82,6 @@ export class CreateMessageResponseDto {
  */
 export class UpdateMessageDto {
   @ApiProperty({
-    description: 'Conversation ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  @IsString()
-  @IsNotEmpty()
-  conversationId: string;
-
-  @ApiProperty({
-    description: 'Message ID to update',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  @IsString()
-  @IsNotEmpty()
-  messageId: string;
-
-  @ApiProperty({
     description: 'Updated question/prompt',
     example: 'What is the security status of my system?',
   })

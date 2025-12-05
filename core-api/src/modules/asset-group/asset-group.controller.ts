@@ -9,32 +9,35 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Asset } from '../assets/entities/assets.entity';
+import { Workflow } from '../workflows/entities/workflow.entity';
 import { AssetGroupService } from './asset-group.service';
 import { AddManyAssetsToAssetGroupDto } from './dto/add-many-assets-to-asset-group.dto';
-import { AssetGroupResponseDto } from './dto/asset-group-response.dto';
+import { AddManyWorkflowsToAssetGroupDto } from './dto/add-many-workflows-to-asset-group.dto';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { RemoveManyAssetsFromAssetGroupDto } from './dto/remove-many-assets-from-asset-group.dto';
-import { AddManyWorkflowsToAssetGroupDto } from './dto/add-many-workflows-to-asset-group.dto';
 import { RemoveManyWorkflowsFromAssetGroupDto } from './dto/remove-many-workflows-from-asset-group.dto';
-import { Workflow } from '../workflows/entities/workflow.entity';
+import { UpdateAssetGroupWorkflowDto } from './dto/update-asset-group-workflow.dto';
+import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
+import { AssetGroup } from './entities/asset-groups.entity';
 
 @ApiTags('Asset Group')
 @Controller('asset-group')
 export class AssetGroupController {
-  constructor(private readonly assetGroupService: AssetGroupService) {}
+  constructor(private readonly assetGroupService: AssetGroupService) { }
 
   @Doc({
     summary: 'Get all asset groups',
     description:
       'Retrieves all asset groups with optional filtering and pagination.',
     response: {
-      serialization: GetManyResponseDto(AssetGroupResponseDto),
+      serialization: GetManyResponseDto(AssetGroup),
     },
     request: {
       getWorkspaceId: true,
@@ -52,7 +55,7 @@ export class AssetGroupController {
     summary: 'Get asset group by ID',
     description: 'Fetches a specific asset group by its unique identifier.',
     response: {
-      serialization: AssetGroupResponseDto,
+      serialization: AssetGroup,
     },
     request: {
       getWorkspaceId: true,
@@ -60,19 +63,25 @@ export class AssetGroupController {
   })
   @Get(':id')
   getById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
-    return this.assetGroupService.getById(id, workspaceId);
+    return this.assetGroupService.getAssetGroupById(id, workspaceId);
   }
 
   @Doc({
     summary: 'Create asset group',
     description: 'Creates a new asset group.',
     response: {
-      serialization: AssetGroupResponseDto,
+      serialization: AssetGroup,
+    },
+    request: {
+      getWorkspaceId: true,
     },
   })
   @Post()
-  create(@Body() createAssetGroupDto: CreateAssetGroupDto) {
-    return this.assetGroupService.create(createAssetGroupDto);
+  create(
+    @Body() createAssetGroupDto: CreateAssetGroupDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetGroupService.create(createAssetGroupDto, workspaceId);
   }
 
   @Doc({
@@ -189,7 +198,7 @@ export class AssetGroupController {
     description:
       'Retrieves workflows associated with a specific asset group with pagination.',
     response: {
-      serialization: GetManyResponseDto(Workflow),
+      serialization: GetManyResponseDto(AssetGroupWorkflow),
     },
     request: {
       getWorkspaceId: true,
@@ -253,6 +262,26 @@ export class AssetGroupController {
       assetGroupId,
       query,
       workspaceId,
+    );
+  }
+
+  @Doc({
+    summary: 'Update asset group workflow relationship',
+    description: 'Updates the relationship between an asset group and workflow, primarily to change the schedule.',
+    response: {
+      serialization: AssetGroupWorkflow,
+    },
+  })
+  @Patch('workflows/:id')
+  updateAssetGroupWorkflow(
+    @Param('id') assetGroupWorkflowId: string,
+    @Body() updateDto: UpdateAssetGroupWorkflowDto,
+  ) {
+    return this.assetGroupService.updateAssetGroupWorkflow(
+      assetGroupWorkflowId,
+      {
+        schedule: updateDto.schedule,
+      }
     );
   }
 }

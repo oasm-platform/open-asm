@@ -1,6 +1,7 @@
 import Layout from '@/components/common/layout/layout';
 import Splash from '@/components/common/layout/splash';
 import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
+import { AssetGroups } from '@/pages/asset-group/asset-groups';
 import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
@@ -64,7 +65,7 @@ export const router = createBrowserRouter([
             children: [{ path: '', element: <Studio /> }],
           },
           {
-            path: 'workflow',
+            path: 'groups',
             children: [{ path: '', element: <Workflow /> }],
           },
           {
@@ -133,14 +134,18 @@ export const router = createBrowserRouter([
                 path: ':id',
                 element: <DetailAsset />,
               },
-            ],
-          },
-          {
-            path: 'asset-group',
-            children: [
               {
-                path: ':id',
-                element: <AssetGroupDetail />,
+                path: 'groups',
+                children: [
+                  {
+                    path: '',
+                    element: <AssetGroups />,
+                  },
+                  {
+                    path: ':id',
+                    element: <AssetGroupDetail />,
+                  },
+                ],
               },
             ],
           },

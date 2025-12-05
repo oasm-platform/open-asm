@@ -229,6 +229,7 @@ export type Job = {
   pickJobAt: string;
   completedAt: string;
   command: string;
+  assetServiceId: string;
 };
 
 export type GetManyJobDto = {
@@ -362,18 +363,9 @@ export type HttpResponseDTO = {
   knowledgebase: KnowledgebaseInfo;
   resolvers: string[];
   chain_status_codes: string[];
-  assetId: string;
+  assetServiceId: string;
   jobHistoryId: string;
   techList: string[];
-};
-
-export type Port = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  ports: string[];
-  assetId: string;
-  jobHistoryId: string;
 };
 
 export type GetAssetsResponseDtoDnsRecords = { [key: string]: unknown };
@@ -389,7 +381,7 @@ export type GetAssetsResponseDto = {
   dnsRecords?: GetAssetsResponseDtoDnsRecords;
   ipAddresses: string[];
   httpResponses?: HttpResponseDTO;
-  ports?: Port;
+  port?: number;
   isEnabled: boolean;
 };
 
@@ -591,7 +583,6 @@ export type Asset = {
   targetId: string;
   isPrimary: boolean;
   dnsRecords: AssetDnsRecords;
-  isErrorPage: boolean;
   isEnabled: boolean;
 };
 
@@ -892,6 +883,101 @@ export type GetManyStringDto = {
   pageCount: number;
 };
 
+/**
+ * The workflow content
+ */
+export type GetManyWorkflowsResponseDtoContent = { [key: string]: unknown };
+
+/**
+ * The user who created this workflow
+ */
+export type GetManyWorkflowsResponseDtoCreatedBy = { [key: string]: unknown };
+
+/**
+ * The workspace this workflow belongs to
+ */
+export type GetManyWorkflowsResponseDtoWorkspace = { [key: string]: unknown };
+
+export type GetManyWorkflowsResponseDto = {
+  /** The unique identifier of the workflow */
+  id: string;
+  /** The name of the workflow */
+  name: string;
+  /** The file path of the workflow */
+  filePath: string;
+  /** The workflow content */
+  content: GetManyWorkflowsResponseDtoContent;
+  /** When the workflow was created */
+  createdAt: string;
+  /** When the workflow was last updated */
+  updatedAt: string;
+  /** The user who created this workflow */
+  createdBy?: GetManyWorkflowsResponseDtoCreatedBy;
+  /** The workspace this workflow belongs to */
+  workspace?: GetManyWorkflowsResponseDtoWorkspace;
+};
+
+export type GetManyGetManyWorkflowsResponseDtoDto = {
+  data: GetManyWorkflowsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type OnSchedule = (typeof OnSchedule)[keyof typeof OnSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const OnSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type On = {
+  target: string[];
+  schedule: OnSchedule;
+};
+
+export type WorkflowJob = {
+  name: string;
+  run: string;
+};
+
+export type WorkflowContent = {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+};
+
+export type Workflow = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  content: WorkflowContent;
+};
+
+export type CreateWorkflowDto = {
+  /** Name of the workflow */
+  name: string;
+  /** Content of the workflow in JSON format */
+  content: WorkflowContent;
+  /** File path for the workflow */
+  filePath?: string;
+};
+
+export type UpdateWorkflowDto = {
+  /** Name of the workflow */
+  name?: string;
+  /** Content of the workflow in JSON format */
+  content?: WorkflowContent;
+  /** File path for the workflow */
+  filePath?: string;
+};
+
 export type ToolProvider = {
   id: string;
   createdAt: string;
@@ -1008,19 +1094,15 @@ export type RunTemplateDto = {
   assetId: string;
 };
 
-export type AssetGroupResponseDto = {
-  /** ID of the asset group */
+export type AssetGroup = {
   id: string;
-  /** Name of the asset group */
-  name: string;
-  /** Date when the asset group was created */
   createdAt: string;
-  /** Date when the asset group was last updated */
   updatedAt: string;
+  name: string;
 };
 
-export type GetManyAssetGroupResponseDtoDto = {
-  data: AssetGroupResponseDto[];
+export type GetManyAssetGroupDto = {
+  data: AssetGroup[];
   total: number;
   page: number;
   limit: number;
@@ -1031,8 +1113,6 @@ export type GetManyAssetGroupResponseDtoDto = {
 export type CreateAssetGroupDto = {
   /** Name of the asset group */
   name: string;
-  /** ID of the workspace the asset group belongs to */
-  workspaceId: string;
 };
 
 export type AddManyWorkflowsToAssetGroupDto = {
@@ -1064,10 +1144,34 @@ export type GetManyAssetDto = {
   pageCount: number;
 };
 
-export type Workflow = {
+export type AssetGroupWorkflowSchedule =
+  (typeof AssetGroupWorkflowSchedule)[keyof typeof AssetGroupWorkflowSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const AssetGroupWorkflowSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type AssetGroupWorkflow = {
   id: string;
   createdAt: string;
   updatedAt: string;
+  assetGroup: AssetGroup;
+  workflow: Workflow;
+  schedule: AssetGroupWorkflowSchedule;
+};
+
+export type GetManyAssetGroupWorkflowDto = {
+  data: AssetGroupWorkflow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
 };
 
 export type GetManyWorkflowDto = {
@@ -1079,16 +1183,191 @@ export type GetManyWorkflowDto = {
   pageCount: number;
 };
 
+export type UpdateAssetGroupWorkflowDtoSchedule =
+  (typeof UpdateAssetGroupWorkflowDtoSchedule)[keyof typeof UpdateAssetGroupWorkflowDtoSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UpdateAssetGroupWorkflowDtoSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type UpdateAssetGroupWorkflowDto = {
+  schedule: UpdateAssetGroupWorkflowDtoSchedule;
+};
+
 export type GenerateTagsResponseDto = {
-  /** The domain that was analyzed */
+  /** Domain that tags were generated for */
   domain: string;
-  /** Array of generated tags for the domain */
+  /** Generated tags */
   tags: string[];
 };
 
 export type GenerateTagsDto = {
-  /** Domain name to generate tags for */
+  /** Domain to generate tags for */
   domain: string;
+};
+
+/**
+ * MCP servers configuration with status
+ */
+export type AddMcpServersResponseDtoMcpServers = { [key: string]: unknown };
+
+export type AddMcpServersResponseDto = {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** MCP servers configuration with status */
+  mcpServers: AddMcpServersResponseDtoMcpServers;
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Error message if operation failed */
+  error?: string;
+};
+
+/**
+ * MCP servers configuration object
+ */
+export type AddMcpServersDtoMcpServers = { [key: string]: unknown };
+
+export type AddMcpServersDto = {
+  /** MCP servers configuration object */
+  mcpServers: AddMcpServersDtoMcpServers;
+};
+
+/**
+ * Updated MCP servers configuration with status
+ */
+export type UpdateMcpServersResponseDtoMcpServers = { [key: string]: unknown };
+
+export type UpdateMcpServersResponseDto = {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** Updated MCP servers configuration with status */
+  mcpServers: UpdateMcpServersResponseDtoMcpServers;
+  /** Whether the operation succeeded */
+  success: boolean;
+};
+
+/**
+ * MCP servers configuration object
+ */
+export type UpdateMcpServersDtoMcpServers = { [key: string]: unknown };
+
+export type UpdateMcpServersDto = {
+  /** MCP servers configuration object */
+  mcpServers: UpdateMcpServersDtoMcpServers;
+};
+
+export type DeleteMcpServersResponseDto = {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Response message */
+  message?: string;
+};
+
+export type GetConversationsResponseDtoConversationsItem = {
+  conversationId?: string;
+  title?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type GetConversationsResponseDto = {
+  /** List of conversations */
+  conversations: GetConversationsResponseDtoConversationsItem[];
+};
+
+/**
+ * Updated conversation
+ */
+export type UpdateConversationResponseDtoConversation = {
+  conversationId?: string;
+  title?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type UpdateConversationResponseDto = {
+  /** Updated conversation */
+  conversation: UpdateConversationResponseDtoConversation;
+};
+
+export type UpdateConversationDto = {
+  /** New title for the conversation */
+  title?: string;
+  /** New description for the conversation */
+  description?: string;
+};
+
+export type DeleteConversationResponseDto = {
+  /** Success status */
+  success: boolean;
+  /** Response message */
+  message: string;
+};
+
+export type DeleteConversationsResponseDto = {
+  /** Success status */
+  success: boolean;
+  /** Response message */
+  message: string;
+};
+
+export type GetMessagesResponseDtoMessagesItem = {
+  messageId?: string;
+  question?: string;
+  type?: string;
+  content?: string;
+  conversationId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type GetMessagesResponseDto = {
+  /** List of messages in the conversation */
+  messages: GetMessagesResponseDtoMessagesItem[];
+};
+
+export type CreateMessageDto = {
+  /** Question/prompt to send */
+  question: string;
+  /** Conversation ID (if continuing existing conversation) */
+  conversationId?: string;
+  /** Whether to create a new conversation */
+  isCreateConversation?: boolean;
+};
+
+export type UpdateMessageDto = {
+  /** Updated question/prompt */
+  question: string;
+};
+
+export type DeleteMessageResponseDto = {
+  /** Success status */
+  success: boolean;
+  /** Response message */
+  message: string;
 };
 
 export type McpTool = {
@@ -1301,10 +1580,6 @@ export const ToolsControllerGetManyToolsCategory = {
 } as const;
 
 export type ToolsControllerGetInstalledToolsParams = {
-  /**
-   * The ID of the workspace
-   */
-  workspaceId: string;
   category?: ToolsControllerGetInstalledToolsCategory;
 };
 
@@ -1320,6 +1595,17 @@ export const ToolsControllerGetInstalledToolsCategory = {
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
+
+export type WorkflowsControllerGetManyWorkflowsParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * Filter by workflow name
+   */
+  name?: string;
+};
 
 export type ProvidersControllerGetManyProvidersParams = {
   page?: number;
@@ -14922,7 +15208,7 @@ export function useToolsControllerGetBuiltInTools<
  * @summary Get installed tools for a workspace
  */
 export const toolsControllerGetInstalledTools = (
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -14954,7 +15240,7 @@ export const getToolsControllerGetInstalledToolsInfiniteQueryOptions = <
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -14995,7 +15281,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params: undefined | ToolsControllerGetInstalledToolsParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -15024,7 +15310,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -15053,7 +15339,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -15078,7 +15364,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -15114,7 +15400,7 @@ export const getToolsControllerGetInstalledToolsQueryOptions = <
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15153,7 +15439,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params: undefined | ToolsControllerGetInstalledToolsParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -15180,7 +15466,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15207,7 +15493,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15230,7 +15516,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -16328,6 +16614,964 @@ export function useWorkflowsControllerListTemplates<
 
   return query;
 }
+
+/**
+ * Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
+ * @summary Get many workflows
+ */
+export const workflowsControllerGetManyWorkflows = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetManyWorkflowsResponseDtoDto>(
+    { url: `/api/workflows`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+) => {
+  return ['infinate', `/api/workflows`, ...(params ? [params] : [])] as const;
+};
+
+export const getWorkflowsControllerGetManyWorkflowsQueryKey = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+) => {
+  return [`/api/workflows`, ...(params ? [params] : [])] as const;
+};
+
+export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  > = ({ signal }) =>
+    workflowsControllerGetManyWorkflows(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetManyWorkflowsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>>;
+export type WorkflowsControllerGetManyWorkflowsInfiniteQueryError = unknown;
+
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many workflows
+ */
+
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkflowsControllerGetManyWorkflowsQueryOptions = <
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetManyWorkflowsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  > = ({ signal }) =>
+    workflowsControllerGetManyWorkflows(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetManyWorkflowsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+>;
+export type WorkflowsControllerGetManyWorkflowsQueryError = unknown;
+
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many workflows
+ */
+
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkflowsControllerGetManyWorkflowsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Creates a new workflow with the provided data.
+ * @summary Create workflow
+ */
+export const workflowsControllerCreateWorkflow = (
+  createWorkflowDto: CreateWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Workflow>(
+    {
+      url: `/api/workflows`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createWorkflowDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkflowsControllerCreateWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+    TError,
+    { data: CreateWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+  TError,
+  { data: CreateWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerCreateWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+    { data: CreateWorkflowDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workflowsControllerCreateWorkflow(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkflowsControllerCreateWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>
+>;
+export type WorkflowsControllerCreateWorkflowMutationBody = CreateWorkflowDto;
+export type WorkflowsControllerCreateWorkflowMutationError = unknown;
+
+/**
+ * @summary Create workflow
+ */
+export const useWorkflowsControllerCreateWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+      TError,
+      { data: CreateWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+  TError,
+  { data: CreateWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkflowsControllerCreateWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves a specific workflow by its ID within the specified workspace.
+ * @summary Get workflow by ID
+ */
+export const workflowsControllerGetWorkspaceWorkflow = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Workflow>(
+    { url: `/api/workflows/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkflowsControllerGetWorkspaceWorkflowInfiniteQueryKey = (
+  id?: string,
+) => {
+  return ['infinate', `/api/workflows/${id}`] as const;
+};
+
+export const getWorkflowsControllerGetWorkspaceWorkflowQueryKey = (
+  id?: string,
+) => {
+  return [`/api/workflows/${id}`] as const;
+};
+
+export const getWorkflowsControllerGetWorkspaceWorkflowInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetWorkspaceWorkflowInfiniteQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  > = ({ signal }) =>
+    workflowsControllerGetWorkspaceWorkflow(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetWorkspaceWorkflowInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >;
+export type WorkflowsControllerGetWorkspaceWorkflowInfiniteQueryError = unknown;
+
+export function useWorkflowsControllerGetWorkspaceWorkflowInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflowInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflowInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workflow by ID
+ */
+
+export function useWorkflowsControllerGetWorkspaceWorkflowInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkflowsControllerGetWorkspaceWorkflowInfiniteQueryOptions(id, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkflowsControllerGetWorkspaceWorkflowQueryOptions = <
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetWorkspaceWorkflowQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  > = ({ signal }) =>
+    workflowsControllerGetWorkspaceWorkflow(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetWorkspaceWorkflowQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+>;
+export type WorkflowsControllerGetWorkspaceWorkflowQueryError = unknown;
+
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workflow by ID
+ */
+
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkflowsControllerGetWorkspaceWorkflowQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates an existing workflow with the provided data.
+ * @summary Update workflow
+ */
+export const workflowsControllerUpdateWorkflow = (
+  id: string,
+  updateWorkflowDto: UpdateWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<Workflow>(
+    {
+      url: `/api/workflows/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateWorkflowDto,
+    },
+    options,
+  );
+};
+
+export const getWorkflowsControllerUpdateWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+    TError,
+    { id: string; data: UpdateWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+  TError,
+  { id: string; data: UpdateWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerUpdateWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+    { id: string; data: UpdateWorkflowDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return workflowsControllerUpdateWorkflow(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkflowsControllerUpdateWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>
+>;
+export type WorkflowsControllerUpdateWorkflowMutationBody = UpdateWorkflowDto;
+export type WorkflowsControllerUpdateWorkflowMutationError = unknown;
+
+/**
+ * @summary Update workflow
+ */
+export const useWorkflowsControllerUpdateWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+      TError,
+      { id: string; data: UpdateWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+  TError,
+  { id: string; data: UpdateWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkflowsControllerUpdateWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes a workflow by its ID.
+ * @summary Delete workflow
+ */
+export const workflowsControllerDeleteWorkflow = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/workflows/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getWorkflowsControllerDeleteWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerDeleteWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workflowsControllerDeleteWorkflow(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkflowsControllerDeleteWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>
+>;
+
+export type WorkflowsControllerDeleteWorkflowMutationError = unknown;
+
+/**
+ * @summary Delete workflow
+ */
+export const useWorkflowsControllerDeleteWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkflowsControllerDeleteWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * Get all providers with pagination, filtered by owner
@@ -18443,7 +19687,7 @@ export const assetGroupControllerGetAll = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyAssetGroupResponseDtoDto>(
+  return orvalClient<GetManyAssetGroupDto>(
     { url: `/api/asset-group`, method: 'GET', params, signal },
     options,
   );
@@ -18771,7 +20015,7 @@ export const assetGroupControllerCreate = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AssetGroupResponseDto>(
+  return orvalClient<AssetGroup>(
     {
       url: `/api/asset-group`,
       method: 'POST',
@@ -18864,7 +20108,7 @@ export const assetGroupControllerGetById = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AssetGroupResponseDto>(
+  return orvalClient<AssetGroup>(
     { url: `/api/asset-group/${id}`, method: 'GET', signal },
     options,
   );
@@ -20108,7 +21352,7 @@ export const assetGroupControllerGetWorkflowsByAssetGroupsId = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyWorkflowDto>(
+  return orvalClient<GetManyAssetGroupWorkflowDto>(
     {
       url: `/api/asset-group/${assetGroupId}/workflows`,
       method: 'GET',
@@ -21445,6 +22689,105 @@ export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
 }
 
 /**
+ * Updates the relationship between an asset group and workflow, primarily to change the schedule.
+ * @summary Update asset group workflow relationship
+ */
+export const assetGroupControllerUpdateAssetGroupWorkflow = (
+  id: string,
+  updateAssetGroupWorkflowDto: UpdateAssetGroupWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AssetGroupWorkflow>(
+    {
+      url: `/api/asset-group/workflows/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAssetGroupWorkflowDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+    TError,
+    { id: string; data: UpdateAssetGroupWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerUpdateAssetGroupWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+    { id: string; data: UpdateAssetGroupWorkflowDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetGroupControllerUpdateAssetGroupWorkflow(
+      id,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>
+  >;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationBody =
+  UpdateAssetGroupWorkflowDto;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationError = unknown;
+
+/**
+ * @summary Update asset group workflow relationship
+ */
+export const useAssetGroupControllerUpdateAssetGroupWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+      TError,
+      { id: string; data: UpdateAssetGroupWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
  * @summary Generate tags for a domain using AI
  */
@@ -21534,6 +22877,2401 @@ export const useAiAssistantControllerGenerateTags = <
 > => {
   const mutationOptions =
     getAiAssistantControllerGenerateTagsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all MCP servers for the current workspace and user
+ * @summary Get all MCP servers
+ */
+export const aiAssistantControllerGetMcpServers = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/ai-assistant/mcp-servers`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetMcpServersInfiniteQueryKey = () => {
+  return ['infinate', `/api/ai-assistant/mcp-servers`] as const;
+};
+
+export const getAiAssistantControllerGetMcpServersQueryKey = () => {
+  return [`/api/ai-assistant/mcp-servers`] as const;
+};
+
+export const getAiAssistantControllerGetMcpServersInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetMcpServersInfiniteQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMcpServers(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMcpServersInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+>;
+export type AiAssistantControllerGetMcpServersInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all MCP servers
+ */
+
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetMcpServersInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetMcpServersQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAiAssistantControllerGetMcpServersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMcpServers(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMcpServersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+>;
+export type AiAssistantControllerGetMcpServersQueryError = unknown;
+
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all MCP servers
+ */
+
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetMcpServersQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Adds one or more MCP servers to the workspace
+ * @summary Add MCP servers
+ */
+export const aiAssistantControllerAddMcpServers = (
+  addMcpServersDto: AddMcpServersDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AddMcpServersResponseDto>(
+    {
+      url: `/api/ai-assistant/mcp-servers`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: addMcpServersDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerAddMcpServersMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+    TError,
+    { data: AddMcpServersDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+  TError,
+  { data: AddMcpServersDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerAddMcpServers'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+    { data: AddMcpServersDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiAssistantControllerAddMcpServers(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerAddMcpServersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>
+>;
+export type AiAssistantControllerAddMcpServersMutationBody = AddMcpServersDto;
+export type AiAssistantControllerAddMcpServersMutationError = unknown;
+
+/**
+ * @summary Add MCP servers
+ */
+export const useAiAssistantControllerAddMcpServers = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+      TError,
+      { data: AddMcpServersDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+  TError,
+  { data: AddMcpServersDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerAddMcpServersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Updates one or more MCP servers
+ * @summary Update MCP servers
+ */
+export const aiAssistantControllerUpdateMcpServers = (
+  updateMcpServersDto: UpdateMcpServersDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<UpdateMcpServersResponseDto>(
+    {
+      url: `/api/ai-assistant/mcp-servers`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateMcpServersDto,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerUpdateMcpServersMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+    TError,
+    { data: UpdateMcpServersDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+  TError,
+  { data: UpdateMcpServersDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerUpdateMcpServers'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+    { data: UpdateMcpServersDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiAssistantControllerUpdateMcpServers(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerUpdateMcpServersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>
+>;
+export type AiAssistantControllerUpdateMcpServersMutationBody =
+  UpdateMcpServersDto;
+export type AiAssistantControllerUpdateMcpServersMutationError = unknown;
+
+/**
+ * @summary Update MCP servers
+ */
+export const useAiAssistantControllerUpdateMcpServers = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+      TError,
+      { data: UpdateMcpServersDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+  TError,
+  { data: UpdateMcpServersDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerUpdateMcpServersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes MCP config by ID
+ * @summary Delete MCP config
+ */
+export const aiAssistantControllerDeleteMcpServers = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteMcpServersResponseDto>(
+    { url: `/api/ai-assistant/mcp-servers/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteMcpServersMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteMcpServers'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiAssistantControllerDeleteMcpServers(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteMcpServersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>
+>;
+
+export type AiAssistantControllerDeleteMcpServersMutationError = unknown;
+
+/**
+ * @summary Delete MCP config
+ */
+export const useAiAssistantControllerDeleteMcpServers = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteMcpServersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all conversations for the current workspace and user
+ * @summary Get all conversations
+ */
+export const aiAssistantControllerGetConversations = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetConversationsResponseDto>(
+    { url: `/api/ai-assistant/conversations`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetConversationsInfiniteQueryKey = () => {
+  return ['infinate', `/api/ai-assistant/conversations`] as const;
+};
+
+export const getAiAssistantControllerGetConversationsQueryKey = () => {
+  return [`/api/ai-assistant/conversations`] as const;
+};
+
+export const getAiAssistantControllerGetConversationsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetConversationsInfiniteQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetConversations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetConversationsInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >;
+export type AiAssistantControllerGetConversationsInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all conversations
+ */
+
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetConversationsInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetConversationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetConversationsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetConversations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetConversationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+>;
+export type AiAssistantControllerGetConversationsQueryError = unknown;
+
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all conversations
+ */
+
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetConversationsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Deletes all conversations for the current workspace and user
+ * @summary Delete all conversations
+ */
+export const aiAssistantControllerDeleteConversations = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteConversationsResponseDto>(
+    { url: `/api/ai-assistant/conversations`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteConversationsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteConversations'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+    void
+  > = () => {
+    return aiAssistantControllerDeleteConversations(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteConversationsMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>
+  >;
+
+export type AiAssistantControllerDeleteConversationsMutationError = unknown;
+
+/**
+ * @summary Delete all conversations
+ */
+export const useAiAssistantControllerDeleteConversations = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteConversationsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Updates the title and/or description of a conversation
+ * @summary Update a conversation
+ */
+export const aiAssistantControllerUpdateConversation = (
+  id: string,
+  updateConversationDto: UpdateConversationDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<UpdateConversationResponseDto>(
+    {
+      url: `/api/ai-assistant/conversations/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateConversationDto,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerUpdateConversationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+    TError,
+    { id: string; data: UpdateConversationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerUpdateConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+    { id: string; data: UpdateConversationDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return aiAssistantControllerUpdateConversation(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerUpdateConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>
+>;
+export type AiAssistantControllerUpdateConversationMutationBody =
+  UpdateConversationDto;
+export type AiAssistantControllerUpdateConversationMutationError = unknown;
+
+/**
+ * @summary Update a conversation
+ */
+export const useAiAssistantControllerUpdateConversation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+      TError,
+      { id: string; data: UpdateConversationDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerUpdateConversationMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes a specific conversation by ID
+ * @summary Delete a conversation
+ */
+export const aiAssistantControllerDeleteConversation = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteConversationResponseDto>(
+    { url: `/api/ai-assistant/conversations/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteConversationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiAssistantControllerDeleteConversation(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>
+>;
+
+export type AiAssistantControllerDeleteConversationMutationError = unknown;
+
+/**
+ * @summary Delete a conversation
+ */
+export const useAiAssistantControllerDeleteConversation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteConversationMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all messages in a specific conversation
+ * @summary Get messages in a conversation
+ */
+export const aiAssistantControllerGetMessages = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetMessagesResponseDto>(
+    {
+      url: `/api/ai-assistant/conversations/${id}/messages`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetMessagesInfiniteQueryKey = (
+  id?: string,
+) => {
+  return [
+    'infinate',
+    `/api/ai-assistant/conversations/${id}/messages`,
+  ] as const;
+};
+
+export const getAiAssistantControllerGetMessagesQueryKey = (id?: string) => {
+  return [`/api/ai-assistant/conversations/${id}/messages`] as const;
+};
+
+export const getAiAssistantControllerGetMessagesInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetMessagesInfiniteQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMessages(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMessagesInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+>;
+export type AiAssistantControllerGetMessagesInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get messages in a conversation
+ */
+
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerGetMessagesInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetMessagesQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAiAssistantControllerGetMessagesQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMessages(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMessagesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+>;
+export type AiAssistantControllerGetMessagesQueryError = unknown;
+
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get messages in a conversation
+ */
+
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerGetMessagesQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Creates a new message and streams the AI response using Server-Sent Events (SSE)
+ * @summary Create a message with streaming response
+ */
+export const aiAssistantControllerCreateMessageStream = (
+  createMessageDto: CreateMessageDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/ai-assistant/messages/stream`,
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerCreateMessageStreamInfiniteQueryKey = (
+  createMessageDto?: CreateMessageDto,
+) => {
+  return [
+    'infinate',
+    `/api/ai-assistant/messages/stream`,
+    createMessageDto,
+  ] as const;
+};
+
+export const getAiAssistantControllerCreateMessageStreamQueryKey = (
+  createMessageDto?: CreateMessageDto,
+) => {
+  return [`/api/ai-assistant/messages/stream`, createMessageDto] as const;
+};
+
+export const getAiAssistantControllerCreateMessageStreamInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerCreateMessageStreamInfiniteQueryKey(
+      createMessageDto,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  > = ({ signal }) =>
+    aiAssistantControllerCreateMessageStream(
+      createMessageDto,
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerCreateMessageStreamInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >;
+export type AiAssistantControllerCreateMessageStreamInfiniteQueryError =
+  unknown;
+
+export function useAiAssistantControllerCreateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerCreateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerCreateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Create a message with streaming response
+ */
+
+export function useAiAssistantControllerCreateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerCreateMessageStreamInfiniteQueryOptions(
+      createMessageDto,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerCreateMessageStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerCreateMessageStreamQueryKey(createMessageDto);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  > = ({ signal }) =>
+    aiAssistantControllerCreateMessageStream(
+      createMessageDto,
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerCreateMessageStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+>;
+export type AiAssistantControllerCreateMessageStreamQueryError = unknown;
+
+export function useAiAssistantControllerCreateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerCreateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerCreateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Create a message with streaming response
+ */
+
+export function useAiAssistantControllerCreateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerCreateMessageStreamQueryOptions(
+    createMessageDto,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates a message and streams the regenerated AI response using Server-Sent Events (SSE)
+ * @summary Update a message with streaming response
+ */
+export const aiAssistantControllerUpdateMessageStream = (
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}/stream`,
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerUpdateMessageStreamInfiniteQueryKey = (
+  conversationId?: string,
+  messageId?: string,
+  updateMessageDto?: UpdateMessageDto,
+) => {
+  return [
+    'infinate',
+    `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}/stream`,
+    updateMessageDto,
+  ] as const;
+};
+
+export const getAiAssistantControllerUpdateMessageStreamQueryKey = (
+  conversationId?: string,
+  messageId?: string,
+  updateMessageDto?: UpdateMessageDto,
+) => {
+  return [
+    `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}/stream`,
+    updateMessageDto,
+  ] as const;
+};
+
+export const getAiAssistantControllerUpdateMessageStreamInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerUpdateMessageStreamInfiniteQueryKey(
+      conversationId,
+      messageId,
+      updateMessageDto,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  > = ({ signal }) =>
+    aiAssistantControllerUpdateMessageStream(
+      conversationId,
+      messageId,
+      updateMessageDto,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(conversationId && messageId),
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerUpdateMessageStreamInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >;
+export type AiAssistantControllerUpdateMessageStreamInfiniteQueryError =
+  unknown;
+
+export function useAiAssistantControllerUpdateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerUpdateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerUpdateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Update a message with streaming response
+ */
+
+export function useAiAssistantControllerUpdateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerUpdateMessageStreamInfiniteQueryOptions(
+      conversationId,
+      messageId,
+      updateMessageDto,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerUpdateMessageStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerUpdateMessageStreamQueryKey(
+      conversationId,
+      messageId,
+      updateMessageDto,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  > = ({ signal }) =>
+    aiAssistantControllerUpdateMessageStream(
+      conversationId,
+      messageId,
+      updateMessageDto,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(conversationId && messageId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerUpdateMessageStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+>;
+export type AiAssistantControllerUpdateMessageStreamQueryError = unknown;
+
+export function useAiAssistantControllerUpdateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerUpdateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerUpdateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Update a message with streaming response
+ */
+
+export function useAiAssistantControllerUpdateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerUpdateMessageStreamQueryOptions(
+    conversationId,
+    messageId,
+    updateMessageDto,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Deletes a specific message by ID
+ * @summary Delete a message
+ */
+export const aiAssistantControllerDeleteMessage = (
+  conversationId: string,
+  messageId: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteMessageResponseDto>(
+    {
+      url: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
+      method: 'DELETE',
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteMessageMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+    TError,
+    { conversationId: string; messageId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+  TError,
+  { conversationId: string; messageId: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteMessage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+    { conversationId: string; messageId: string }
+  > = (props) => {
+    const { conversationId, messageId } = props ?? {};
+
+    return aiAssistantControllerDeleteMessage(
+      conversationId,
+      messageId,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>
+>;
+
+export type AiAssistantControllerDeleteMessageMutationError = unknown;
+
+/**
+ * @summary Delete a message
+ */
+export const useAiAssistantControllerDeleteMessage = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+      TError,
+      { conversationId: string; messageId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+  TError,
+  { conversationId: string; messageId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteMessageMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

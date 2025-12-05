@@ -27,14 +27,6 @@ export class GetConversationsResponseDto {
  * Update Conversation
  */
 export class UpdateConversationDto {
-  @ApiProperty({
-    description: 'Conversation ID to update',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  @IsString()
-  @IsNotEmpty()
-  conversationId: string;
-
   @ApiPropertyOptional({
     description: 'New title for the conversation',
     example: 'Updated Conversation Title',

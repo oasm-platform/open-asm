@@ -6,10 +6,10 @@ import { AssetGroup } from './asset-groups.entity';
 @Entity('assets_group_assets')
 export class AssetGroupAsset extends BaseEntity {
   @ManyToOne(() => AssetGroup, (assetGroup) => assetGroup.assetGroupAssets)
-  @JoinColumn({ name: 'asset_group_id' })
+  @JoinColumn({ name: 'assetGroupId' })
   assetGroup: AssetGroup;
 
   @ManyToOne(() => Asset, (asset) => asset.id)
-  @JoinColumn({ name: 'asset_id' })
+  @JoinColumn({ name: 'assetId' })
   asset: Asset;
 }

@@ -29,23 +29,21 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { PlusIcon, TrashIcon } from 'lucide-react';
 import { useState } from 'react';
 
-
-
 interface WorkflowSectionProps {
   assetGroupId: string;
-  refetch: () => void;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   assetGroupId,
-  refetch,
 }) => {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [page2, setPage2] = useState(1);
 
   // Queries for workflows in the asset group
   const workflowsInGroupQuery =
     useAssetGroupControllerGetWorkflowsByAssetGroupsId(assetGroupId, {
-      page: 1,
+      page: page,
       limit: 10,
       sortBy: 'createdAt',
       sortOrder: 'DESC',
@@ -65,7 +63,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const workflowsNotInGroupQuery =
     useAssetGroupControllerGetWorkflowsNotInAssetGroup(
       assetGroupId,
-      { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
+      { page: page2, limit: 10, sortBy: 'createdAt', sortOrder: 'DESC' },
       { query: { enabled: showSelectWorkflowsDialog } },
     );
 
@@ -77,7 +75,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       },
       {
         onSuccess: () => {
-          refetch();
+          workflowsInGroupQuery.refetch();
           queryClient.invalidateQueries({
             queryKey: ['assetGroupControllerGetWorkflowsByAssetGroupsId'],
           });
@@ -100,7 +98,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       },
       {
         onSuccess: () => {
-          refetch();
+          workflowsInGroupQuery.refetch();
           setSelectedWorkflows([]);
           setShowSelectWorkflowsDialog(false);
           queryClient.invalidateQueries({
@@ -198,7 +196,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
-          <CardTitle>Workflows</CardTitle>
+          <CardTitle>Tools</CardTitle>
           <CardDescription>
             {workflowsInGroupQuery.data?.total || 0} workflows in this group
           </CardDescription>
@@ -230,7 +228,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                   page={workflowsNotInGroupQuery.data?.page || 1}
                   pageSize={workflowsNotInGroupQuery.data?.limit || 10}
                   totalItems={workflowsNotInGroupQuery.data?.total || 0}
-                  onPageChange={() => { }}
+                  onPageChange={setPage2}
                 />
               </div>
               <DialogFooter className="flex sm:justify-between">
@@ -257,15 +255,15 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       </CardHeader>
       <CardContent>
         {workflowsInGroupQuery.data &&
-          workflowsInGroupQuery.data.data.length > 0 ? (
+        workflowsInGroupQuery.data.data.length > 0 ? (
           <DataTable
             columns={workflowColumns}
-            data={workflowsInGroupQuery.data.data}
+            data={workflowsInGroupQuery.data.data.map((afw) => afw.workflow)}
             isLoading={workflowsInGroupQuery.isLoading}
             page={workflowsInGroupQuery.data.page}
             pageSize={workflowsInGroupQuery.data.limit}
             totalItems={workflowsInGroupQuery.data.total}
-            onPageChange={() => { }}
+            onPageChange={setPage}
           />
         ) : (
           <div className="text-center py-8 text-muted-foreground">
