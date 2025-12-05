@@ -129,7 +129,10 @@ const AddTagDialog = (props: AddTagDialogProps) => {
 
     startGenerating(props.id);
     try {
-      const response = await generateTagsMutation({ data: { domain } });
+      const domainWithoutPort = domain.split(':')[0];
+      const response = await generateTagsMutation({
+        data: { domain: domainWithoutPort },
+      });
       const generatedTags = response.tags || [];
       const newTags = generatedTags.filter((tag) => !tagList.includes(tag));
 
