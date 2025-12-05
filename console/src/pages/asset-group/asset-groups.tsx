@@ -1,24 +1,13 @@
 import Page from '@/components/common/page';
-import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
-  useAssetGroupControllerDelete,
   useAssetGroupControllerGetAll,
   type AssetGroup,
 } from '@/services/apis/gen/queries';
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
-import { MoreHorizontal } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import { CreateAssetGroupDialog } from '../assets/components/create-asset-group-dialog';
 
 export function AssetGroups() {
@@ -27,7 +16,6 @@ export function AssetGroups() {
     tableHandlers: { setPage, setPageSize, setFilter },
   } = useServerDataTable();
 
-  const { mutate } = useAssetGroupControllerDelete();
   const navigate = useNavigate();
 
   const columns: ColumnDef<AssetGroup>[] = [
@@ -35,9 +23,9 @@ export function AssetGroups() {
       accessorKey: 'name',
       header: 'Name',
       cell: ({ row }) => (
-        <div className="font-medium flex gap-2">
+        <div className="font-medium flex items-center gap-2">
           <div
-            className={`h-5 w-5 rounded-full`}
+            className={`h-3 w-3 rounded-full`}
             style={{ background: row.original.hexColor }}
           ></div>
           <span>{row.original.name}</span>
@@ -59,46 +47,9 @@ export function AssetGroups() {
         <div>{dayjs(row.original.createdAt).format('YYYY-MM-DD HH:mm')}</div>
       ),
     },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => {
-        const assetGroup = row.original;
-
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  mutate(
-                    { id: assetGroup.id },
-                    {
-                      onSuccess: () => {
-                        refetch();
-                        toast('Asset group deleted successfully');
-                      },
-                    },
-                  );
-                }}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
   ];
 
-  const { data, isLoading, refetch } = useAssetGroupControllerGetAll(
+  const { data, isLoading } = useAssetGroupControllerGetAll(
     {
       limit: pageSize,
       page: page,
