@@ -13,13 +13,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
-import { FindOptionsWhere, In, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { ToolsService } from '../tools/tools.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { CreateAssetGroupDto } from './dto/create-asset-group.dto';
 import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
+import { UpdateAssetGroupDto } from './dto/update-asset-group.dto';
 import { AssetGroupAsset } from './entities/asset-groups-assets.entity';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
 import { AssetGroup } from './entities/asset-groups.entity';
@@ -47,40 +48,97 @@ export class AssetGroupService {
   /**
    * Retrieves all asset groups with optional filtering and pagination
    */
-  async getAll(query: GetAllAssetGroupsQueryDto, workspaceId: string) {
+  async getManyAssetGroups(
+    query: GetAllAssetGroupsQueryDto,
+    workspaceId: string,
+  ) {
     try {
       const { page, limit, sortBy, sortOrder } = query;
       const offset = (page - 1) * limit;
 
-      const whereConditions:
-        | FindOptionsWhere<AssetGroup>
-        | FindOptionsWhere<AssetGroup>[]
-        | undefined = {
-        workspace: { id: workspaceId },
-      };
+      // Build query using query builder to get asset groups with asset counts
+      const queryBuilder = this.assetGroupRepo
+        .createQueryBuilder('assetGroup')
+        .leftJoin('assetGroup.workspace', 'workspace')
+        .where('workspace.id = :workspaceId', { workspaceId });
 
-      if (query.targetIds && query.targetIds.length > 0) {
-        whereConditions.assetGroupAssets = {
-          asset: {
-            targetId: In(query.targetIds || []),
-          },
-        };
+      // Add search filter if provided
+      if (query.search && query.search.trim() !== '') {
+        queryBuilder.andWhere('assetGroup.name ILIKE :search', {
+          search: `%${query.search.trim()}%`,
+        });
       }
 
-      const [data, total] = await this.assetGroupRepo.findAndCount({
-        where: whereConditions,
-        order: { [sortBy]: sortOrder },
-        skip: offset,
-        take: limit,
-        relations: [
-          'assetGroupAssets',
-          'assetGroupWorkflows',
-          'assetGroupWorkflows.workflow',
-          'assetGroupAssets.asset',
-        ],
-      });
+      // Add targetIds filter if provided
+      if (query.targetIds && query.targetIds.length > 0) {
+        queryBuilder
+          .leftJoin('assetGroup.assetGroupAssets', 'aga')
+          .leftJoin('aga.asset', 'asset')
+          .andWhere('asset.targetId IN (:...targetIds)', {
+            targetIds: query.targetIds,
+          });
+      }
 
-      return getManyResponse({ query, data, total });
+      // Add asset count subquery
+      queryBuilder.addSelect(
+        (subQuery) =>
+          subQuery
+            .select('COUNT(aga_sub.id)', 'count')
+            .from('assets_group_assets', 'aga_sub')
+            .where('aga_sub."assetGroupId" = assetGroup.id'),
+        'totalAssets',
+      );
+
+      // Get total count with the same base conditions (without pagination)
+      const countQueryBuilder = this.assetGroupRepo
+        .createQueryBuilder('assetGroup')
+        .leftJoin('assetGroup.workspace', 'workspace')
+        .where('workspace.id = :workspaceId', { workspaceId });
+
+      if (query.search && query.search.trim() !== '') {
+        countQueryBuilder.andWhere('assetGroup.name ILIKE :search', {
+          search: `%${query.search.trim()}%`,
+        });
+      }
+
+      if (query.targetIds && query.targetIds.length > 0) {
+        countQueryBuilder
+          .leftJoin('assetGroup.assetGroupAssets', 'aga')
+          .leftJoin('aga.asset', 'asset')
+          .andWhere('asset.targetId IN (:...targetIds)', {
+            targetIds: query.targetIds,
+          });
+      }
+
+      const total = await countQueryBuilder.getCount();
+
+      // Apply ordering, pagination to main query
+      queryBuilder
+        .orderBy(`assetGroup.${sortBy}`, sortOrder)
+        .offset(offset)
+        .limit(limit);
+
+      const results: {
+        entities: AssetGroup[];
+        raw: Array<{ totalAssets: string }>;
+      } = await queryBuilder.getRawAndEntities();
+
+      // Map results to include totalAssets in the entity
+      const assetGroupsWithTotalAssets = results.entities.map(
+        (assetGroup, index) => {
+          const rawResult = results.raw[index];
+          return {
+            ...assetGroup,
+            totalAssets: parseInt(rawResult.totalAssets) || 0,
+          };
+        },
+      );
+
+      return getManyResponse({
+        query,
+        data: assetGroupsWithTotalAssets,
+        total,
+      });
     } catch (error) {
       this.logger.error(
         `Error retrieving asset groups for workspace ${workspaceId}:`,
@@ -100,12 +158,6 @@ export class AssetGroupService {
     try {
       const assetGroup = await this.assetGroupRepo.findOne({
         where: { id, workspace: { id: workspaceId } },
-        relations: [
-          'assetGroupAssets',
-          'assetGroupWorkflows',
-          'assetGroupWorkflows.workflow',
-          'assetGroupAssets.asset',
-        ],
       });
 
       if (!assetGroup) {
@@ -114,13 +166,7 @@ export class AssetGroupService {
         );
       }
 
-      const response = new AssetGroup();
-      response.id = assetGroup.id;
-      response.name = assetGroup.name;
-      response.createdAt = assetGroup.createdAt;
-      response.updatedAt = assetGroup.updatedAt;
-
-      return response;
+      return assetGroup;
     } catch (error) {
       this.logger.error(
         `Error retrieving asset group with ID ${id} for workspace ${workspaceId}:`,
@@ -772,7 +818,7 @@ export class AssetGroupService {
 
   public async runGroupWorkflowScheduler(
     assetGroupWorkflowId: string,
-  ): Promise<void> {
+  ): Promise<DefaultMessageResponseDto> {
     // Get the asset group workflow to access the workflow
     const assetGroupWorkflow = await this.assetGroupWorkflowRepo
       .createQueryBuilder('assetGroupWorkflow')
@@ -800,6 +846,12 @@ export class AssetGroupService {
       .where('agw.id = :assetGroupWorkflowId', { assetGroupWorkflowId })
       .getMany();
 
+    if (assets.length === 0) {
+      throw new BadRequestException(
+        'Asset group workflow does not have any assets associated with it.',
+      );
+    }
+
     const firstJobs = workflow.content.jobs.map((j) => j.run)[0];
     const tools = await this.toolsService.getToolByNames([firstJobs]);
     await Promise.all(
@@ -812,6 +864,49 @@ export class AssetGroupService {
         }),
       ),
     );
-    return;
+    return {
+      message: `Run scheduler for asset group workflow with ID ${assetGroupWorkflowId}`,
+    };
+  }
+
+  /**
+   * Updates an existing asset group
+   */
+  async updateAssetGroupById(
+    id: string,
+    updateAssetGroupDto: UpdateAssetGroupDto,
+    workspaceId: string,
+  ): Promise<AssetGroup> {
+    try {
+      // Find the asset group
+      const assetGroup = await this.assetGroupRepo.findOne({
+        where: { id, workspace: { id: workspaceId } },
+      });
+
+      if (!assetGroup) {
+        throw new NotFoundException(
+          `Asset group with ID "${id}" not found in workspace "${workspaceId}"`,
+        );
+      }
+
+      // Update fields if provided
+      if (updateAssetGroupDto.name !== undefined) {
+        assetGroup.name = updateAssetGroupDto.name;
+      }
+      if (updateAssetGroupDto.hexColor !== undefined) {
+        assetGroup.hexColor = updateAssetGroupDto.hexColor;
+      }
+
+      // Save the updated asset group
+      const updatedAssetGroup = await this.assetGroupRepo.save(assetGroup);
+
+      return updatedAssetGroup;
+    } catch (error) {
+      this.logger.error(
+        `Error updating asset group with ID ${id} in workspace ${workspaceId}:`,
+        error,
+      );
+      throw error;
+    }
   }
 }

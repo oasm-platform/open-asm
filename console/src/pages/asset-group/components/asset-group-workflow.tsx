@@ -1,5 +1,6 @@
 import { ScanScheduleSelect } from '@/components/scan-schedule-select';
 import { Image } from '@/components/ui/image';
+import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
   OnSchedule,
   ToolCategory,
@@ -222,7 +223,7 @@ export default function AssetGroupWorkflow({
   return (
     <div className="space-y-4 mb-4">
       <h2 className="text-xl font-semibold">Tools</h2>
-      <div className="flex justify-between items-center">
+      <div className="flex-col md:flex-row flex justify-start md:justify-between md:items-center gap-2">
         <div className="flex gap-4">
           {vulnerabilityTools.map((tool) => {
             const isAdded = isToolInGroup(tool.name);
@@ -305,29 +306,31 @@ export default function AssetGroupWorkflow({
             );
           })}
         </div>
-        <ScanScheduleSelect
-          disabled={isPendingUpdateSchedule || !groupWorkflows?.data[0]?.id}
-          value={
-            groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule
-          }
-          onChange={(value: UpdateTargetDtoScanSchedule) => {
-            console.log(value);
-            updateAssetGroupWorkflowMutation(
-              {
-                id: groupWorkflows?.data[0]?.id as string,
-                data: {
-                  schedule: value,
+        <div className="flex gap-2 justify-between">
+          <ScanScheduleSelect
+            disabled={isPendingUpdateSchedule || !groupWorkflows?.data[0]?.id}
+            value={
+              groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule
+            }
+            onChange={(value: UpdateTargetDtoScanSchedule) => {
+              updateAssetGroupWorkflowMutation(
+                {
+                  id: groupWorkflows?.data[0]?.id as string,
+                  data: {
+                    schedule: value,
+                  },
                 },
-              },
-              {
-                onSuccess: async () => {
-                  await refetchWorkflows();
-                  toast.success('Update schedule successfuly');
+                {
+                  onSuccess: async () => {
+                    await refetchWorkflows();
+                    toast.success('Update schedule successfuly');
+                  },
                 },
-              },
-            );
-          }}
-        />
+              );
+            }}
+          />
+          <RunWorkflowButton id={getCurrentWorkflow()?.id} />
+        </div>
       </div>
     </div>
   );

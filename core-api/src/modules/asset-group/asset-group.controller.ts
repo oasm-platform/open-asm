@@ -2,6 +2,8 @@ import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -12,6 +14,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Asset } from '../assets/entities/assets.entity';
@@ -24,13 +27,14 @@ import { GetAllAssetGroupsQueryDto } from './dto/get-all-asset-groups-dto.dto';
 import { RemoveManyAssetsFromAssetGroupDto } from './dto/remove-many-assets-from-asset-group.dto';
 import { RemoveManyWorkflowsFromAssetGroupDto } from './dto/remove-many-workflows-from-asset-group.dto';
 import { UpdateAssetGroupWorkflowDto } from './dto/update-asset-group-workflow.dto';
+import { UpdateAssetGroupDto } from './dto/update-asset-group.dto';
 import { AssetGroupWorkflow } from './entities/asset-groups-workflows.entity';
 import { AssetGroup } from './entities/asset-groups.entity';
 
 @ApiTags('Asset Group')
 @Controller('asset-group')
 export class AssetGroupController {
-  constructor(private readonly assetGroupService: AssetGroupService) { }
+  constructor(private readonly assetGroupService: AssetGroupService) {}
 
   @Doc({
     summary: 'Get all asset groups',
@@ -48,7 +52,7 @@ export class AssetGroupController {
     @Query() query: GetAllAssetGroupsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetGroupService.getAll(query, workspaceId);
+    return this.assetGroupService.getManyAssetGroups(query, workspaceId);
   }
 
   @Doc({
@@ -64,6 +68,29 @@ export class AssetGroupController {
   @Get(':id')
   getById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
     return this.assetGroupService.getAssetGroupById(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Update asset group',
+    description: 'Updates an existing asset group by ID.',
+    response: {
+      serialization: AssetGroup,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Patch(':id')
+  updateAssetGroupById(
+    @Param() param: IdQueryParamDto,
+    @Body() updateAssetGroupDto: UpdateAssetGroupDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetGroupService.updateAssetGroupById(
+      param.id,
+      updateAssetGroupDto,
+      workspaceId,
+    );
   }
 
   @Doc({
@@ -267,7 +294,8 @@ export class AssetGroupController {
 
   @Doc({
     summary: 'Update asset group workflow relationship',
-    description: 'Updates the relationship between an asset group and workflow, primarily to change the schedule.',
+    description:
+      'Updates the relationship between an asset group and workflow, primarily to change the schedule.',
     response: {
       serialization: AssetGroupWorkflow,
     },
@@ -281,7 +309,23 @@ export class AssetGroupController {
       assetGroupWorkflowId,
       {
         schedule: updateDto.schedule,
-      }
+      },
     );
+  }
+
+  @Doc({
+    summary: 'Runs the scheduler for a specific asset group workflow.',
+    description: 'Runs the scheduler for a specific asset group workflow.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @UseGuards(WorkspaceOwnerGuard)
+  @Post('workflows/:id/run')
+  runGroupWorkflowScheduler(@Param() queryParams: IdQueryParamDto) {
+    return this.assetGroupService.runGroupWorkflowScheduler(queryParams.id);
   }
 }

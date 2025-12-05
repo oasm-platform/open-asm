@@ -838,11 +838,6 @@ export type CreateToolDto = {
   providerId: string;
 };
 
-export type RunToolDto = {
-  targetIds?: string[];
-  assetIds?: string[];
-};
-
 export type WorkspaceTool = {
   id: string;
   createdAt: string;
@@ -1099,6 +1094,8 @@ export type AssetGroup = {
   createdAt: string;
   updatedAt: string;
   name: string;
+  hexColor?: string;
+  totalAssets: number;
 };
 
 export type GetManyAssetGroupDto = {
@@ -1108,6 +1105,13 @@ export type GetManyAssetGroupDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type UpdateAssetGroupDto = {
+  /** Name of the asset group */
+  name?: string;
+  /** Hex color of the asset group */
+  hexColor?: string;
 };
 
 export type CreateAssetGroupDto = {
@@ -1407,6 +1411,7 @@ export type GetManyMcpPermissionDto = {
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1415,6 +1420,7 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
 };
 
 export type WorkspacesControllerGetWorkspacesParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1426,6 +1432,7 @@ export type WorkspacesControllerGetWorkspacesParams = {
 };
 
 export type JobsRegistryControllerGetManyJobsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1433,6 +1440,7 @@ export type JobsRegistryControllerGetManyJobsParams = {
 };
 
 export type AssetsControllerGetAssetsInWorkspaceParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1446,6 +1454,7 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
 };
 
 export type AssetsControllerGetIpAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1459,6 +1468,7 @@ export type AssetsControllerGetIpAssetsParams = {
 };
 
 export type AssetsControllerGetPortAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1472,6 +1482,7 @@ export type AssetsControllerGetPortAssetsParams = {
 };
 
 export type AssetsControllerGetTechnologyAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1485,6 +1496,7 @@ export type AssetsControllerGetTechnologyAssetsParams = {
 };
 
 export type AssetsControllerGetStatusCodeAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1498,6 +1510,7 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
 };
 
 export type WorkersControllerGetWorkersParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1506,6 +1519,7 @@ export type WorkersControllerGetWorkersParams = {
 };
 
 export type SearchControllerSearchAssetsTargetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1516,6 +1530,7 @@ export type SearchControllerSearchAssetsTargetsParams = {
 };
 
 export type SearchControllerGetSearchHistoryParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1532,6 +1547,7 @@ export type StatisticControllerGetStatisticsParams = {
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1547,6 +1563,7 @@ export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
 };
 
 export type ToolsControllerGetManyToolsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1597,6 +1614,7 @@ export const ToolsControllerGetInstalledToolsCategory = {
 } as const;
 
 export type WorkflowsControllerGetManyWorkflowsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1608,6 +1626,7 @@ export type WorkflowsControllerGetManyWorkflowsParams = {
 };
 
 export type ProvidersControllerGetManyProvidersParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1616,6 +1635,7 @@ export type ProvidersControllerGetManyProvidersParams = {
 };
 
 export type TemplatesControllerGetAllTemplatesParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1624,6 +1644,7 @@ export type TemplatesControllerGetAllTemplatesParams = {
 };
 
 export type AssetGroupControllerGetAllParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1632,6 +1653,7 @@ export type AssetGroupControllerGetAllParams = {
 };
 
 export type AssetGroupControllerGetAssetsByAssetGroupsIdParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1639,6 +1661,7 @@ export type AssetGroupControllerGetAssetsByAssetGroupsIdParams = {
 };
 
 export type AssetGroupControllerGetWorkflowsByAssetGroupsIdParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1646,6 +1669,7 @@ export type AssetGroupControllerGetWorkflowsByAssetGroupsIdParams = {
 };
 
 export type AssetGroupControllerGetAssetsNotInAssetGroupParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1653,6 +1677,7 @@ export type AssetGroupControllerGetAssetsNotInAssetGroupParams = {
 };
 
 export type AssetGroupControllerGetWorkflowsNotInAssetGroupParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1679,6 +1704,7 @@ export type StorageControllerForwardImageParams = {
 };
 
 export type McpControllerGetMcpPermissionsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -14520,97 +14546,6 @@ export function useToolsControllerGetManyTools<
 }
 
 /**
- * Executes a security assessment tool with specified parameters in the designated workspace.
- * @summary Run a tool
- */
-export const toolsControllerRunTool = (
-  id: string,
-  runToolDto: RunToolDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    {
-      url: `/api/tools/${id}/run`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: runToolDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getToolsControllerRunToolMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof toolsControllerRunTool>>,
-    TError,
-    { id: string; data: RunToolDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof toolsControllerRunTool>>,
-  TError,
-  { id: string; data: RunToolDto },
-  TContext
-> => {
-  const mutationKey = ['toolsControllerRunTool'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof toolsControllerRunTool>>,
-    { id: string; data: RunToolDto }
-  > = (props) => {
-    const { id, data } = props ?? {};
-
-    return toolsControllerRunTool(id, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ToolsControllerRunToolMutationResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerRunTool>>
->;
-export type ToolsControllerRunToolMutationBody = RunToolDto;
-export type ToolsControllerRunToolMutationError = unknown;
-
-/**
- * @summary Run a tool
- */
-export const useToolsControllerRunTool = <TError = unknown, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof toolsControllerRunTool>>,
-      TError,
-      { id: string; data: RunToolDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof toolsControllerRunTool>>,
-  TError,
-  { id: string; data: RunToolDto },
-  TContext
-> => {
-  const mutationOptions = getToolsControllerRunToolMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
  * Associates an existing security tool with a specific workspace for targeted assessments.
  * @summary Add tool to workspace
  */
@@ -20429,6 +20364,101 @@ export function useAssetGroupControllerGetById<
 }
 
 /**
+ * Updates an existing asset group by ID.
+ * @summary Update asset group
+ */
+export const assetGroupControllerUpdateAssetGroupById = (
+  id: string,
+  updateAssetGroupDto: UpdateAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AssetGroup>(
+    {
+      url: `/api/asset-group/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAssetGroupDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerUpdateAssetGroupByIdMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+    TError,
+    { id: string; data: UpdateAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+  TError,
+  { id: string; data: UpdateAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerUpdateAssetGroupById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+    { id: string; data: UpdateAssetGroupDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetGroupControllerUpdateAssetGroupById(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerUpdateAssetGroupByIdMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>
+  >;
+export type AssetGroupControllerUpdateAssetGroupByIdMutationBody =
+  UpdateAssetGroupDto;
+export type AssetGroupControllerUpdateAssetGroupByIdMutationError = unknown;
+
+/**
+ * @summary Update asset group
+ */
+export const useAssetGroupControllerUpdateAssetGroupById = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+      TError,
+      { id: string; data: UpdateAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+  TError,
+  { id: string; data: UpdateAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerUpdateAssetGroupByIdMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Permanently removes an asset group.
  * @summary Delete asset group
  */
@@ -22783,6 +22813,96 @@ export const useAssetGroupControllerUpdateAssetGroupWorkflow = <
 > => {
   const mutationOptions =
     getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Runs the scheduler for a specific asset group workflow.
+ * @summary Runs the scheduler for a specific asset group workflow.
+ */
+export const assetGroupControllerRunGroupWorkflowScheduler = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/asset-group/workflows/${id}/run`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getAssetGroupControllerRunGroupWorkflowSchedulerMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRunGroupWorkflowScheduler'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return assetGroupControllerRunGroupWorkflowScheduler(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerRunGroupWorkflowSchedulerMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>
+  >;
+
+export type AssetGroupControllerRunGroupWorkflowSchedulerMutationError =
+  unknown;
+
+/**
+ * @summary Runs the scheduler for a specific asset group workflow.
+ */
+export const useAssetGroupControllerRunGroupWorkflowScheduler = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerRunGroupWorkflowSchedulerMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

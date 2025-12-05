@@ -913,11 +913,6 @@ export interface CreateToolDto {
   providerId: string;
 }
 
-export interface RunToolDto {
-  targetIds?: string[];
-  assetIds?: string[];
-}
-
 export interface WorkspaceTool {
   id: string;
   /** @format date-time */
@@ -1176,6 +1171,9 @@ export interface AssetGroup {
   /** @format date-time */
   updatedAt: string;
   name: string;
+  /** @example "#78716C" */
+  hexColor?: string;
+  totalAssets: number;
 }
 
 export interface GetManyAssetGroupDto {
@@ -1185,6 +1183,19 @@ export interface GetManyAssetGroupDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+}
+
+export interface UpdateAssetGroupDto {
+  /**
+   * Name of the asset group
+   * @example "Web Servers"
+   */
+  name?: string;
+  /**
+   * Hex color of the asset group
+   * @example "#78716C"
+   */
+  hexColor?: string;
 }
 
 export interface CreateAssetGroupDto {
@@ -1819,6 +1830,7 @@ export class Api<
    */
   targetsControllerGetTargetsInWorkspace = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1944,6 +1956,7 @@ export class Api<
    */
   workspacesControllerGetWorkspaces = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2180,6 +2193,7 @@ export class Api<
    */
   jobsRegistryControllerGetManyJobs = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2287,6 +2301,7 @@ export class Api<
    */
   assetsControllerGetAssetsInWorkspace = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2322,6 +2337,7 @@ export class Api<
    */
   assetsControllerGetIpAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2357,6 +2373,7 @@ export class Api<
    */
   assetsControllerGetPortAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2392,6 +2409,7 @@ export class Api<
    */
   assetsControllerGetTechnologyAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2427,6 +2445,7 @@ export class Api<
    */
   assetsControllerGetStatusCodeAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2592,6 +2611,7 @@ export class Api<
    */
   workersControllerGetWorkers = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2622,6 +2642,7 @@ export class Api<
    */
   searchControllerSearchAssetsTargets = (
     query: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2654,6 +2675,7 @@ export class Api<
    */
   searchControllerGetSearchHistory = (
     query: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2844,6 +2866,7 @@ export class Api<
    */
   vulnerabilitiesControllerGetVulnerabilities = (
     query: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2939,6 +2962,7 @@ export class Api<
    */
   toolsControllerGetManyTools = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2958,28 +2982,6 @@ export class Api<
       path: `/api/tools`,
       method: "GET",
       query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Executes a security assessment tool with specified parameters in the designated workspace.
-   *
-   * @tags Tools
-   * @name ToolsControllerRunTool
-   * @summary Run a tool
-   * @request POST:/api/tools/{id}/run
-   */
-  toolsControllerRunTool = (
-    id: string,
-    data: RunToolDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/${id}/run`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
       format: "json",
       ...params,
     });
@@ -3159,6 +3161,7 @@ export class Api<
    */
   workflowsControllerGetManyWorkflows = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3271,6 +3274,7 @@ export class Api<
    */
   providersControllerGetManyProviders = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3401,6 +3405,7 @@ export class Api<
    */
   templatesControllerGetAllTemplates = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3533,6 +3538,7 @@ export class Api<
    */
   assetGroupControllerGetAll = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3586,6 +3592,28 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${id}`,
       method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates an existing asset group by ID.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerUpdateAssetGroupById
+   * @summary Update asset group
+   * @request PATCH:/api/asset-group/{id}
+   */
+  assetGroupControllerUpdateAssetGroupById = (
+    id: string,
+    data: UpdateAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });
@@ -3705,6 +3733,7 @@ export class Api<
   assetGroupControllerGetAssetsByAssetGroupsId = (
     assetGroupId: string,
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3735,6 +3764,7 @@ export class Api<
   assetGroupControllerGetWorkflowsByAssetGroupsId = (
     assetGroupId: string,
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3765,6 +3795,7 @@ export class Api<
   assetGroupControllerGetAssetsNotInAssetGroup = (
     assetGroupId: string,
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3795,6 +3826,7 @@ export class Api<
   assetGroupControllerGetWorkflowsNotInAssetGroup = (
     assetGroupId: string,
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3832,6 +3864,25 @@ export class Api<
       method: "PATCH",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Runs the scheduler for a specific asset group workflow.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerRunGroupWorkflowScheduler
+   * @summary Runs the scheduler for a specific asset group workflow.
+   * @request POST:/api/asset-group/workflows/{id}/run
+   */
+  assetGroupControllerRunGroupWorkflowScheduler = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/workflows/${id}/run`,
+      method: "POST",
       format: "json",
       ...params,
     });
@@ -4215,6 +4266,7 @@ export class Api<
    */
   mcpControllerGetMcpPermissions = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
