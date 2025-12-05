@@ -1173,6 +1173,7 @@ export interface AssetGroup {
   name: string;
   /** @example "#78716C" */
   hexColor?: string;
+  totalAssets: number;
 }
 
 export interface GetManyAssetGroupDto {
@@ -1631,6 +1632,7 @@ export class Api<
    */
   targetsControllerGetTargetsInWorkspace = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1756,6 +1758,7 @@ export class Api<
    */
   workspacesControllerGetWorkspaces = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1992,6 +1995,7 @@ export class Api<
    */
   jobsRegistryControllerGetManyJobs = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2099,6 +2103,7 @@ export class Api<
    */
   assetsControllerGetAssetsInWorkspace = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2134,6 +2139,7 @@ export class Api<
    */
   assetsControllerGetIpAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2169,6 +2175,7 @@ export class Api<
    */
   assetsControllerGetPortAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2204,6 +2211,7 @@ export class Api<
    */
   assetsControllerGetTechnologyAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2239,6 +2247,7 @@ export class Api<
    */
   assetsControllerGetStatusCodeAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2404,6 +2413,7 @@ export class Api<
    */
   workersControllerGetWorkers = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2434,6 +2444,7 @@ export class Api<
    */
   searchControllerSearchAssetsTargets = (
     query: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2466,6 +2477,7 @@ export class Api<
    */
   searchControllerGetSearchHistory = (
     query: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2656,6 +2668,7 @@ export class Api<
    */
   vulnerabilitiesControllerGetVulnerabilities = (
     query: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2751,6 +2764,7 @@ export class Api<
    */
   toolsControllerGetManyTools = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2949,6 +2963,7 @@ export class Api<
    */
   workflowsControllerGetManyWorkflows = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3061,6 +3076,7 @@ export class Api<
    */
   providersControllerGetManyProviders = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3191,6 +3207,7 @@ export class Api<
    */
   templatesControllerGetAllTemplates = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3323,6 +3340,7 @@ export class Api<
    */
   assetGroupControllerGetAll = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3517,6 +3535,7 @@ export class Api<
   assetGroupControllerGetAssetsByAssetGroupsId = (
     assetGroupId: string,
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3547,6 +3566,7 @@ export class Api<
   assetGroupControllerGetWorkflowsByAssetGroupsId = (
     assetGroupId: string,
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3577,6 +3597,7 @@ export class Api<
   assetGroupControllerGetAssetsNotInAssetGroup = (
     assetGroupId: string,
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3607,6 +3628,7 @@ export class Api<
   assetGroupControllerGetWorkflowsNotInAssetGroup = (
     assetGroupId: string,
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -3795,6 +3817,7 @@ export class Api<
    */
   mcpControllerGetMcpPermissions = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */

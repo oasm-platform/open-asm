@@ -52,7 +52,7 @@ export class AssetGroupController {
     @Query() query: GetAllAssetGroupsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetGroupService.getAll(query, workspaceId);
+    return this.assetGroupService.getManyAssetGroups(query, workspaceId);
   }
 
   @Doc({

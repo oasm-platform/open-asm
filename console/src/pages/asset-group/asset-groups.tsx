@@ -45,6 +45,13 @@ export function AssetGroups() {
       ),
     },
     {
+      accessorKey: 'totalAssets',
+      header: 'Total Assets',
+      cell: ({ row }) => (
+        <div className="font-medium">{row.original.totalAssets || 0}</div>
+      ),
+    },
+    {
       accessorKey: 'createdAt',
       header: 'Created Date',
       enableSorting: false,

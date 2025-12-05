@@ -33,6 +33,11 @@ export enum SortOrder {
 
 export class GetManyBaseQueryParams {
   @IsOptional()
+  @ApiProperty({ required: false })
+  @IsString()
+  search?: string = '';
+
+  @IsOptional()
   @ApiProperty({ required: false, example: 1 })
   @IsNumber()
   @Transform(({ value }) => Number(value))
