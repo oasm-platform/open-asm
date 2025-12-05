@@ -913,11 +913,6 @@ export interface CreateToolDto {
   providerId: string;
 }
 
-export interface RunToolDto {
-  targetIds?: string[];
-  assetIds?: string[];
-}
-
 export interface WorkspaceTool {
   id: string;
   /** @format date-time */
@@ -1245,7 +1240,6 @@ export interface AssetGroupWorkflow {
   assetGroup: AssetGroup;
   workflow: Workflow;
   schedule: AssetGroupWorkflowScheduleEnum;
-  job: object;
 }
 
 export interface GetManyAssetGroupWorkflowDto {
@@ -2766,28 +2760,6 @@ export class Api<
     });
 
   /**
-   * @description Executes a security assessment tool with specified parameters in the designated workspace.
-   *
-   * @tags Tools
-   * @name ToolsControllerRunTool
-   * @summary Run a tool
-   * @request POST:/api/tools/{id}/run
-   */
-  toolsControllerRunTool = (
-    id: string,
-    data: RunToolDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/${id}/run`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
    * @description Associates an existing security tool with a specific workspace for targeted assessments.
    *
    * @tags Tools
@@ -3635,6 +3607,25 @@ export class Api<
       method: "PATCH",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Runs the scheduler for a specific asset group workflow.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerRunGroupWorkflowScheduler
+   * @summary Runs the scheduler for a specific asset group workflow.
+   * @request POST:/api/asset-group/workflows/{id}/run
+   */
+  assetGroupControllerRunGroupWorkflowScheduler = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/workflows/${id}/run`,
+      method: "POST",
       format: "json",
       ...params,
     });

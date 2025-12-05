@@ -1,5 +1,6 @@
 import { ScanScheduleSelect } from '@/components/scan-schedule-select';
 import { Image } from '@/components/ui/image';
+import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
   OnSchedule,
   ToolCategory,
@@ -305,29 +306,31 @@ export default function AssetGroupWorkflow({
             );
           })}
         </div>
-        <ScanScheduleSelect
-          disabled={isPendingUpdateSchedule || !groupWorkflows?.data[0]?.id}
-          value={
-            groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule
-          }
-          onChange={(value: UpdateTargetDtoScanSchedule) => {
-            console.log(value);
-            updateAssetGroupWorkflowMutation(
-              {
-                id: groupWorkflows?.data[0]?.id as string,
-                data: {
-                  schedule: value,
+        <div className="flex gap-2">
+          <ScanScheduleSelect
+            disabled={isPendingUpdateSchedule || !groupWorkflows?.data[0]?.id}
+            value={
+              groupWorkflows?.data[0]?.schedule as UpdateTargetDtoScanSchedule
+            }
+            onChange={(value: UpdateTargetDtoScanSchedule) => {
+              updateAssetGroupWorkflowMutation(
+                {
+                  id: groupWorkflows?.data[0]?.id as string,
+                  data: {
+                    schedule: value,
+                  },
                 },
-              },
-              {
-                onSuccess: async () => {
-                  await refetchWorkflows();
-                  toast.success('Update schedule successfuly');
+                {
+                  onSuccess: async () => {
+                    await refetchWorkflows();
+                    toast.success('Update schedule successfuly');
+                  },
                 },
-              },
-            );
-          }}
-        />
+              );
+            }}
+          />
+          <RunWorkflowButton id={getCurrentWorkflow()?.id} />
+        </div>
       </div>
     </div>
   );
