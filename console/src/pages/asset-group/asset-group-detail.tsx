@@ -45,7 +45,7 @@ export default function AssetGroupDetail() {
               className={`h-3 w-3 rounded-full`}
               style={{ background: data?.hexColor }}
             ></div>
-            {data?.name}
+            <span className="font-bold capitalize">{data?.name}</span>
             <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
           </div>
           <ConfirmDialog
