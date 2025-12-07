@@ -33,6 +33,7 @@ export class ToolsService implements OnModuleInit {
   constructor(
     @InjectRepository(Tool)
     public readonly toolsRepository: Repository<Tool>,
+
     @InjectRepository(WorkspaceTool)
     private readonly workspaceToolRepository: Repository<WorkspaceTool>,
 
@@ -46,7 +47,7 @@ export class ToolsService implements OnModuleInit {
 
     @Inject(forwardRef(() => JobsRegistryService))
     private jobRegistryService: JobsRegistryService,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     try {
@@ -67,7 +68,10 @@ export class ToolsService implements OnModuleInit {
         type: WorkerType.PROVIDER,
       }));
 
-      const toolsToInsert = [...builtInToolsToInsert, ...officialSupportToolsToInsert];
+      const toolsToInsert = [
+        ...builtInToolsToInsert,
+        ...officialSupportToolsToInsert,
+      ];
 
       // Insert tools using upsert to avoid duplicates
       await this.toolsRepository
@@ -414,7 +418,25 @@ export class ToolsService implements OnModuleInit {
    * @param {string[]} names - The names of the tools.
    * @returns {Promise<Tool[]>} The tools with the specified names.
    */
-  public getToolByNames(names: string[]) {
+  public getToolByNames({
+    names,
+    isInstalled = false,
+  }: {
+    names: string[];
+    isInstalled?: boolean;
+  }): Promise<Tool[]> {
+    if (isInstalled) {
+      return this.workspaceToolRepository
+        .find({
+          where: {
+            tool: {
+              name: In(names),
+            },
+          },
+          relations: ['tool'],
+        })
+        .then((res) => res.map((r) => r.tool));
+    }
     return this.toolsRepository.find({
       where: {
         name: In(names),

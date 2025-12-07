@@ -19,7 +19,7 @@ export class VulnerabilitiesService {
     private vulnerabilitiesRepository: Repository<Vulnerability>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
-  ) { }
+  ) {}
 
   /**
    * Initiates a vulnerability scan for a given target.
@@ -29,7 +29,7 @@ export class VulnerabilitiesService {
    * @returns A message indicating the scan has started.
    */
   public async scan(targetId: string) {
-    const tools = await this.toolsService.getToolByNames(['nuclei']);
+    const tools = await this.toolsService.getToolByNames({ names: ['nuclei'] });
     await this.jobRegistryService.createNewJob({
       tool: tools[0],
       targetIds: [targetId],

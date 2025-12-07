@@ -6,15 +6,10 @@ import type {
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
-import {
-  BriefcaseBusiness,
-  Globe,
-  Network
-} from 'lucide-react';
+import { BriefcaseBusiness, Globe, Network } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
 import HTTPXStatusCode from './status-code';
-import SwitchEnableAsset from './switch-enable-asset';
 import { TechnologyTooltip } from './technology-tooltip';
 
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
@@ -130,16 +125,16 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       );
     },
   },
-  {
-    header: 'Enabled',
-    size: 120,
-    cell: ({ row }) => {
-      return (
-        <SwitchEnableAsset
-          id={row.original.id}
-          currentStatus={row.original.isEnabled}
-        />
-      );
-    },
-  },
+  // {
+  //   header: 'Enabled',
+  //   size: 120,
+  //   cell: ({ row }) => {
+  //     return (
+  //       <SwitchEnableAsset
+  //         id={row.original.id}
+  //         currentStatus={row.original.isEnabled}
+  //       />
+  //     );
+  //   },
+  // },
 ];

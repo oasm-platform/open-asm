@@ -54,7 +54,7 @@ export class JobsRegistryService {
     private toolsService: ToolsService,
     private storageService: StorageService,
     private redis: RedisService,
-  ) { }
+  ) {}
   public async getManyJobs(
     query: GetManyBaseQueryParams,
   ): Promise<GetManyBaseResponseDto<Job>> {
@@ -115,9 +115,7 @@ export class JobsRegistryService {
       (priority < JobPriority.CRITICAL || priority > JobPriority.BACKGROUND)
     ) {
       priority = tool.priority || JobPriority.BACKGROUND;
-    }
-
-    else if (!priority) {
+    } else if (!priority) {
       priority = tool.priority || JobPriority.BACKGROUND;
     }
     // Step 1: create job history
@@ -138,7 +136,11 @@ export class JobsRegistryService {
     // Step 2: find appropriate data source based on tool category
     if (tool.category === ToolCategory.HTTP_PROBE) {
       // For HTTP_PROBE, use asset services
-      const assetServices = await this.findAssetServicesForJob(targetIds, assetIds, workspaceId);
+      const assetServices = await this.findAssetServicesForJob(
+        targetIds,
+        assetIds,
+        workspaceId,
+      );
 
       // Step 3: iterate tools and create jobs
       const defaultCommand = builtInTools.find(
@@ -157,7 +159,8 @@ export class JobsRegistryService {
           tool,
           priority: priority ?? 4,
           jobHistory,
-          command: bindingCommand(defaultCommand ?? '', { // Use the default command template for HTTP_PROBE
+          command: bindingCommand(defaultCommand ?? '', {
+            // Use the default command template for HTTP_PROBE
             value: assetService.value,
             port: assetService.port.toString(),
           }),
@@ -169,7 +172,11 @@ export class JobsRegistryService {
       }
     } else {
       // For all other categories, use regular assets
-      const assets = await this.findAssetsForJob(targetIds, assetIds, workspaceId);
+      const assets = await this.findAssetsForJob(
+        targetIds,
+        assetIds,
+        workspaceId,
+      );
       const filteredAssets = this.filterAssetsByCategory(assets, tool.category);
 
       // Step 3: iterate tools and create jobs
@@ -271,9 +278,12 @@ export class JobsRegistryService {
     }
 
     if (assetIds && assetIds.length > 0) {
-      assetServicesQueryBuilder.andWhere('assetServices.assetId IN (:...assetIds)', {
-        assetIds,
-      });
+      assetServicesQueryBuilder.andWhere(
+        'assetServices.assetId IN (:...assetIds)',
+        {
+          assetIds,
+        },
+      );
     }
 
     if (workspaceId) {
@@ -293,7 +303,10 @@ export class JobsRegistryService {
    * @param toolCategory the category of the tool
    * @returns filtered list of assets
    */
-  private filterAssetsByCategory(assets: Asset[], toolCategory: ToolCategory): Asset[] {
+  private filterAssetsByCategory(
+    assets: Asset[],
+    toolCategory: ToolCategory,
+  ): Asset[] {
     if (toolCategory === ToolCategory.SUBDOMAINS) {
       return assets.filter((asset) => asset.isPrimary);
     }
@@ -338,7 +351,6 @@ export class JobsRegistryService {
         .orderBy('jobs.priority', 'DESC')
         .orderBy('jobs.createdAt', 'ASC');
 
-
       if (isBuiltInTools) {
         const builtInToolsName = builtInTools.map((tool) => tool.name);
         queryBuilder.andWhere('tool.name IN (:...names)', {
@@ -358,7 +370,9 @@ export class JobsRegistryService {
       if (worker.tool?.category === ToolCategory.HTTP_PROBE) {
         queryBuilder
           .leftJoinAndSelect('jobs.assetService', 'assetService')
-          .andWhere('jobs.category = :category', { category: ToolCategory.HTTP_PROBE });
+          .andWhere('jobs.category = :category', {
+            category: ToolCategory.HTTP_PROBE,
+          });
       } else {
         queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
       }
@@ -687,13 +701,17 @@ export class JobsRegistryService {
     const currentTool = job.tool.name;
     const { jobs } = workflow.content;
 
-    const curretJobMetadata = jobs.find(j => j.run === currentTool);
+    const curretJobMetadata = jobs.find((j) => j.run === currentTool);
     if (!curretJobMetadata) return null;
 
-    const indexCurrentTool = workflow?.content.jobs.findIndex(j => j.name === curretJobMetadata.name);
+    const indexCurrentTool = workflow?.content.jobs.findIndex(
+      (j) => j.name === curretJobMetadata.name,
+    );
     const nextTool = workflow?.content.jobs[indexCurrentTool + 1]?.run;
     if (nextTool) {
-      const tools = await this.toolsService.getToolByNames([nextTool]);
+      const tools = await this.toolsService.getToolByNames({
+        names: [nextTool],
+      });
       await Promise.all(
         tools.map((tool) =>
           this.createNewJob({

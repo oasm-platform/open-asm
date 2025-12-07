@@ -154,7 +154,7 @@ export function EditAssetGroupDialog({
                             <button
                               key={color}
                               type="button"
-                              className={`w-8 h-8 rounded-full border-2 ${
+                              className={`w-8 h-8 rounded-full border-2 cursor-pointer ${
                                 field.value === color
                                   ? 'border-gray-400 ring-2 ring-offset-2 ring-blue-500'
                                   : 'border-gray-300'

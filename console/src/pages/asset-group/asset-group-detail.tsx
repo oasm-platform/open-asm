@@ -42,10 +42,10 @@ export default function AssetGroupDetail() {
         <div className="flex items-center gap-2 justify-between w-full">
           <div className="flex items-center gap-2">
             <div
-              className={`h-3 w-3 rounded-full`}
+              className={`h-4 w-4 rounded-full`}
               style={{ background: data?.hexColor }}
             ></div>
-            {data?.name}
+            <span className="font-bold capitalize text-2xl">{data?.name}</span>
             <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
           </div>
           <ConfirmDialog
