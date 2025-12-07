@@ -529,6 +529,7 @@ export const ToolCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   classifier: 'classifier',
+  assistant: 'assistant',
 } as const;
 
 export type Tool = {
@@ -823,6 +824,7 @@ export const CreateToolDtoCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   classifier: 'classifier',
+  assistant: 'assistant',
 } as const;
 
 export type CreateToolDto = {
@@ -1201,6 +1203,177 @@ export type UpdateAssetGroupWorkflowDto = {
   schedule: UpdateAssetGroupWorkflowDtoSchedule;
 };
 
+export type GenerateTagsResponseDto = {
+  /** Domain that tags were generated for */
+  domain: string;
+  /** Generated tags */
+  tags: string[];
+};
+
+export type GenerateTagsDto = {
+  /** Domain to generate tags for */
+  domain: string;
+};
+
+/**
+ * MCP servers configuration with status
+ */
+export type AddMcpServersResponseDtoMcpServers = { [key: string]: unknown };
+
+export type AddMcpServersResponseDto = {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** MCP servers configuration with status */
+  mcpServers: AddMcpServersResponseDtoMcpServers;
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Error message if operation failed */
+  error?: string;
+};
+
+/**
+ * MCP servers configuration object
+ */
+export type AddMcpServersDtoMcpServers = { [key: string]: unknown };
+
+export type AddMcpServersDto = {
+  /** MCP servers configuration object */
+  mcpServers: AddMcpServersDtoMcpServers;
+};
+
+/**
+ * Updated MCP servers configuration with status
+ */
+export type UpdateMcpServersResponseDtoMcpServers = { [key: string]: unknown };
+
+export type UpdateMcpServersResponseDto = {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** Updated MCP servers configuration with status */
+  mcpServers: UpdateMcpServersResponseDtoMcpServers;
+  /** Whether the operation succeeded */
+  success: boolean;
+};
+
+/**
+ * MCP servers configuration object
+ */
+export type UpdateMcpServersDtoMcpServers = { [key: string]: unknown };
+
+export type UpdateMcpServersDto = {
+  /** MCP servers configuration object */
+  mcpServers: UpdateMcpServersDtoMcpServers;
+};
+
+export type DeleteMcpServersResponseDto = {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Response message */
+  message?: string;
+};
+
+export type GetConversationsResponseDtoConversationsItem = {
+  conversationId?: string;
+  title?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type GetConversationsResponseDto = {
+  /** List of conversations */
+  conversations: GetConversationsResponseDtoConversationsItem[];
+};
+
+/**
+ * Updated conversation
+ */
+export type UpdateConversationResponseDtoConversation = {
+  conversationId?: string;
+  title?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type UpdateConversationResponseDto = {
+  /** Updated conversation */
+  conversation: UpdateConversationResponseDtoConversation;
+};
+
+export type UpdateConversationDto = {
+  /** New title for the conversation */
+  title?: string;
+  /** New description for the conversation */
+  description?: string;
+};
+
+export type DeleteConversationResponseDto = {
+  /** Success status */
+  success: boolean;
+  /** Response message */
+  message: string;
+};
+
+export type DeleteConversationsResponseDto = {
+  /** Success status */
+  success: boolean;
+  /** Response message */
+  message: string;
+};
+
+export type GetMessagesResponseDtoMessagesItem = {
+  messageId?: string;
+  question?: string;
+  type?: string;
+  content?: string;
+  conversationId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type GetMessagesResponseDto = {
+  /** List of messages in the conversation */
+  messages: GetMessagesResponseDtoMessagesItem[];
+};
+
+export type CreateMessageDto = {
+  /** Question/prompt to send */
+  question: string;
+  /** Conversation ID (if continuing existing conversation) */
+  conversationId?: string;
+  /** Whether to create a new conversation */
+  isCreateConversation?: boolean;
+};
+
+export type UpdateMessageDto = {
+  /** Updated question/prompt */
+  question: string;
+};
+
+export type DeleteMessageResponseDto = {
+  /** Success status */
+  success: boolean;
+  /** Response message */
+  message: string;
+};
+
 export type McpTool = {
   name: string;
   type: string;
@@ -1420,6 +1593,7 @@ export const ToolsControllerGetManyToolsCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   classifier: 'classifier',
+  assistant: 'assistant',
 } as const;
 
 export type ToolsControllerGetInstalledToolsParams = {
@@ -1436,6 +1610,7 @@ export const ToolsControllerGetInstalledToolsCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   classifier: 'classifier',
+  assistant: 'assistant',
 } as const;
 
 export type WorkflowsControllerGetManyWorkflowsParams = {
@@ -22728,6 +22903,2495 @@ export const useAssetGroupControllerRunGroupWorkflowScheduler = <
 > => {
   const mutationOptions =
     getAssetGroupControllerRunGroupWorkflowSchedulerMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
+ * @summary Generate tags for a domain using AI
+ */
+export const aiAssistantControllerGenerateTags = (
+  generateTagsDto: GenerateTagsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GenerateTagsResponseDto>(
+    {
+      url: `/api/ai-assistant/generate-tags`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: generateTagsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGenerateTagsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+    TError,
+    { data: GenerateTagsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+  TError,
+  { data: GenerateTagsDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerGenerateTags'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+    { data: GenerateTagsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiAssistantControllerGenerateTags(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerGenerateTagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>
+>;
+export type AiAssistantControllerGenerateTagsMutationBody = GenerateTagsDto;
+export type AiAssistantControllerGenerateTagsMutationError = unknown;
+
+/**
+ * @summary Generate tags for a domain using AI
+ */
+export const useAiAssistantControllerGenerateTags = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+      TError,
+      { data: GenerateTagsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+  TError,
+  { data: GenerateTagsDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerGenerateTagsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all MCP servers for the current workspace and user
+ * @summary Get all MCP servers
+ */
+export const aiAssistantControllerGetMcpServers = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/ai-assistant/mcp-servers`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetMcpServersInfiniteQueryKey = () => {
+  return ['infinate', `/api/ai-assistant/mcp-servers`] as const;
+};
+
+export const getAiAssistantControllerGetMcpServersQueryKey = () => {
+  return [`/api/ai-assistant/mcp-servers`] as const;
+};
+
+export const getAiAssistantControllerGetMcpServersInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetMcpServersInfiniteQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMcpServers(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMcpServersInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+>;
+export type AiAssistantControllerGetMcpServersInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all MCP servers
+ */
+
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetMcpServersInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetMcpServersQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAiAssistantControllerGetMcpServersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMcpServers(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMcpServersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+>;
+export type AiAssistantControllerGetMcpServersQueryError = unknown;
+
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all MCP servers
+ */
+
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetMcpServersQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Adds one or more MCP servers to the workspace
+ * @summary Add MCP servers
+ */
+export const aiAssistantControllerAddMcpServers = (
+  addMcpServersDto: AddMcpServersDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AddMcpServersResponseDto>(
+    {
+      url: `/api/ai-assistant/mcp-servers`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: addMcpServersDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerAddMcpServersMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+    TError,
+    { data: AddMcpServersDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+  TError,
+  { data: AddMcpServersDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerAddMcpServers'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+    { data: AddMcpServersDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiAssistantControllerAddMcpServers(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerAddMcpServersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>
+>;
+export type AiAssistantControllerAddMcpServersMutationBody = AddMcpServersDto;
+export type AiAssistantControllerAddMcpServersMutationError = unknown;
+
+/**
+ * @summary Add MCP servers
+ */
+export const useAiAssistantControllerAddMcpServers = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+      TError,
+      { data: AddMcpServersDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+  TError,
+  { data: AddMcpServersDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerAddMcpServersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Updates one or more MCP servers
+ * @summary Update MCP servers
+ */
+export const aiAssistantControllerUpdateMcpServers = (
+  updateMcpServersDto: UpdateMcpServersDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<UpdateMcpServersResponseDto>(
+    {
+      url: `/api/ai-assistant/mcp-servers`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateMcpServersDto,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerUpdateMcpServersMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+    TError,
+    { data: UpdateMcpServersDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+  TError,
+  { data: UpdateMcpServersDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerUpdateMcpServers'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+    { data: UpdateMcpServersDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiAssistantControllerUpdateMcpServers(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerUpdateMcpServersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>
+>;
+export type AiAssistantControllerUpdateMcpServersMutationBody =
+  UpdateMcpServersDto;
+export type AiAssistantControllerUpdateMcpServersMutationError = unknown;
+
+/**
+ * @summary Update MCP servers
+ */
+export const useAiAssistantControllerUpdateMcpServers = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+      TError,
+      { data: UpdateMcpServersDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+  TError,
+  { data: UpdateMcpServersDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerUpdateMcpServersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes MCP config by ID
+ * @summary Delete MCP config
+ */
+export const aiAssistantControllerDeleteMcpServers = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteMcpServersResponseDto>(
+    { url: `/api/ai-assistant/mcp-servers/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteMcpServersMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteMcpServers'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiAssistantControllerDeleteMcpServers(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteMcpServersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>
+>;
+
+export type AiAssistantControllerDeleteMcpServersMutationError = unknown;
+
+/**
+ * @summary Delete MCP config
+ */
+export const useAiAssistantControllerDeleteMcpServers = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteMcpServersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all conversations for the current workspace and user
+ * @summary Get all conversations
+ */
+export const aiAssistantControllerGetConversations = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetConversationsResponseDto>(
+    { url: `/api/ai-assistant/conversations`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetConversationsInfiniteQueryKey = () => {
+  return ['infinate', `/api/ai-assistant/conversations`] as const;
+};
+
+export const getAiAssistantControllerGetConversationsQueryKey = () => {
+  return [`/api/ai-assistant/conversations`] as const;
+};
+
+export const getAiAssistantControllerGetConversationsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetConversationsInfiniteQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetConversations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetConversationsInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >;
+export type AiAssistantControllerGetConversationsInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all conversations
+ */
+
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetConversationsInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetConversationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetConversationsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetConversations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetConversationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+>;
+export type AiAssistantControllerGetConversationsQueryError = unknown;
+
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all conversations
+ */
+
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetConversationsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Deletes all conversations for the current workspace and user
+ * @summary Delete all conversations
+ */
+export const aiAssistantControllerDeleteConversations = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteConversationsResponseDto>(
+    { url: `/api/ai-assistant/conversations`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteConversationsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteConversations'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+    void
+  > = () => {
+    return aiAssistantControllerDeleteConversations(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteConversationsMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>
+  >;
+
+export type AiAssistantControllerDeleteConversationsMutationError = unknown;
+
+/**
+ * @summary Delete all conversations
+ */
+export const useAiAssistantControllerDeleteConversations = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteConversationsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Updates the title and/or description of a conversation
+ * @summary Update a conversation
+ */
+export const aiAssistantControllerUpdateConversation = (
+  id: string,
+  updateConversationDto: UpdateConversationDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<UpdateConversationResponseDto>(
+    {
+      url: `/api/ai-assistant/conversations/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateConversationDto,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerUpdateConversationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+    TError,
+    { id: string; data: UpdateConversationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerUpdateConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+    { id: string; data: UpdateConversationDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return aiAssistantControllerUpdateConversation(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerUpdateConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>
+>;
+export type AiAssistantControllerUpdateConversationMutationBody =
+  UpdateConversationDto;
+export type AiAssistantControllerUpdateConversationMutationError = unknown;
+
+/**
+ * @summary Update a conversation
+ */
+export const useAiAssistantControllerUpdateConversation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+      TError,
+      { id: string; data: UpdateConversationDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerUpdateConversationMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes a specific conversation by ID
+ * @summary Delete a conversation
+ */
+export const aiAssistantControllerDeleteConversation = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteConversationResponseDto>(
+    { url: `/api/ai-assistant/conversations/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteConversationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiAssistantControllerDeleteConversation(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>
+>;
+
+export type AiAssistantControllerDeleteConversationMutationError = unknown;
+
+/**
+ * @summary Delete a conversation
+ */
+export const useAiAssistantControllerDeleteConversation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteConversationMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all messages in a specific conversation
+ * @summary Get messages in a conversation
+ */
+export const aiAssistantControllerGetMessages = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetMessagesResponseDto>(
+    {
+      url: `/api/ai-assistant/conversations/${id}/messages`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetMessagesInfiniteQueryKey = (
+  id?: string,
+) => {
+  return [
+    'infinate',
+    `/api/ai-assistant/conversations/${id}/messages`,
+  ] as const;
+};
+
+export const getAiAssistantControllerGetMessagesQueryKey = (id?: string) => {
+  return [`/api/ai-assistant/conversations/${id}/messages`] as const;
+};
+
+export const getAiAssistantControllerGetMessagesInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetMessagesInfiniteQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMessages(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMessagesInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+>;
+export type AiAssistantControllerGetMessagesInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get messages in a conversation
+ */
+
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerGetMessagesInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetMessagesQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAiAssistantControllerGetMessagesQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMessages(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMessagesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+>;
+export type AiAssistantControllerGetMessagesQueryError = unknown;
+
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get messages in a conversation
+ */
+
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerGetMessagesQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Creates a new message and streams the AI response using Server-Sent Events (SSE)
+ * @summary Create a message with streaming response
+ */
+export const aiAssistantControllerCreateMessageStream = (
+  createMessageDto: CreateMessageDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/ai-assistant/messages/stream`,
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerCreateMessageStreamInfiniteQueryKey = (
+  createMessageDto?: CreateMessageDto,
+) => {
+  return [
+    'infinate',
+    `/api/ai-assistant/messages/stream`,
+    createMessageDto,
+  ] as const;
+};
+
+export const getAiAssistantControllerCreateMessageStreamQueryKey = (
+  createMessageDto?: CreateMessageDto,
+) => {
+  return [`/api/ai-assistant/messages/stream`, createMessageDto] as const;
+};
+
+export const getAiAssistantControllerCreateMessageStreamInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerCreateMessageStreamInfiniteQueryKey(
+      createMessageDto,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  > = ({ signal }) =>
+    aiAssistantControllerCreateMessageStream(
+      createMessageDto,
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerCreateMessageStreamInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >;
+export type AiAssistantControllerCreateMessageStreamInfiniteQueryError =
+  unknown;
+
+export function useAiAssistantControllerCreateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerCreateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerCreateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Create a message with streaming response
+ */
+
+export function useAiAssistantControllerCreateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerCreateMessageStreamInfiniteQueryOptions(
+      createMessageDto,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerCreateMessageStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerCreateMessageStreamQueryKey(createMessageDto);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+  > = ({ signal }) =>
+    aiAssistantControllerCreateMessageStream(
+      createMessageDto,
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerCreateMessageStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+>;
+export type AiAssistantControllerCreateMessageStreamQueryError = unknown;
+
+export function useAiAssistantControllerCreateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerCreateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerCreateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Create a message with streaming response
+ */
+
+export function useAiAssistantControllerCreateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+  TError = unknown,
+>(
+  createMessageDto: CreateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerCreateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerCreateMessageStreamQueryOptions(
+    createMessageDto,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates a message and streams the regenerated AI response using Server-Sent Events (SSE)
+ * @summary Update a message with streaming response
+ */
+export const aiAssistantControllerUpdateMessageStream = (
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}/stream`,
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerUpdateMessageStreamInfiniteQueryKey = (
+  conversationId?: string,
+  messageId?: string,
+  updateMessageDto?: UpdateMessageDto,
+) => {
+  return [
+    'infinate',
+    `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}/stream`,
+    updateMessageDto,
+  ] as const;
+};
+
+export const getAiAssistantControllerUpdateMessageStreamQueryKey = (
+  conversationId?: string,
+  messageId?: string,
+  updateMessageDto?: UpdateMessageDto,
+) => {
+  return [
+    `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}/stream`,
+    updateMessageDto,
+  ] as const;
+};
+
+export const getAiAssistantControllerUpdateMessageStreamInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerUpdateMessageStreamInfiniteQueryKey(
+      conversationId,
+      messageId,
+      updateMessageDto,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  > = ({ signal }) =>
+    aiAssistantControllerUpdateMessageStream(
+      conversationId,
+      messageId,
+      updateMessageDto,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(conversationId && messageId),
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerUpdateMessageStreamInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >;
+export type AiAssistantControllerUpdateMessageStreamInfiniteQueryError =
+  unknown;
+
+export function useAiAssistantControllerUpdateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerUpdateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerUpdateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Update a message with streaming response
+ */
+
+export function useAiAssistantControllerUpdateMessageStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  >,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerUpdateMessageStreamInfiniteQueryOptions(
+      conversationId,
+      messageId,
+      updateMessageDto,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerUpdateMessageStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerUpdateMessageStreamQueryKey(
+      conversationId,
+      messageId,
+      updateMessageDto,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+  > = ({ signal }) =>
+    aiAssistantControllerUpdateMessageStream(
+      conversationId,
+      messageId,
+      updateMessageDto,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(conversationId && messageId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerUpdateMessageStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+>;
+export type AiAssistantControllerUpdateMessageStreamQueryError = unknown;
+
+export function useAiAssistantControllerUpdateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerUpdateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerUpdateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Update a message with streaming response
+ */
+
+export function useAiAssistantControllerUpdateMessageStream<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+  TError = unknown,
+>(
+  conversationId: string,
+  messageId: string,
+  updateMessageDto: UpdateMessageDto,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerUpdateMessageStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerUpdateMessageStreamQueryOptions(
+    conversationId,
+    messageId,
+    updateMessageDto,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Deletes a specific message by ID
+ * @summary Delete a message
+ */
+export const aiAssistantControllerDeleteMessage = (
+  conversationId: string,
+  messageId: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteMessageResponseDto>(
+    {
+      url: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
+      method: 'DELETE',
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteMessageMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+    TError,
+    { conversationId: string; messageId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+  TError,
+  { conversationId: string; messageId: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteMessage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+    { conversationId: string; messageId: string }
+  > = (props) => {
+    const { conversationId, messageId } = props ?? {};
+
+    return aiAssistantControllerDeleteMessage(
+      conversationId,
+      messageId,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>
+>;
+
+export type AiAssistantControllerDeleteMessageMutationError = unknown;
+
+/**
+ * @summary Delete a message
+ */
+export const useAiAssistantControllerDeleteMessage = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+      TError,
+      { conversationId: string; messageId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+  TError,
+  { conversationId: string; messageId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteMessageMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

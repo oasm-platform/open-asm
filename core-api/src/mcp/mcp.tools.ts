@@ -39,10 +39,12 @@ export class McpTools {
     }),
   })
   async getWorkspaces(_, context: Context, req: RequestWithMetadata) {
-    const workspaceIds = req.mcp?.permissions.value.map((p) => p.workspaceId);
-    if (!workspaceIds) {
-      return [];
+    const workspaceIds = req.mcp?.permissions?.value.map((p) => p.workspaceId);
+
+    if (!workspaceIds || workspaceIds.length === 0) {
+      return { workspaces: [] };
     }
+
     const workspaces = await this.workspaceService
       .getWorkspacesByIds(workspaceIds)
       .then((res) =>

@@ -28,7 +28,10 @@ async function bootstrap() {
   app.useStaticAssets(path.join(__dirname, '..', 'public'), {
     prefix: '/api/static/',
     setHeaders: (res: Response) => {
-      res.set('Cache-Control', `max-age=${CACHE_STATIC_RESOURCE}, no-transform`);
+      res.set(
+        'Cache-Control',
+        `max-age=${CACHE_STATIC_RESOURCE}, no-transform`,
+      );
     },
   });
 
@@ -56,9 +59,11 @@ async function bootstrap() {
   );
 
   // Configure global prefix
-  app.setGlobalPrefix(API_GLOBAL_PREFIX, { exclude: [`/${API_GLOBAL_PREFIX}/auth/{*path}`, '/'] });
+  app.setGlobalPrefix(API_GLOBAL_PREFIX, {
+    exclude: [`/${API_GLOBAL_PREFIX}/auth/{*path}`, '/'],
+  });
 
-  // Show Swagger UI in development: http://localhost:3000/api/docs
+  // Show Swagger UI in development: http://localhost:6276/api/docs
   const config = new DocumentBuilder()
     .setTitle(APP_NAME)
     .setDescription(

@@ -5,14 +5,18 @@ import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { MCP_API_KEY_HEADER } from '../constants/app.constants';
 import { RequestWithMetadata } from '../interfaces/app.interface';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * Guard to validate the presence of an MCP API key in the request headers
- * This guard checks for an 'api-key' header and validates its presence and validity
+ * This guard checks for an 'mcp-api-key' header and validates its presence and validity
  */
 @Injectable()
 export class McpGuard implements CanActivate {
-  constructor(private mcpService: McpService) {}
+  constructor(
+    private mcpService: McpService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Validates if the current request has a valid MCP API key in the headers
@@ -23,6 +27,11 @@ export class McpGuard implements CanActivate {
     const request: RequestWithMetadata = context.switchToHttp().getRequest();
     // Extract the MCP API key from headers
     const mcpApiKey = request.headers[MCP_API_KEY_HEADER] as string;
+
+    // Allow access if the API key matches the server's internal key
+    if (this.configService.get('OASM_CLOUD_APIKEY') === mcpApiKey) {
+      return true;
+    }
 
     // Validate the API key format and existence
     this.validateApiKey(mcpApiKey);
@@ -35,30 +44,17 @@ export class McpGuard implements CanActivate {
     };
 
     const { body } = request;
-    if (body?.method === 'tools/call') {
-      // Check if workspaceId exists in arguments
-      if (!body.params?.arguments?.workspaceId) {
-        throw new UnauthorizedException(
-          'Workspace ID is required for tool calls',
-        );
-      }
-
+    if (body?.method === 'tools/call' && body?.params?.arguments?.workspaceId) {
       const { workspaceId } = body.params.arguments;
       const workspacePermission = permissions.value.find(
         (permission) => permission.workspaceId === workspaceId,
       );
-
       if (!workspacePermission) {
         throw new UnauthorizedException(
           'Workspace ID not found in MCP permissions',
         );
       }
-
       const method = body.params.name;
-      if (!method) {
-        throw new UnauthorizedException('Method name is required');
-      }
-
       if (!workspacePermission.permissions.includes(method)) {
         throw new UnauthorizedException(`Cannot access method ${method}`);
       }

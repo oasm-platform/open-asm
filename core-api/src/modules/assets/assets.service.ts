@@ -25,6 +25,7 @@ import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { GetTlsResponseDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { AssetService } from './entities/asset-services.entity';
+import { AssetTag } from './entities/asset-tags.entity';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
 
@@ -58,7 +59,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all assets services associated with a specified target.
@@ -360,7 +361,17 @@ export class AssetsService {
     asset.isEnabled = item.asset.isEnabled;
     asset.port = item.port;
 
-    // asset.tags = item.asset.tags || [];
+    // Load tags separately - tags belong to AssetService, not Asset
+    const tagsResult = await this.dataSource
+      .createQueryBuilder()
+      .select(['tag', 'id'])
+      .from('asset_services_tags', 'asset_services_tags')
+      .where('"assetServiceId" = :assetServiceId', { assetServiceId: item.id })
+      .getRawMany<{ tag: string; id: string }>();
+
+    asset.tags = tagsResult.map(
+      (t) => ({ id: t.id, tag: t.tag }) as Partial<AssetTag>,
+    ) as AssetTag[];
 
     asset.ipAddresses = item.asset.ipAssets
       ? item.asset.ipAssets.map((e) => e.ipAddress)
@@ -732,50 +743,59 @@ export class AssetsService {
    *
    * @param id - The ID of the asset to update.
    * @param updateAssetDto - The DTO containing the update information.
+   * @param workspaceId - The workspace ID to ensure the asset belongs to the user's workspace.
    * @returns A promise that resolves to the updated asset.
    * @throws NotFoundException if the asset with the given ID is not found.
    */
   public async updateAssetById(
     id: string,
     updateAssetDto: UpdateAssetDto,
+    workspaceId: string,
   ): Promise<Asset> {
-    const asset = await this.assetRepo.findOne({
-      where: { id },
-    });
+    // ID is actually AssetService ID, not Asset ID (matching getAssetById)
+    const assetService = await this.assetServiceRepo
+      .createQueryBuilder('assetService')
+      .leftJoinAndSelect('assetService.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .innerJoin('target.workspaceTargets', 'workspaceTargets')
+      .where('assetService.id = :id', { id })
+      .andWhere('workspaceTargets.workspaceId = :workspaceId', { workspaceId })
+      .getOne();
 
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
+    if (!assetService) {
+      throw new NotFoundException('Asset service not found');
     }
 
-    // Update the asset with the provided data
-    // Handle tags update
+    // Update tags - tags belong to AssetService
     if (updateAssetDto.tags) {
       // Remove existing tags
       await this.dataSource
         .createQueryBuilder()
         .delete()
-        .from('asset_tags')
-        .where('assetId = :assetId', { assetId: id })
+        .from('asset_services_tags')
+        .where('"assetServiceId" = :assetServiceId', {
+          assetServiceId: id, // Use the ID directly since it's AssetService ID
+        })
         .execute();
 
       // Add new tags
       const tagsToInsert = updateAssetDto.tags.map((tag) => ({
         tag,
-        assetId: id,
+        assetServiceId: id, // Use the ID directly
       }));
 
       if (tagsToInsert.length > 0) {
         await this.dataSource
           .createQueryBuilder()
           .insert()
-          .into('asset_tags')
+          .into('asset_services_tags')
           .values(tagsToInsert)
           .execute();
       }
     }
 
-    // Save the updated asset
-    return this.assetRepo.save(asset);
+    // Return the asset (not assetService)
+    return assetService.asset;
   }
 
   /**

@@ -22,6 +22,8 @@ export enum ToolCategory {
   VULNERABILITIES = 'vulnerabilities',
   /** Data classification tool */
   CLASSIFIER = 'classifier',
+  /** AI Assistant tool */
+  ASSISTANT = 'assistant',
 }
 
 /**
