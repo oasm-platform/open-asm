@@ -3,7 +3,7 @@ import { Image } from '@/components/ui/image';
 import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
   OnSchedule,
-  ToolCategory,
+  ToolsControllerGetManyToolsType,
   UpdateTargetDtoScanSchedule,
   useAssetGroupControllerAddManyWorkflows,
   useAssetGroupControllerGetWorkflowsByAssetGroupsId,
@@ -14,8 +14,9 @@ import {
   useWorkflowsControllerDeleteWorkflow,
   useWorkflowsControllerUpdateWorkflow,
 } from '@/services/apis/gen/queries';
-import { Plus } from 'lucide-react';
+import { MoveUpRight, Plus } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export default function AssetGroupWorkflow({
@@ -41,9 +42,9 @@ export default function AssetGroupWorkflow({
   const removeWorkflowsMutation = useAssetGroupControllerRemoveManyWorkflows();
 
   // Filter tools with category "vulnerabilities"
-  const vulnerabilityTools =
+  const toolProviders =
     workspaceToolsInstalled?.data?.filter(
-      (tool) => tool.category === ToolCategory.vulnerabilities,
+      (tool) => tool.type === ToolsControllerGetManyToolsType.provider,
     ) || [];
 
   // Check if a tool is already added to this group
@@ -225,7 +226,17 @@ export default function AssetGroupWorkflow({
       <h2 className="text-xl font-semibold">Tools</h2>
       <div className="flex-col md:flex-row flex justify-start md:justify-between md:items-center gap-2">
         <div className="flex gap-4">
-          {vulnerabilityTools.map((tool) => {
+          {toolProviders.length === 0 && (
+            <div>
+              <Link
+                className="text-blue-500 italic flex items-center gap-1 hover:underline"
+                to={'/tools'}
+              >
+                Open Marketplace <MoveUpRight className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+          {toolProviders.map((tool) => {
             const isAdded = isToolInGroup(tool.name);
             const isHovered = hoveredToolId === tool.id;
             return (

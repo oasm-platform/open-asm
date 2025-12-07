@@ -853,7 +853,17 @@ export class AssetGroupService {
     }
 
     const firstJobs = workflow.content.jobs.map((j) => j.run)[0];
-    const tools = await this.toolsService.getToolByNames([firstJobs]);
+
+    // Require tools installed
+    const tools = await this.toolsService.getToolByNames({
+      names: [firstJobs],
+      isInstalled: true,
+    });
+
+    if (!tools || tools.length === 0) {
+      throw new BadRequestException(`Tools is not installed in the workspace.`);
+    }
+
     await Promise.all(
       tools.map((tool) =>
         this.jobRegistryService.createNewJob({
