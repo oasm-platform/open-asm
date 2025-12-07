@@ -1,8 +1,14 @@
 name: assets_discovery
 
 on:
-  target: [create, re_scan]
+  target: [create, re-scan]
 
 jobs:
-  subfinder: [httpx, naabu]
-  nuclei:
+  - name: Scan Subdomain
+    run: subfinder
+
+  - name: Port Scan
+    run: naabu
+
+  - name: HTTP Probe
+    run: httpx

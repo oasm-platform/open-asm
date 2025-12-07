@@ -17,7 +17,6 @@ import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
-import { builtInTools } from './built-in-tools';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
@@ -27,11 +26,14 @@ import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
+import { builtInTools } from './tools-privider/built-in-tools';
+import { officialSupportTools } from './tools-privider/official-support-tools';
 @Injectable()
 export class ToolsService implements OnModuleInit {
   constructor(
     @InjectRepository(Tool)
     public readonly toolsRepository: Repository<Tool>,
+
     @InjectRepository(WorkspaceTool)
     private readonly workspaceToolRepository: Repository<WorkspaceTool>,
 
@@ -45,23 +47,31 @@ export class ToolsService implements OnModuleInit {
 
     @Inject(forwardRef(() => JobsRegistryService))
     private jobRegistryService: JobsRegistryService,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     try {
       // Convert builtInTools to Tool entities
-      const toolsToInsert = builtInTools.map((tool) => ({
+      const builtInToolsToInsert = builtInTools.map((tool) => ({
+        ...tool,
         id: randomUUID(),
-        name: tool.name,
-        category: tool.category,
-        description: tool.description,
-        logoUrl: tool.logoUrl,
-        command: tool.command,
-        version: tool.version,
         isBuiltIn: true,
         isOfficialSupport: true,
         type: WorkerType.BUILT_IN,
       }));
+
+      const officialSupportToolsToInsert = officialSupportTools.map((tool) => ({
+        ...tool,
+        id: randomUUID(),
+        isBuiltIn: false,
+        isOfficialSupport: true,
+        type: WorkerType.PROVIDER,
+      }));
+
+      const toolsToInsert = [
+        ...builtInToolsToInsert,
+        ...officialSupportToolsToInsert,
+      ];
 
       // Insert tools using upsert to avoid duplicates
       await this.toolsRepository
@@ -69,7 +79,7 @@ export class ToolsService implements OnModuleInit {
         .insert()
         .orUpdate({
           conflict_target: ['name'],
-          overwrite: ['description', 'logoUrl', 'version'],
+          overwrite: ['description', 'logoUrl', 'version', 'priority'],
         })
         .values(toolsToInsert)
         .execute();
@@ -247,7 +257,7 @@ export class ToolsService implements OnModuleInit {
     }
   }
 
-  async getInstalledTools(dto: GetInstalledToolsDto) {
+  async getInstalledTools(dto: GetInstalledToolsDto, workspaceId?: string) {
     const builtInTools = await this.toolsRepository.find({
       where: {
         type: WorkerType.BUILT_IN,
@@ -257,7 +267,7 @@ export class ToolsService implements OnModuleInit {
 
     const workspaceTools = await this.workspaceToolRepository.find({
       where: {
-        workspace: { id: dto.workspaceId },
+        workspace: { id: workspaceId },
         ...(dto.category && { tool: { category: dto.category } }),
       },
       relations: ['tool'],
@@ -408,12 +418,60 @@ export class ToolsService implements OnModuleInit {
    * @param {string[]} names - The names of the tools.
    * @returns {Promise<Tool[]>} The tools with the specified names.
    */
-  public getToolByNames(names: string[]) {
+  public getToolByNames({
+    names,
+    isInstalled = false,
+  }: {
+    names: string[];
+    isInstalled?: boolean;
+  }): Promise<Tool[]> {
+    if (isInstalled) {
+      return this.workspaceToolRepository
+        .find({
+          where: {
+            tool: {
+              name: In(names),
+            },
+          },
+          relations: ['tool'],
+        })
+        .then((res) => res.map((r) => r.tool));
+    }
     return this.toolsRepository.find({
       where: {
         name: In(names),
       },
     });
+  }
+
+  /**
+   * Check if AI Assistant tool is installed and enabled in a workspace.
+   * @param {string} workspaceId - The workspace ID.
+   * @returns {Promise<boolean>} True if AI Assistant is installed and enabled.
+   */
+  public async isAiAssistantEnabled(workspaceId: string): Promise<boolean> {
+    // Find the AI Assistant tool
+    const aiAssistantTool = await this.toolsRepository.findOne({
+      where: {
+        name: 'AI Assistant',
+        category: ToolCategory.ASSISTANT,
+      },
+    });
+
+    if (!aiAssistantTool) {
+      return false;
+    }
+
+    // Check if the tool is installed in the workspace
+    const workspaceTool = await this.workspaceToolRepository.findOne({
+      where: {
+        workspace: { id: workspaceId },
+        tool: { id: aiAssistantTool.id },
+        isEnabled: true,
+      },
+    });
+
+    return !!workspaceTool;
   }
 
   /**

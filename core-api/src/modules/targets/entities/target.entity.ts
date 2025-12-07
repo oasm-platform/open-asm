@@ -29,7 +29,7 @@ export class Target extends BaseEntity {
       return value;
     }
   })
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', unique: true })
   value: string;
 
   @ApiProperty()
@@ -58,4 +58,7 @@ export class Target extends BaseEntity {
   @ApiProperty({ enum: CronSchedule, enumName: 'CronSchedule' })
   @Column({ type: 'enum', enum: CronSchedule, default: CronSchedule.DAILY })
   scanSchedule: CronSchedule;
+
+  @Column({ nullable: true })
+  jobId: string;
 }

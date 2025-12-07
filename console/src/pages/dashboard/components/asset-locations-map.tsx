@@ -1,4 +1,5 @@
 import { CardDescription, CardTitle } from '@/components/ui/card';
+import { useTheme } from '@/components/ui/theme-provider';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetAssetLocations } from '@/services/apis/gen/queries';
 import type { LeafletMouseEvent } from 'leaflet';
@@ -8,7 +9,9 @@ import { useNavigate } from 'react-router-dom';
 
 export default function AssetLocationsMap() {
     const navigate = useNavigate();
+    const { theme } = useTheme();
     const { selectedWorkspace } = useWorkspaceSelector()
+    const mapTheme = theme === 'dark' ? 'dark_all' : 'light_all';
     const { data: locations, isLoading } = useStatisticControllerGetAssetLocations({
         query: {
             queryKey: [selectedWorkspace, 'asset-locations']
@@ -42,7 +45,7 @@ export default function AssetLocationsMap() {
                     detectRetina={true}
                     crossOrigin
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+                    url={`https://c.basemaps.cartocdn.com/${mapTheme}/{z}/{x}/{y}.png`}
                 />
                 {!isLoading && locations && locations?.map((location) => (
                     <CircleMarker

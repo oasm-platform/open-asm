@@ -11,7 +11,6 @@ import dayjs from 'dayjs';
 import {
   ChartNoAxesGantt,
   Copy,
-  EthernetPort,
   Globe,
   Layers,
   Loader2Icon,
@@ -38,8 +37,7 @@ export default function AssetDetail({ id }: { id: string }) {
     );
   }
 
-  const { value, httpResponses, ports, ipAddresses, tags } = data;
-  const ports_scanner = ports;
+  const { value, httpResponses, ipAddresses, tags } = data;
   const tls = httpResponses?.tls;
 
   // Calculate days left for SSL certificate
@@ -131,7 +129,7 @@ export default function AssetDetail({ id }: { id: string }) {
           </div>
         </section>
         <div className="flex flex-wrap gap-2 mt-4">
-          {data.tags.map((tag) => (
+          {(tags ?? []).map((tag) => (
             <Badge
               key={tag.id}
               variant="outline"
@@ -140,7 +138,7 @@ export default function AssetDetail({ id }: { id: string }) {
               <Tag size={16} /> {tag.tag}
             </Badge>
           ))}
-          <AddTagDialog id={id} tags={tags} refetch={refetch} />
+          <AddTagDialog id={id} domain={value} tags={tags} refetch={refetch} />
         </div>
         <Separator className="my-5" />
 
@@ -160,22 +158,6 @@ export default function AssetDetail({ id }: { id: string }) {
               <div>
                 <span className="block mb-1">Port</span>
                 <span className="">{tls.port}</span>
-              </div>
-            )}
-            {ports_scanner && ports_scanner.ports.length > 0 ? (
-              <div>
-                <span className="block mb-1">Open Ports</span>
-                <BadgeList
-                  list={ports_scanner.ports.sort(
-                    (a: string, b: string) => parseInt(a) - parseInt(b),
-                  )}
-                  Icon={EthernetPort}
-                />
-              </div>
-            ) : (
-              <div>
-                <span className="block mb-1">Open Ports</span>
-                <span className="italic">No open ports detected.</span>
               </div>
             )}
           </div>
@@ -277,9 +259,12 @@ export default function AssetDetail({ id }: { id: string }) {
               <div className="flex flex-wrap gap-2">
                 {(
                   httpResponses.techList as unknown as TechnologyDetailDTO[]
-                ).map((item) => (
-                  <TechnologyTooltip tech={item} key={item.name} />
-                ))}
+                ).map(
+                  (item) =>
+                    item.name && (
+                      <TechnologyTooltip tech={item} key={item.name} />
+                    ),
+                )}
               </div>
             </section>
           </>

@@ -37,7 +37,7 @@ export function DetailTarget() {
     data: target,
     isLoading,
     error,
-    refetch
+    refetch,
   } = useTargetsControllerGetTargetById(id || '', {
     query: { enabled: !!id, refetchInterval: 5000 },
   });
@@ -88,7 +88,7 @@ export function DetailTarget() {
             <TargetStatus status={target.status} />
           </div>
           <div className="flex items-center gap-3">
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground hidden md:block">
               {dayjs(target.lastDiscoveredAt).fromNow()}
             </p>
             <SettingTarget target={target} refetch={refetch} />

@@ -5,6 +5,7 @@ import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { MCP_API_KEY_HEADER } from '../constants/app.constants';
 import { RequestWithMetadata } from '../interfaces/app.interface';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * Guard to validate the presence of an MCP API key in the request headers
@@ -13,8 +14,9 @@ import { RequestWithMetadata } from '../interfaces/app.interface';
 @Injectable()
 export class McpGuard implements CanActivate {
   constructor(
-    private mcpService: McpService
-  ) { }
+    private mcpService: McpService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Validates if the current request has a valid MCP API key in the headers
@@ -26,6 +28,11 @@ export class McpGuard implements CanActivate {
     // Extract the MCP API key from headers
     const mcpApiKey = request.headers[MCP_API_KEY_HEADER] as string;
 
+    // Allow access if the API key matches the server's internal key
+    if (this.configService.get('OASM_CLOUD_APIKEY') === mcpApiKey) {
+      return true;
+    }
+
     // Validate the API key format and existence
     this.validateApiKey(mcpApiKey);
 
@@ -33,17 +40,21 @@ export class McpGuard implements CanActivate {
     const permissions = await this.validateApiKeyWithService(mcpApiKey);
 
     request.mcp = {
-      permissions
-    }
+      permissions,
+    };
 
-    const { body } = request
-    if (body?.method === 'tools/call' && body.params.arguments.workspaceId) {
-      const { workspaceId } = body.params.arguments
-      const workspacePermission = permissions.value.find(permission => permission.workspaceId === workspaceId)
+    const { body } = request;
+    if (body?.method === 'tools/call' && body?.params?.arguments?.workspaceId) {
+      const { workspaceId } = body.params.arguments;
+      const workspacePermission = permissions.value.find(
+        (permission) => permission.workspaceId === workspaceId,
+      );
       if (!workspacePermission) {
-        throw new UnauthorizedException('Workspace ID not found in MCP permissions');
+        throw new UnauthorizedException(
+          'Workspace ID not found in MCP permissions',
+        );
       }
-      const method = body.params.name
+      const method = body.params.name;
       if (!workspacePermission.permissions.includes(method)) {
         throw new UnauthorizedException(`Cannot access method ${method}`);
       }
@@ -74,7 +85,9 @@ export class McpGuard implements CanActivate {
    * @returns The MCP permissions if the key is valid
    * @throws UnauthorizedException if the API key is invalid or not found
    */
-  private async validateApiKeyWithService(apiKey: string): Promise<McpPermission> {
+  private async validateApiKeyWithService(
+    apiKey: string,
+  ): Promise<McpPermission> {
     try {
       const permissions = await this.mcpService.checkApiKey(apiKey);
       if (!permissions) {

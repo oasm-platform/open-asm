@@ -1,5 +1,7 @@
 import Layout from '@/components/common/layout/layout';
 import Splash from '@/components/common/layout/splash';
+import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
+import { AssetGroups } from '@/pages/asset-group/asset-groups';
 import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
@@ -19,6 +21,7 @@ import ToolDetail from '@/pages/tools/components/tool-detail';
 import Tools from '@/pages/tools/tools';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 import Workers from '@/pages/workers/workers';
+import Workflow from '@/pages/workflow/workflow';
 import { createBrowserRouter } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
@@ -62,6 +65,10 @@ export const router = createBrowserRouter([
             children: [{ path: '', element: <Studio /> }],
           },
           {
+            path: 'groups',
+            children: [{ path: '', element: <Workflow /> }],
+          },
+          {
             path: 'settings',
             children: [
               {
@@ -76,7 +83,6 @@ export const router = createBrowserRouter([
                 path: ':tab',
                 element: <Settings />,
               },
-
             ],
           },
           {
@@ -127,6 +133,19 @@ export const router = createBrowserRouter([
               {
                 path: ':id',
                 element: <DetailAsset />,
+              },
+              {
+                path: 'groups',
+                children: [
+                  {
+                    path: '',
+                    element: <AssetGroups />,
+                  },
+                  {
+                    path: ':id',
+                    element: <AssetGroupDetail />,
+                  },
+                ],
               },
             ],
           },

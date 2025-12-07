@@ -1,24 +1,23 @@
-import { BullMQName } from '@/common/enums/enum';
-import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryController } from './jobs-registry.controller';
 import { JobsRegistryService } from './jobs-registry.service';
-import { ScheduleConsumer } from './processors/scan-schedule.processor';
+import {
+  AssetGroupsScheduleConsumer,
+  AssetsDiscoveryScheduleConsumer,
+} from './processors/scan-schedule.processor';
 
 @Global()
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Job, JobHistory]),
-    BullModule.registerQueue({
-      name: BullMQName.SCAN_SCHEDULE,
-    }),
-  ],
+  imports: [TypeOrmModule.forFeature([Job, JobHistory])],
   controllers: [JobsRegistryController],
-  providers: [JobsRegistryService, ScheduleConsumer],
+  providers: [
+    JobsRegistryService,
+    AssetsDiscoveryScheduleConsumer,
+    AssetGroupsScheduleConsumer,
+  ],
   exports: [JobsRegistryService],
 })
-
-export class JobsRegistryModule { }
+export class JobsRegistryModule {}

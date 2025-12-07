@@ -1,8 +1,8 @@
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { createContext, useCallback, useContext } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-type AssetContextType = ReturnType<typeof useServerDataTable> & {
+export type AssetContextType = ReturnType<typeof useServerDataTable> & {
   queryParams: {
     targetIds?: string[];
     value?: string;
@@ -10,6 +10,7 @@ type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ipAddresses?: string[];
     ports?: string[];
     techs?: string[];
+    statusCodes?: string[];
     page: number;
     sortBy: string;
     sortOrder: 'ASC' | 'DESC';
@@ -35,6 +36,10 @@ type AssetContextType = ReturnType<typeof useServerDataTable> & {
     statusCodes?: string[];
   };
   filterHandlers: (key: string, value: string[]) => void;
+  generatingAssets: Set<string>;
+  startGenerating: (assetId: string) => void;
+  stopGenerating: (assetId: string) => void;
+  isGenerating: (assetId: string) => boolean;
 };
 
 const AssetContext = createContext<AssetContextType | null>(null);
@@ -49,6 +54,7 @@ export default function AssetProvider({
   refetchInterval?: number;
 }) {
   const [params, setParams] = useSearchParams();
+  const [generatingAssets, setGeneratingAssets] = useState<Set<string>>(new Set());
 
   const { tableParams, tableHandlers } = useServerDataTable({
     defaultSortBy: 'value',
@@ -69,6 +75,25 @@ export default function AssetProvider({
       setParams(params, { replace: true });
     },
     [params, setParams],
+  );
+
+  const startGenerating = useCallback((assetId: string) => {
+    setGeneratingAssets((prev) => new Set(prev).add(assetId));
+  }, []);
+
+  const stopGenerating = useCallback((assetId: string) => {
+    setGeneratingAssets((prev) => {
+      const next = new Set(prev);
+      next.delete(assetId);
+      return next;
+    });
+  }, []);
+
+  const isGenerating = useCallback(
+    (assetId: string) => {
+      return generatingAssets.has(assetId);
+    },
+    [generatingAssets],
   );
 
   const queryParams = {
@@ -109,7 +134,7 @@ export default function AssetProvider({
   };
 
   return (
-    <AssetContext
+    <AssetContext.Provider
       value={{
         queryFilterParams,
         tableHandlers,
@@ -125,10 +150,14 @@ export default function AssetProvider({
         },
         filterHandlers,
         targetId,
+        generatingAssets,
+        startGenerating,
+        stopGenerating,
+        isGenerating,
       }}
     >
       {children}
-    </AssetContext>
+    </AssetContext.Provider>
   );
 }
 

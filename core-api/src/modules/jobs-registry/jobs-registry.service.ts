@@ -3,7 +3,13 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
-import { JobPriority, JobStatus, ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
+import {
+  JobPriority,
+  JobStatus,
+  ToolCategory,
+  WorkerScope,
+  WorkerType,
+} from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { RedisService } from '@/services/redis/redis.service';
 import bindingCommand from '@/utils/bindingCommand';
@@ -17,10 +23,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
+import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
-import { builtInTools } from '../tools/built-in-tools';
+import { builtInTools } from '../tools/tools-privider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import {
@@ -46,8 +53,8 @@ export class JobsRegistryService {
     private dataAdapterService: DataAdapterService,
     private toolsService: ToolsService,
     private storageService: StorageService,
-    private redis: RedisService
-  ) { }
+    private redis: RedisService,
+  ) {}
   public async getManyJobs(
     query: GetManyBaseQueryParams,
   ): Promise<GetManyBaseResponseDto<Job>> {
@@ -93,10 +100,23 @@ export class JobsRegistryService {
     jobHistory: existingJobHistory,
     priority,
     isSaveRawResult,
-    isPublishEvent
+    isPublishEvent,
   }: CreateJobs): Promise<Job[]> {
-    if (priority && (priority < JobPriority.CRITICAL || priority > JobPriority.BACKGROUND)) {
-      priority = 4;
+    if (!tool) {
+      throw new Error('Tool is required for creating a job');
+    }
+
+    if (!tool.category) {
+      throw new Error('Tool category is required for creating a job');
+    }
+
+    if (
+      priority &&
+      (priority < JobPriority.CRITICAL || priority > JobPriority.BACKGROUND)
+    ) {
+      priority = tool.priority || JobPriority.BACKGROUND;
+    } else if (!priority) {
+      priority = tool.priority || JobPriority.BACKGROUND;
     }
     // Step 1: create job history
     let jobHistory: JobHistory;
@@ -110,10 +130,109 @@ export class JobsRegistryService {
       await this.jobHistoryRepo.save(jobHistory);
     }
 
-    // Step 2: find assets of the given targets
+    const jobRepo = this.dataSource.getRepository(Job);
+    const jobsToInsert: Job[] = [];
+
+    // Step 2: find appropriate data source based on tool category
+    if (tool.category === ToolCategory.HTTP_PROBE) {
+      // For HTTP_PROBE, use asset services
+      const assetServices = await this.findAssetServicesForJob(
+        targetIds,
+        assetIds,
+        workspaceId,
+      );
+
+      // Step 3: iterate tools and create jobs
+      const defaultCommand = builtInTools.find(
+        (t) => t.name === tool.name,
+      )?.command;
+
+      // Create jobs for each asset service
+      for (const assetService of assetServices) {
+        const job = jobRepo.create({
+          id: randomUUID(),
+          asset: assetService.asset, // Use the associated asset from asset service
+          assetService, // Store the asset service reference
+          jobName: tool.name,
+          status: JobStatus.PENDING,
+          category: tool.category,
+          tool,
+          priority: priority ?? 4,
+          jobHistory,
+          command: bindingCommand(defaultCommand ?? '', {
+            // Use the default command template for HTTP_PROBE
+            value: assetService.value,
+            port: assetService.port.toString(),
+          }),
+          isSaveRawResult: isSaveRawResult ?? false,
+          isPublishEvent,
+        } as DeepPartial<Job>);
+
+        jobsToInsert.push(job);
+      }
+    } else {
+      // Cannot query assets for PORTS_SCANNER with assetIds
+      if (tool.category === ToolCategory.PORTS_SCANNER) assetIds = [];
+
+      // For all other categories, use regular assets
+      const assets = await this.findAssetsForJob(
+        targetIds,
+        assetIds,
+        workspaceId,
+      );
+
+      const filteredAssets = this.filterAssetsByCategory(assets, tool.category);
+
+      // Step 3: iterate tools and create jobs
+      const defaultCommand = builtInTools.find(
+        (t) => t.name === tool.name,
+      )?.command;
+
+      for (const asset of filteredAssets) {
+        const job = jobRepo.create({
+          id: randomUUID(),
+          asset,
+          jobName: tool.name,
+          status: JobStatus.PENDING,
+          category: tool.category,
+          tool,
+          priority: priority ?? 4,
+          jobHistory,
+          command: bindingCommand(defaultCommand ?? '', {
+            value: asset.value,
+          }),
+          isSaveRawResult: isSaveRawResult ?? false,
+          isPublishEvent,
+        } as DeepPartial<Job>);
+
+        jobsToInsert.push(job);
+      }
+    }
+
+    // Step 4: save all jobs
+    if (jobsToInsert.length > 0) {
+      await jobRepo.save(jobsToInsert);
+    }
+
+    return jobsToInsert;
+  }
+
+  /**
+   * Finds assets for job creation based on targetIds, assetIds, and workspaceId
+   * @param targetIds list of target IDs to filter assets
+   * @param assetIds list of asset IDs to filter assets
+   * @param workspaceId workspace ID to filter assets
+   * @returns Promise<Array<Asset>> list of filtered assets
+   */
+  private async findAssetsForJob(
+    targetIds?: string[],
+    assetIds?: string[],
+    workspaceId?: string,
+  ): Promise<Asset[]> {
     const assetsQueryBuilder = this.dataSource
       .getRepository(Asset)
-      .createQueryBuilder('assets').where('assets.isEnabled = true');
+      .createQueryBuilder('assets')
+      .where('assets.isEnabled = true');
 
     if (targetIds && targetIds.length > 0) {
       assetsQueryBuilder.andWhere('assets.targetId IN (:...targetIds)', {
@@ -134,48 +253,68 @@ export class JobsRegistryService {
         .innerJoin('workspaceTarget.workspace', 'workspace')
         .andWhere('workspace.id = :workspaceId', { workspaceId });
     }
-    const assets = await assetsQueryBuilder.getMany();
 
-    const jobRepo = this.dataSource.getRepository(Job);
-    const jobsToInsert: Job[] = [];
+    return await assetsQueryBuilder.getMany();
+  }
 
-    // Step 3: iterate tools and create jobs
-    const defaultCommand = builtInTools.find(t => t.name === tool.name)?.command;
-    let filteredAssets: Asset[];
-    if (tool.category === ToolCategory.SUBDOMAINS) {
-      filteredAssets = assets.filter((asset) => asset.isPrimary);
-    } else if (tool.category === ToolCategory.PORTS_SCANNER) {
-      filteredAssets = assets.filter((asset) => asset.isPrimary);
-    } else {
-      filteredAssets = assets;
+  /**
+   * Finds asset services for HTTP_PROBE job creation based on targetIds, assetIds, and workspaceId
+   * @param targetIds list of target IDs to filter asset services
+   * @param assetIds list of asset IDs to filter asset services
+   * @param workspaceId workspace ID to filter asset services
+   * @returns Promise<Array<AssetService>> list of filtered asset services
+   */
+  private async findAssetServicesForJob(
+    targetIds?: string[],
+    assetIds?: string[],
+    workspaceId?: string,
+  ): Promise<AssetService[]> {
+    const assetServicesQueryBuilder = this.dataSource
+      .getRepository(AssetService)
+      .createQueryBuilder('assetServices')
+      .innerJoinAndSelect('assetServices.asset', 'asset')
+      .where('asset.isEnabled = true');
+
+    if (targetIds && targetIds.length > 0) {
+      assetServicesQueryBuilder.andWhere('asset.targetId IN (:...targetIds)', {
+        targetIds,
+      });
     }
 
-    for (const asset of filteredAssets) {
-      const job = jobRepo.create({
-        id: randomUUID(),
-        asset,
-        jobName: tool.name,
-        status: JobStatus.PENDING,
-        category: tool.category,
-        tool,
-        priority: priority ?? 4,
-        jobHistory,
-        command: bindingCommand(defaultCommand!, {
-          value: asset.value,
-        }),
-        isSaveRawResult: isSaveRawResult ?? false,
-        isPublishEvent
-      } as DeepPartial<Job>);
-
-      jobsToInsert.push(job);
+    if (assetIds && assetIds.length > 0) {
+      assetServicesQueryBuilder.andWhere(
+        'assetServices.assetId IN (:...assetIds)',
+        {
+          assetIds,
+        },
+      );
     }
 
-    // Step 4: save all jobs
-    if (jobsToInsert.length > 0) {
-      await jobRepo.save(jobsToInsert);
+    if (workspaceId) {
+      assetServicesQueryBuilder
+        .innerJoin('asset.target', 'target')
+        .innerJoin('target.workspaceTargets', 'workspaceTarget')
+        .innerJoin('workspaceTarget.workspace', 'workspace')
+        .andWhere('workspace.id = :workspaceId', { workspaceId });
     }
 
-    return jobsToInsert;
+    return await assetServicesQueryBuilder.getMany();
+  }
+
+  /**
+   * Filters assets based on tool category
+   * @param assets list of assets to filter
+   * @param toolCategory the category of the tool
+   * @returns filtered list of assets
+   */
+  private filterAssetsByCategory(
+    assets: Asset[],
+    toolCategory: ToolCategory,
+  ): Asset[] {
+    if (toolCategory === ToolCategory.SUBDOMAINS) {
+      return assets.filter((asset) => asset.isPrimary);
+    }
+    return assets;
   }
 
   /**
@@ -213,15 +352,14 @@ export class JobsRegistryService {
         .leftJoin('workspace_targets.workspace', 'workspaces')
         .leftJoin('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
-        .orderBy('jobs.createdAt', 'ASC')
-        .orderBy('jobs.priority', 'ASC');
+        .orderBy('jobs.priority', 'DESC')
+        .orderBy('jobs.createdAt', 'ASC');
 
       if (isBuiltInTools) {
         const builtInToolsName = builtInTools.map((tool) => tool.name);
-        queryBuilder
-          .andWhere('tool.name IN (:...names)', {
-            names: builtInToolsName,
-          });
+        queryBuilder.andWhere('tool.name IN (:...names)', {
+          names: builtInToolsName,
+        });
 
         if (worker.scope !== WorkerScope.CLOUD) {
           queryBuilder.andWhere('workspaces.id = :workspaceId', {
@@ -230,6 +368,17 @@ export class JobsRegistryService {
         }
       } else {
         queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
+      }
+
+      // Only join assetService for HTTP_PROBE category jobs
+      if (worker.tool?.category === ToolCategory.HTTP_PROBE) {
+        queryBuilder
+          .leftJoinAndSelect('jobs.assetService', 'assetService')
+          .andWhere('jobs.category = :category', {
+            category: ToolCategory.HTTP_PROBE,
+          });
+      } else {
+        queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
       }
 
       const job = await queryBuilder
@@ -267,7 +416,6 @@ export class JobsRegistryService {
       };
 
       return response;
-
     } catch (error) {
       Logger.error('Error in getNextJob', error);
       await queryRunner.rollbackTransaction();
@@ -363,7 +511,11 @@ export class JobsRegistryService {
       where: { id: In(dto.toolIds) },
     });
 
-    await Promise.all(tools.map(tool => this.createNewJob({ tool, targetIds: [dto.targetId] })));
+    await Promise.all(
+      tools.map((tool) =>
+        this.createNewJob({ tool, targetIds: [dto.targetId] }),
+      ),
+    );
 
     return {
       message: 'Jobs created successfully',
@@ -411,7 +563,11 @@ export class JobsRegistryService {
       }
       dataForSync = builtInStep?.parser?.(data.raw);
       if (job.isSaveRawResult) {
-        const uploadResult = this.storageService.uploadFile(`${job.id}.txt`, Buffer.from(data.raw, 'utf-8'), 'jobs-result');
+        const uploadResult = this.storageService.uploadFile(
+          `${job.id}.txt`,
+          Buffer.from(data.raw, 'utf-8'),
+          'jobs-result',
+        );
         pathResult = uploadResult.path;
       }
     } else {
@@ -423,7 +579,6 @@ export class JobsRegistryService {
         data: dataForSync,
         job,
       });
-
     }
 
     const hasError = data?.error;
@@ -548,16 +703,31 @@ export class JobsRegistryService {
     if (!workflow) return;
 
     const currentTool = job.tool.name;
-    const nextTool = workflow?.content.jobs[currentTool];
+    const { jobs } = workflow.content;
 
+    const curretJobMetadata = jobs.find((j) => j.run === currentTool);
+    if (!curretJobMetadata) return null;
+
+    const indexCurrentTool = workflow?.content.jobs.findIndex(
+      (j) => j.name === curretJobMetadata.name,
+    );
+    const nextTool = workflow?.content.jobs[indexCurrentTool + 1]?.run;
     if (nextTool) {
-      const tools = await this.toolsService.getToolByNames(nextTool);
-      await Promise.all(tools.map(tool => this.createNewJob({
-        tool,
-        targetIds: [job.asset.target.id],
-        workflow: job.jobHistory.workflow,
-        jobHistory: job.jobHistory,
-      })));
+      const tools = await this.toolsService.getToolByNames({
+        names: [nextTool],
+      });
+      await Promise.all(
+        tools.map((tool) =>
+          this.createNewJob({
+            tool,
+            targetIds: [job.asset.target.id],
+            assetIds: [job.asset.id],
+            workflow: job.jobHistory.workflow,
+            jobHistory: job.jobHistory,
+            priority: tool.priority,
+          }),
+        ),
+      );
     }
   }
 
@@ -582,6 +752,7 @@ export class JobsRegistryService {
           workflow: true,
         },
         tool: true,
+        assetService: true,
       },
     });
   }

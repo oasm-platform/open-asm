@@ -3,6 +3,7 @@ import { Role } from '@/common/enums/enum';
 import { McpPermission } from '@/mcp/entities/mcp-permission.entity';
 import { ToolProvider } from '@/modules/providers/entities/provider.entity';
 import { SearchHistory } from '@/modules/search/entities/search-history.entity';
+import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { WorkspaceMembers } from '@/modules/workspaces/entities/workspace-members.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
@@ -58,4 +59,7 @@ export class User extends BaseEntity {
 
   @OneToMany(() => McpPermission, (mcpPermission) => mcpPermission.owner)
   mcpPermissions: McpPermission[];
+
+  @OneToMany(() => Workflow, (workflow) => workflow.createdBy)
+  createdWorkflows: Workflow[];
 }

@@ -1,25 +1,33 @@
-import Page from "@/components/common/page";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { ToolsControllerGetManyToolsType, useToolsControllerGetToolById } from "@/services/apis/gen/queries";
-import { Hash, Verified } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import ToolInstallButton from "../tool-install-button";
-import ToolRunButton from "../tool-run-button";
+import Page from '@/components/common/page';
+import { ToolApiKeyDialog } from '@/components/tools/tool-api-key-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import Image from '@/components/ui/image';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import {
+  ToolsControllerGetManyToolsType,
+  useToolsControllerGetToolById,
+} from '@/services/apis/gen/queries';
+import { Group, Verified } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import ToolInstallButton from './tool-install-button';
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
   const { selectedWorkspace } = useWorkspaceSelector();
 
-  const { data: toolResponse, isLoading, error, refetch } = useToolsControllerGetToolById(
-    id || "", {
+  const {
+    data: toolResponse,
+    isLoading,
+    error,
+    refetch,
+  } = useToolsControllerGetToolById(id || '', {
     query: {
-      queryKey: [selectedWorkspace, id]
-    }
-  },
-  );
+      queryKey: [selectedWorkspace, id],
+    },
+  });
 
   // Local state to track installation status
   const [isInstalled, setIsInstalled] = useState(false);
@@ -33,7 +41,7 @@ export default function ToolDetail() {
 
   // Callback function to update installation status
   const handleInstallChange = () => {
-    setIsInstalled(prev => !prev);
+    setIsInstalled((prev) => !prev);
     refetch();
   };
 
@@ -57,11 +65,11 @@ export default function ToolDetail() {
 
   // Format category name for display
   const formatCategory = (category: string | undefined) => {
-    if (!category) return "N/A";
+    if (!category) return 'N/A';
     return category
-      .split("_")
+      .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+      .join(' ');
   };
 
   return (
@@ -70,29 +78,18 @@ export default function ToolDetail() {
         <CardHeader>
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Logo section - moved to the left */}
-            <div className="flex-shrink-0">
-              <div className="bg-white p-4 rounded-xl flex items-center justify-center w-32 h-32 mx-auto lg:mx-0">
-                {tool.logoUrl ? (
-                  <img
-                    src={tool.logoUrl}
-                    alt={tool.name}
-                    className="max-h-24 object-contain"
-                  />
-                ) : (
-                  <div className="h-24 w-24 flex items-center justify-center bg-gray-200 rounded-lg">
-                    <span className="text-3xl font-bold text-gray-500">
-                      {tool.name.charAt(0)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
 
+            <Image
+              url={tool?.logoUrl}
+              width={140}
+              height={140}
+              className="rounded-2xl"
+            />
             {/* Content section */}
             <div className="flex-1">
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <CardTitle className="text-3xl">{tool.name}</CardTitle>
                     {tool.isOfficialSupport && (
                       <Badge variant="default" className="gap-1">
@@ -101,35 +98,44 @@ export default function ToolDetail() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex-shrink-0 flex items-center ">
-                    <ToolInstallButton
-                      tool={tool}
-                      workspaceId={selectedWorkspace || ""}
-                      onInstallChange={handleInstallChange}
-                    />
-                    {(isInstalled || tool.isInstalled) && tool.type !== ToolsControllerGetManyToolsType.built_in && (
-                      <ToolRunButton
+                  <div className="flex-shrink-0 flex-col md:flex-row flex md:items-center gap-2">
+                    <div className="flex gap-2">
+                      <ToolApiKeyDialog tool={tool} />
+                      <ToolInstallButton
                         tool={tool}
-                        workspaceId={selectedWorkspace || ""}
+                        workspaceId={selectedWorkspace || ''}
+                        onInstallChange={handleInstallChange}
                       />
-                    )}
+                    </div>
+                    {(isInstalled || tool.isInstalled) &&
+                      tool.type !==
+                        ToolsControllerGetManyToolsType.built_in && (
+                        <Link to={`/assets/groups?toolId=${tool.id}`}>
+                          <Button>
+                            <Group /> Add to group
+                          </Button>
+                        </Link>
+                      )}
                   </div>
                 </div>
 
                 <p className="text-muted-foreground">
-                  {tool.description || "No description available."}
+                  {tool.description || 'No description available.'}
                 </p>
 
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary" className="gap-1">
+                  {/* <Badge variant="secondary" className="gap-1">
                     <Hash className="w-3 h-3" />
                     Version: {tool.version || "N/A"}
-                  </Badge>
+                  </Badge> */}
                   <Badge variant="secondary" className="gap-1">
                     Category: {formatCategory(tool.category)}
                   </Badge>
                   <Badge variant="secondary" className="gap-1">
-                    Type: {tool.type === ToolsControllerGetManyToolsType.built_in ? "Built-in" : "Provider"}
+                    Type:{' '}
+                    {tool.type === ToolsControllerGetManyToolsType.built_in
+                      ? 'Built-in'
+                      : 'Provider'}
                   </Badge>
                 </div>
               </div>

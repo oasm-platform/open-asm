@@ -1,7 +1,8 @@
-import { DataTable } from '@/components/ui/data-table';
+import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetTechnologyAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
+import { AssetTable } from './asset-table';
 import { technologyAssetsColumn } from './technology-assets-column';
 
 export default function TechnologyAssetsTab() {
@@ -10,8 +11,7 @@ export default function TechnologyAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
-    filterParams,
-    filterHandlers,
+    targetId,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetTechnologyAssets(
@@ -32,7 +32,7 @@ export default function TechnologyAssetsTab() {
   return (
     <>
       <TabsContent value="tech" className="overflow-hidden">
-        <DataTable
+        <CollapsibleDataTable
           data={technologyAssets}
           columns={technologyAssetsColumn}
           isLoading={isLoading}
@@ -47,13 +47,14 @@ export default function TechnologyAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
-          onRowClick={(row) => {
-            let selectedValue = filterParams.techs || [];
-            if (selectedValue.indexOf(row.technology.name) < 0) {
-              selectedValue = [...selectedValue, row.technology.name];
-              filterHandlers('techs', selectedValue);
-            }
-          }}
+          collapsibleElement={(row) => (
+            <AssetTable
+              filter={{
+                techs: [row.technology.name],
+                targetIds: targetId ? [targetId] : undefined,
+              }}
+            />
+          )}
         />
       </TabsContent>
     </>

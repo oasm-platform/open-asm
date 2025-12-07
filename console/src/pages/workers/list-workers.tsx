@@ -2,13 +2,17 @@ import Page from "@/components/common/page"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { ConnectWorker } from "@/components/ui/connect-worker"
+import Image from '@/components/ui/image'
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector"
 import { useWorkersControllerGetWorkers } from "@/services/apis/gen/queries"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
 import { Loader2Icon } from "lucide-react"
 dayjs.extend(relativeTime)
+
+
 
 
 const ListWorkers = () => {
@@ -76,12 +80,48 @@ const ListWorkers = () => {
                                 <Badge variant="outline">
                                     Scope
                                 </Badge>
-                                <Badge
-                                    variant="outline"
-                                    className={`ml-2`}
-                                >
-                                    {worker.scope === "cloud" ? "Global" : "This workspace"}
-                                </Badge>
+                                <div className='flex'>
+                                    {worker.tool ? (
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <div>
+                                                        <Image
+                                                            url={worker.tool?.logoUrl}
+                                                            className="h-6 w-6 rounded-full"
+                                                        />
+                                                    </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent className="p-3 bg-white border border-gray-200 shadow-lg rounded-md max-w-xs">
+                                                    <div className="flex items-start space-x-3">
+                                                        {worker.tool.logoUrl && (
+                                                            <Image
+                                                                url={worker.tool.logoUrl}
+                                                                className="h-8 w-8 rounded-full flex-shrink-0"
+                                                            />
+                                                        )}
+                                                        <div className="min-w-0 flex-1">
+                                                            <h4 className="font-semibold text-sm text-gray-900 truncate">
+                                                                {worker.tool.name}
+                                                            </h4>
+                                                            {worker.tool.description && (
+                                                                <p className="text-xs text-gray-600 mt-1">
+                                                                    {worker.tool.description}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    ) : (<Badge variant="outline">Built-in</Badge>)}
+                                    <Badge
+                                        variant="outline"
+                                        className={`ml-2`}
+                                    >
+                                        {worker.scope === "cloud" ? "Global" : "This workspace"}
+                                    </Badge>
+                                </div>
                             </div>
                             <div className="flex justify-between items-start">
                                 <Badge variant="outline">

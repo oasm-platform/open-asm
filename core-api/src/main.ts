@@ -14,6 +14,7 @@ import {
   API_GLOBAL_PREFIX,
   APP_NAME,
   AUTH_INSTANCE_KEY,
+  CACHE_STATIC_RESOURCE,
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
@@ -24,11 +25,13 @@ async function bootstrap() {
   });
   app.set('query parser', 'extended');
 
-  // Serve files from .storage directory
-  app.useStaticAssets(path.join(__dirname, '..', '.storage'), {
-    prefix: '/storage/',
+  app.useStaticAssets(path.join(__dirname, '..', 'public'), {
+    prefix: '/api/static/',
     setHeaders: (res: Response) => {
-      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set(
+        'Cache-Control',
+        `max-age=${CACHE_STATIC_RESOURCE}, no-transform`,
+      );
     },
   });
 
@@ -56,9 +59,11 @@ async function bootstrap() {
   );
 
   // Configure global prefix
-  app.setGlobalPrefix(API_GLOBAL_PREFIX, { exclude: [`/${API_GLOBAL_PREFIX}/auth/{*path}`, '/'] });
+  app.setGlobalPrefix(API_GLOBAL_PREFIX, {
+    exclude: [`/${API_GLOBAL_PREFIX}/auth/{*path}`, '/'],
+  });
 
-  // Show Swagger UI in development: http://localhost:3000/api/docs
+  // Show Swagger UI in development: http://localhost:6276/api/docs
   const config = new DocumentBuilder()
     .setTitle(APP_NAME)
     .setDescription(

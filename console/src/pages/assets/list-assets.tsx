@@ -11,9 +11,16 @@ import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
 
 export function ListAssets() {
-  const { workspaces } = useWorkspaceSelector()
+  const { workspaces } = useWorkspaceSelector();
 
-  const tabList = useMemo(
+  type TabItem = {
+    value: string;
+    text: string;
+    tab: React.ReactNode;
+    isNew?: boolean;
+  };
+
+  const tabList = useMemo<TabItem[]>(
     () => [
       {
         value: 'asset',
@@ -27,7 +34,7 @@ export function ListAssets() {
       },
       {
         value: 'ip',
-        text: 'IP Adresses',
+        text: 'IP Addresses',
         tab: <IpAssetsTab />,
       },
       {
@@ -48,8 +55,11 @@ export function ListAssets() {
   if (workspaces.length === 0) return <CreateWorkspace />;
   return (
     <div className="w-full">
-      {/* <FilterForm /> */}
-      <FilterFormInfinite />
+      {/* FilterFormInfinite always on top */}
+      <div className="mb-4">
+        <FilterFormInfinite />
+      </div>
+
       <Tabs
         value={selectedTab}
         onValueChange={setSelectedTab}

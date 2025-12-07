@@ -3,9 +3,9 @@ import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsNotEmpty, IsString } from 'class-validator';
 import { Column, Entity, ManyToOne } from 'typeorm';
-import { Asset } from './assets.entity';
+import { AssetService } from './asset-services.entity';
 
-@Entity('asset_tags')
+@Entity('asset_services_tags')
 export class AssetTag extends BaseEntity {
   @ApiProperty()
   @IsString()
@@ -13,13 +13,13 @@ export class AssetTag extends BaseEntity {
   @Column()
   tag: string;
 
-  @ManyToOne(() => Asset, (asset) => asset.tags, {
+  @ManyToOne(() => AssetService, (assetService) => assetService.tags, {
     onDelete: 'CASCADE',
   })
-  asset: Asset;
+  assetService: AssetService;
 
   @Column()
-  assetId: string;
+  assetServiceId: string;
 
   @ApiProperty({ type: () => PickType(Tool, ['id', 'name']) })
   @ManyToOne(() => Tool, (tool) => tool.assetTags)

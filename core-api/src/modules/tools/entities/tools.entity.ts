@@ -1,4 +1,4 @@
-import { ToolCategory, WorkerType } from '@/common/enums/enum';
+import { JobPriority, ToolCategory, WorkerType } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
@@ -102,7 +102,7 @@ export class Tool {
   assetTags?: AssetTag[];
 
   @ApiProperty()
-  @Column({ name: 'provider_id', nullable: true })
+  @Column({ name: 'providerId', nullable: true })
   providerId?: string;
 
   @ManyToOne(() => ToolProvider, (provider) => provider.tools, {
@@ -117,4 +117,7 @@ export class Tool {
 
   @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.tool)
   workers?: WorkerInstance[];
+
+  @Column({ default: JobPriority.BACKGROUND })
+  priority?: JobPriority;
 }

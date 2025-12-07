@@ -1,8 +1,9 @@
-import { DataTable } from '@/components/ui/data-table';
+import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetIpAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
 import { ipAssetsColumn } from './ip-assets-column';
+import { AssetTable } from './asset-table';
 
 export default function IpAssetsTab() {
   const {
@@ -10,8 +11,7 @@ export default function IpAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
-    filterParams,
-    filterHandlers,
+    targetId,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetIpAssets(queryParams, {
@@ -29,7 +29,7 @@ export default function IpAssetsTab() {
   return (
     <>
       <TabsContent value="ip" className="overflow-hidden">
-        <DataTable
+        <CollapsibleDataTable
           data={ipAssets}
           columns={ipAssetsColumn}
           isLoading={isLoading}
@@ -44,13 +44,14 @@ export default function IpAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
-          onRowClick={(row) => {
-            let selectedValue = filterParams.ipAddresses || [];
-            if (selectedValue.indexOf(row.ip.toString()) < 0) {
-              selectedValue = [...selectedValue, row.ip];
-              filterHandlers('ipAddresses', selectedValue);
-            }
-          }}
+          collapsibleElement={(row) => (
+            <AssetTable
+              filter={{
+                ipAddresses: [row.ip],
+                targetIds: targetId ? [targetId] : undefined,
+              }}
+            />
+          )}
         />
       </TabsContent>
     </>

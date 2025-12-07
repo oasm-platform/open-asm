@@ -1,7 +1,15 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
@@ -16,7 +24,7 @@ import { UpdateAssetDto } from './dto/update-asset.dto';
 @ApiTags('Assets')
 @Controller('assets')
 export class AssetsController {
-  constructor(private readonly assetsService: AssetsService) { }
+  constructor(private readonly assetsService: AssetsService) {}
 
   @Doc({
     summary: 'Get assets in target',
@@ -144,13 +152,17 @@ export class AssetsController {
     response: {
       serialization: GetAssetsResponseDto,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Patch(':id')
   updateAssetById(
     @Param('id') id: string,
     @Body() updateAssetDto: UpdateAssetDto,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.updateAssetById(id, updateAssetDto);
+    return this.assetsService.updateAssetById(id, updateAssetDto, workspaceId);
   }
 
   @Doc({
@@ -162,6 +174,9 @@ export class AssetsController {
   })
   @Post('/switch')
   switchAsset(@Body() switchAssetDto: SwitchAssetDto) {
-    return this.assetsService.switchAsset(switchAssetDto.assetId, switchAssetDto.isEnabled);
+    return this.assetsService.switchAsset(
+      switchAssetDto.assetId,
+      switchAssetDto.isEnabled,
+    );
   }
 }

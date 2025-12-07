@@ -1,11 +1,11 @@
 /* eslint-disable */
 
 import type { Severity } from '@/common/enums/enum';
-import { ToolCategory } from '@/common/enums/enum';
+import { JobPriority, ToolCategory } from '@/common/enums/enum';
 import { randomUUID } from 'crypto';
-import { Asset } from '../assets/entities/assets.entity';
-import type { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
-import { Tool } from './entities/tools.entity';
+import { Asset } from '../../assets/entities/assets.entity';
+import type { Vulnerability } from '../../vulnerabilities/entities/vulnerability.entity';
+import { Tool } from '../entities/tools.entity';
 
 export const builtInTools: Tool[] = [
   {
@@ -14,7 +14,7 @@ export const builtInTools: Tool[] = [
     description:
       'Subfinder is a subdomain discovery tool that returns valid subdomains for websites, using passive online sources.',
     logoUrl:
-      'https://raw.githubusercontent.com/projectdiscovery/subfinder/refs/heads/main/static/subfinder-logo.png',
+      '/static/images/subfinder.png',
     command:
       '(echo {{value}} && subfinder -duc -d {{value}}) | dnsx -duc -a -aaaa -cname -mx -ns -soa -txt -resp',
     parser: (result: string) => {
@@ -37,6 +37,7 @@ export const builtInTools: Tool[] = [
       })) as Asset[];
     },
     version: '2.8.0',
+    priority: JobPriority.MEDIUM,
   },
   {
     name: 'httpx',
@@ -44,7 +45,7 @@ export const builtInTools: Tool[] = [
     description:
       'Httpx is a fast and multi-purpose HTTP toolkit that allows running multiple probes using the retryable http library. It is designed to maintain result reliability with an increased number of threads.',
     logoUrl:
-      'https://raw.githubusercontent.com/projectdiscovery/httpx/main/static/httpx-logo.png',
+      '/static/images/httpx.png',
     command:
       'httpx -duc -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
     parser: (result: string) => {
@@ -52,6 +53,7 @@ export const builtInTools: Tool[] = [
       return parsed;
     },
     version: '1.7.1',
+    priority: JobPriority.MEDIUM,
   },
   {
     name: 'naabu',
@@ -59,7 +61,7 @@ export const builtInTools: Tool[] = [
     description:
       'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
     logoUrl:
-      'https://raw.githubusercontent.com/projectdiscovery/naabu/refs/heads/main/static/naabu-logo.png',
+      '/static/images/naabu.png',
     command: 'naabu -host {{value}} -silent',
     parser: (result: string) => {
       const parsed = result
@@ -71,6 +73,7 @@ export const builtInTools: Tool[] = [
       return parsed;
     },
     version: '2.3.5',
+    priority: JobPriority.MEDIUM,
   },
   {
     name: 'nuclei',
@@ -78,7 +81,7 @@ export const builtInTools: Tool[] = [
     description:
       'Nuclei is a fast, customizable vulnerability scanner powered by the global security community and built on a simple YAML-based DSL, enabling collaboration to tackle trending vulnerabilities on the internet. It helps you find vulnerabilities in your applications, APIs, networks, DNS, and cloud configurations.',
     logoUrl:
-      'https://raw.githubusercontent.com/projectdiscovery/nuclei/refs/heads/dev/static/nuclei-logo.png',
+      '/static/images/nuclei.png',
     command: 'nuclei -duc -u {{value}} -j --silent',
     parser: (result: string) => {
       const initialVulnerabilities = result
@@ -100,16 +103,14 @@ export const builtInTools: Tool[] = [
               affectedUrl: finding['matched-at'] as string,
               ipAddress: finding['ip'] as string,
               host: finding['host'] as string,
-              port: finding['port']?.toString(),
+              ports: [finding['port']?.toString()] as string[],
               cvssMetric: finding['info']['classification']?.[
                 'cvss-metrics'
               ] as string,
               cvssScore: finding['info']['classification']?.[
                 'cvss-score'
               ] as number,
-              cveId: finding['info']['classification']?.[
-                'cve-id'
-              ]?.[0] as string,
+              cveId: finding['info']['classification']?.['cve-id'] as string[],
               cweId: finding['info']['classification']?.['cwe-id'] as string[],
               extractorName: finding['extractor-name'] as string,
               extractedResults: finding['extracted-results'] || [],
@@ -157,5 +158,6 @@ export const builtInTools: Tool[] = [
     },
 
     version: '3.4.7',
+    priority: JobPriority.LOW,
   },
 ];

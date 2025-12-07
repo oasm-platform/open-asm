@@ -6,31 +6,24 @@ import type {
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
-import {
-  BriefcaseBusiness,
-  EthernetPort,
-  Globe,
-  Network,
-  Tag
-} from 'lucide-react';
+import { BriefcaseBusiness, Globe, Network } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
 import HTTPXStatusCode from './status-code';
-import SwitchEnableAsset from './switch-enable-asset';
 import { TechnologyTooltip } from './technology-tooltip';
 
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
     accessorKey: 'value',
-    header: 'Value',
+    header: 'Service',
     enableHiding: false,
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
-      const ports = data.ports?.ports as string[];
+      // const ports = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
       const ipAddresses = data.ipAddresses;
-      const tags = data.tags;
+      // const tags = data.tags;
 
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
@@ -56,24 +49,13 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
               maxDisplay={2}
             />
           </div>
-          <div className="w-full">
+          {/*<div className="w-full">
             <BadgeList
               list={tags.map((t) => t.tag)}
               Icon={Tag}
               maxDisplay={2}
             />
-          </div>
-          {ports && (
-            <div className="w-full">
-              <BadgeList
-                list={ports.sort(
-                  (a: string, b: string) => parseInt(a) - parseInt(b),
-                )}
-                Icon={EthernetPort}
-                maxDisplay={6}
-              />
-            </div>
-          )}
+          </div>*/}
         </div>
       );
     },
@@ -143,13 +125,16 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       );
     },
   },
-  {
-    header: 'Enabled',
-    size: 120,
-    cell: ({ row }) => {
-      return (
-        <SwitchEnableAsset id={row.original.id} currentStatus={row.original.isEnabled} />
-      );
-    },
-  },
+  // {
+  //   header: 'Enabled',
+  //   size: 120,
+  //   cell: ({ row }) => {
+  //     return (
+  //       <SwitchEnableAsset
+  //         id={row.original.id}
+  //         currentStatus={row.original.isEnabled}
+  //       />
+  //     );
+  //   },
+  // },
 ];

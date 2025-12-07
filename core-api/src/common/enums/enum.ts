@@ -22,6 +22,8 @@ export enum ToolCategory {
   VULNERABILITIES = 'vulnerabilities',
   /** Data classification tool */
   CLASSIFIER = 'classifier',
+  /** AI Assistant tool */
+  ASSISTANT = 'assistant',
 }
 
 /**
@@ -119,5 +121,6 @@ export enum ApiKeyType {
 }
 
 export enum BullMQName {
-  SCAN_SCHEDULE = 'scan-schedule',
+  ASSETS_DISCOVERY_SCHEDULE = 'assets-discovery-schedule',
+  ASSET_GROUPS_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
 }

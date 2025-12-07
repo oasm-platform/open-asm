@@ -21,7 +21,7 @@ const ToolsList = ({
   renderButton,
 }: ToolsListProps) => {
   return (
-    <div className="flex flex-col gap-4 py-4">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2 text-blue-500">
         {icon}
         <span className="text font-bold">{title}</span>

@@ -229,6 +229,7 @@ export type Job = {
   pickJobAt: string;
   completedAt: string;
   command: string;
+  assetServiceId: string;
 };
 
 export type GetManyJobDto = {
@@ -362,18 +363,9 @@ export type HttpResponseDTO = {
   knowledgebase: KnowledgebaseInfo;
   resolvers: string[];
   chain_status_codes: string[];
-  assetId: string;
+  assetServiceId: string;
   jobHistoryId: string;
   techList: string[];
-};
-
-export type Port = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  ports: string[];
-  assetId: string;
-  jobHistoryId: string;
 };
 
 export type GetAssetsResponseDtoDnsRecords = { [key: string]: unknown };
@@ -389,7 +381,7 @@ export type GetAssetsResponseDto = {
   dnsRecords?: GetAssetsResponseDtoDnsRecords;
   ipAddresses: string[];
   httpResponses?: HttpResponseDTO;
-  ports?: Port;
+  port?: number;
   isEnabled: boolean;
 };
 
@@ -528,6 +520,34 @@ export type WorkerAliveDto = {
   token: string;
 };
 
+export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ToolCategory = {
+  subdomains: 'subdomains',
+  http_probe: 'http_probe',
+  ports_scanner: 'ports_scanner',
+  vulnerabilities: 'vulnerabilities',
+  classifier: 'classifier',
+  assistant: 'assistant',
+} as const;
+
+export type Tool = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  description: string;
+  category: ToolCategory;
+  version: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: string;
+  providerId: string;
+};
+
 export type WorkerInstance = {
   id: string;
   createdAt: string;
@@ -537,6 +557,7 @@ export type WorkerInstance = {
   currentJobsCount: number;
   type: string;
   scope: string;
+  tool: Tool;
 };
 
 export type WorkerJoinDto = {
@@ -562,7 +583,6 @@ export type Asset = {
   targetId: string;
   isPrimary: boolean;
   dnsRecords: AssetDnsRecords;
-  isErrorPage: boolean;
   isEnabled: boolean;
 };
 
@@ -706,36 +726,28 @@ export type GeoIp = {
   asname: string;
 };
 
+export type TopAssetVulnerabilities = {
+  /** The number of critical vulnerabilities */
+  critical: number;
+  /** The number of high severity vulnerabilities */
+  high: number;
+  /** The number of medium severity vulnerabilities */
+  medium: number;
+  /** The number of low severity vulnerabilities */
+  low: number;
+  /** The number of info severity vulnerabilities */
+  info: number;
+  /** The total number of vulnerabilities */
+  total: number;
+  /** The ID of the asset */
+  id: string;
+  /** The value of the asset */
+  value: string;
+};
+
 export type ScanDto = {
   /** Target ID */
   targetId: string;
-};
-
-export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ToolCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  classifier: 'classifier',
-} as const;
-
-export type Tool = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  name: string;
-  description: string;
-  category: ToolCategory;
-  version: string;
-  /** @nullable */
-  logoUrl?: string | null;
-  isInstalled: boolean;
-  isOfficialSupport: boolean;
-  type: string;
-  providerId: string;
 };
 
 export type Vulnerability = {
@@ -744,6 +756,7 @@ export type Vulnerability = {
   updatedAt: string;
   name: string;
   description: string;
+  synopsis: string;
   severity: string;
   tags: string[];
   references: string[];
@@ -751,13 +764,23 @@ export type Vulnerability = {
   affectedUrl: string;
   ipAddress: string;
   host: string;
-  port: string;
+  ports: string[];
   cvssMetric: string;
   cvssScore: number;
-  cveId: string;
+  epssScore: number;
+  vprScore: number;
+  cveId: string[];
+  bidId: string[];
   cweId: string[];
+  ceaId: string[];
+  iava: string[];
+  cveUrl: string;
+  cweUrl: string;
+  solution: string;
   extractorName: string;
   extractedResults: string[];
+  publicationDate: string;
+  modificationDate: string;
   tool: Tool;
 };
 
@@ -801,6 +824,7 @@ export const CreateToolDtoCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   classifier: 'classifier',
+  assistant: 'assistant',
 } as const;
 
 export type CreateToolDto = {
@@ -812,11 +836,6 @@ export type CreateToolDto = {
   logoUrl?: string | null;
   /** The ID of the provider */
   providerId: string;
-};
-
-export type RunToolDto = {
-  targetIds?: string[];
-  assetIds?: string[];
 };
 
 export type WorkspaceTool = {
@@ -857,6 +876,101 @@ export type GetManyStringDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+/**
+ * The workflow content
+ */
+export type GetManyWorkflowsResponseDtoContent = { [key: string]: unknown };
+
+/**
+ * The user who created this workflow
+ */
+export type GetManyWorkflowsResponseDtoCreatedBy = { [key: string]: unknown };
+
+/**
+ * The workspace this workflow belongs to
+ */
+export type GetManyWorkflowsResponseDtoWorkspace = { [key: string]: unknown };
+
+export type GetManyWorkflowsResponseDto = {
+  /** The unique identifier of the workflow */
+  id: string;
+  /** The name of the workflow */
+  name: string;
+  /** The file path of the workflow */
+  filePath: string;
+  /** The workflow content */
+  content: GetManyWorkflowsResponseDtoContent;
+  /** When the workflow was created */
+  createdAt: string;
+  /** When the workflow was last updated */
+  updatedAt: string;
+  /** The user who created this workflow */
+  createdBy?: GetManyWorkflowsResponseDtoCreatedBy;
+  /** The workspace this workflow belongs to */
+  workspace?: GetManyWorkflowsResponseDtoWorkspace;
+};
+
+export type GetManyGetManyWorkflowsResponseDtoDto = {
+  data: GetManyWorkflowsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type OnSchedule = (typeof OnSchedule)[keyof typeof OnSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const OnSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type On = {
+  target: string[];
+  schedule: OnSchedule;
+};
+
+export type WorkflowJob = {
+  name: string;
+  run: string;
+};
+
+export type WorkflowContent = {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+};
+
+export type Workflow = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  content: WorkflowContent;
+};
+
+export type CreateWorkflowDto = {
+  /** Name of the workflow */
+  name: string;
+  /** Content of the workflow in JSON format */
+  content: WorkflowContent;
+  /** File path for the workflow */
+  filePath?: string;
+};
+
+export type UpdateWorkflowDto = {
+  /** Name of the workflow */
+  name?: string;
+  /** Content of the workflow in JSON format */
+  content?: WorkflowContent;
+  /** File path for the workflow */
+  filePath?: string;
 };
 
 export type ToolProvider = {
@@ -975,6 +1089,277 @@ export type RunTemplateDto = {
   assetId: string;
 };
 
+export type AssetGroup = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  hexColor?: string;
+  totalAssets: number;
+};
+
+export type GetManyAssetGroupDto = {
+  data: AssetGroup[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type UpdateAssetGroupDto = {
+  /** Name of the asset group */
+  name?: string;
+  /** Hex color of the asset group */
+  hexColor?: string;
+};
+
+export type CreateAssetGroupDto = {
+  /** Name of the asset group */
+  name: string;
+};
+
+export type AddManyWorkflowsToAssetGroupDto = {
+  /** Array of workflow IDs to add */
+  workflowIds: string[];
+};
+
+export type AddManyAssetsToAssetGroupDto = {
+  /** Array of asset IDs to add */
+  assetIds: string[];
+};
+
+export type RemoveManyWorkflowsFromAssetGroupDto = {
+  /** Array of workflow IDs to remove */
+  workflowIds: string[];
+};
+
+export type RemoveManyAssetsFromAssetGroupDto = {
+  /** Array of asset IDs to remove */
+  assetIds: string[];
+};
+
+export type GetManyAssetDto = {
+  data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type AssetGroupWorkflowSchedule =
+  (typeof AssetGroupWorkflowSchedule)[keyof typeof AssetGroupWorkflowSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const AssetGroupWorkflowSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type AssetGroupWorkflow = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  assetGroup: AssetGroup;
+  workflow: Workflow;
+  schedule: AssetGroupWorkflowSchedule;
+};
+
+export type GetManyAssetGroupWorkflowDto = {
+  data: AssetGroupWorkflow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type GetManyWorkflowDto = {
+  data: Workflow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type UpdateAssetGroupWorkflowDtoSchedule =
+  (typeof UpdateAssetGroupWorkflowDtoSchedule)[keyof typeof UpdateAssetGroupWorkflowDtoSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UpdateAssetGroupWorkflowDtoSchedule = {
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type UpdateAssetGroupWorkflowDto = {
+  schedule: UpdateAssetGroupWorkflowDtoSchedule;
+};
+
+export type GenerateTagsResponseDto = {
+  /** Domain that tags were generated for */
+  domain: string;
+  /** Generated tags */
+  tags: string[];
+};
+
+export type GenerateTagsDto = {
+  /** Domain to generate tags for */
+  domain: string;
+};
+
+/**
+ * MCP servers configuration with status
+ */
+export type AddMcpServersResponseDtoMcpServers = { [key: string]: unknown };
+
+export type AddMcpServersResponseDto = {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** MCP servers configuration with status */
+  mcpServers: AddMcpServersResponseDtoMcpServers;
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Error message if operation failed */
+  error?: string;
+};
+
+/**
+ * MCP servers configuration object
+ */
+export type AddMcpServersDtoMcpServers = { [key: string]: unknown };
+
+export type AddMcpServersDto = {
+  /** MCP servers configuration object */
+  mcpServers: AddMcpServersDtoMcpServers;
+};
+
+/**
+ * Updated MCP servers configuration with status
+ */
+export type UpdateMcpServersResponseDtoMcpServers = { [key: string]: unknown };
+
+export type UpdateMcpServersResponseDto = {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** Updated MCP servers configuration with status */
+  mcpServers: UpdateMcpServersResponseDtoMcpServers;
+  /** Whether the operation succeeded */
+  success: boolean;
+};
+
+/**
+ * MCP servers configuration object
+ */
+export type UpdateMcpServersDtoMcpServers = { [key: string]: unknown };
+
+export type UpdateMcpServersDto = {
+  /** MCP servers configuration object */
+  mcpServers: UpdateMcpServersDtoMcpServers;
+};
+
+export type DeleteMcpServersResponseDto = {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Response message */
+  message?: string;
+};
+
+export type GetConversationsResponseDtoConversationsItem = {
+  conversationId?: string;
+  title?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type GetConversationsResponseDto = {
+  /** List of conversations */
+  conversations: GetConversationsResponseDtoConversationsItem[];
+};
+
+/**
+ * Updated conversation
+ */
+export type UpdateConversationResponseDtoConversation = {
+  conversationId?: string;
+  title?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type UpdateConversationResponseDto = {
+  /** Updated conversation */
+  conversation: UpdateConversationResponseDtoConversation;
+};
+
+export type UpdateConversationDto = {
+  /** New title for the conversation */
+  title?: string;
+  /** New description for the conversation */
+  description?: string;
+};
+
+export type DeleteConversationResponseDto = {
+  /** Success status */
+  success: boolean;
+  /** Response message */
+  message: string;
+};
+
+export type DeleteConversationsResponseDto = {
+  /** Success status */
+  success: boolean;
+  /** Response message */
+  message: string;
+};
+
+export type GetMessagesResponseDtoMessagesItem = {
+  messageId?: string;
+  question?: string;
+  type?: string;
+  content?: string;
+  conversationId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type GetMessagesResponseDto = {
+  /** List of messages in the conversation */
+  messages: GetMessagesResponseDtoMessagesItem[];
+};
+
+export type DeleteMessageResponseDto = {
+  /** Success status */
+  success: boolean;
+  /** Response message */
+  message: string;
+};
+
 export type McpTool = {
   name: string;
   type: string;
@@ -1012,6 +1397,7 @@ export type GetManyMcpPermissionDto = {
 };
 
 export type TargetsControllerGetTargetsInWorkspaceParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1020,6 +1406,7 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
 };
 
 export type WorkspacesControllerGetWorkspacesParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1031,6 +1418,7 @@ export type WorkspacesControllerGetWorkspacesParams = {
 };
 
 export type JobsRegistryControllerGetManyJobsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1038,6 +1426,7 @@ export type JobsRegistryControllerGetManyJobsParams = {
 };
 
 export type AssetsControllerGetAssetsInWorkspaceParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1051,6 +1440,7 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
 };
 
 export type AssetsControllerGetIpAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1064,6 +1454,7 @@ export type AssetsControllerGetIpAssetsParams = {
 };
 
 export type AssetsControllerGetPortAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1077,6 +1468,7 @@ export type AssetsControllerGetPortAssetsParams = {
 };
 
 export type AssetsControllerGetTechnologyAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1090,6 +1482,7 @@ export type AssetsControllerGetTechnologyAssetsParams = {
 };
 
 export type AssetsControllerGetStatusCodeAssetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1103,6 +1496,7 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
 };
 
 export type WorkersControllerGetWorkersParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1111,6 +1505,7 @@ export type WorkersControllerGetWorkersParams = {
 };
 
 export type SearchControllerSearchAssetsTargetsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1121,6 +1516,7 @@ export type SearchControllerSearchAssetsTargetsParams = {
 };
 
 export type SearchControllerGetSearchHistoryParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1137,6 +1533,7 @@ export type StatisticControllerGetStatisticsParams = {
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1152,6 +1549,7 @@ export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
 };
 
 export type ToolsControllerGetManyToolsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1181,13 +1579,10 @@ export const ToolsControllerGetManyToolsCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   classifier: 'classifier',
+  assistant: 'assistant',
 } as const;
 
 export type ToolsControllerGetInstalledToolsParams = {
-  /**
-   * The ID of the workspace
-   */
-  workspaceId: string;
   category?: ToolsControllerGetInstalledToolsCategory;
 };
 
@@ -1201,9 +1596,23 @@ export const ToolsControllerGetInstalledToolsCategory = {
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
   classifier: 'classifier',
+  assistant: 'assistant',
 } as const;
 
+export type WorkflowsControllerGetManyWorkflowsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * Filter by workflow name
+   */
+  name?: string;
+};
+
 export type ProvidersControllerGetManyProvidersParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -1212,11 +1621,53 @@ export type ProvidersControllerGetManyProvidersParams = {
 };
 
 export type TemplatesControllerGetAllTemplatesParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
   value?: string;
+};
+
+export type AssetGroupControllerGetAllParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  targetIds?: string[];
+};
+
+export type AssetGroupControllerGetAssetsByAssetGroupsIdParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AssetGroupControllerGetAssetsNotInAssetGroupParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -1239,6 +1690,7 @@ export type StorageControllerForwardImageParams = {
 };
 
 export type McpControllerGetMcpPermissionsParams = {
+  search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -11882,6 +12334,454 @@ export function useStatisticControllerGetAssetLocations<
   return query;
 }
 
+/**
+ * Retrieves the top 10 assets with the most vulnerabilities in a workspace.
+ * @summary Get top 10 assets with the most vulnerabilities in a workspace
+ */
+export const statisticControllerGetTopAssetsWithMostVulnerabilities = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TopAssetVulnerabilities[]>(
+    { url: `/api/statistic/top-assets-vulnerabilities`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryKey =
+  () => {
+    return ['infinate', `/api/statistic/top-assets-vulnerabilities`] as const;
+  };
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryKey =
+  () => {
+    return [`/api/statistic/top-assets-vulnerabilities`] as const;
+  };
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >
+    >,
+    TError = unknown,
+  >(options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryKey();
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >
+    > = ({ signal }) =>
+      statisticControllerGetTopAssetsWithMostVulnerabilities(
+        requestOptions,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >;
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryError =
+  unknown;
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top 10 assets with the most vulnerabilities in a workspace
+ */
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopAssetsWithMostVulnerabilitiesInfiniteQueryOptions(
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >,
+    TError = unknown,
+  >(options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryKey();
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >
+    > = ({ signal }) =>
+      statisticControllerGetTopAssetsWithMostVulnerabilities(
+        requestOptions,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >;
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryError =
+  unknown;
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top 10 assets with the most vulnerabilities in a workspace
+ */
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions(
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
 export const vulnerabilitiesControllerScan = (
   scanDto: ScanDto,
   options?: SecondParameter<typeof orvalClient>,
@@ -12814,6 +13714,403 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
 }
 
 /**
+ * Retrieves detailed information about a specific security vulnerability identified within the system, including its attributes, associated assets, and remediation guidance.
+ * @summary Get vulnerability by id
+ */
+export const vulnerabilitiesControllerGetVulnerabilityById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Vulnerability>(
+    { url: `/api/vulnerabilities/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerGetVulnerabilityByIdInfiniteQueryKey =
+  (id?: string) => {
+    return ['infinate', `/api/vulnerabilities/${id}`] as const;
+  };
+
+export const getVulnerabilitiesControllerGetVulnerabilityByIdQueryKey = (
+  id?: string,
+) => {
+  return [`/api/vulnerabilities/${id}`] as const;
+};
+
+export const getVulnerabilitiesControllerGetVulnerabilityByIdInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>
+    >,
+    TError = unknown,
+  >(
+    id: string,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getVulnerabilitiesControllerGetVulnerabilityByIdInfiniteQueryKey(id);
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>
+    > = ({ signal }) =>
+      vulnerabilitiesControllerGetVulnerabilityById(id, requestOptions, signal);
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!id,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type VulnerabilitiesControllerGetVulnerabilityByIdInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>
+  >;
+export type VulnerabilitiesControllerGetVulnerabilityByIdInfiniteQueryError =
+  unknown;
+
+export function useVulnerabilitiesControllerGetVulnerabilityByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilityByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilityByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get vulnerability by id
+ */
+
+export function useVulnerabilitiesControllerGetVulnerabilityByIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getVulnerabilitiesControllerGetVulnerabilityByIdInfiniteQueryOptions(
+      id,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getVulnerabilitiesControllerGetVulnerabilityByIdQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getVulnerabilitiesControllerGetVulnerabilityByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>
+  > = ({ signal }) =>
+    vulnerabilitiesControllerGetVulnerabilityById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type VulnerabilitiesControllerGetVulnerabilityByIdQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>>
+  >;
+export type VulnerabilitiesControllerGetVulnerabilityByIdQueryError = unknown;
+
+export function useVulnerabilitiesControllerGetVulnerabilityById<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilityById<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetVulnerabilityById<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get vulnerability by id
+ */
+
+export function useVulnerabilitiesControllerGetVulnerabilityById<
+  TData = Awaited<
+    ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof vulnerabilitiesControllerGetVulnerabilityById>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getVulnerabilitiesControllerGetVulnerabilityByIdQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Registers a new security assessment tool in the system with specified configuration and capabilities.
  * @summary Create a new tool
  */
@@ -13233,97 +14530,6 @@ export function useToolsControllerGetManyTools<
 
   return query;
 }
-
-/**
- * Executes a security assessment tool with specified parameters in the designated workspace.
- * @summary Run a tool
- */
-export const toolsControllerRunTool = (
-  id: string,
-  runToolDto: RunToolDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    {
-      url: `/api/tools/${id}/run`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: runToolDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getToolsControllerRunToolMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof toolsControllerRunTool>>,
-    TError,
-    { id: string; data: RunToolDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof toolsControllerRunTool>>,
-  TError,
-  { id: string; data: RunToolDto },
-  TContext
-> => {
-  const mutationKey = ['toolsControllerRunTool'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof toolsControllerRunTool>>,
-    { id: string; data: RunToolDto }
-  > = (props) => {
-    const { id, data } = props ?? {};
-
-    return toolsControllerRunTool(id, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ToolsControllerRunToolMutationResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerRunTool>>
->;
-export type ToolsControllerRunToolMutationBody = RunToolDto;
-export type ToolsControllerRunToolMutationError = unknown;
-
-/**
- * @summary Run a tool
- */
-export const useToolsControllerRunTool = <TError = unknown, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof toolsControllerRunTool>>,
-      TError,
-      { id: string; data: RunToolDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof toolsControllerRunTool>>,
-  TError,
-  { id: string; data: RunToolDto },
-  TContext
-> => {
-  const mutationOptions = getToolsControllerRunToolMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
 
 /**
  * Associates an existing security tool with a specific workspace for targeted assessments.
@@ -13923,7 +15129,7 @@ export function useToolsControllerGetBuiltInTools<
  * @summary Get installed tools for a workspace
  */
 export const toolsControllerGetInstalledTools = (
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -13955,7 +15161,7 @@ export const getToolsControllerGetInstalledToolsInfiniteQueryOptions = <
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -13996,7 +15202,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params: undefined | ToolsControllerGetInstalledToolsParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -14025,7 +15231,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -14054,7 +15260,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -14079,7 +15285,7 @@ export function useToolsControllerGetInstalledToolsInfinite<
   >,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -14115,7 +15321,7 @@ export const getToolsControllerGetInstalledToolsQueryOptions = <
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -14154,7 +15360,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params: undefined | ToolsControllerGetInstalledToolsParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -14181,7 +15387,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -14208,7 +15414,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -14231,7 +15437,7 @@ export function useToolsControllerGetInstalledTools<
   TData = Awaited<ReturnType<typeof toolsControllerGetInstalledTools>>,
   TError = unknown,
 >(
-  params: ToolsControllerGetInstalledToolsParams,
+  params?: ToolsControllerGetInstalledToolsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15329,6 +16535,964 @@ export function useWorkflowsControllerListTemplates<
 
   return query;
 }
+
+/**
+ * Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
+ * @summary Get many workflows
+ */
+export const workflowsControllerGetManyWorkflows = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetManyWorkflowsResponseDtoDto>(
+    { url: `/api/workflows`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+) => {
+  return ['infinate', `/api/workflows`, ...(params ? [params] : [])] as const;
+};
+
+export const getWorkflowsControllerGetManyWorkflowsQueryKey = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+) => {
+  return [`/api/workflows`, ...(params ? [params] : [])] as const;
+};
+
+export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  > = ({ signal }) =>
+    workflowsControllerGetManyWorkflows(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetManyWorkflowsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>>;
+export type WorkflowsControllerGetManyWorkflowsInfiniteQueryError = unknown;
+
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many workflows
+ */
+
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkflowsControllerGetManyWorkflowsQueryOptions = <
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetManyWorkflowsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  > = ({ signal }) =>
+    workflowsControllerGetManyWorkflows(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetManyWorkflowsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+>;
+export type WorkflowsControllerGetManyWorkflowsQueryError = unknown;
+
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many workflows
+ */
+
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkflowsControllerGetManyWorkflowsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Creates a new workflow with the provided data.
+ * @summary Create workflow
+ */
+export const workflowsControllerCreateWorkflow = (
+  createWorkflowDto: CreateWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Workflow>(
+    {
+      url: `/api/workflows`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createWorkflowDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkflowsControllerCreateWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+    TError,
+    { data: CreateWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+  TError,
+  { data: CreateWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerCreateWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+    { data: CreateWorkflowDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workflowsControllerCreateWorkflow(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkflowsControllerCreateWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>
+>;
+export type WorkflowsControllerCreateWorkflowMutationBody = CreateWorkflowDto;
+export type WorkflowsControllerCreateWorkflowMutationError = unknown;
+
+/**
+ * @summary Create workflow
+ */
+export const useWorkflowsControllerCreateWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+      TError,
+      { data: CreateWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+  TError,
+  { data: CreateWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkflowsControllerCreateWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves a specific workflow by its ID within the specified workspace.
+ * @summary Get workflow by ID
+ */
+export const workflowsControllerGetWorkspaceWorkflow = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Workflow>(
+    { url: `/api/workflows/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkflowsControllerGetWorkspaceWorkflowInfiniteQueryKey = (
+  id?: string,
+) => {
+  return ['infinate', `/api/workflows/${id}`] as const;
+};
+
+export const getWorkflowsControllerGetWorkspaceWorkflowQueryKey = (
+  id?: string,
+) => {
+  return [`/api/workflows/${id}`] as const;
+};
+
+export const getWorkflowsControllerGetWorkspaceWorkflowInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetWorkspaceWorkflowInfiniteQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  > = ({ signal }) =>
+    workflowsControllerGetWorkspaceWorkflow(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetWorkspaceWorkflowInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >;
+export type WorkflowsControllerGetWorkspaceWorkflowInfiniteQueryError = unknown;
+
+export function useWorkflowsControllerGetWorkspaceWorkflowInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflowInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflowInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workflow by ID
+ */
+
+export function useWorkflowsControllerGetWorkspaceWorkflowInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkflowsControllerGetWorkspaceWorkflowInfiniteQueryOptions(id, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkflowsControllerGetWorkspaceWorkflowQueryOptions = <
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetWorkspaceWorkflowQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  > = ({ signal }) =>
+    workflowsControllerGetWorkspaceWorkflow(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetWorkspaceWorkflowQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+>;
+export type WorkflowsControllerGetWorkspaceWorkflowQueryError = unknown;
+
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workflow by ID
+ */
+
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkflowsControllerGetWorkspaceWorkflowQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates an existing workflow with the provided data.
+ * @summary Update workflow
+ */
+export const workflowsControllerUpdateWorkflow = (
+  id: string,
+  updateWorkflowDto: UpdateWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<Workflow>(
+    {
+      url: `/api/workflows/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateWorkflowDto,
+    },
+    options,
+  );
+};
+
+export const getWorkflowsControllerUpdateWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+    TError,
+    { id: string; data: UpdateWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+  TError,
+  { id: string; data: UpdateWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerUpdateWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+    { id: string; data: UpdateWorkflowDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return workflowsControllerUpdateWorkflow(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkflowsControllerUpdateWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>
+>;
+export type WorkflowsControllerUpdateWorkflowMutationBody = UpdateWorkflowDto;
+export type WorkflowsControllerUpdateWorkflowMutationError = unknown;
+
+/**
+ * @summary Update workflow
+ */
+export const useWorkflowsControllerUpdateWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+      TError,
+      { id: string; data: UpdateWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+  TError,
+  { id: string; data: UpdateWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkflowsControllerUpdateWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes a workflow by its ID.
+ * @summary Delete workflow
+ */
+export const workflowsControllerDeleteWorkflow = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/workflows/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getWorkflowsControllerDeleteWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerDeleteWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workflowsControllerDeleteWorkflow(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkflowsControllerDeleteWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>
+>;
+
+export type WorkflowsControllerDeleteWorkflowMutationError = unknown;
+
+/**
+ * @summary Delete workflow
+ */
+export const useWorkflowsControllerDeleteWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkflowsControllerDeleteWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * Get all providers with pagination, filtered by owner
@@ -17431,6 +19595,5014 @@ export const useTemplatesControllerRunTemplate = <
 > => {
   const mutationOptions =
     getTemplatesControllerRunTemplateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all asset groups with optional filtering and pagination.
+ * @summary Get all asset groups
+ */
+export const assetGroupControllerGetAll = (
+  params?: AssetGroupControllerGetAllParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyAssetGroupDto>(
+    { url: `/api/asset-group`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetAllInfiniteQueryKey = (
+  params?: AssetGroupControllerGetAllParams,
+) => {
+  return ['infinate', `/api/asset-group`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetGroupControllerGetAllQueryKey = (
+  params?: AssetGroupControllerGetAllParams,
+) => {
+  return [`/api/asset-group`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetGroupControllerGetAllInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetAllInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+  > = ({ signal }) =>
+    assetGroupControllerGetAll(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetAllInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+>;
+export type AssetGroupControllerGetAllInfiniteQueryError = unknown;
+
+export function useAssetGroupControllerGetAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params: undefined | AssetGroupControllerGetAllParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all asset groups
+ */
+
+export function useAssetGroupControllerGetAllInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetAll>>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetGroupControllerGetAllInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetAllQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetGroupControllerGetAllQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+  > = ({ signal }) =>
+    assetGroupControllerGetAll(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetAllQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+>;
+export type AssetGroupControllerGetAllQueryError = unknown;
+
+export function useAssetGroupControllerGetAll<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params: undefined | AssetGroupControllerGetAllParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAll<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAll<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all asset groups
+ */
+
+export function useAssetGroupControllerGetAll<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+  TError = unknown,
+>(
+  params?: AssetGroupControllerGetAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetGroupControllerGetAllQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Creates a new asset group.
+ * @summary Create asset group
+ */
+export const assetGroupControllerCreate = (
+  createAssetGroupDto: CreateAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AssetGroup>(
+    {
+      url: `/api/asset-group`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createAssetGroupDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerCreateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+    TError,
+    { data: CreateAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+  TError,
+  { data: CreateAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerCreate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+    { data: CreateAssetGroupDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assetGroupControllerCreate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerCreateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerCreate>>
+>;
+export type AssetGroupControllerCreateMutationBody = CreateAssetGroupDto;
+export type AssetGroupControllerCreateMutationError = unknown;
+
+/**
+ * @summary Create asset group
+ */
+export const useAssetGroupControllerCreate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+      TError,
+      { data: CreateAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerCreate>>,
+  TError,
+  { data: CreateAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions = getAssetGroupControllerCreateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Fetches a specific asset group by its unique identifier.
+ * @summary Get asset group by ID
+ */
+export const assetGroupControllerGetById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AssetGroup>(
+    { url: `/api/asset-group/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetByIdInfiniteQueryKey = (id?: string) => {
+  return ['infinate', `/api/asset-group/${id}`] as const;
+};
+
+export const getAssetGroupControllerGetByIdQueryKey = (id?: string) => {
+  return [`/api/asset-group/${id}`] as const;
+};
+
+export const getAssetGroupControllerGetByIdInfiniteQueryOptions = <
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetByIdInfiniteQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetById>>
+  > = ({ signal }) => assetGroupControllerGetById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetByIdInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerGetById>>
+>;
+export type AssetGroupControllerGetByIdInfiniteQueryError = unknown;
+
+export function useAssetGroupControllerGetByIdInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetByIdInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetByIdInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get asset group by ID
+ */
+
+export function useAssetGroupControllerGetByIdInfinite<
+  TData = InfiniteData<Awaited<ReturnType<typeof assetGroupControllerGetById>>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetGroupControllerGetByIdInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetGroupControllerGetByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetById>>
+  > = ({ signal }) => assetGroupControllerGetById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerGetById>>
+>;
+export type AssetGroupControllerGetByIdQueryError = unknown;
+
+export function useAssetGroupControllerGetById<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetById<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof assetGroupControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetById<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get asset group by ID
+ */
+
+export function useAssetGroupControllerGetById<
+  TData = Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetGroupControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetGroupControllerGetByIdQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates an existing asset group by ID.
+ * @summary Update asset group
+ */
+export const assetGroupControllerUpdateAssetGroupById = (
+  id: string,
+  updateAssetGroupDto: UpdateAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AssetGroup>(
+    {
+      url: `/api/asset-group/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAssetGroupDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerUpdateAssetGroupByIdMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+    TError,
+    { id: string; data: UpdateAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+  TError,
+  { id: string; data: UpdateAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerUpdateAssetGroupById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+    { id: string; data: UpdateAssetGroupDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetGroupControllerUpdateAssetGroupById(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerUpdateAssetGroupByIdMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>
+  >;
+export type AssetGroupControllerUpdateAssetGroupByIdMutationBody =
+  UpdateAssetGroupDto;
+export type AssetGroupControllerUpdateAssetGroupByIdMutationError = unknown;
+
+/**
+ * @summary Update asset group
+ */
+export const useAssetGroupControllerUpdateAssetGroupById = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+      TError,
+      { id: string; data: UpdateAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupById>>,
+  TError,
+  { id: string; data: UpdateAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerUpdateAssetGroupByIdMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Permanently removes an asset group.
+ * @summary Delete asset group
+ */
+export const assetGroupControllerDelete = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/asset-group/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAssetGroupControllerDeleteMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerDelete'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return assetGroupControllerDelete(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerDeleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerDelete>>
+>;
+
+export type AssetGroupControllerDeleteMutationError = unknown;
+
+/**
+ * @summary Delete asset group
+ */
+export const useAssetGroupControllerDelete = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerDelete>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions = getAssetGroupControllerDeleteMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Associates multiple workflows with the specified asset group.
+ * @summary Add multiple workflows to asset group
+ */
+export const assetGroupControllerAddManyWorkflows = (
+  groupId: string,
+  addManyWorkflowsToAssetGroupDto: AddManyWorkflowsToAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/workflows`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: addManyWorkflowsToAssetGroupDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerAddManyWorkflowsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+    TError,
+    { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+  TError,
+  { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerAddManyWorkflows'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+    { groupId: string; data: AddManyWorkflowsToAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerAddManyWorkflows(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerAddManyWorkflowsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>
+>;
+export type AssetGroupControllerAddManyWorkflowsMutationBody =
+  AddManyWorkflowsToAssetGroupDto;
+export type AssetGroupControllerAddManyWorkflowsMutationError = unknown;
+
+/**
+ * @summary Add multiple workflows to asset group
+ */
+export const useAssetGroupControllerAddManyWorkflows = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+      TError,
+      { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyWorkflows>>,
+  TError,
+  { groupId: string; data: AddManyWorkflowsToAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerAddManyWorkflowsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Disassociates multiple workflows from the asset group.
+ * @summary Remove multiple workflows from asset group
+ */
+export const assetGroupControllerRemoveManyWorkflows = (
+  groupId: string,
+  removeManyWorkflowsFromAssetGroupDto: RemoveManyWorkflowsFromAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/workflows`,
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      data: removeManyWorkflowsFromAssetGroupDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerRemoveManyWorkflowsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+    TError,
+    { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+  TError,
+  { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRemoveManyWorkflows'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+    { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerRemoveManyWorkflows(
+      groupId,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerRemoveManyWorkflowsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>
+>;
+export type AssetGroupControllerRemoveManyWorkflowsMutationBody =
+  RemoveManyWorkflowsFromAssetGroupDto;
+export type AssetGroupControllerRemoveManyWorkflowsMutationError = unknown;
+
+/**
+ * @summary Remove multiple workflows from asset group
+ */
+export const useAssetGroupControllerRemoveManyWorkflows = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+      TError,
+      { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyWorkflows>>,
+  TError,
+  { groupId: string; data: RemoveManyWorkflowsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerRemoveManyWorkflowsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Associates multiple assets with the specified asset group.
+ * @summary Add multiple assets to asset group
+ */
+export const assetGroupControllerAddManyAssets = (
+  groupId: string,
+  addManyAssetsToAssetGroupDto: AddManyAssetsToAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/assets`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: addManyAssetsToAssetGroupDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerAddManyAssetsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+    TError,
+    { groupId: string; data: AddManyAssetsToAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+  TError,
+  { groupId: string; data: AddManyAssetsToAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerAddManyAssets'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+    { groupId: string; data: AddManyAssetsToAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerAddManyAssets(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerAddManyAssetsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>
+>;
+export type AssetGroupControllerAddManyAssetsMutationBody =
+  AddManyAssetsToAssetGroupDto;
+export type AssetGroupControllerAddManyAssetsMutationError = unknown;
+
+/**
+ * @summary Add multiple assets to asset group
+ */
+export const useAssetGroupControllerAddManyAssets = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+      TError,
+      { groupId: string; data: AddManyAssetsToAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerAddManyAssets>>,
+  TError,
+  { groupId: string; data: AddManyAssetsToAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerAddManyAssetsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Disassociates multiple assets from the asset group.
+ * @summary Remove multiple assets from asset group
+ */
+export const assetGroupControllerRemoveManyAssets = (
+  groupId: string,
+  removeManyAssetsFromAssetGroupDto: RemoveManyAssetsFromAssetGroupDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/asset-group/${groupId}/assets`,
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      data: removeManyAssetsFromAssetGroupDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerRemoveManyAssetsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+    TError,
+    { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+  TError,
+  { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRemoveManyAssets'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+    { groupId: string; data: RemoveManyAssetsFromAssetGroupDto }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return assetGroupControllerRemoveManyAssets(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerRemoveManyAssetsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>
+>;
+export type AssetGroupControllerRemoveManyAssetsMutationBody =
+  RemoveManyAssetsFromAssetGroupDto;
+export type AssetGroupControllerRemoveManyAssetsMutationError = unknown;
+
+/**
+ * @summary Remove multiple assets from asset group
+ */
+export const useAssetGroupControllerRemoveManyAssets = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+      TError,
+      { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRemoveManyAssets>>,
+  TError,
+  { groupId: string; data: RemoveManyAssetsFromAssetGroupDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerRemoveManyAssetsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves assets associated with a specific asset group with pagination.
+ * @summary Get assets by asset group ID
+ */
+export const assetGroupControllerGetAssetsByAssetGroupsId = (
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyAssetDto>(
+    {
+      url: `/api/asset-group/${assetGroupId}/assets`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+) => {
+  return [
+    'infinate',
+    `/api/asset-group/${assetGroupId}/assets`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+) => {
+  return [
+    `/api/asset-group/${assetGroupId}/assets`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+    >,
+    TError = unknown,
+  >(
+    assetGroupId: string,
+    params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryKey(
+        assetGroupId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+    > = ({ signal }) =>
+      assetGroupControllerGetAssetsByAssetGroupsId(
+        assetGroupId,
+        params,
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!assetGroupId,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  >;
+export type AssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryError =
+  unknown;
+
+export function useAssetGroupControllerGetAssetsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets by asset group ID
+ */
+
+export function useAssetGroupControllerGetAssetsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetAssetsByAssetGroupsIdInfiniteQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetAssetsByAssetGroupsIdQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey(
+      assetGroupId,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  > = ({ signal }) =>
+    assetGroupControllerGetAssetsByAssetGroupsId(
+      assetGroupId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!assetGroupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetAssetsByAssetGroupsIdQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>>
+  >;
+export type AssetGroupControllerGetAssetsByAssetGroupsIdQueryError = unknown;
+
+export function useAssetGroupControllerGetAssetsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets by asset group ID
+ */
+
+export function useAssetGroupControllerGetAssetsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetAssetsByAssetGroupsIdQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves workflows associated with a specific asset group with pagination.
+ * @summary Get workflows by asset group ID
+ */
+export const assetGroupControllerGetWorkflowsByAssetGroupsId = (
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyAssetGroupWorkflowDto>(
+    {
+      url: `/api/asset-group/${assetGroupId}/workflows`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryKey =
+  (
+    assetGroupId?: string,
+    params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  ) => {
+    return [
+      'infinate',
+      `/api/asset-group/${assetGroupId}/workflows`,
+      ...(params ? [params] : []),
+    ] as const;
+  };
+
+export const getAssetGroupControllerGetWorkflowsByAssetGroupsIdQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+) => {
+  return [
+    `/api/asset-group/${assetGroupId}/workflows`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+      >
+    >,
+    TError = unknown,
+  >(
+    assetGroupId: string,
+    params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryKey(
+        assetGroupId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+      >
+    > = ({ signal }) =>
+      assetGroupControllerGetWorkflowsByAssetGroupsId(
+        assetGroupId,
+        params,
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!assetGroupId,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
+  >;
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryError =
+  unknown;
+
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workflows by asset group ID
+ */
+
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetWorkflowsByAssetGroupsIdInfiniteQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetWorkflowsByAssetGroupsIdQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetWorkflowsByAssetGroupsIdQueryKey(
+      assetGroupId,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
+  > = ({ signal }) =>
+    assetGroupControllerGetWorkflowsByAssetGroupsId(
+      assetGroupId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!assetGroupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>>
+  >;
+export type AssetGroupControllerGetWorkflowsByAssetGroupsIdQueryError = unknown;
+
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workflows by asset group ID
+ */
+
+export function useAssetGroupControllerGetWorkflowsByAssetGroupsId<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsByAssetGroupsIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsByAssetGroupsId>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetWorkflowsByAssetGroupsIdQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves assets not associated with a specific asset group with pagination.
+ * @summary Get assets not in asset group
+ */
+export const assetGroupControllerGetAssetsNotInAssetGroup = (
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyAssetDto>(
+    {
+      url: `/api/asset-group/${assetGroupId}/assets/not-in-group`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+) => {
+  return [
+    'infinate',
+    `/api/asset-group/${assetGroupId}/assets/not-in-group`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+) => {
+  return [
+    `/api/asset-group/${assetGroupId}/assets/not-in-group`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+    >,
+    TError = unknown,
+  >(
+    assetGroupId: string,
+    params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryKey(
+        assetGroupId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+    > = ({ signal }) =>
+      assetGroupControllerGetAssetsNotInAssetGroup(
+        assetGroupId,
+        params,
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!assetGroupId,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  >;
+export type AssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryError =
+  unknown;
+
+export function useAssetGroupControllerGetAssetsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets not in asset group
+ */
+
+export function useAssetGroupControllerGetAssetsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetAssetsNotInAssetGroupInfiniteQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetAssetsNotInAssetGroupQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey(
+      assetGroupId,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  > = ({ signal }) =>
+    assetGroupControllerGetAssetsNotInAssetGroup(
+      assetGroupId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!assetGroupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetAssetsNotInAssetGroupQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>>
+  >;
+export type AssetGroupControllerGetAssetsNotInAssetGroupQueryError = unknown;
+
+export function useAssetGroupControllerGetAssetsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetAssetsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get assets not in asset group
+ */
+
+export function useAssetGroupControllerGetAssetsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetAssetsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetAssetsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetAssetsNotInAssetGroupQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves workflows not associated with a specific asset group but preinstalled in the workspace with pagination.
+ * @summary Get workflows not in asset group (preinstalled in workspace)
+ */
+export const assetGroupControllerGetWorkflowsNotInAssetGroup = (
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyWorkflowDto>(
+    {
+      url: `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryKey =
+  (
+    assetGroupId?: string,
+    params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  ) => {
+    return [
+      'infinate',
+      `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
+      ...(params ? [params] : []),
+    ] as const;
+  };
+
+export const getAssetGroupControllerGetWorkflowsNotInAssetGroupQueryKey = (
+  assetGroupId?: string,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+) => {
+  return [
+    `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+      >
+    >,
+    TError = unknown,
+  >(
+    assetGroupId: string,
+    params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getAssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryKey(
+        assetGroupId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+      >
+    > = ({ signal }) =>
+      assetGroupControllerGetWorkflowsNotInAssetGroup(
+        assetGroupId,
+        params,
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!assetGroupId,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<
+        ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
+  >;
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryError =
+  unknown;
+
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workflows not in asset group (preinstalled in workspace)
+ */
+
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroupInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetWorkflowsNotInAssetGroupInfiniteQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAssetGroupControllerGetWorkflowsNotInAssetGroupQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetGroupControllerGetWorkflowsNotInAssetGroupQueryKey(
+      assetGroupId,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
+  > = ({ signal }) =>
+    assetGroupControllerGetWorkflowsNotInAssetGroup(
+      assetGroupId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!assetGroupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>>
+  >;
+export type AssetGroupControllerGetWorkflowsNotInAssetGroupQueryError = unknown;
+
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params: undefined | AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workflows not in asset group (preinstalled in workspace)
+ */
+
+export function useAssetGroupControllerGetWorkflowsNotInAssetGroup<
+  TData = Awaited<
+    ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+  >,
+  TError = unknown,
+>(
+  assetGroupId: string,
+  params?: AssetGroupControllerGetWorkflowsNotInAssetGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof assetGroupControllerGetWorkflowsNotInAssetGroup>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetGroupControllerGetWorkflowsNotInAssetGroupQueryOptions(
+      assetGroupId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates the relationship between an asset group and workflow, primarily to change the schedule.
+ * @summary Update asset group workflow relationship
+ */
+export const assetGroupControllerUpdateAssetGroupWorkflow = (
+  id: string,
+  updateAssetGroupWorkflowDto: UpdateAssetGroupWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AssetGroupWorkflow>(
+    {
+      url: `/api/asset-group/workflows/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAssetGroupWorkflowDto,
+    },
+    options,
+  );
+};
+
+export const getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+    TError,
+    { id: string; data: UpdateAssetGroupWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerUpdateAssetGroupWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+    { id: string; data: UpdateAssetGroupWorkflowDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return assetGroupControllerUpdateAssetGroupWorkflow(
+      id,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>
+  >;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationBody =
+  UpdateAssetGroupWorkflowDto;
+export type AssetGroupControllerUpdateAssetGroupWorkflowMutationError = unknown;
+
+/**
+ * @summary Update asset group workflow relationship
+ */
+export const useAssetGroupControllerUpdateAssetGroupWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+      TError,
+      { id: string; data: UpdateAssetGroupWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerUpdateAssetGroupWorkflow>>,
+  TError,
+  { id: string; data: UpdateAssetGroupWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerUpdateAssetGroupWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Runs the scheduler for a specific asset group workflow.
+ * @summary Runs the scheduler for a specific asset group workflow.
+ */
+export const assetGroupControllerRunGroupWorkflowScheduler = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/asset-group/workflows/${id}/run`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getAssetGroupControllerRunGroupWorkflowSchedulerMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['assetGroupControllerRunGroupWorkflowScheduler'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return assetGroupControllerRunGroupWorkflowScheduler(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetGroupControllerRunGroupWorkflowSchedulerMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>
+  >;
+
+export type AssetGroupControllerRunGroupWorkflowSchedulerMutationError =
+  unknown;
+
+/**
+ * @summary Runs the scheduler for a specific asset group workflow.
+ */
+export const useAssetGroupControllerRunGroupWorkflowScheduler = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetGroupControllerRunGroupWorkflowScheduler>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAssetGroupControllerRunGroupWorkflowSchedulerMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
+ * @summary Generate tags for a domain using AI
+ */
+export const aiAssistantControllerGenerateTags = (
+  generateTagsDto: GenerateTagsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GenerateTagsResponseDto>(
+    {
+      url: `/api/ai-assistant/generate-tags`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: generateTagsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGenerateTagsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+    TError,
+    { data: GenerateTagsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+  TError,
+  { data: GenerateTagsDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerGenerateTags'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+    { data: GenerateTagsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiAssistantControllerGenerateTags(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerGenerateTagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>
+>;
+export type AiAssistantControllerGenerateTagsMutationBody = GenerateTagsDto;
+export type AiAssistantControllerGenerateTagsMutationError = unknown;
+
+/**
+ * @summary Generate tags for a domain using AI
+ */
+export const useAiAssistantControllerGenerateTags = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+      TError,
+      { data: GenerateTagsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerGenerateTags>>,
+  TError,
+  { data: GenerateTagsDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerGenerateTagsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all MCP servers for the current workspace and user
+ * @summary Get all MCP servers
+ */
+export const aiAssistantControllerGetMcpServers = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/ai-assistant/mcp-servers`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetMcpServersInfiniteQueryKey = () => {
+  return ['infinate', `/api/ai-assistant/mcp-servers`] as const;
+};
+
+export const getAiAssistantControllerGetMcpServersQueryKey = () => {
+  return [`/api/ai-assistant/mcp-servers`] as const;
+};
+
+export const getAiAssistantControllerGetMcpServersInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetMcpServersInfiniteQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMcpServers(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMcpServersInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+>;
+export type AiAssistantControllerGetMcpServersInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all MCP servers
+ */
+
+export function useAiAssistantControllerGetMcpServersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetMcpServersInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetMcpServersQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAiAssistantControllerGetMcpServersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMcpServers(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMcpServersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+>;
+export type AiAssistantControllerGetMcpServersQueryError = unknown;
+
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all MCP servers
+ */
+
+export function useAiAssistantControllerGetMcpServers<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetMcpServersQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Adds one or more MCP servers to the workspace
+ * @summary Add MCP servers
+ */
+export const aiAssistantControllerAddMcpServers = (
+  addMcpServersDto: AddMcpServersDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AddMcpServersResponseDto>(
+    {
+      url: `/api/ai-assistant/mcp-servers`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: addMcpServersDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerAddMcpServersMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+    TError,
+    { data: AddMcpServersDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+  TError,
+  { data: AddMcpServersDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerAddMcpServers'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+    { data: AddMcpServersDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiAssistantControllerAddMcpServers(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerAddMcpServersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>
+>;
+export type AiAssistantControllerAddMcpServersMutationBody = AddMcpServersDto;
+export type AiAssistantControllerAddMcpServersMutationError = unknown;
+
+/**
+ * @summary Add MCP servers
+ */
+export const useAiAssistantControllerAddMcpServers = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+      TError,
+      { data: AddMcpServersDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerAddMcpServers>>,
+  TError,
+  { data: AddMcpServersDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerAddMcpServersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Updates one or more MCP servers
+ * @summary Update MCP servers
+ */
+export const aiAssistantControllerUpdateMcpServers = (
+  updateMcpServersDto: UpdateMcpServersDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<UpdateMcpServersResponseDto>(
+    {
+      url: `/api/ai-assistant/mcp-servers`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateMcpServersDto,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerUpdateMcpServersMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+    TError,
+    { data: UpdateMcpServersDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+  TError,
+  { data: UpdateMcpServersDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerUpdateMcpServers'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+    { data: UpdateMcpServersDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiAssistantControllerUpdateMcpServers(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerUpdateMcpServersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>
+>;
+export type AiAssistantControllerUpdateMcpServersMutationBody =
+  UpdateMcpServersDto;
+export type AiAssistantControllerUpdateMcpServersMutationError = unknown;
+
+/**
+ * @summary Update MCP servers
+ */
+export const useAiAssistantControllerUpdateMcpServers = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+      TError,
+      { data: UpdateMcpServersDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateMcpServers>>,
+  TError,
+  { data: UpdateMcpServersDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerUpdateMcpServersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes MCP config by ID
+ * @summary Delete MCP config
+ */
+export const aiAssistantControllerDeleteMcpServers = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteMcpServersResponseDto>(
+    { url: `/api/ai-assistant/mcp-servers/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteMcpServersMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteMcpServers'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiAssistantControllerDeleteMcpServers(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteMcpServersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>
+>;
+
+export type AiAssistantControllerDeleteMcpServersMutationError = unknown;
+
+/**
+ * @summary Delete MCP config
+ */
+export const useAiAssistantControllerDeleteMcpServers = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMcpServers>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteMcpServersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all conversations for the current workspace and user
+ * @summary Get all conversations
+ */
+export const aiAssistantControllerGetConversations = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetConversationsResponseDto>(
+    { url: `/api/ai-assistant/conversations`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetConversationsInfiniteQueryKey = () => {
+  return ['infinate', `/api/ai-assistant/conversations`] as const;
+};
+
+export const getAiAssistantControllerGetConversationsQueryKey = () => {
+  return [`/api/ai-assistant/conversations`] as const;
+};
+
+export const getAiAssistantControllerGetConversationsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetConversationsInfiniteQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetConversations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetConversationsInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >;
+export type AiAssistantControllerGetConversationsInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all conversations
+ */
+
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetConversationsInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetConversationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetConversationsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetConversations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetConversationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+>;
+export type AiAssistantControllerGetConversationsQueryError = unknown;
+
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all conversations
+ */
+
+export function useAiAssistantControllerGetConversations<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetConversationsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Deletes all conversations for the current workspace and user
+ * @summary Delete all conversations
+ */
+export const aiAssistantControllerDeleteConversations = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteConversationsResponseDto>(
+    { url: `/api/ai-assistant/conversations`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteConversationsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteConversations'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+    void
+  > = () => {
+    return aiAssistantControllerDeleteConversations(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteConversationsMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>
+  >;
+
+export type AiAssistantControllerDeleteConversationsMutationError = unknown;
+
+/**
+ * @summary Delete all conversations
+ */
+export const useAiAssistantControllerDeleteConversations = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteConversationsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Updates the title and/or description of a conversation
+ * @summary Update a conversation
+ */
+export const aiAssistantControllerUpdateConversation = (
+  id: string,
+  updateConversationDto: UpdateConversationDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<UpdateConversationResponseDto>(
+    {
+      url: `/api/ai-assistant/conversations/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateConversationDto,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerUpdateConversationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+    TError,
+    { id: string; data: UpdateConversationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerUpdateConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+    { id: string; data: UpdateConversationDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return aiAssistantControllerUpdateConversation(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerUpdateConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>
+>;
+export type AiAssistantControllerUpdateConversationMutationBody =
+  UpdateConversationDto;
+export type AiAssistantControllerUpdateConversationMutationError = unknown;
+
+/**
+ * @summary Update a conversation
+ */
+export const useAiAssistantControllerUpdateConversation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+      TError,
+      { id: string; data: UpdateConversationDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerUpdateConversationMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes a specific conversation by ID
+ * @summary Delete a conversation
+ */
+export const aiAssistantControllerDeleteConversation = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteConversationResponseDto>(
+    { url: `/api/ai-assistant/conversations/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteConversationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiAssistantControllerDeleteConversation(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>
+>;
+
+export type AiAssistantControllerDeleteConversationMutationError = unknown;
+
+/**
+ * @summary Delete a conversation
+ */
+export const useAiAssistantControllerDeleteConversation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteConversationMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all messages in a specific conversation
+ * @summary Get messages in a conversation
+ */
+export const aiAssistantControllerGetMessages = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetMessagesResponseDto>(
+    {
+      url: `/api/ai-assistant/conversations/${id}/messages`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetMessagesInfiniteQueryKey = (
+  id?: string,
+) => {
+  return [
+    'infinate',
+    `/api/ai-assistant/conversations/${id}/messages`,
+  ] as const;
+};
+
+export const getAiAssistantControllerGetMessagesQueryKey = (id?: string) => {
+  return [`/api/ai-assistant/conversations/${id}/messages`] as const;
+};
+
+export const getAiAssistantControllerGetMessagesInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetMessagesInfiniteQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMessages(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMessagesInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+>;
+export type AiAssistantControllerGetMessagesInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get messages in a conversation
+ */
+
+export function useAiAssistantControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerGetMessagesInfiniteQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetMessagesQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAiAssistantControllerGetMessagesQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMessages(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMessagesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+>;
+export type AiAssistantControllerGetMessagesQueryError = unknown;
+
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get messages in a conversation
+ */
+
+export function useAiAssistantControllerGetMessages<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerGetMessagesQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Deletes a specific message by ID
+ * @summary Delete a message
+ */
+export const aiAssistantControllerDeleteMessage = (
+  conversationId: string,
+  messageId: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DeleteMessageResponseDto>(
+    {
+      url: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
+      method: 'DELETE',
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteMessageMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+    TError,
+    { conversationId: string; messageId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+  TError,
+  { conversationId: string; messageId: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteMessage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+    { conversationId: string; messageId: string }
+  > = (props) => {
+    const { conversationId, messageId } = props ?? {};
+
+    return aiAssistantControllerDeleteMessage(
+      conversationId,
+      messageId,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>
+>;
+
+export type AiAssistantControllerDeleteMessageMutationError = unknown;
+
+/**
+ * @summary Delete a message
+ */
+export const useAiAssistantControllerDeleteMessage = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+      TError,
+      { conversationId: string; messageId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteMessage>>,
+  TError,
+  { conversationId: string; messageId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteMessageMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

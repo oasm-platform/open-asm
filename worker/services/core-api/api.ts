@@ -225,6 +225,7 @@ export interface Job {
   /** @format date-time */
   completedAt: string;
   command: string;
+  assetServiceId: string;
 }
 
 export interface GetManyJobDto {
@@ -361,20 +362,9 @@ export interface HttpResponseDTO {
   knowledgebase: KnowledgebaseInfo;
   resolvers: string[];
   chain_status_codes: string[];
-  assetId: string;
+  assetServiceId: string;
   jobHistoryId: string;
   techList: string[];
-}
-
-export interface Port {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  ports: string[];
-  assetId: string;
-  jobHistoryId: string;
 }
 
 export interface GetAssetsResponseDto {
@@ -390,7 +380,7 @@ export interface GetAssetsResponseDto {
   dnsRecords?: object;
   ipAddresses: string[];
   httpResponses?: HttpResponseDTO;
-  ports?: Port;
+  port?: number;
   isEnabled: boolean;
 }
 
@@ -519,6 +509,23 @@ export interface WorkerAliveDto {
   token: string;
 }
 
+export interface Tool {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  description: string;
+  category: ToolCategoryEnum;
+  version: string;
+  logoUrl?: string | null;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: string;
+  providerId: string;
+}
+
 export interface WorkerInstance {
   id: string;
   /** @format date-time */
@@ -531,6 +538,7 @@ export interface WorkerInstance {
   currentJobsCount: number;
   type: string;
   scope: string;
+  tool: Tool;
 }
 
 export interface WorkerJoinDto {
@@ -556,7 +564,6 @@ export interface Asset {
   targetId: string;
   isPrimary: boolean;
   dnsRecords: object;
-  isErrorPage: boolean;
   isEnabled: boolean;
 }
 
@@ -792,26 +799,52 @@ export interface GeoIp {
   asname: string;
 }
 
+export interface TopAssetVulnerabilities {
+  /**
+   * The number of critical vulnerabilities
+   * @example 5
+   */
+  critical: number;
+  /**
+   * The number of high severity vulnerabilities
+   * @example 10
+   */
+  high: number;
+  /**
+   * The number of medium severity vulnerabilities
+   * @example 15
+   */
+  medium: number;
+  /**
+   * The number of low severity vulnerabilities
+   * @example 20
+   */
+  low: number;
+  /**
+   * The number of info severity vulnerabilities
+   * @example 5
+   */
+  info: number;
+  /**
+   * The total number of vulnerabilities
+   * @example 55
+   */
+  total: number;
+  /**
+   * The ID of the asset
+   * @example "asset-id-123"
+   */
+  id: string;
+  /**
+   * The value of the asset
+   * @example "example.com"
+   */
+  value: string;
+}
+
 export interface ScanDto {
   /** Target ID */
   targetId: string;
-}
-
-export interface Tool {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  name: string;
-  description: string;
-  category: ToolCategoryEnum;
-  version: string;
-  logoUrl?: string | null;
-  isInstalled: boolean;
-  isOfficialSupport: boolean;
-  type: string;
-  providerId: string;
 }
 
 export interface Vulnerability {
@@ -822,6 +855,7 @@ export interface Vulnerability {
   updatedAt: string;
   name: string;
   description: string;
+  synopsis: string;
   severity: string;
   tags: string[];
   references: string[];
@@ -829,13 +863,25 @@ export interface Vulnerability {
   affectedUrl: string;
   ipAddress: string;
   host: string;
-  port: string;
+  ports: string[];
   cvssMetric: string;
   cvssScore: number;
-  cveId: string;
+  epssScore: number;
+  vprScore: number;
+  cveId: string[];
+  bidId: string[];
   cweId: string[];
+  ceaId: string[];
+  iava: string[];
+  cveUrl: string;
+  cweUrl: string;
+  solution: string;
   extractorName: string;
   extractedResults: string[];
+  /** @format date-time */
+  publicationDate: string;
+  /** @format date-time */
+  modificationDate: string;
   tool: Tool;
 }
 
@@ -865,11 +911,6 @@ export interface CreateToolDto {
   logoUrl?: string | null;
   /** The ID of the provider */
   providerId: string;
-}
-
-export interface RunToolDto {
-  targetIds?: string[];
-  assetIds?: string[];
 }
 
 export interface WorkspaceTool {
@@ -912,6 +953,95 @@ export interface GetManyStringDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+}
+
+export interface GetManyWorkflowsResponseDto {
+  /** The unique identifier of the workflow */
+  id: string;
+  /** The name of the workflow */
+  name: string;
+  /** The file path of the workflow */
+  filePath: string;
+  /** The workflow content */
+  content: object;
+  /**
+   * When the workflow was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the workflow was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The user who created this workflow */
+  createdBy?: object;
+  /** The workspace this workflow belongs to */
+  workspace?: object;
+}
+
+export interface GetManyGetManyWorkflowsResponseDtoDto {
+  data: GetManyWorkflowsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface On {
+  target: string[];
+  schedule: OnScheduleEnum;
+}
+
+export interface WorkflowJob {
+  name: string;
+  run: string;
+}
+
+export interface WorkflowContent {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+}
+
+export interface Workflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  content: WorkflowContent;
+}
+
+export interface CreateWorkflowDto {
+  /**
+   * Name of the workflow
+   * @example "Vulnerability Scan Workflow"
+   */
+  name: string;
+  /** Content of the workflow in JSON format */
+  content: WorkflowContent;
+  /**
+   * File path for the workflow
+   * @example "workflows/vulnerability-scan.yaml"
+   */
+  filePath?: string;
+}
+
+export interface UpdateWorkflowDto {
+  /**
+   * Name of the workflow
+   * @example "Vulnerability Scan Workflow"
+   */
+  name?: string;
+  /** Content of the workflow in JSON format */
+  content?: WorkflowContent;
+  /**
+   * File path for the workflow
+   * @example "workflows/vulnerability-scan.yaml"
+   */
+  filePath?: string;
 }
 
 export interface ToolProvider {
@@ -1034,6 +1164,289 @@ export interface RunTemplateDto {
   assetId: string;
 }
 
+export interface AssetGroup {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  /** @example "#78716C" */
+  hexColor?: string;
+  totalAssets: number;
+}
+
+export interface GetManyAssetGroupDto {
+  data: AssetGroup[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface UpdateAssetGroupDto {
+  /**
+   * Name of the asset group
+   * @example "Web Servers"
+   */
+  name?: string;
+  /**
+   * Hex color of the asset group
+   * @example "#78716C"
+   */
+  hexColor?: string;
+}
+
+export interface CreateAssetGroupDto {
+  /**
+   * Name of the asset group
+   * @example "Web Servers"
+   */
+  name: string;
+}
+
+export interface AddManyWorkflowsToAssetGroupDto {
+  /**
+   * Array of workflow IDs to add
+   * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-426614174002"]
+   */
+  workflowIds: string[];
+}
+
+export interface AddManyAssetsToAssetGroupDto {
+  /**
+   * Array of asset IDs to add
+   * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-426614174002"]
+   */
+  assetIds: string[];
+}
+
+export interface RemoveManyWorkflowsFromAssetGroupDto {
+  /**
+   * Array of workflow IDs to remove
+   * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-42614174002"]
+   */
+  workflowIds: string[];
+}
+
+export interface RemoveManyAssetsFromAssetGroupDto {
+  /**
+   * Array of asset IDs to remove
+   * @example ["123e4567-e89b-12d3-a456-426614174001","123e4567-e89b-12d3-a456-42614174002"]
+   */
+  assetIds: string[];
+}
+
+export interface GetManyAssetDto {
+  data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface AssetGroupWorkflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  assetGroup: AssetGroup;
+  workflow: Workflow;
+  schedule: AssetGroupWorkflowScheduleEnum;
+}
+
+export interface GetManyAssetGroupWorkflowDto {
+  data: AssetGroupWorkflow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface GetManyWorkflowDto {
+  data: Workflow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface UpdateAssetGroupWorkflowDto {
+  schedule: UpdateAssetGroupWorkflowDtoScheduleEnum;
+}
+
+export interface GenerateTagsResponseDto {
+  /**
+   * Domain that tags were generated for
+   * @example "example.com"
+   */
+  domain: string;
+  /**
+   * Generated tags
+   * @example ["web","technology","blog"]
+   */
+  tags: string[];
+}
+
+export interface GenerateTagsDto {
+  /**
+   * Domain to generate tags for
+   * @example "example.com"
+   */
+  domain: string;
+}
+
+export interface AddMcpServersResponseDto {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** MCP servers configuration with status */
+  mcpServers: object;
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Error message if operation failed */
+  error?: string;
+}
+
+export interface AddMcpServersDto {
+  /**
+   * MCP servers configuration object
+   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"5cN3KVQ9..."},"disabled":false},"searxng":{"command":"npx","args":["-y","mcp-searxng"],"env":{"SEARXNG_URL":"http://localhost:8081"},"disabled":false}}
+   */
+  mcpServers: object;
+}
+
+export interface UpdateMcpServersResponseDto {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** Updated MCP servers configuration with status */
+  mcpServers: object;
+  /** Whether the operation succeeded */
+  success: boolean;
+}
+
+export interface UpdateMcpServersDto {
+  /**
+   * MCP servers configuration object
+   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"updated-key"},"disabled":false}}
+   */
+  mcpServers: object;
+}
+
+export interface DeleteMcpServersResponseDto {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Response message */
+  message?: string;
+}
+
+export interface GetConversationsResponseDto {
+  /** List of conversations */
+  conversations: {
+    conversationId?: string;
+    title?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }[];
+}
+
+export interface UpdateConversationResponseDto {
+  /** Updated conversation */
+  conversation: {
+    conversationId?: string;
+    title?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+}
+
+export interface UpdateConversationDto {
+  /**
+   * New title for the conversation
+   * @example "Updated Conversation Title"
+   */
+  title?: string;
+  /**
+   * New description for the conversation
+   * @example "Updated description"
+   */
+  description?: string;
+}
+
+export interface DeleteConversationResponseDto {
+  /**
+   * Success status
+   * @example true
+   */
+  success: boolean;
+  /**
+   * Response message
+   * @example "Conversation deleted successfully"
+   */
+  message: string;
+}
+
+export interface DeleteConversationsResponseDto {
+  /**
+   * Success status
+   * @example true
+   */
+  success: boolean;
+  /**
+   * Response message
+   * @example "All conversations deleted successfully"
+   */
+  message: string;
+}
+
+export interface GetMessagesResponseDto {
+  /** List of messages in the conversation */
+  messages: {
+    messageId?: string;
+    question?: string;
+    type?: string;
+    content?: string;
+    conversationId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }[];
+}
+
+export interface DeleteMessageResponseDto {
+  /**
+   * Success status
+   * @example true
+   */
+  success: boolean;
+  /**
+   * Response message
+   * @example "Message deleted successfully"
+   */
+  message: string;
+}
+
 export interface McpTool {
   name: string;
   type: string;
@@ -1105,6 +1518,7 @@ export enum ToolCategoryEnum {
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
+  Assistant = "assistant",
 }
 
 export enum VulnerabilityStatisticsDtoSeverityEnum {
@@ -1121,6 +1535,31 @@ export enum CreateToolDtoCategoryEnum {
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
+  Assistant = "assistant",
+}
+
+export enum OnScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum AssetGroupWorkflowScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -1134,6 +1573,7 @@ export enum ToolsControllerGetManyToolsParamsCategoryEnum {
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
+  Assistant = "assistant",
 }
 
 export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
@@ -1142,6 +1582,7 @@ export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
+  Assistant = "assistant",
 }
 
 import type {
@@ -1362,6 +1803,7 @@ export class Api<
    */
   targetsControllerGetTargetsInWorkspace = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1487,6 +1929,7 @@ export class Api<
    */
   workspacesControllerGetWorkspaces = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1723,6 +2166,7 @@ export class Api<
    */
   jobsRegistryControllerGetManyJobs = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1830,6 +2274,7 @@ export class Api<
    */
   assetsControllerGetAssetsInWorkspace = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1865,6 +2310,7 @@ export class Api<
    */
   assetsControllerGetIpAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1900,6 +2346,7 @@ export class Api<
    */
   assetsControllerGetPortAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1935,6 +2382,7 @@ export class Api<
    */
   assetsControllerGetTechnologyAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -1970,6 +2418,7 @@ export class Api<
    */
   assetsControllerGetStatusCodeAssets = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2135,6 +2584,7 @@ export class Api<
    */
   workersControllerGetWorkers = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2165,6 +2615,7 @@ export class Api<
    */
   searchControllerSearchAssetsTargets = (
     query: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2197,6 +2648,7 @@ export class Api<
    */
   searchControllerGetSearchHistory = (
     query: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2344,6 +2796,24 @@ export class Api<
     });
 
   /**
+   * @description Retrieves the top 10 assets with the most vulnerabilities in a workspace.
+   *
+   * @tags Statistic
+   * @name StatisticControllerGetTopAssetsWithMostVulnerabilities
+   * @summary Get top 10 assets with the most vulnerabilities in a workspace
+   * @request GET:/api/statistic/top-assets-vulnerabilities
+   */
+  statisticControllerGetTopAssetsWithMostVulnerabilities = (
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/statistic/top-assets-vulnerabilities`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * No description
    *
    * @tags Vulnerabilities
@@ -2369,6 +2839,7 @@ export class Api<
    */
   vulnerabilitiesControllerGetVulnerabilities = (
     query: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2415,6 +2886,25 @@ export class Api<
     });
 
   /**
+   * @description Retrieves detailed information about a specific security vulnerability identified within the system, including its attributes, associated assets, and remediation guidance.
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerGetVulnerabilityById
+   * @summary Get vulnerability by id
+   * @request GET:/api/vulnerabilities/{id}
+   */
+  vulnerabilitiesControllerGetVulnerabilityById = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Registers a new security assessment tool in the system with specified configuration and capabilities.
    *
    * @tags Tools
@@ -2445,6 +2935,7 @@ export class Api<
    */
   toolsControllerGetManyTools = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2464,28 +2955,6 @@ export class Api<
       path: `/api/tools`,
       method: "GET",
       query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Executes a security assessment tool with specified parameters in the designated workspace.
-   *
-   * @tags Tools
-   * @name ToolsControllerRunTool
-   * @summary Run a tool
-   * @request POST:/api/tools/{id}/run
-   */
-  toolsControllerRunTool = (
-    id: string,
-    data: RunToolDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/${id}/run`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
       format: "json",
       ...params,
     });
@@ -2578,9 +3047,7 @@ export class Api<
    * @request GET:/api/tools/installed
    */
   toolsControllerGetInstalledTools = (
-    query: {
-      /** The ID of the workspace */
-      workspaceId: string;
+    query?: {
       category?: ToolsControllerGetInstalledToolsParamsCategoryEnum;
     },
     params: RequestParams = {},
@@ -2658,6 +3125,119 @@ export class Api<
     });
 
   /**
+   * @description Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerGetManyWorkflows
+   * @summary Get many workflows
+   * @request GET:/api/workflows
+   */
+  workflowsControllerGetManyWorkflows = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      /** Filter by workflow name */
+      name?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Creates a new workflow with the provided data.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerCreateWorkflow
+   * @summary Create workflow
+   * @request POST:/api/workflows
+   */
+  workflowsControllerCreateWorkflow = (
+    data: CreateWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a specific workflow by its ID within the specified workspace.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerGetWorkspaceWorkflow
+   * @summary Get workflow by ID
+   * @request GET:/api/workflows/{id}
+   */
+  workflowsControllerGetWorkspaceWorkflow = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates an existing workflow with the provided data.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerUpdateWorkflow
+   * @summary Update workflow
+   * @request PATCH:/api/workflows/{id}
+   */
+  workflowsControllerUpdateWorkflow = (
+    id: string,
+    data: UpdateWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a workflow by its ID.
+   *
+   * @tags workflows
+   * @name WorkflowsControllerDeleteWorkflow
+   * @summary Delete workflow
+   * @request DELETE:/api/workflows/{id}
+   */
+  workflowsControllerDeleteWorkflow = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Get all providers with pagination, filtered by owner
    *
    * @tags Providers
@@ -2667,6 +3247,7 @@ export class Api<
    */
   providersControllerGetManyProviders = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2797,6 +3378,7 @@ export class Api<
    */
   templatesControllerGetAllTemplates = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */
@@ -2915,6 +3497,572 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all asset groups with optional filtering and pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetAll
+   * @summary Get all asset groups
+   * @request GET:/api/asset-group
+   */
+  assetGroupControllerGetAll = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      targetIds?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Creates a new asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerCreate
+   * @summary Create asset group
+   * @request POST:/api/asset-group
+   */
+  assetGroupControllerCreate = (
+    data: CreateAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Fetches a specific asset group by its unique identifier.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetById
+   * @summary Get asset group by ID
+   * @request GET:/api/asset-group/{id}
+   */
+  assetGroupControllerGetById = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates an existing asset group by ID.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerUpdateAssetGroupById
+   * @summary Update asset group
+   * @request PATCH:/api/asset-group/{id}
+   */
+  assetGroupControllerUpdateAssetGroupById = (
+    id: string,
+    data: UpdateAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Permanently removes an asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerDelete
+   * @summary Delete asset group
+   * @request DELETE:/api/asset-group/{id}
+   */
+  assetGroupControllerDelete = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Associates multiple workflows with the specified asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerAddManyWorkflows
+   * @summary Add multiple workflows to asset group
+   * @request POST:/api/asset-group/{groupId}/workflows
+   */
+  assetGroupControllerAddManyWorkflows = (
+    groupId: string,
+    data: AddManyWorkflowsToAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${groupId}/workflows`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Disassociates multiple workflows from the asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerRemoveManyWorkflows
+   * @summary Remove multiple workflows from asset group
+   * @request DELETE:/api/asset-group/{groupId}/workflows
+   */
+  assetGroupControllerRemoveManyWorkflows = (
+    groupId: string,
+    data: RemoveManyWorkflowsFromAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${groupId}/workflows`,
+      method: "DELETE",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Associates multiple assets with the specified asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerAddManyAssets
+   * @summary Add multiple assets to asset group
+   * @request POST:/api/asset-group/{groupId}/assets
+   */
+  assetGroupControllerAddManyAssets = (
+    groupId: string,
+    data: AddManyAssetsToAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${groupId}/assets`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Disassociates multiple assets from the asset group.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerRemoveManyAssets
+   * @summary Remove multiple assets from asset group
+   * @request DELETE:/api/asset-group/{groupId}/assets
+   */
+  assetGroupControllerRemoveManyAssets = (
+    groupId: string,
+    data: RemoveManyAssetsFromAssetGroupDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${groupId}/assets`,
+      method: "DELETE",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves assets associated with a specific asset group with pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetAssetsByAssetGroupsId
+   * @summary Get assets by asset group ID
+   * @request GET:/api/asset-group/{assetGroupId}/assets
+   */
+  assetGroupControllerGetAssetsByAssetGroupsId = (
+    assetGroupId: string,
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${assetGroupId}/assets`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves workflows associated with a specific asset group with pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetWorkflowsByAssetGroupsId
+   * @summary Get workflows by asset group ID
+   * @request GET:/api/asset-group/{assetGroupId}/workflows
+   */
+  assetGroupControllerGetWorkflowsByAssetGroupsId = (
+    assetGroupId: string,
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${assetGroupId}/workflows`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves assets not associated with a specific asset group with pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetAssetsNotInAssetGroup
+   * @summary Get assets not in asset group
+   * @request GET:/api/asset-group/{assetGroupId}/assets/not-in-group
+   */
+  assetGroupControllerGetAssetsNotInAssetGroup = (
+    assetGroupId: string,
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${assetGroupId}/assets/not-in-group`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves workflows not associated with a specific asset group but preinstalled in the workspace with pagination.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerGetWorkflowsNotInAssetGroup
+   * @summary Get workflows not in asset group (preinstalled in workspace)
+   * @request GET:/api/asset-group/{assetGroupId}/workflows/not-in-group
+   */
+  assetGroupControllerGetWorkflowsNotInAssetGroup = (
+    assetGroupId: string,
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates the relationship between an asset group and workflow, primarily to change the schedule.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerUpdateAssetGroupWorkflow
+   * @summary Update asset group workflow relationship
+   * @request PATCH:/api/asset-group/workflows/{id}
+   */
+  assetGroupControllerUpdateAssetGroupWorkflow = (
+    id: string,
+    data: UpdateAssetGroupWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/workflows/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Runs the scheduler for a specific asset group workflow.
+   *
+   * @tags Asset Group
+   * @name AssetGroupControllerRunGroupWorkflowScheduler
+   * @summary Runs the scheduler for a specific asset group workflow.
+   * @request POST:/api/asset-group/workflows/{id}/run
+   */
+  assetGroupControllerRunGroupWorkflowScheduler = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/asset-group/workflows/${id}/run`,
+      method: "POST",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGenerateTags
+   * @summary Generate tags for a domain using AI
+   * @request POST:/api/ai-assistant/generate-tags
+   */
+  aiAssistantControllerGenerateTags = (
+    data: GenerateTagsDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/generate-tags`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all MCP servers for the current workspace and user
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetMcpServers
+   * @summary Get all MCP servers
+   * @request GET:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerGetMcpServers = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Adds one or more MCP servers to the workspace
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerAddMcpServers
+   * @summary Add MCP servers
+   * @request POST:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerAddMcpServers = (
+    data: AddMcpServersDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates one or more MCP servers
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerUpdateMcpServers
+   * @summary Update MCP servers
+   * @request PATCH:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerUpdateMcpServers = (
+    data: UpdateMcpServersDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes MCP config by ID
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteMcpServers
+   * @summary Delete MCP config
+   * @request DELETE:/api/ai-assistant/mcp-servers/{id}
+   */
+  aiAssistantControllerDeleteMcpServers = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all conversations for the current workspace and user
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetConversations
+   * @summary Get all conversations
+   * @request GET:/api/ai-assistant/conversations
+   */
+  aiAssistantControllerGetConversations = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes all conversations for the current workspace and user
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteConversations
+   * @summary Delete all conversations
+   * @request DELETE:/api/ai-assistant/conversations
+   */
+  aiAssistantControllerDeleteConversations = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates the title and/or description of a conversation
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerUpdateConversation
+   * @summary Update a conversation
+   * @request PATCH:/api/ai-assistant/conversations/{id}
+   */
+  aiAssistantControllerUpdateConversation = (
+    id: string,
+    data: UpdateConversationDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a specific conversation by ID
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteConversation
+   * @summary Delete a conversation
+   * @request DELETE:/api/ai-assistant/conversations/{id}
+   */
+  aiAssistantControllerDeleteConversation = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all messages in a specific conversation
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetMessages
+   * @summary Get messages in a conversation
+   * @request GET:/api/ai-assistant/conversations/{id}/messages
+   */
+  aiAssistantControllerGetMessages = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${id}/messages`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a specific message by ID
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteMessage
+   * @summary Delete a message
+   * @request DELETE:/api/ai-assistant/conversations/{conversationId}/messages/{messageId}
+   */
+  aiAssistantControllerDeleteMessage = (
+    conversationId: string,
+    messageId: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
+      method: "DELETE",
       format: "json",
       ...params,
     });
@@ -3047,6 +4195,7 @@ export class Api<
    */
   mcpControllerGetMcpPermissions = (
     query?: {
+      search?: string;
       /** @example 1 */
       page?: number;
       /** @example 10 */

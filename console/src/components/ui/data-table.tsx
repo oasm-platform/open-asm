@@ -1,22 +1,22 @@
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
   type VisibilityState,
-} from "@tanstack/react-table";
-import { ArrowDownNarrowWide, ArrowUpNarrowWide } from "lucide-react";
-import * as React from "react";
+} from '@tanstack/react-table';
+import { ArrowDownNarrowWide, ArrowUpNarrowWide } from 'lucide-react';
+import * as React from 'react';
 
-import { Input } from "@/components/ui/input";
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -24,8 +24,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import useDebounce from "@/hooks/use-debounce";
+} from '@/components/ui/table';
+import useDebounce from '@/hooks/use-debounce';
 import {
   Pagination,
   PaginationContent,
@@ -34,7 +34,7 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "./pagination";
+} from './pagination';
 
 // Define props interface
 interface DataTableProps<TData, TValue> {
@@ -55,12 +55,15 @@ interface DataTableProps<TData, TValue> {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   sortBy?: string;
-  sortOrder?: "ASC" | "DESC";
-  onSortChange?: (sortBy: string, sortOrder: "ASC" | "DESC") => void;
+  sortOrder?: 'ASC' | 'DESC';
+  onSortChange?: (sortBy: string, sortOrder: 'ASC' | 'DESC') => void;
   emptyMessage?: string;
   filterComponents?: React.JSX.Element[];
   isShowHeader?: boolean;
   isShowBorder?: boolean;
+  tableState?: {
+    rowSelection?: Record<string, boolean>;
+  };
 }
 
 export function DataTable<TData, TValue>({
@@ -68,11 +71,11 @@ export function DataTable<TData, TValue>({
   data,
   isLoading = false,
   filterColumnKey,
-  filterValue = "",
+  filterValue = '',
   onFilterChange,
   onRowClick,
   rowClassName,
-  filterPlaceholder = "Filter...",
+  filterPlaceholder = 'Filter...',
   showPagination = true,
   page,
   pageSize,
@@ -82,13 +85,15 @@ export function DataTable<TData, TValue>({
   sortBy,
   sortOrder,
   onSortChange,
-  emptyMessage = "No data",
+  emptyMessage = 'No data',
   filterComponents,
   isShowHeader = true,
   isShowBorder = true,
+  tableState,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
 
   const [searchValue, setSearchValue] = React.useState(filterValue);
   const debouncedSearchValue = useDebounce(searchValue, 500);
@@ -97,18 +102,28 @@ export function DataTable<TData, TValue>({
     onFilterChange?.(debouncedSearchValue);
   }, [debouncedSearchValue, onFilterChange]);
 
+  // Sync external tableState.rowSelection with internal rowSelection state
+  React.useEffect(() => {
+    if (tableState?.rowSelection) {
+      setRowSelection(tableState.rowSelection);
+    }
+  }, [tableState?.rowSelection]);
+
   const table = useReactTable({
     data,
     columns,
     state: {
       columnVisibility,
+      rowSelection: tableState?.rowSelection || rowSelection,
       pagination: { pageIndex: page - 1, pageSize }, // 0-based index for react-table
-      sorting: sortBy ? [{ id: sortBy, desc: sortOrder === "DESC" }] : [],
+      sorting: sortBy ? [{ id: sortBy, desc: sortOrder === 'DESC' }] : [],
     },
     pageCount: Math.ceil(totalItems / pageSize),
     manualPagination: true,
     manualFiltering: true,
     manualSorting: true,
+    enableRowSelection: true,
+    onRowSelectionChange: tableState?.rowSelection ? setRowSelection : setRowSelection,
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
   });
@@ -117,7 +132,7 @@ export function DataTable<TData, TValue>({
   const handleSort = (columnId: string) => {
     if (!onSortChange) return;
     const newSortOrder =
-      sortBy === columnId && sortOrder === "ASC" ? "DESC" : "ASC";
+      sortBy === columnId && sortOrder === 'ASC' ? 'DESC' : 'ASC';
     onSortChange(columnId, newSortOrder);
   };
 
@@ -128,12 +143,12 @@ export function DataTable<TData, TValue>({
       (p) => p === 1 || p === pageCount || Math.abs(p - page) <= 2,
     );
 
-    const mergedPages: (number | "...")[] = [];
+    const mergedPages: (number | '...')[] = [];
     pages.forEach((curr, i) => {
       if (i === 0 || curr - pages[i - 1] === 1) {
         mergedPages.push(curr);
       } else {
-        mergedPages.push("...", curr);
+        mergedPages.push('...', curr);
       }
     });
 
@@ -146,28 +161,26 @@ export function DataTable<TData, TValue>({
       {/* Filter and column visibility controls */}
       {filterColumnKey && (
         <div className="flex items-center gap-4 py-1">
-          {filterColumnKey && (
-            <Input
-              placeholder={filterPlaceholder}
-              className="max-w-sm"
-              value={searchValue}
-              onChange={(e) => {
-                setSearchValue(e.target.value);
-              }}
-            />
-          )}
+          <Input
+            placeholder={filterPlaceholder}
+            className="max-w-sm"
+            value={searchValue}
+            onChange={(e) => {
+              setSearchValue(e.target.value);
+            }}
+          />
         </div>
       )}
 
       {filterComponents}
 
       {/* Table */}
-      <div className={cn("rounded-md", isShowBorder && "border")}>
+      <div className={cn('rounded-md', isShowBorder && 'border')}>
         <Table>
           {isShowHeader && (
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+                <TableRow key={headerGroup.id} className="border-b!">
                   {headerGroup.headers.map((header) => (
                     <TableHead
                       key={header.id}
@@ -175,7 +188,7 @@ export function DataTable<TData, TValue>({
                         header.column.getCanSort() &&
                         handleSort(header.column.id)
                       }
-                      className={`whitespace-nowrap ${header.column.getCanSort() ? "cursor-pointer" : ""}`}
+                      className={`whitespace-nowrap ${header.column.getCanSort() ? 'cursor-pointer' : ''}`}
                     >
                       <div className="flex items-center gap-2">
                         {flexRender(
@@ -183,7 +196,7 @@ export function DataTable<TData, TValue>({
                           header.getContext(),
                         )}
                         {sortBy === header.column.id &&
-                          (sortOrder === "ASC" ? (
+                          (sortOrder === 'ASC' ? (
                             <ArrowUpNarrowWide size={16} />
                           ) : (
                             <ArrowDownNarrowWide size={16} />
@@ -197,7 +210,7 @@ export function DataTable<TData, TValue>({
           )}
           <TableBody>
             {showSkeleton ? (
-              [...Array(5)].map((_, rowIndex) => (
+              [...Array(pageSize)].map((_, rowIndex) => (
                 <TableRow key={`skeleton-${rowIndex}`}>
                   {[...Array(table.getAllLeafColumns().length)].map(
                     (_, colIndex) => (
@@ -212,10 +225,10 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
+                  data-state={row.getIsSelected() && 'selected'}
                   className={cn(
                     rowClassName,
-                    onRowClick && "cursor-pointer hover:bg-muted/50",
+                    onRowClick && 'cursor-pointer hover:bg-muted/50',
                   )}
                   onClick={() => onRowClick?.(row.original)}
                 >
@@ -255,7 +268,7 @@ export function DataTable<TData, TValue>({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[10, 20, 50, 100].map((size) => (
+                {[5, 10, 20, 50, 100].map((size) => (
                   <SelectItem
                     key={size}
                     value={size.toString()}
@@ -277,12 +290,12 @@ export function DataTable<TData, TValue>({
                     e.preventDefault();
                     onPageChange?.(page - 1);
                   }}
-                  className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                  className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
                 />
               </PaginationItem>
 
               {getPaginationPages().map((p, idx) =>
-                p === "..." ? (
+                p === '...' ? (
                   <PaginationItem key={`ellipsis-${idx}`}>
                     <PaginationEllipsis />
                   </PaginationItem>
@@ -311,8 +324,8 @@ export function DataTable<TData, TValue>({
                   }}
                   className={
                     page >= Math.ceil(totalItems / pageSize)
-                      ? "pointer-events-none opacity-50"
-                      : ""
+                      ? 'pointer-events-none opacity-50'
+                      : ''
                   }
                 />
               </PaginationItem>

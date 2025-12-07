@@ -11,6 +11,8 @@ WORKDIR /app
 COPY . .
 RUN bun install
 RUN bun run build
+# Copy proto files before cleaning
+RUN mkdir -p /tmp/proto && cp -r src/proto/* /tmp/proto/
 # Clean bun cache and remove unused files
 RUN bun pm cache clean && rm -rf src test
 
@@ -21,6 +23,9 @@ WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
+COPY --from=builder /tmp/proto ./proto
+
 
 EXPOSE 6276
 

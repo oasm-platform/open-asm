@@ -1,7 +1,8 @@
-import { DataTable } from '@/components/ui/data-table';
+import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetPortAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
+import { AssetTable } from './asset-table';
 import { portAssetsColumn } from './port-assets-column';
 
 export default function PortAssetsTab() {
@@ -10,8 +11,7 @@ export default function PortAssetsTab() {
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
-    filterParams,
-    filterHandlers,
+    targetId,
   } = useAsset();
 
   const { data, isLoading } = useAssetsControllerGetPortAssets(queryParams, {
@@ -29,7 +29,7 @@ export default function PortAssetsTab() {
   return (
     <>
       <TabsContent value="port" className="overflow-hidden">
-        <DataTable
+        <CollapsibleDataTable
           data={portAssets}
           columns={portAssetsColumn}
           isLoading={isLoading}
@@ -44,13 +44,14 @@ export default function PortAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
-          onRowClick={(row) => {
-            let selectedValue = filterParams.ports || [];
-            if (selectedValue.indexOf(row.port.toString()) < 0) {
-              selectedValue = [...selectedValue, row.port];
-              filterHandlers('ports', selectedValue);
-            }
-          }}
+          collapsibleElement={(row) => (
+            <AssetTable
+              filter={{
+                ports: [row.port],
+                targetIds: targetId ? [targetId] : undefined,
+              }}
+            />
+          )}
         />
       </TabsContent>
     </>

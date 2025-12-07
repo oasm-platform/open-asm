@@ -4,6 +4,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { DataSource, InsertResult } from 'typeorm';
 import { JobStatus, ToolCategory } from '../../common/enums/enum';
+import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
@@ -15,7 +16,10 @@ import { DataAdapterInput } from './data-adapter.interface';
 
 @Injectable()
 export class DataAdapterService {
-  constructor(private readonly dataSource: DataSource, private workspaceService: WorkspacesService) { }
+  constructor(
+    private readonly dataSource: DataSource,
+    private workspaceService: WorkspacesService,
+  ) {}
 
   public async validateData<T extends object>(
     data: object | object[],
@@ -63,8 +67,11 @@ export class DataAdapterService {
         .where({ id: job.id })
         .execute();
 
-      const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(job.asset.target.id);
-      const workspaceConfigs = await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
+      const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(
+        job.asset.target.id,
+      );
+      const workspaceConfigs =
+        await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
 
       // const workspaceId =
       // Insert Assets
@@ -115,12 +122,12 @@ export class DataAdapterService {
     await queryRunner.startTransaction();
 
     try {
-      if (data.failed) {
+      if (data.failed && job.assetServiceId) {
         await queryRunner.manager
           .createQueryBuilder()
-          .update(Asset)
+          .update(AssetService)
           .set({ isErrorPage: true })
-          .where({ id: job.asset.id })
+          .where({ id: job.assetServiceId })
           .execute();
       }
 
@@ -130,7 +137,7 @@ export class DataAdapterService {
         .into(HttpResponse)
         .values({
           ...data,
-          assetId: job.asset.id,
+          assetServiceId: job.assetService?.id,
           jobHistoryId: job.jobHistory.id,
         })
         .execute();
@@ -147,7 +154,7 @@ export class DataAdapterService {
   }
 
   /**
-   * Ports data normalization
+   *
    * @param param0
    * @returns
    */
@@ -155,16 +162,53 @@ export class DataAdapterService {
     data,
     job,
   }: DataAdapterInput<number[]>): Promise<void> {
-    await this.dataSource
-      .createQueryBuilder()
-      .insert()
-      .into(Port)
-      .values({
-        ports: data,
-        assetId: job.asset.id,
-        jobHistoryId: job.jobHistory.id,
-      })
-      .execute();
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    // Filter out NaN values from the port array
+    const filteredPorts = data.filter((port) => !isNaN(port));
+
+    try {
+      // Insert ports data
+      await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(Port)
+        .values({
+          ports: filteredPorts,
+          assetId: job.asset.id,
+          jobHistoryId: job.jobHistory.id,
+        })
+        .execute();
+
+      // Insert asset services data
+      if (filteredPorts && filteredPorts.length > 0) {
+        const assetServices = filteredPorts.map((port) => ({
+          value: `${job.asset.value}:${port}`,
+          port: port,
+          assetId: job.asset.id,
+        }));
+
+        await queryRunner.manager
+          .createQueryBuilder()
+          .insert()
+          .into(AssetService)
+          .values(assetServices)
+          .orUpdate({
+            conflict_target: ['assetId', 'port'],
+            overwrite: ['value'],
+          })
+          .execute();
+      }
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
 
     return;
   }
@@ -179,15 +223,7 @@ export class DataAdapterService {
     job,
   }: DataAdapterInput<Vulnerability[]>): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
-      // Step 1: Delete old vulnerabilities of this asset
-      await manager
-        .createQueryBuilder()
-        .delete()
-        .from(Vulnerability)
-        .where('assetId = :assetId', { assetId: job.asset.id })
-        .execute();
-
-      // Step 2: Insert new vulnerabilities
+      // Insert new vulnerabilities if data length > 0, do not delete old records
       if (data.length > 0) {
         await manager
           .createQueryBuilder()
@@ -201,6 +237,10 @@ export class DataAdapterService {
               tool: { id: job.tool.id },
             })),
           )
+          .orUpdate({
+            conflict_target: ['name', 'toolId', 'assetId'],
+            overwrite: ['updatedAt'],
+          })
           .execute();
       }
     });

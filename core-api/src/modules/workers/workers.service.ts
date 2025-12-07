@@ -25,6 +25,7 @@ import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
+import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import {
   GetManyWorkersDto,
@@ -42,6 +43,9 @@ export class WorkersService {
 
     @InjectRepository(Asset)
     public readonly assetRepo: Repository<Asset>,
+
+    @InjectRepository(WorkspaceTool)
+    public readonly workspaceToolRepo: Repository<WorkspaceTool>,
 
     @Inject(forwardRef(() => JobsRegistryService))
     private jobsRegistryService: JobsRegistryService,
@@ -159,6 +163,7 @@ export class WorkersService {
         `(SELECT COUNT(j.id) FROM jobs j WHERE j."workerId"::uuid = w.id::uuid and j.status = '${JobStatus.IN_PROGRESS}')`,
         'currentJobsCount',
       )
+      .leftJoinAndSelect('w.tool', 't')
       .where('1=1');
 
     // Add workspace filter if workspaceId is provided, or if worker has cloud scope
@@ -169,6 +174,17 @@ export class WorkersService {
           workspaceId,
           cloudScope: WorkerScope.CLOUD
         }
+      );
+
+      // For PROVIDER type workers, ensure they have a corresponding workspace_tool record
+      queryBuilder.andWhere(
+        `(w.type != '${WorkerType.PROVIDER}' OR EXISTS (
+          SELECT 1 FROM workspace_tools wt
+          WHERE wt."workspaceId" = :workspaceId
+          AND wt."toolId" = w."toolId"
+          AND wt."isEnabled" = true
+        ))`,
+        { workspaceId }
       );
     } else {
       // If no workspaceId provided, we still want to include cloud workers
