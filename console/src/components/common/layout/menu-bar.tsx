@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
+import AppLogo from '@/components/ui/app-logo';
 import {
   Sidebar,
   SidebarContent,
@@ -15,13 +16,13 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
 import {
   Bug,
   CloudCheck,
   Cpu,
   Group,
   LayoutDashboard,
-  Radar,
   SquareTerminal,
   Target,
 } from 'lucide-react';
@@ -30,8 +31,8 @@ import { NewBadge } from '../new-badge';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
-  const { state } = useSidebar();
-
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  console.log(state);
   const menu = [
     {
       title: 'Overview',
@@ -42,11 +43,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: <LayoutDashboard />,
           url: '',
         },
-        // {
-        //   title: 'Studio',
-        //   icon: <BookDashed />,
-        //   url: '/studio',
-        // },
       ],
     },
     {
@@ -102,11 +98,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props} collapsible="icon">
       <SidebarHeader>
-        <div className="flex h-13 justify-start items-center gap-3">
-          <Radar size={40} />
-
-          {state === 'expanded' && <b className="text-xl">OASM</b>}
-        </div>
+        <AppLogo type="large" />
+        {(state === 'expanded' || (state === 'collapsed' && isMobile)) && (
+          <WorkspaceSwitcher />
+        )}
       </SidebarHeader>
       <SidebarContent>
         {menu.map((item) => (
@@ -131,6 +126,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       >
                         <Link
                           to={toUrl}
+                          onClick={() => setOpenMobile(false)}
                           className="flex items-center justify-start w-full h-full text-base"
                         >
                           {item.icon} {item.title} {item.isNew && <NewBadge />}
