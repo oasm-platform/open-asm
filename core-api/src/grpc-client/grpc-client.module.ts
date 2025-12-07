@@ -15,7 +15,7 @@ import { join } from 'path';
           transport: Transport.GRPC,
           options: {
             package: 'app',
-            protoPath: join(process.cwd(), 'src/proto/assistant.proto'),
+            protoPath: join(process.cwd(), '/proto/assistant.proto'),
             url: configService.get('AI_ASSISTANT_GRPC_URL', 'localhost:8000'),
             loader: {
               keepCase: false,
