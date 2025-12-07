@@ -15,7 +15,7 @@ import { RequestWithMetadata } from '../interfaces/app.interface';
 export class AssistantGuard implements CanActivate {
   constructor(private readonly toolsService: ToolsService) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean {
     const request: RequestWithMetadata = context.switchToHttp().getRequest();
     const workspaceId = request.headers['x-workspace-id'];
 

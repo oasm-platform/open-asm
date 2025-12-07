@@ -1,44 +1,44 @@
+import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { AssistantGuard } from '@/common/guards/assistant.guard';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
-  UseGuards,
   Sse,
-  Delete,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiExcludeEndpoint, ApiTags } from '@nestjs/swagger';
+import { map, Observable } from 'rxjs';
 import { AiAssistantService } from './ai-assistant.service';
-import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
-import { AssistantGuard } from '@/common/guards/assistant.guard';
-import { Doc } from '@/common/doc/doc.decorator';
 import {
-  AddMcpServersDto,
-  AddMcpServersResponseDto,
-  UpdateMcpServersDto,
-  UpdateMcpServersResponseDto,
-  DeleteMcpServersResponseDto,
-} from './dto/mcp-servers.dto';
+  DeleteConversationResponseDto,
+  DeleteConversationsResponseDto,
+  GetConversationsResponseDto,
+  UpdateConversationDto,
+  UpdateConversationResponseDto,
+} from './dto/conversation.dto';
 import {
   GenerateTagsDto,
   GenerateTagsResponseDto,
 } from './dto/generate-tags.dto';
 import {
-  GetConversationsResponseDto,
-  UpdateConversationDto,
-  UpdateConversationResponseDto,
-  DeleteConversationResponseDto,
-  DeleteConversationsResponseDto,
-} from './dto/conversation.dto';
+  AddMcpServersDto,
+  AddMcpServersResponseDto,
+  DeleteMcpServersResponseDto,
+  UpdateMcpServersDto,
+  UpdateMcpServersResponseDto,
+} from './dto/mcp-servers.dto';
 import {
-  GetMessagesResponseDto,
   CreateMessageDto,
-  UpdateMessageDto,
   DeleteMessageResponseDto,
+  GetMessagesResponseDto,
+  UpdateMessageDto,
 } from './dto/message.dto';
-import { map, Observable } from 'rxjs';
 
 @ApiTags('AI Assistant')
 @Controller('ai-assistant')
@@ -270,6 +270,7 @@ export class AiAssistantController {
       getWorkspaceId: true,
     },
   })
+  @ApiExcludeEndpoint()
   @Sse('messages/stream')
   createMessageStream(
     @Body() createMessageDto: CreateMessageDto,
@@ -293,6 +294,7 @@ export class AiAssistantController {
       getWorkspaceId: true,
     },
   })
+  @ApiExcludeEndpoint()
   @Sse('conversations/:conversationId/messages/:messageId/stream')
   updateMessageStream(
     @Param('conversationId') conversationId: string,
