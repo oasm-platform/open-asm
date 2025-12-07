@@ -171,12 +171,16 @@ export class JobsRegistryService {
         jobsToInsert.push(job);
       }
     } else {
+      // Cannot query assets for PORTS_SCANNER with assetIds
+      if (tool.category === ToolCategory.PORTS_SCANNER) assetIds = [];
+
       // For all other categories, use regular assets
       const assets = await this.findAssetsForJob(
         targetIds,
         assetIds,
         workspaceId,
       );
+
       const filteredAssets = this.filterAssetsByCategory(assets, tool.category);
 
       // Step 3: iterate tools and create jobs
@@ -717,6 +721,7 @@ export class JobsRegistryService {
           this.createNewJob({
             tool,
             targetIds: [job.asset.target.id],
+            assetIds: [job.asset.id],
             workflow: job.jobHistory.workflow,
             jobHistory: job.jobHistory,
             priority: tool.priority,
