@@ -23,7 +23,9 @@ WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
 COPY --from=builder /tmp/proto ./proto
+
 
 EXPOSE 6276
 
