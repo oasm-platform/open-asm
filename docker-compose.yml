@@ -3,7 +3,7 @@ version: '3.8'
 services:
   console:
     container_name: console
-    image: oasm/console:dev
+    image: oasm/oasm-console:latest
     build:
       context: ./console
       dockerfile: Dockerfile
