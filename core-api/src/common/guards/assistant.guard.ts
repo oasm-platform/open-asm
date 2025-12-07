@@ -26,13 +26,13 @@ export class AssistantGuard implements CanActivate {
     }
 
     // Check if AI Assistant tool is installed and enabled
-    const isEnabled = await this.toolsService.isAiAssistantEnabled(workspaceId);
+    // const isEnabled = await this.toolsService.isAiAssistantEnabled(workspaceId);
 
-    if (!isEnabled) {
-      throw new ForbiddenException(
-        'AI Assistant tool is not installed or enabled in this workspace. Please install the tool first.',
-      );
-    }
+    // if (!isEnabled) {
+    //   throw new ForbiddenException(
+    //     'AI Assistant tool is not installed or enabled in this workspace. Please install the tool first.',
+    //   );
+    // }
 
     return true;
   }

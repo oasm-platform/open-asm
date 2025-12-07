@@ -11,12 +11,4 @@ export const officialSupportTools: Tool[] = [
     version: '',
     priority: JobPriority.LOW,
   },
-  {
-    name: 'AI Assistant',
-    category: ToolCategory.ASSISTANT,
-    description:
-      'OASM Assistant is an AI-powered automation layer for external attack surface management built on Open-ASM. It uses multi-agent architecture with LangGraph to deliver intelligent threat intelligence, vulnerability analysis, and incident response.',
-    logoUrl: '/static/images/oasm-assistant.png',
-    version: '',
-  },
 ];
