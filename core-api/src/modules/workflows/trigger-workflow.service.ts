@@ -22,7 +22,9 @@ export class TriggerWorkflowService implements OnModuleInit {
         .then(async (workflow: Workflow | null) => {
           if (workflow) {
             const firstJobs = workflow.content.jobs.map((j) => j.run)[0];
-            const tools = await this.toolsService.getToolByNames([firstJobs]);
+            const tools = await this.toolsService.getToolByNames({
+              names: [firstJobs],
+            });
             await Promise.all(
               tools.map((tool) =>
                 this.jobRegistryService.createNewJob({

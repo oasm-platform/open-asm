@@ -30,8 +30,8 @@ export class TemplatesService {
     private readonly workspacesService: WorkspacesService,
     private readonly storageService: StorageService,
     private jobService: JobsRegistryService,
-    private toolService: ToolsService
-  ) { }
+    private toolService: ToolsService,
+  ) {}
 
   /**
    * Creates a new template in the specified workspace
@@ -288,7 +288,9 @@ export class TemplatesService {
     workspaceId: string,
   ): Promise<Job> {
     const { assetId } = dto;
-    const [nuclei] = await this.toolService.getToolByNames(['nuclei']);
+    const [nuclei] = await this.toolService.getToolByNames({
+      names: ['nuclei'],
+    });
 
     if (!nuclei) {
       throw new NotFoundException('Nuclei tool is not available');
@@ -300,7 +302,7 @@ export class TemplatesService {
       workspaceId,
       priority: 0,
       isSaveRawResult: true,
-      isSaveData: false
+      isSaveData: false,
     });
 
     return job[0];

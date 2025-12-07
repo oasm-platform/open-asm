@@ -98,13 +98,15 @@ export default function ToolDetail() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex-shrink-0 flex items-center gap-2">
-                    <ToolApiKeyDialog tool={tool} />
-                    <ToolInstallButton
-                      tool={tool}
-                      workspaceId={selectedWorkspace || ''}
-                      onInstallChange={handleInstallChange}
-                    />
+                  <div className="flex-shrink-0 flex-col md:flex-row flex md:items-center gap-2">
+                    <div className="flex gap-2">
+                      <ToolApiKeyDialog tool={tool} />
+                      <ToolInstallButton
+                        tool={tool}
+                        workspaceId={selectedWorkspace || ''}
+                        onInstallChange={handleInstallChange}
+                      />
+                    </div>
                     {(isInstalled || tool.isInstalled) &&
                       tool.type !==
                         ToolsControllerGetManyToolsType.built_in && (
