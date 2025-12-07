@@ -1,8 +1,8 @@
 import { useWorkspacesControllerGetWorkspaces } from '@/services/apis/gen/queries';
 import { setGlobalWorkspaceId } from '@/utils/workspaceState';
+import { useQueryClient } from '@tanstack/react-query';
 import React from 'react';
 import createState from './createState'; // adjust path as needed
-import { useQueryClient } from '@tanstack/react-query';
 
 // Define workspace state type
 interface WorkspaceState {
