@@ -1,25 +1,27 @@
-#!/usr/bin bash
+#!/bin/sh
 
-# The first part wrapped in a function
 makeSedCommands() {
-  printenv | \
-      grep  '^VITE' | \
-      sed -r "s/=/ /g" | \
-      xargs -n 2 bash -c 'echo "sed -i \"s#APP_$0#$1#g\""'
+    printenv | grep '^VITE' | \
+    while IFS='=' read -r key value; do
+        # In ra lệnh sed
+        # APP_KEY sẽ được replace thành value
+        echo "sed -i \"s#APP_${key}#${value}#g\""
+    done
 }
 
-# Set the delimiter to newlines (needed for looping over the function output)
-IFS=$'\n'
-# For each sed command
+# IFS newline
+IFS='
+'
+
+# Loop từng lệnh sed
 for c in $(makeSedCommands); do
-  # For each file in the ./ directory
-  for f in $(find ./ -type f); do
-    # Execute the command against the file
-    COMMAND="$c $f"
-    eval $COMMAND
-  done
+    # Loop tất cả file
+    for f in $(find ./ -type f); do
+        # Thực thi command
+        COMMAND="$c $f"
+        eval "$COMMAND"
+    done
 done
 
 echo "Starting entrypoint.sh"
-# Run any arguments passed to this script
 exec "$@"

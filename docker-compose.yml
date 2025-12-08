@@ -3,7 +3,7 @@ version: '3.8'
 services:
   console:
     container_name: console
-    image: oasm/console:latest
+    image: oasm/oasm-console:latest
     build:
       context: ./console
       dockerfile: Dockerfile
@@ -12,7 +12,7 @@ services:
     env_file:
       - ./console/.env
     ports:
-      - '3000:3000'
+      - '3000:80'
     restart: 'always'
     depends_on:
       core-api:

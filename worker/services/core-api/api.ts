@@ -1434,33 +1434,6 @@ export interface GetMessagesResponseDto {
   }[];
 }
 
-export interface CreateMessageDto {
-  /**
-   * Question/prompt to send
-   * @example "What is the security status of my system?"
-   */
-  question: string;
-  /**
-   * Conversation ID (if continuing existing conversation)
-   * @example "123e4567-e89b-12d3-a456-426614174000"
-   */
-  conversationId?: string;
-  /**
-   * Whether to create a new conversation
-   * @default false
-   * @example false
-   */
-  isCreateConversation?: boolean;
-}
-
-export interface UpdateMessageDto {
-  /**
-   * Updated question/prompt
-   * @example "What is the security status of my system?"
-   */
-  question: string;
-}
-
 export interface DeleteMessageResponseDto {
   /**
    * Success status
@@ -4070,50 +4043,6 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations/${id}/messages`,
       method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Creates a new message and streams the AI response using Server-Sent Events (SSE)
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerCreateMessageStream
-   * @summary Create a message with streaming response
-   * @request GET:/api/ai-assistant/messages/stream
-   */
-  aiAssistantControllerCreateMessageStream = (
-    data: CreateMessageDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/messages/stream`,
-      method: "GET",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Updates a message and streams the regenerated AI response using Server-Sent Events (SSE)
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerUpdateMessageStream
-   * @summary Update a message with streaming response
-   * @request GET:/api/ai-assistant/conversations/{conversationId}/messages/{messageId}/stream
-   */
-  aiAssistantControllerUpdateMessageStream = (
-    conversationId: string,
-    messageId: string,
-    data: UpdateMessageDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}/stream`,
-      method: "GET",
-      body: data,
-      type: ContentType.Json,
       format: "json",
       ...params,
     });
