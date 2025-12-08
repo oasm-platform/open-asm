@@ -58,7 +58,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all assets services associated with a specified target.
@@ -112,6 +112,7 @@ export class AssetsService {
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoin('asset.ipAssets', 'ipAssets')
       .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
+      .leftJoin('assetServices.tags', 'tags')
       .where('"assetServices"."isErrorPage" = false')
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
@@ -156,6 +157,8 @@ export class AssetsService {
       .select([
         'assetServices.value',
         'assetServices.port',
+        'tags.tag',
+        'tags.id',
         'assetServices.id',
         'asset.isEnabled',
         'asset.targetId',
@@ -190,8 +193,8 @@ export class AssetsService {
       asset.createdAt = item.createdAt;
       asset.dnsRecords = item.asset.dnsRecords;
       asset.isEnabled = item.asset.isEnabled;
+      asset.tags = item.tags || [];
 
-      // asset.tags = item.asset.tags || [];
       asset.ipAddresses = item.asset.ipAssets
         ? item.asset.ipAssets.map((e) => e.ipAddress)
         : [];
@@ -332,6 +335,7 @@ export class AssetsService {
       .select([
         'assetServices.value',
         'assetServices.port',
+        'tags.tag',
         'assetServices.id',
         'asset.isEnabled',
         'asset.targetId',
@@ -360,7 +364,7 @@ export class AssetsService {
     asset.isEnabled = item.asset.isEnabled;
     asset.port = item.port;
 
-    // asset.tags = item.asset.tags || [];
+    asset.tags = item.tags || [];
 
     asset.ipAddresses = item.asset.ipAssets
       ? item.asset.ipAssets.map((e) => e.ipAddress)
@@ -738,8 +742,8 @@ export class AssetsService {
   public async updateAssetById(
     id: string,
     updateAssetDto: UpdateAssetDto,
-  ): Promise<Asset> {
-    const asset = await this.assetRepo.findOne({
+  ): Promise<AssetService> {
+    const asset = await this.assetServiceRepo.findOne({
       where: { id },
     });
 
@@ -747,35 +751,31 @@ export class AssetsService {
       throw new NotFoundException('Asset not found');
     }
 
-    // Update the asset with the provided data
-    // Handle tags update
     if (updateAssetDto.tags) {
-      // Remove existing tags
       await this.dataSource
         .createQueryBuilder()
         .delete()
-        .from('asset_tags')
-        .where('assetId = :assetId', { assetId: id })
+        .from('asset_services_tags')
+        .where('"assetServiceId" = :assetServiceId', { assetServiceId: id })
         .execute();
 
-      // Add new tags
       const tagsToInsert = updateAssetDto.tags.map((tag) => ({
         tag,
-        assetId: id,
+        assetServiceId: id,
       }));
 
       if (tagsToInsert.length > 0) {
         await this.dataSource
           .createQueryBuilder()
           .insert()
-          .into('asset_tags')
+          .into('asset_services_tags')
           .values(tagsToInsert)
           .execute();
       }
     }
 
     // Save the updated asset
-    return this.assetRepo.save(asset);
+    return this.assetServiceRepo.save(asset);
   }
 
   /**

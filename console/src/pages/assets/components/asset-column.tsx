@@ -6,7 +6,7 @@ import type {
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
-import { BriefcaseBusiness, Globe, Network } from 'lucide-react';
+import { BriefcaseBusiness, Globe, Network, Tag } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
 import HTTPXStatusCode from './status-code';
@@ -23,7 +23,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       // const ports = data.ports?.ports as string[];
       const httpResponse = data.httpResponses;
       const ipAddresses = data.ipAddresses;
-      // const tags = data.tags;
+      const tags = data.tags;
 
       return (
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
@@ -49,13 +49,13 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
               maxDisplay={2}
             />
           </div>
-          {/*<div className="w-full">
+          <div className="w-full">
             <BadgeList
               list={tags.map((t) => t.tag)}
               Icon={Tag}
               maxDisplay={2}
             />
-          </div>*/}
+          </div>
         </div>
       );
     },
