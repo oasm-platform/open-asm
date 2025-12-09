@@ -163,6 +163,7 @@ export class AssetsService {
         'assetServices.createdAt',
         'ipAssets.ipAddress',
         'httpResponses.tech',
+        'httpResponses.id',
         'httpResponses.title',
         'httpResponses.tls',
         'httpResponses.chain_status_codes',
