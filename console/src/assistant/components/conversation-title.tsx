@@ -21,7 +21,7 @@ export function ConversationTitle({
 
   // Always render to maintain layout, even if just default title
   const displayTitle = session?.title || 'New Conversation';
-  const displayDescription = session?.lastMessage || 'No visible messages';
+  const displayDescription = session?.lastMessage || '';
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -172,8 +172,7 @@ export function ConversationTitle({
             onClick={(e) => isEditing && e.stopPropagation()}
           >
             <p className="text-xs text-muted-foreground font-mono leading-relaxed line-clamp-3 break-words">
-              {displayDescription &&
-              displayDescription !== 'No visible messages'
+              {displayDescription
                 ? displayDescription
                 : 'Start a conversation to see details here...'}
             </p>
