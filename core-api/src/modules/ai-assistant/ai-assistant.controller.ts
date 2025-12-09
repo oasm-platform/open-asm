@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Sse,
   UseGuards,
 } from '@nestjs/common';
@@ -273,10 +274,18 @@ export class AiAssistantController {
   @ApiExcludeEndpoint()
   @Sse('messages/stream')
   createMessageStream(
-    @Body() createMessageDto: CreateMessageDto,
+    @Query('question') question: string,
+    @Query('conversationId') conversationId: string | undefined,
+    @Query('isCreateConversation') isCreateConversation: string | undefined,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Observable<{ data: string }> {
+    const createMessageDto: CreateMessageDto = {
+      question,
+      conversationId,
+      isCreateConversation: isCreateConversation === 'true',
+    };
+
     return this.aiAssistantService
       .createMessage(createMessageDto, workspaceId, userId)
       .pipe(
