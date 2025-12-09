@@ -27,7 +27,6 @@ export class NotificationsConsumer extends WorkerHost {
 
   async process(job: Job<any>): Promise<void> {
     const { recipients, type, content } = job.data;
-
     // Create notification
     const notification = await this.notificationRepo.save({
       type,
@@ -41,18 +40,12 @@ export class NotificationsConsumer extends WorkerHost {
 
     const recipientEntities: Partial<NotificationRecipient>[] = [];
 
+    // Create recipient entities without message logic first
     for (const user of users) {
-      // Translate message
-      const message = this.i18n.translate<string>(content.key, {
-        lang: user.language || 'en',
-        args: content.metadata || {},
-      }) as unknown as string;
-
       recipientEntities.push({
         notificationId: notification.id,
         userId: user.id,
         status: NotificationStatus.SENT,
-        message,
       });
     }
 
@@ -61,8 +54,24 @@ export class NotificationsConsumer extends WorkerHost {
         recipientEntities,
       );
 
+      // Now iterate to send realtime notifications with translated message
       for (const recipient of savedRecipients) {
-        this.notificationsService.sendToUser(recipient.userId, recipient);
+        // Find the user to get language (optimization: map user by id earlier)
+        const user = users.find(u => u.id === recipient.userId);
+        
+        const message = this.i18n.translate<string>(content.key, {
+          lang: user?.language || 'en',
+          args: content.metadata || {},
+        }) as unknown as string;
+
+        // Attach message to payload for SSE/Websocket
+        const payload = {
+            ...recipient,
+            message,
+            notification // attach notification details if needed
+        };
+        // We need to type cast or adjust sendToUser to accept DTO or extended type
+        this.notificationsService.sendToUser(recipient.userId, payload as any);
       }
     }
   }

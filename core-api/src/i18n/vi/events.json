@@ -1,3 +1,7 @@
 {
-  "test": "Xin chào {name}, đây là thông báo thử nghiệm."
+  "test": "Xin chào {name}, đây là thông báo thử nghiệm.",
+  "test_event": "Sự kiện thử nghiệm {name}",
+  "scan_started": "Bắt đầu quét {targetName}",
+  "scan_completed": "Hoàn thành quét {targetName}",
+  "scan_failed": "Quét thất bại cho {targetName}"
 }

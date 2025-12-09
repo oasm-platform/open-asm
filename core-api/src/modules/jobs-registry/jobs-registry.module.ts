@@ -9,9 +9,16 @@ import {
   AssetsDiscoveryScheduleConsumer,
 } from './processors/scan-schedule.processor';
 
+import { NotificationsModule } from '../notifications/notifications.module';
+import { WorkspacesModule } from '../workspaces/workspaces.module';
+
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([Job, JobHistory])],
+  imports: [
+    TypeOrmModule.forFeature([Job, JobHistory]),
+    NotificationsModule,
+    WorkspacesModule,
+  ],
   controllers: [JobsRegistryController],
   providers: [
     JobsRegistryService,

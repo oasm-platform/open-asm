@@ -1,3 +1,6 @@
 {
-  "test": "Hello {name}, this is a test notification."
+  "test": "Hello {name}, this is a test notification.",
+  "scan_started": "Scan started for target {targetName}",
+  "scan_completed": "Scan completed for target {targetName}",
+  "scan_failed": "Scan failed for target {targetName}"
 }

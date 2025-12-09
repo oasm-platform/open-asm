@@ -7,6 +7,9 @@ import { filter, map, Observable, Subject } from 'rxjs';
 import { Repository } from 'typeorm';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
 
+import { I18nService } from 'nestjs-i18n';
+import { NotificationResponseDto } from './dto/notification.dto';
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -14,6 +17,7 @@ export class NotificationsService {
     private notificationQueue: Queue,
     @InjectRepository(NotificationRecipient)
     private notificationRecipientRepo: Repository<NotificationRecipient>,
+    private readonly i18n: I18nService,
   ) {}
 
   private notificationSubject = new Subject<{
@@ -33,13 +37,13 @@ export class NotificationsService {
     });
   }
 
-  // ... existing methods ...
-
   sendToUser(userId: string, data: NotificationRecipient) {
+    console.log(`[NotificationsService] Sending to user ${userId}:`, data.id);
     this.notificationSubject.next({ userId, data });
   }
 
   subscribeToStream(userId: string): Observable<MessageEvent> {
+    console.log(`[NotificationsService] User ${userId} subscribing to stream`);
     return this.notificationSubject.asObservable().pipe(
       filter((event) => event.userId === userId),
       map((event) => {
@@ -50,7 +54,7 @@ export class NotificationsService {
     );
   }
 
-  async getNotifications(userId: string, page: number, limit: number) {
+  async getNotifications(userId: string, page: number, limit: number, lang: string = 'en') {
     const offset = (page - 1) * limit;
     const [notifications, total] = await this.notificationRecipientRepo
       .createQueryBuilder('recipient')
@@ -61,8 +65,22 @@ export class NotificationsService {
       .take(limit)
       .getManyAndCount();
 
+    const data = await Promise.all(
+      notifications.map(async (n) => {
+        const message = this.i18n.translate<string>(n.notification.content.key, {
+          lang,
+          args: n.notification.content.metadata || {},
+        }) as unknown as string;
+
+        return {
+          ...n,
+          message,
+        } as NotificationResponseDto;
+      })
+    );
+
     return {
-      data: notifications,
+      data,
       total,
       page,
       limit,

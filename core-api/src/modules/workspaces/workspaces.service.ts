@@ -414,4 +414,18 @@ export class WorkspacesService implements OnModuleInit {
 
     return workspaceMember;
   }
+
+  /**
+   * Retrieves all members of a workspace.
+   * @param workspaceId - The ID of the workspace.
+   * @returns A promise that resolves to an array of workspace members with user details.
+   */
+  public async getMembersByWorkspaceId(workspaceId: string): Promise<WorkspaceMembers[]> {
+    return this.workspaceMembersRepository.find({
+      where: {
+        workspace: { id: workspaceId },
+      },
+      relations: ['user'],
+    });
+  }
 }
