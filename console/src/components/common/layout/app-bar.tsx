@@ -2,6 +2,7 @@
 
 import AppLogo from '@/components/ui/app-logo';
 import { GithubBadge } from '@/components/ui/github-badge';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import {
   SidebarInset,
   SidebarTrigger,
@@ -26,6 +27,7 @@ export default function AppBar({ children }: { children: JSX.Element }) {
         <div className="ml-auto flex gap-3">
           <CreateTarget />
           <GithubBadge />
+          <NotificationBell />
         </div>
       </header>
       <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>

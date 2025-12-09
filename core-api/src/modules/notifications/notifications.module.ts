@@ -8,6 +8,8 @@ import { Notification } from './entities/notification.entity';
 import { NotificationsService } from './notifications.service';
 import { NotificationsConsumer } from './processors/notifications.processor';
 
+import { NotificationsController } from './notifications.controller';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([Notification, NotificationRecipient, User]),
@@ -15,6 +17,7 @@ import { NotificationsConsumer } from './processors/notifications.processor';
       name: BullMQName.NOTIFICATION,
     }),
   ],
+  controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsConsumer],
   exports: [NotificationsService],
 })

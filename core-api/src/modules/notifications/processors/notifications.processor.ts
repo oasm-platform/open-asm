@@ -8,6 +8,8 @@ import { In, Repository } from 'typeorm';
 import { NotificationRecipient } from '../entities/notification-recipient.entity';
 import { Notification } from '../entities/notification.entity';
 
+import { NotificationsService } from '../notifications.service';
+
 @Processor(BullMQName.NOTIFICATION)
 export class NotificationsConsumer extends WorkerHost {
   constructor(
@@ -18,6 +20,7 @@ export class NotificationsConsumer extends WorkerHost {
     @InjectRepository(User)
     private userRepo: Repository<User>,
     private readonly i18n: I18nService,
+    private notificationsService: NotificationsService,
   ) {
     super();
   }
@@ -54,7 +57,13 @@ export class NotificationsConsumer extends WorkerHost {
     }
 
     if (recipientEntities.length > 0) {
-      await this.notificationRecipientRepo.save(recipientEntities);
+      const savedRecipients = await this.notificationRecipientRepo.save(
+        recipientEntities,
+      );
+
+      for (const recipient of savedRecipients) {
+        this.notificationsService.sendToUser(recipient.userId, recipient);
+      }
     }
   }
 }

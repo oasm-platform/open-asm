@@ -4070,6 +4070,86 @@ export class Api<
   /**
    * No description
    *
+   * @tags notifications
+   * @name NotificationsControllerGetNotifications
+   * @request GET:/api/notifications
+   */
+  notificationsControllerGetNotifications = (
+    query: {
+      page: number;
+      limit: number;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<any, any>({
+      path: `/api/notifications`,
+      method: "GET",
+      query: query,
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags notifications
+   * @name NotificationsControllerStream
+   * @request GET:/api/notifications/stream
+   */
+  notificationsControllerStream = (params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/api/notifications/stream`,
+      method: "GET",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags notifications
+   * @name NotificationsControllerGetUnreadCount
+   * @request GET:/api/notifications/unread-count
+   */
+  notificationsControllerGetUnreadCount = (params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/api/notifications/unread-count`,
+      method: "GET",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags notifications
+   * @name NotificationsControllerMarkAllAsRead
+   * @request PATCH:/api/notifications/mark-read
+   */
+  notificationsControllerMarkAllAsRead = (params: RequestParams = {}) =>
+    this.request<any, any>({
+      path: `/api/notifications/mark-read`,
+      method: "PATCH",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags notifications
+   * @name NotificationsControllerMarkAsRead
+   * @request PATCH:/api/notifications/{id}/read
+   */
+  notificationsControllerMarkAsRead = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<any, any>({
+      path: `/api/notifications/${id}/read`,
+      method: "PATCH",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
    * @tags Storage
    * @name StorageControllerUploadFile
    * @summary Upload a file to storage

@@ -1670,6 +1670,11 @@ export type AssetGroupControllerGetWorkflowsNotInAssetGroupParams = {
   sortOrder?: string;
 };
 
+export type NotificationsControllerGetNotificationsParams = {
+  page: number;
+  limit: number;
+};
+
 export type StorageControllerUploadFileBody = {
   file: Blob;
   /** Bucket name (default: "default") */
@@ -24603,6 +24608,1107 @@ export const useAiAssistantControllerDeleteMessage = <
 > => {
   const mutationOptions =
     getAiAssistantControllerDeleteMessageMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+export const notificationsControllerGetNotifications = (
+  params: NotificationsControllerGetNotificationsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>(
+    { url: `/api/notifications`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getNotificationsControllerGetNotificationsInfiniteQueryKey = (
+  params?: NotificationsControllerGetNotificationsParams,
+) => {
+  return [
+    'infinate',
+    `/api/notifications`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getNotificationsControllerGetNotificationsQueryKey = (
+  params?: NotificationsControllerGetNotificationsParams,
+) => {
+  return [`/api/notifications`, ...(params ? [params] : [])] as const;
+};
+
+export const getNotificationsControllerGetNotificationsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+  >,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getNotificationsControllerGetNotificationsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+  > = ({ signal }) =>
+    notificationsControllerGetNotifications(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type NotificationsControllerGetNotificationsInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+  >;
+export type NotificationsControllerGetNotificationsInfiniteQueryError = unknown;
+
+export function useNotificationsControllerGetNotificationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+  >,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerGetNotificationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+  >,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerGetNotificationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+  >,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useNotificationsControllerGetNotificationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+  >,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getNotificationsControllerGetNotificationsInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getNotificationsControllerGetNotificationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getNotificationsControllerGetNotificationsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+  > = ({ signal }) =>
+    notificationsControllerGetNotifications(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type NotificationsControllerGetNotificationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+>;
+export type NotificationsControllerGetNotificationsQueryError = unknown;
+
+export function useNotificationsControllerGetNotifications<
+  TData = Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerGetNotifications<
+  TData = Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerGetNotifications<
+  TData = Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useNotificationsControllerGetNotifications<
+  TData = Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+  TError = unknown,
+>(
+  params: NotificationsControllerGetNotificationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getNotificationsControllerGetNotificationsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const notificationsControllerStream = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>(
+    { url: `/api/notifications/stream`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getNotificationsControllerStreamInfiniteQueryKey = () => {
+  return ['infinate', `/api/notifications/stream`] as const;
+};
+
+export const getNotificationsControllerStreamQueryKey = () => {
+  return [`/api/notifications/stream`] as const;
+};
+
+export const getNotificationsControllerStreamInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerStream>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof notificationsControllerStream>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getNotificationsControllerStreamInfiniteQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof notificationsControllerStream>>
+  > = ({ signal }) => notificationsControllerStream(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof notificationsControllerStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type NotificationsControllerStreamInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof notificationsControllerStream>>
+>;
+export type NotificationsControllerStreamInfiniteQueryError = unknown;
+
+export function useNotificationsControllerStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerStream>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerStream>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerStream>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useNotificationsControllerStreamInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerStream>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getNotificationsControllerStreamInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getNotificationsControllerStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof notificationsControllerStream>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getNotificationsControllerStreamQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof notificationsControllerStream>>
+  > = ({ signal }) => notificationsControllerStream(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof notificationsControllerStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type NotificationsControllerStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof notificationsControllerStream>>
+>;
+export type NotificationsControllerStreamQueryError = unknown;
+
+export function useNotificationsControllerStream<
+  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerStream<
+  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerStream<
+  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useNotificationsControllerStream<
+  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getNotificationsControllerStreamQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const notificationsControllerGetUnreadCount = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>(
+    { url: `/api/notifications/unread-count`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getNotificationsControllerGetUnreadCountInfiniteQueryKey = () => {
+  return ['infinate', `/api/notifications/unread-count`] as const;
+};
+
+export const getNotificationsControllerGetUnreadCountQueryKey = () => {
+  return [`/api/notifications/unread-count`] as const;
+};
+
+export const getNotificationsControllerGetUnreadCountInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+  >,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseInfiniteQueryOptions<
+      Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getNotificationsControllerGetUnreadCountInfiniteQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+  > = ({ signal }) =>
+    notificationsControllerGetUnreadCount(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type NotificationsControllerGetUnreadCountInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+  >;
+export type NotificationsControllerGetUnreadCountInfiniteQueryError = unknown;
+
+export function useNotificationsControllerGetUnreadCountInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerGetUnreadCountInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerGetUnreadCountInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useNotificationsControllerGetUnreadCountInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getNotificationsControllerGetUnreadCountInfiniteQueryOptions(options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getNotificationsControllerGetUnreadCountQueryOptions = <
+  TData = Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getNotificationsControllerGetUnreadCountQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+  > = ({ signal }) =>
+    notificationsControllerGetUnreadCount(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type NotificationsControllerGetUnreadCountQueryResult = NonNullable<
+  Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+>;
+export type NotificationsControllerGetUnreadCountQueryError = unknown;
+
+export function useNotificationsControllerGetUnreadCount<
+  TData = Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerGetUnreadCount<
+  TData = Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+          TError,
+          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useNotificationsControllerGetUnreadCount<
+  TData = Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useNotificationsControllerGetUnreadCount<
+  TData = Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getNotificationsControllerGetUnreadCountQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const notificationsControllerMarkAllAsRead = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<void>(
+    { url: `/api/notifications/mark-read`, method: 'PATCH' },
+    options,
+  );
+};
+
+export const getNotificationsControllerMarkAllAsReadMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerMarkAllAsRead'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+    void
+  > = () => {
+    return notificationsControllerMarkAllAsRead(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type NotificationsControllerMarkAllAsReadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>
+>;
+
+export type NotificationsControllerMarkAllAsReadMutationError = unknown;
+
+export const useNotificationsControllerMarkAllAsRead = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsRead>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getNotificationsControllerMarkAllAsReadMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+export const notificationsControllerMarkAsRead = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<void>(
+    { url: `/api/notifications/${id}/read`, method: 'PATCH' },
+    options,
+  );
+};
+
+export const getNotificationsControllerMarkAsReadMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerMarkAsRead'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return notificationsControllerMarkAsRead(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type NotificationsControllerMarkAsReadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>
+>;
+
+export type NotificationsControllerMarkAsReadMutationError = unknown;
+
+export const useNotificationsControllerMarkAsRead = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerMarkAsRead>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getNotificationsControllerMarkAsReadMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
