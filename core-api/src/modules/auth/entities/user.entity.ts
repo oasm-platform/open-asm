@@ -27,6 +27,9 @@ export class User extends BaseEntity {
   @Column({ type: 'enum', enum: Role, default: Role.USER })
   role: Role;
 
+  @Column({ type: 'text', default: 'en' })
+  language: string;
+
   @OneToMany(() => Session, (session) => session.user)
   sessions: Session[];
 

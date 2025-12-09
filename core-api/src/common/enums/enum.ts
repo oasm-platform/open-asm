@@ -137,3 +137,8 @@ export enum NotificationType {
   USER = 'USER',
   GROUP = 'GROUP',
 }
+
+export enum Language {
+  EN = 'en',
+  VI = 'vi',
+}
