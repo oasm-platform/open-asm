@@ -55,6 +55,7 @@
     "mongodb": "^6.16.0",
     "multer": "^2.0.2",
     "nanoid": "^3.3.8",
+    "nestjs-i18n": "^10.6.0",
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
