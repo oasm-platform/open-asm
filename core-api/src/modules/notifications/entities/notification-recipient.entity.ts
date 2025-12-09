@@ -1,8 +1,8 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { NotificationStatus } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Notification } from './notification.entity';
-import { NotificationStatus } from '@/common/enums/enum';
 
 @Entity('notification_recipients')
 export class NotificationRecipient extends BaseEntity {
@@ -26,5 +26,4 @@ export class NotificationRecipient extends BaseEntity {
     default: NotificationStatus.SENT,
   })
   status: NotificationStatus;
-
 }
