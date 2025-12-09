@@ -10,6 +10,8 @@ import { CombineModule } from './modules/combine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { ServicesModule } from './services/services.module';
+import { AcceptLanguageResolver, HeaderResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
+import * as path from 'path';
 
 @Module({
   imports: [
@@ -19,6 +21,18 @@ import { ServicesModule } from './services/services.module';
     }),
     EventEmitterModule.forRoot({ wildcard: true }),
     ScheduleModule.forRoot(),
+    I18nModule.forRoot({
+      fallbackLanguage: 'en',
+      loaderOptions: {
+        path: path.join(__dirname, '/i18n/'),
+        watch: true,
+      },
+      resolvers: [
+        { use: QueryResolver, options: ['lang'] },
+        AcceptLanguageResolver,
+        new HeaderResolver(['x-custom-lang']),
+      ],
+    }),
     BullModule.forRootAsync({
       useFactory: (config: ConfigService) => ({
         connection: {
