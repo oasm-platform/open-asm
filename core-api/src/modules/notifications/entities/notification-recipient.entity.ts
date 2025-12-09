@@ -26,7 +26,4 @@ export class NotificationRecipient extends BaseEntity {
     default: NotificationStatus.SENT,
   })
   status: NotificationStatus;
-
-  @Column({ type: 'text', nullable: true })
-  message: string;
 }
