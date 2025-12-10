@@ -5,27 +5,49 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+  getNotificationsControllerGetNotificationsInfiniteQueryKey,
+  getNotificationsControllerGetUnreadCountQueryKey,
   useNotificationsControllerGetUnreadCount,
   useNotificationsControllerMarkAllAsRead,
 } from '@/services/apis/gen/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { NotificationList } from './notification-list';
 import { useNotificationStream } from '@/hooks/use-notification-stream';
+import { Link } from 'react-router-dom';
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const { data: unreadCount = 0 } = useNotificationsControllerGetUnreadCount();
-  const markAllAsRead = useNotificationsControllerMarkAllAsRead();
+  const queryClient = useQueryClient();
+  const { data: unreadCountData } = useNotificationsControllerGetUnreadCount();
+  const unreadCount = typeof unreadCountData === 'number' ? unreadCountData : 0;
+  const markAllAsRead = useNotificationsControllerMarkAllAsRead({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey({
+            limit: 10,
+          }),
+        });
+        queryClient.invalidateQueries({
+          queryKey: getNotificationsControllerGetUnreadCountQueryKey(),
+        });
+      },
+    },
+  });
 
-  useNotificationStream(); // Activate stream
+  useNotificationStream();
 
-  const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen);
-    if (newOpen && unreadCount > 0) {
-      markAllAsRead.mutate();
-    }
-  };
+  const handleOpenChange = useCallback(
+    (newOpen: boolean) => {
+      setOpen(newOpen);
+      if (newOpen && unreadCount > 0) {
+        markAllAsRead.mutate();
+      }
+    },
+    [unreadCount, markAllAsRead],
+  );
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -43,6 +65,9 @@ export function NotificationBell() {
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h4 className="font-semibold">Notifications</h4>
+          <Button variant="ghost" size="sm" className="justify-between">
+            <Link to="/notifications">View all</Link>
+          </Button>
         </div>
         <NotificationList />
       </PopoverContent>
