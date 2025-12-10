@@ -15,6 +15,8 @@ import type {
   UpdateMCPServersResponse,
   DeleteMCPServersRequest,
   DeleteMCPServersResponse,
+  GetMCPServerHealthRequest,
+  GetMCPServerHealthResponse,
   GetConversationsRequest,
   GetConversationsResponse,
   UpdateConversationRequest,
@@ -63,6 +65,10 @@ export interface MCPServerService {
     request: DeleteMCPServersRequest,
     metadata?: unknown,
   ): Observable<DeleteMCPServersResponse>;
+  getMcpServerHealth(
+    request: GetMCPServerHealthRequest,
+    metadata?: unknown,
+  ): Observable<GetMCPServerHealthResponse>;
 }
 
 /**

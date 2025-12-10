@@ -33,6 +33,7 @@ import {
   DeleteMcpServersResponseDto,
   UpdateMcpServersDto,
   UpdateMcpServersResponseDto,
+  GetMcpServerHealthResponseDto,
 } from './dto/mcp-servers.dto';
 import {
   CreateMessageDto,
@@ -153,6 +154,29 @@ export class AiAssistantController {
     @WorkspaceId() workspaceId: string,
   ): Promise<DeleteMcpServersResponseDto> {
     return this.aiAssistantService.deleteMcpServers(id, workspaceId, userId);
+  }
+
+  @Doc({
+    summary: 'Get MCP server health',
+    description: 'Gets the health status of a specific MCP server',
+    response: {
+      serialization: GetMcpServerHealthResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('mcp-servers/:serverName/health')
+  async getMcpServerHealth(
+    @Param('serverName') serverName: string,
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetMcpServerHealthResponseDto> {
+    return this.aiAssistantService.getMcpServerHealth(
+      serverName,
+      workspaceId,
+      userId,
+    );
   }
 
   @Doc({
