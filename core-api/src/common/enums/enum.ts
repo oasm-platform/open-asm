@@ -129,7 +129,7 @@ export enum BullMQName {
 export enum NotificationStatus {
   SENT = 'sent',
   UNREAD = 'unread',
-  READED = 'readed',
+  READ = 'read',
 }
 
 export enum NotificationType {
