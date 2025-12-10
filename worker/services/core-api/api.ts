@@ -2438,6 +2438,22 @@ export class Api<
     });
 
   /**
+   * @description Mark all notifications as unread for the current user
+   *
+   * @tags notifications
+   * @name NotificationsControllerMarkAllAsUnread
+   * @summary Mark all notifications as unread
+   * @request PATCH:/api/notifications/mark-unread
+   */
+  notificationsControllerMarkAllAsUnread = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/notifications/mark-unread`,
+      method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Mark a single notification as read by its ID
    *
    * @tags notifications

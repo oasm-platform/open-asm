@@ -8,7 +8,7 @@ import {
   getNotificationsControllerGetNotificationsInfiniteQueryKey,
   getNotificationsControllerGetUnreadCountQueryKey,
   useNotificationsControllerGetUnreadCount,
-  useNotificationsControllerMarkAllAsRead,
+  useNotificationsControllerMarkAllAsUnread,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
@@ -22,7 +22,7 @@ export function NotificationBell() {
   const queryClient = useQueryClient();
   const { data: unreadCountData } = useNotificationsControllerGetUnreadCount();
   const unreadCount = typeof unreadCountData === 'number' ? unreadCountData : 0;
-  const markAllAsRead = useNotificationsControllerMarkAllAsRead({
+  const markAllAsUnread = useNotificationsControllerMarkAllAsUnread({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({
@@ -43,10 +43,10 @@ export function NotificationBell() {
     (newOpen: boolean) => {
       setOpen(newOpen);
       if (newOpen && unreadCount > 0) {
-        markAllAsRead.mutate();
+        markAllAsUnread.mutate();
       }
     },
-    [unreadCount, markAllAsRead],
+    [unreadCount, markAllAsUnread],
   );
 
   return (

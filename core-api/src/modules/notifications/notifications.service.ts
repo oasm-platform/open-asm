@@ -85,8 +85,15 @@ export class NotificationsService {
 
   async markAllAsRead(userId: string) {
     return this.notificationRecipientRepo.update(
-      { userId, status: NotificationStatus.SENT },
+      { userId },
       { status: NotificationStatus.READ },
+    );
+  }
+
+  async markAllAsUnread(userId: string) {
+    return this.notificationRecipientRepo.update(
+      { userId, status: NotificationStatus.SENT },
+      { status: NotificationStatus.UNREAD },
     );
   }
 

@@ -84,6 +84,15 @@ export class NotificationsController {
   }
 
   @Doc({
+    summary: 'Mark all notifications as unread',
+    description: 'Mark all notifications as unread for the current user',
+  })
+  @Patch('mark-unread')
+  markAllAsUnread(@UserContext() user: UserContextPayload) {
+    return this.notificationsService.markAllAsUnread(user.id);
+  }
+
+  @Doc({
     summary: 'Mark a specific notification as read',
     description: 'Mark a single notification as read by its ID',
   })

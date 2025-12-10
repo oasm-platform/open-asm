@@ -7740,6 +7740,90 @@ export const useNotificationsControllerMarkAllAsRead = <
 };
 
 /**
+ * Mark all notifications as unread for the current user
+ * @summary Mark all notifications as unread
+ */
+export const notificationsControllerMarkAllAsUnread = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/notifications/mark-unread`, method: 'PATCH' },
+    options,
+  );
+};
+
+export const getNotificationsControllerMarkAllAsUnreadMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerMarkAllAsUnread'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+    void
+  > = () => {
+    return notificationsControllerMarkAllAsUnread(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type NotificationsControllerMarkAllAsUnreadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>
+>;
+
+export type NotificationsControllerMarkAllAsUnreadMutationError = unknown;
+
+/**
+ * @summary Mark all notifications as unread
+ */
+export const useNotificationsControllerMarkAllAsUnread = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerMarkAllAsUnread>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getNotificationsControllerMarkAllAsUnreadMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Mark a single notification as read by its ID
  * @summary Mark a specific notification as read
  */
