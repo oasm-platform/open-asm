@@ -3,6 +3,7 @@ import { NotificationStatus } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Notification } from './notification.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 
 @Entity('notification_recipients')
 export class NotificationRecipient extends BaseEntity {
@@ -19,6 +20,13 @@ export class NotificationRecipient extends BaseEntity {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  @Column({ type: 'uuid', nullable: true })
+  workspaceId?: string;
+
+  @ManyToOne(() => Workspace)
+  @JoinColumn({ name: 'workspaceId' })
+  workspace: Workspace;
 
   @Column({
     type: 'enum',

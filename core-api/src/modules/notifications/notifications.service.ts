@@ -1,8 +1,4 @@
-import {
-  BullMQName,
-  NotificationStatus,
-  NotificationType,
-} from '@/common/enums/enum';
+import { BullMQName, NotificationStatus } from '@/common/enums/enum';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, MessageEvent } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,6 +9,9 @@ import { NotificationRecipient } from './entities/notification-recipient.entity'
 
 import { I18nService } from 'nestjs-i18n';
 import { NotificationResponseDto } from './dto/notification.dto';
+import { CreateNotificationDto } from './dto/create-notification.dto';
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { getManyResponse } from '@/utils/getManyResponse';
 
 @Injectable()
 export class NotificationsService {
@@ -29,20 +28,8 @@ export class NotificationsService {
     data: NotificationRecipient;
   }>();
 
-  async createNotification(
-    recipients: string[],
-    type: NotificationType,
-    content: { key: string; metadata?: Record<string, any> },
-  ) {
-    await this.notificationQueue.add('create-notification', {
-      recipients,
-      type,
-      content,
-    });
-  }
-
-  sendToUser(userId: string, data: NotificationRecipient) {
-    this.notificationSubject.next({ userId, data });
+  async createNotification(body: CreateNotificationDto) {
+    await this.notificationQueue.add('create-notification', body);
   }
 
   subscribeToStream(userId: string): Observable<MessageEvent> {
@@ -58,18 +45,25 @@ export class NotificationsService {
 
   async getNotifications(
     userId: string,
-    page: number,
-    limit: number,
+    query: GetManyBaseQueryParams,
     lang: string = 'en',
   ) {
-    const offset = (page - 1) * limit;
+    const offset = (query.page - 1) * query.limit;
     const [notifications, total] = await this.notificationRecipientRepo
       .createQueryBuilder('recipient')
       .leftJoinAndSelect('recipient.notification', 'notification')
       .where('recipient.userId = :userId', { userId })
       .orderBy('recipient.createdAt', 'DESC')
+      .select([
+        'recipient.id',
+        'recipient.status',
+        'recipient.createdAt',
+        'notification.id',
+        'notification.type',
+        'notification.content',
+      ])
       .skip(offset)
-      .take(limit)
+      .take(query.limit)
       .getManyAndCount();
 
     const data = notifications.map((n) => {
@@ -84,12 +78,11 @@ export class NotificationsService {
       } as NotificationResponseDto;
     });
 
-    return {
+    return getManyResponse({
+      query,
       data,
       total,
-      page,
-      limit,
-    };
+    });
   }
 
   async getUnreadCount(userId: string) {
@@ -104,14 +97,14 @@ export class NotificationsService {
   async markAllAsRead(userId: string) {
     return this.notificationRecipientRepo.update(
       { userId, status: NotificationStatus.SENT },
-      { status: NotificationStatus.UNREAD },
+      { status: NotificationStatus.READ },
     );
   }
 
   async markAsRead(id: string, userId: string) {
     return this.notificationRecipientRepo.update(
       { id, userId },
-      { status: NotificationStatus.READED },
+      { status: NotificationStatus.READ },
     );
   }
 }

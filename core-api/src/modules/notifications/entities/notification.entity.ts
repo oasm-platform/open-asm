@@ -10,6 +10,6 @@ export class Notification extends BaseEntity {
   @Column('jsonb')
   content: {
     key: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, string>;
   };
 }
