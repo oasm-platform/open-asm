@@ -1,9 +1,8 @@
 import { BullMQName, NotificationStatus } from '@/common/enums/enum';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, MessageEvent } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { filter, map, Observable, Subject } from 'rxjs';
 import { Repository } from 'typeorm';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
 
@@ -12,6 +11,7 @@ import { NotificationResponseDto } from './dto/notification.dto';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { RedisService } from '@/services/redis/redis.service';
 
 @Injectable()
 export class NotificationsService {
@@ -21,26 +21,15 @@ export class NotificationsService {
     @InjectRepository(NotificationRecipient)
     private notificationRecipientRepo: Repository<NotificationRecipient>,
     private readonly i18n: I18nService,
+    private readonly redisService: RedisService,
   ) {}
-
-  private notificationSubject = new Subject<{
-    userId: string;
-    data: NotificationRecipient;
-  }>();
 
   async createNotification(body: CreateNotificationDto) {
     await this.notificationQueue.add('create-notification', body);
   }
 
-  subscribeToStream(userId: string): Observable<MessageEvent> {
-    return this.notificationSubject.asObservable().pipe(
-      filter((event) => event.userId === userId),
-      map((event) => {
-        return {
-          data: event.data,
-        } as MessageEvent;
-      }),
-    );
+  subscribeToStream(userId: string) {
+    return this.redisService.client.subscribe(`notification:${userId}`);
   }
 
   async getNotifications(

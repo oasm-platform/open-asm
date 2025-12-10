@@ -7,10 +7,12 @@ import { In, Repository } from 'typeorm';
 import { NotificationRecipient } from '../entities/notification-recipient.entity';
 import { Notification } from '../entities/notification.entity';
 import { CreateNotificationDto } from '../dto/create-notification.dto';
+import { RedisService } from '@/services/redis/redis.service';
 
 @Processor(BullMQName.NOTIFICATION)
 export class NotificationsConsumer extends WorkerHost {
   constructor(
+    private readonly redisService: RedisService,
     @InjectRepository(Notification)
     private notificationRepo: Repository<Notification>,
     @InjectRepository(NotificationRecipient)
@@ -44,6 +46,16 @@ export class NotificationsConsumer extends WorkerHost {
 
     if (recipientEntities.length > 0) {
       await this.notificationRecipientRepo.save(recipientEntities);
+      for (const user of users) {
+        await this.redisService.client.publish(
+          `notification:${user.id}`,
+          JSON.stringify({
+            notificationId: notification.id,
+            type,
+            content,
+          }),
+        );
+      }
     }
   }
 }
