@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Sse,
   UseGuards,
 } from '@nestjs/common';
@@ -32,6 +33,7 @@ import {
   DeleteMcpServersResponseDto,
   UpdateMcpServersDto,
   UpdateMcpServersResponseDto,
+  GetMcpServerHealthResponseDto,
 } from './dto/mcp-servers.dto';
 import {
   CreateMessageDto,
@@ -155,6 +157,29 @@ export class AiAssistantController {
   }
 
   @Doc({
+    summary: 'Get MCP server health',
+    description: 'Gets the health status of a specific MCP server',
+    response: {
+      serialization: GetMcpServerHealthResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('mcp-servers/:serverName/health')
+  async getMcpServerHealth(
+    @Param('serverName') serverName: string,
+    @UserId() userId: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetMcpServerHealthResponseDto> {
+    return this.aiAssistantService.getMcpServerHealth(
+      serverName,
+      workspaceId,
+      userId,
+    );
+  }
+
+  @Doc({
     summary: 'Get all conversations',
     description:
       'Retrieves all conversations for the current workspace and user',
@@ -273,10 +298,18 @@ export class AiAssistantController {
   @ApiExcludeEndpoint()
   @Sse('messages/stream')
   createMessageStream(
-    @Body() createMessageDto: CreateMessageDto,
+    @Query('question') question: string,
+    @Query('conversationId') conversationId: string | undefined,
+    @Query('isCreateConversation') isCreateConversation: string | undefined,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Observable<{ data: string }> {
+    const createMessageDto: CreateMessageDto = {
+      question,
+      conversationId,
+      isCreateConversation: isCreateConversation === 'true',
+    };
+
     return this.aiAssistantService
       .createMessage(createMessageDto, workspaceId, userId)
       .pipe(
