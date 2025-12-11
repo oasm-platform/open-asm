@@ -22,7 +22,7 @@ FROM base AS builder
 
 WORKDIR /app
 # Set to production environment
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 COPY . .
 RUN bun install
@@ -32,7 +32,7 @@ RUN bun pm cache clean && rm -rf src test
 
 FROM base AS runner
 # Set to production environment
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 WORKDIR /app
 
