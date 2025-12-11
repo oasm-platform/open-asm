@@ -65,8 +65,10 @@ export function NotificationBell() {
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h4 className="font-semibold">Notifications</h4>
-          <Button variant="ghost" size="sm" className="justify-between">
-            <Link to="/notifications">View all</Link>
+          <Button variant="ghost" size="sm" className="justify-between" asChild>
+            <Link to="/notifications" onClick={() => setOpen(false)}>
+              View all
+            </Link>
           </Button>
         </div>
         <NotificationList />

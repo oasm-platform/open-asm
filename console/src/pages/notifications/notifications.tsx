@@ -9,7 +9,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
@@ -67,14 +66,6 @@ export default function NotificationsPage() {
         </CardHeader>
         <CardContent className="p-0">
           <NotificationList variant="page" />
-          <div className="border-t p-4 text-center">
-            <Link
-              to="/"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Back to Dashboard
-            </Link>
-          </div>
         </CardContent>
       </Card>
     </div>
