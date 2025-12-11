@@ -2160,6 +2160,164 @@ export function useTargetsControllerGetTargetsInWorkspace<
 }
 
 /**
+ * Exports all targets in a workspace to a CSV file containing value, last discovered date, and creation date for reporting and analysis purposes.
+ * @summary Export targets to CSV
+ */
+export const targetsControllerExportTargetsToCSV = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/targets/export`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getTargetsControllerExportTargetsToCSVQueryKey = () => {
+  return [`/api/targets/export`] as const;
+};
+
+export const getTargetsControllerExportTargetsToCSVQueryOptions = <
+  TData = Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getTargetsControllerExportTargetsToCSVQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>
+  > = ({ signal }) =>
+    targetsControllerExportTargetsToCSV(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerExportTargetsToCSVQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>
+>;
+export type TargetsControllerExportTargetsToCSVQueryError = unknown;
+
+export function useTargetsControllerExportTargetsToCSV<
+  TData = Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerExportTargetsToCSV<
+  TData = Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerExportTargetsToCSV<
+  TData = Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Export targets to CSV
+ */
+
+export function useTargetsControllerExportTargetsToCSV<
+  TData = Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerExportTargetsToCSV>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getTargetsControllerExportTargetsToCSVQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Fetches detailed information about a specific security testing target using its unique identifier, including configuration and assessment status.
  * @summary Get a target by ID
  */

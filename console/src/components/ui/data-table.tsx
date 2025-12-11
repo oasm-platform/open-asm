@@ -59,6 +59,7 @@ interface DataTableProps<TData, TValue> {
   onSortChange?: (sortBy: string, sortOrder: 'ASC' | 'DESC') => void;
   emptyMessage?: string;
   filterComponents?: React.JSX.Element[];
+  toolbarComponents?: React.JSX.Element[];
   isShowHeader?: boolean;
   isShowBorder?: boolean;
   tableState?: {
@@ -86,6 +87,7 @@ export function DataTable<TData, TValue>({
   sortOrder,
   onSortChange,
   emptyMessage = 'No data',
+  toolbarComponents = [],
   filterComponents,
   isShowHeader = true,
   isShowBorder = true,
@@ -123,7 +125,9 @@ export function DataTable<TData, TValue>({
     manualFiltering: true,
     manualSorting: true,
     enableRowSelection: true,
-    onRowSelectionChange: tableState?.rowSelection ? setRowSelection : setRowSelection,
+    onRowSelectionChange: tableState?.rowSelection
+      ? setRowSelection
+      : setRowSelection,
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
   });
@@ -159,20 +163,25 @@ export function DataTable<TData, TValue>({
   return (
     <div className="w-full">
       {/* Filter and column visibility controls */}
-      {filterColumnKey && (
-        <div className="flex items-center gap-4 py-1">
-          <Input
-            placeholder={filterPlaceholder}
-            className="max-w-sm"
-            value={searchValue}
-            onChange={(e) => {
-              setSearchValue(e.target.value);
-            }}
-          />
-        </div>
-      )}
+      <div className="flex justify-between items-center">
+        <div>
+          {filterColumnKey && (
+            <div className="flex items-center gap-4 py-1">
+              <Input
+                placeholder={filterPlaceholder}
+                className="max-w-sm"
+                value={searchValue}
+                onChange={(e) => {
+                  setSearchValue(e.target.value);
+                }}
+              />
+            </div>
+          )}
 
-      {filterComponents}
+          {filterComponents}
+        </div>
+        <div className="mx-1 gap-2 flex">{toolbarComponents.map((c) => c)}</div>
+      </div>
 
       {/* Table */}
       <div className={cn('rounded-md', isShowBorder && 'border')}>

@@ -1,34 +1,35 @@
-import { type ColumnDef } from "@tanstack/react-table";
-import dayjs from "dayjs";
-import duration from "dayjs/plugin/duration";
+import { type ColumnDef } from '@tanstack/react-table';
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration';
 dayjs.extend(duration);
 
-import { DataTable } from "@/components/ui/data-table";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useTargetsControllerGetTargetsInWorkspace } from "@/services/apis/gen/queries";
+import { DataTable } from '@/components/ui/data-table';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useTargetsControllerGetTargetsInWorkspace } from '@/services/apis/gen/queries';
 
-import TargetStatus from "@/components/ui/target-status";
-import { useServerDataTable } from "@/hooks/useServerDataTable";
+import TargetStatus from '@/components/ui/target-status';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type {
   GetManyTargetResponseDto,
   JobStatus,
-} from "@/services/apis/gen/queries";
-import { useNavigate } from "react-router-dom";
-import CreateWorkspace from "../workspaces/create-workspace";
+} from '@/services/apis/gen/queries';
+import { useNavigate } from 'react-router-dom';
+import CreateWorkspace from '../workspaces/create-workspace';
+import ExportTargetsButton from './components/export-targets-button';
 
 const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   {
-    accessorKey: "value",
-    header: "Target",
+    accessorKey: 'value',
+    header: 'Target',
     cell: ({ row }) => (
-      <div className="font-medium">{row.getValue("value")}</div>
+      <div className="font-medium">{row.getValue('value')}</div>
     ),
   },
   {
-    accessorKey: "totalAssets",
-    header: "Total assets",
+    accessorKey: 'totalAssets',
+    header: 'Total assets',
     cell: ({ row }) => {
-      const value: string = row.getValue("totalAssets");
+      const value: string = row.getValue('totalAssets');
       return (
         <div>
           <b>{value}</b> assets
@@ -61,10 +62,10 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   //   },
   // },
   {
-    accessorKey: "lastDiscoveredAt",
-    header: "Last Discovered At",
+    accessorKey: 'lastDiscoveredAt',
+    header: 'Last Discovered At',
     cell: ({ row }) => {
-      const value: string = row.getValue("lastDiscoveredAt");
+      const value: string = row.getValue('lastDiscoveredAt');
       return (
         <div className="text-gray-400 font-semibold">
           {new Date(value).toLocaleString()}
@@ -73,10 +74,10 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     },
   },
   {
-    accessorKey: "status",
-    header: "Scan status",
+    accessorKey: 'status',
+    header: 'Scan status',
     cell: ({ row }) => {
-      const value: JobStatus = row.getValue("status");
+      const value: JobStatus = row.getValue('status');
       return <TargetStatus status={value} />;
     },
   },
@@ -103,7 +104,7 @@ export function ListTargets() {
       query: {
         refetchInterval: 3000,
         queryKey: [
-          "targets",
+          'targets',
           selectedWorkspace,
           pageSize,
           page,
@@ -143,6 +144,7 @@ export function ListTargets() {
       filterColumnKey="value"
       filterValue={filter}
       onFilterChange={setFilter}
+      toolbarComponents={[<ExportTargetsButton />]}
       totalItems={total}
       onRowClick={handleRowClick}
       rowClassName="cursor-pointer hover:bg-muted/50 transition-colors"
