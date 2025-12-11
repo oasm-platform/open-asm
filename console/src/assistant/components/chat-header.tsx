@@ -145,7 +145,7 @@ export function ChatHeader({
                         <span className="text-[10px] text-muted-foreground whitespace-nowrap opacity-70 flex-shrink-0 group-hover:hidden">
                           {session.createdAt
                             ? new Date(session.createdAt).toLocaleDateString(
-                                'vi-VN',
+                                undefined,
                                 {
                                   day: '2-digit',
                                   month: '2-digit',

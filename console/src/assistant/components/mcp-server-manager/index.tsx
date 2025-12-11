@@ -247,7 +247,7 @@ function McpServerManagerContent({
         <div className="flex-1 overflow-hidden flex flex-col gap-0">
           {/* Top Section: Server List & Actions */}
           <div
-            className={`bg-background border-b overflow-y-auto custom-scrollbar ${
+            className={`bg-background border-b overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
               showEditor ? 'h-1/2' : 'h-full'
             }`}
           >
@@ -272,20 +272,6 @@ function McpServerManagerContent({
           )}
         </div>
       </DialogContent>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 0px;
-          display: none;
-        }
-        .custom-scrollbar {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-      `,
-        }}
-      />
     </Dialog>
   );
 }

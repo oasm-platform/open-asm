@@ -28,11 +28,7 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
   } = useAssistant();
 
   // Find current session
-  const currentSession = sessions.find(
-    (s) =>
-      s.id === currentConversationId ||
-      s.conversationId === currentConversationId,
-  );
+  const currentSession = sessions.find((s) => s.id === currentConversationId);
 
   const handleSendMessage = async (text?: string) => {
     const messageText = typeof text === 'string' ? text : inputMessage;
@@ -50,7 +46,6 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
       await sendMessage(messageText, isNewConversation);
     } catch (error) {
       console.error('❌ Failed to send message:', error);
-      // Optionally show error to user
     }
   };
 
@@ -142,9 +137,9 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-2.5 w-full max-w-sm">
-                  {suggestions.map((s, i) => (
+                  {suggestions.map((s) => (
                     <Button
-                      key={i}
+                      key={s}
                       variant="outline"
                       className="justify-start h-auto py-3 px-4 text-left whitespace-normal shadow-sm hover:shadow-md hover:border-primary/50 hover:bg-primary/5 transition-all w-full rounded-xl border-dashed border-zinc-300 dark:border-zinc-700"
                       onClick={() => handleSendMessage(s)}

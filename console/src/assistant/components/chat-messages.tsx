@@ -1,18 +1,20 @@
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
 import type { ChatMessagesProps } from '../types/types';
 
 export function ChatMessages({ messages }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Deduplicate messages (consecutive same type & content)
-  const uniqueMessages = messages.filter((msg, index) => {
-    if (index === 0) return true;
-    const prev = messages[index - 1];
-    if (msg.type === prev.type && msg.content === prev.content) {
-      return false;
-    }
-    return true;
-  });
+  const uniqueMessages = useMemo(() => {
+    return messages.filter((msg, index) => {
+      if (index === 0) return true;
+      const prev = messages[index - 1];
+      if (msg.type === prev.type && msg.content === prev.content) {
+        return false;
+      }
+      return true;
+    });
+  }, [messages]);
 
   return (
     <div className="flex-1 overflow-y-auto mb-4 space-y-4 px-2 pt-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-300 transition-colors">
