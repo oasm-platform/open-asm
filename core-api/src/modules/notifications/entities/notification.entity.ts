@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { NotificationType } from '@/common/enums/enum';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 
 @Entity('notifications')
 export class Notification extends BaseEntity {
@@ -12,4 +13,11 @@ export class Notification extends BaseEntity {
     key: string;
     metadata?: Record<string, string>;
   };
+
+  @Column({ type: 'uuid', nullable: true })
+  workspaceId?: string;
+
+  @ManyToOne(() => Workspace)
+  @JoinColumn({ name: 'workspaceId' })
+  workspace: Workspace;
 }
