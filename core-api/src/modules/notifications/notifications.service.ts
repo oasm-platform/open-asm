@@ -29,7 +29,7 @@ export class NotificationsService {
   }
 
   subscribeToStream(userId: string) {
-    return this.redisService.client.subscribe(`notification:${userId}`);
+    return this.redisService.subscriber.subscribe(`notification:${userId}`);
   }
 
   async getNotifications(

@@ -15,6 +15,12 @@ export class RedisService implements OnModuleDestroy {
   public readonly client: Redis;
 
   /**
+   * Dedicated Redis client instance for caching operations (get/set/setex).
+   * This is separate from pub/sub to avoid "subscriber mode" conflicts.
+   */
+  public readonly cacheClient: Redis;
+
+  /**
    * Redis client instance for publishing messages.
    */
   public readonly publisher: Redis;
@@ -32,7 +38,8 @@ export class RedisService implements OnModuleDestroy {
       }
 
       this.client = new Redis(redisUrl);
-      this.publisher = this.client;
+      this.cacheClient = this.client.duplicate();
+      this.publisher = this.client.duplicate();
       this.subscriber = this.client.duplicate();
     } catch (error: unknown) {
       const errorMessage =
@@ -48,6 +55,8 @@ export class RedisService implements OnModuleDestroy {
     try {
       await Promise.all([
         this.client?.disconnect(),
+        this.cacheClient?.disconnect(),
+        this.publisher?.disconnect(),
         this.subscriber?.disconnect(),
       ]);
     } catch (error: unknown) {

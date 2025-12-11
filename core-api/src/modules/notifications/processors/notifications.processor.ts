@@ -47,7 +47,7 @@ export class NotificationsConsumer extends WorkerHost {
     if (recipientEntities.length > 0) {
       await this.notificationRecipientRepo.save(recipientEntities);
       for (const user of users) {
-        await this.redisService.client.publish(
+        await this.redisService.publisher.publish(
           `notification:${user.id}`,
           JSON.stringify({
             notificationId: notification.id,
