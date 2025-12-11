@@ -152,24 +152,23 @@ export class AssetsService {
 
     const offset = (query.page - 1) * query.limit;
 
-    const queryBuilder = this.buildBaseQuery(query, workspaceId)
-      .andWhere('"statusCodeAssets"."statusCode" != 0')
-      .select([
-        'assetServices.value',
-        'assetServices.port',
-        'assetServices.id',
-        'asset.isEnabled',
-        'asset.targetId',
-        'assetServices.createdAt',
-        'ipAssets.ipAddress',
-        'httpResponses.tech',
-        'httpResponses.title',
-        'httpResponses.tls',
-        'httpResponses.chain_status_codes',
-        'httpResponses.status_code',
-        'httpResponses.url',
-        'httpResponses.favicon_url',
-      ]);
+    const queryBuilder = this.buildBaseQuery(query, workspaceId).select([
+      'assetServices.value',
+      'assetServices.port',
+      'assetServices.id',
+      'asset.isEnabled',
+      'asset.targetId',
+      'assetServices.createdAt',
+      'ipAssets.ipAddress',
+      'httpResponses.tech',
+      'httpResponses.id',
+      'httpResponses.title',
+      'httpResponses.tls',
+      'httpResponses.chain_status_codes',
+      'httpResponses.status_code',
+      'httpResponses.url',
+      'httpResponses.favicon_url',
+    ]);
 
     if (query.value) {
       queryBuilder.andWhere('assetServices.value ILIKE :value', {
@@ -416,28 +415,12 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.assetServiceRepo
-      .createQueryBuilder('assetServices')
-      .leftJoin('assetServices.asset', 'asset')
-      .leftJoin('asset.target', 'targets')
-      .leftJoin(
-        'assetServices.httpResponses',
-        'httpResponses',
-        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
-      )
-      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .leftJoin('asset.ipAssets', 'ipAssets')
-      .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
-      .where('"assetServices"."isErrorPage" = false')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
-        workspaceId,
-      })
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
         '"ipAssets"."ip"',
-        'COUNT(DISTINCT "asset"."id") as "assetCount"',
+        'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
       ])
       .andWhere('"ipAssets"."ip" IS NOT NULL')
-      .distinct(true)
       .groupBy('"ipAssets"."ip"');
 
     if (query.value) {
@@ -492,27 +475,11 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.assetServiceRepo
-      .createQueryBuilder('assetServices')
-      .leftJoin('assetServices.asset', 'asset')
-      .leftJoin('asset.target', 'targets')
-      .leftJoin(
-        'assetServices.httpResponses',
-        'httpResponses',
-        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
-      )
-      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .leftJoin('asset.ipAssets', 'ipAssets')
-      .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
-      .where('"assetServices"."isErrorPage" = false')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
-        workspaceId,
-      })
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
         'assetServices.port as port',
-        'COUNT(DISTINCT "asset"."id") as "assetCount"',
+        'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
       ])
-      .distinct(true)
       .groupBy('assetServices.port');
 
     if (query.value) {
@@ -561,37 +528,22 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.assetServiceRepo
-      .createQueryBuilder('assetServices')
-      .leftJoin('assetServices.asset', 'asset')
-      .leftJoin('asset.target', 'targets')
-      .leftJoin(
-        'assetServices.httpResponses',
-        'httpResponses',
-        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
-      )
-      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .leftJoin('asset.ipAssets', 'ipAssets')
-      .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
-      .where('"assetServices"."isErrorPage" = false')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
-        workspaceId,
-      })
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .innerJoin(
         (subQuery) =>
           subQuery
             .select('"httpResponses"."assetServiceId"', 'assetId')
             .addSelect('unnest("httpResponses"."tech")', 'technology')
+            .addSelect('"httpResponses"."createdAt"', 'createdAt')
             .from(HttpResponse, 'httpResponses'),
         'sq',
-        '"sq"."assetId" = "assetServices"."id"',
+        '"sq"."assetId" = "assetServices"."id" AND "sq"."createdAt" = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
       )
       .select([
         '"sq"."technology"',
         'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
       ])
       .andWhere('"sq"."technology" IS NOT NULL')
-      .distinct(true)
       .groupBy('"sq"."technology"');
 
     if (query.value) {
@@ -670,29 +622,11 @@ export class AssetsService {
       query.sortBy = '"assetCount"';
     }
 
-    const queryBuilder = this.assetServiceRepo
-      .createQueryBuilder('assetServices')
-      .leftJoin('assetServices.asset', 'asset')
-      .leftJoin('asset.target', 'targets')
-      .leftJoin(
-        'assetServices.httpResponses',
-        'httpResponses',
-        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
-      )
-      .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .leftJoin('asset.ipAssets', 'ipAssets')
-      .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
-      .where('"assetServices"."isErrorPage" = false')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
-        workspaceId,
-      })
-      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
-      .andWhere('"statusCodeAssets"."statusCode" != 0')
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
         '"statusCodeAssets"."statusCode"',
         'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
       ])
-      .distinct(true)
       .groupBy('"statusCodeAssets"."statusCode"');
 
     if (query.value) {

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsObject, IsUUID } from 'class-validator';
+import { IsObject, IsUUID, IsNotEmpty } from 'class-validator';
 
 /**
  * MCP Server configuration matching Claude Desktop format
@@ -16,6 +16,12 @@ export interface McpServerConfig {
 
   // Server state
   disabled?: boolean;
+
+  // Tool filtering
+  allowed_tools?: string[] | null; // null or empty means all tools allowed
+
+  // Timeout configuration
+  timeout?: number; // timeout in seconds, default 60
 }
 
 /**
@@ -29,11 +35,25 @@ export interface McpServerConfigWithStatus {
   args?: string[];
   env?: Record<string, string>;
   disabled?: boolean;
+  allowed_tools?: string[] | null;
+  timeout?: number;
 
   // Status fields (added by backend)
   active: boolean;
   status: 'active' | 'disabled' | 'error';
   error?: string;
+
+  // Tools and resources (added by backend)
+  tools?: Array<{
+    name: string;
+    description?: string;
+    inputSchema?: any;
+  }>;
+  resources?: Array<{
+    uri: string;
+    name: string;
+    mimeType?: string;
+  }>;
 }
 
 /**
@@ -159,7 +179,7 @@ export class UpdateMcpServersDto {
       },
     },
   })
-  @IsObject()
+  @IsNotEmpty()
   mcpServers: Record<string, McpServerConfig>;
 }
 
@@ -227,4 +247,38 @@ export class DeleteMcpServersResponseDto {
 
   @ApiProperty({ description: 'Response message', required: false })
   message?: string;
+}
+
+/**
+ * DTO for getting MCP server health
+ */
+export class GetMcpServerHealthDto {
+  @ApiProperty({
+    description: 'Name of the MCP server to check',
+    example: 'oasm-platform',
+  })
+  @IsNotEmpty()
+  serverName: string;
+}
+
+/**
+ * Response DTO for getting MCP server health
+ */
+export class GetMcpServerHealthResponseDto {
+  @ApiProperty({
+    description: 'Whether the server is active and operational',
+  })
+  isActive: boolean;
+
+  @ApiProperty({
+    description: 'Server status: active, disabled, or error',
+    enum: ['active', 'disabled', 'error'],
+  })
+  status: 'active' | 'disabled' | 'error';
+
+  @ApiProperty({
+    description: 'Error message if status is error',
+    required: false,
+  })
+  error?: string;
 }
