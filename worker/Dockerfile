@@ -2,8 +2,7 @@ FROM golang:1.25-alpine AS tools-base
 
 WORKDIR /app
 
-RUN apk add --no-cache gcc musl-dev libpcap-dev nmap && \
-    go install github.com/go-task/task/v3/cmd/task@latest
+RUN apk add --no-cache gcc musl-dev libpcap-dev nmap
 
 FROM tools-base AS tools
 
@@ -13,6 +12,7 @@ COPY taskfile.yml .
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
+    go install github.com/go-task/task/v3/cmd/task@latest && \
     task tools
 
 FROM node:22-alpine AS base
@@ -42,6 +42,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
 COPY --from=tools /go/bin /usr/local/bin/
+COPY --from=tools /root/.pdtm/go/bin /usr/local/bin/
 ENV PATH="/usr/local/bin:$PATH"
 
 COPY entrypoint.sh /entrypoint.sh
