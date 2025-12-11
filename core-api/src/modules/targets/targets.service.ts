@@ -331,4 +331,35 @@ export class TargetsService implements OnModuleInit {
       await this.repo.update(target.id, { jobId: job.repeatJobKey });
     }
   }
+
+  /**
+   * Export targets data for CSV export in a specific workspace
+   * Returns array of targets with value, lastDiscoveredAt, and createdAt fields
+   */
+  public async exportTargetsForCSV(workspaceId: string): Promise<
+    Array<{
+      value: string;
+      lastDiscoveredAt: Date;
+      createdAt: Date;
+    }>
+  > {
+    const targets = await this.repo
+      .createQueryBuilder('targets')
+      .innerJoin('targets.workspaceTargets', 'workspaceTarget')
+      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .where('workspace.id = :workspaceId', { workspaceId })
+      .select([
+        'targets.value as value',
+        'targets.lastDiscoveredAt as "lastDiscoveredAt"',
+        'targets.createdAt as "createdAt"',
+      ])
+      .orderBy('targets.createdAt', 'ASC')
+      .getRawMany<{
+        value: string;
+        lastDiscoveredAt: Date;
+        createdAt: Date;
+      }>();
+
+    return targets;
+  }
 }
