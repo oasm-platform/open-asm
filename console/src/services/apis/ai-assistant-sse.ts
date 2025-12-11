@@ -69,12 +69,6 @@ export async function* createMessageStream(
 
   const url = `/api/ai-assistant/messages/stream?${params.toString()}`;
 
-  console.log('🌐 Fetching SSE stream:', {
-    url,
-    method: 'GET',
-    dto,
-  });
-
   const workspaceId = getGlobalWorkspaceId();
   const headers: HeadersInit = {
     Accept: 'text/event-stream',
@@ -88,12 +82,6 @@ export async function* createMessageStream(
     method: 'GET',
     headers,
     credentials: 'include', // Include cookies for authentication
-  });
-
-  console.log('📡 SSE Response:', {
-    status: response.status,
-    statusText: response.statusText,
-    headers: Object.fromEntries(response.headers.entries()),
   });
 
   if (!response.ok) {

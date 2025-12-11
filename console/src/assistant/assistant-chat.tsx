@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription } from '@/components/ui/sheet';
@@ -27,16 +27,6 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
     updateConversation,
   } = useAssistant();
 
-  // Debug logging
-  useEffect(() => {
-    console.log('🔍 Assistant Debug:', {
-      sessionsCount: sessions.length,
-      messagesCount: messages.length,
-      currentConversationId,
-      isStreaming,
-    });
-  }, [sessions, messages, currentConversationId, isStreaming]);
-
   // Find current session
   const currentSession = sessions.find(
     (s) =>
@@ -55,11 +45,9 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
     }
 
     try {
-      console.log('📤 Sending message:', messageText);
       // If no conversation is selected, create a new one
       const isNewConversation = !currentConversationId;
       await sendMessage(messageText, isNewConversation);
-      console.log('✅ Message sent successfully');
     } catch (error) {
       console.error('❌ Failed to send message:', error);
       // Optionally show error to user
@@ -74,12 +62,10 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
   };
 
   const handleNewConversation = () => {
-    console.log('🆕 Creating new conversation');
     createNewConversation();
   };
 
   const handleSelectSession = (sessionId: string) => {
-    console.log('📂 Selecting conversation:', sessionId);
     selectConversation(sessionId);
   };
 

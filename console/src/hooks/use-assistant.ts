@@ -56,21 +56,9 @@ export function useAssistant() {
   // Update messages when data changes
   useEffect(() => {
     if (messagesData?.messages && !internalIsStreaming) {
-      console.log('📨 Messages data updated:', messagesData.messages.length);
       setMessages(messagesData.messages);
     }
   }, [messagesData, internalIsStreaming]);
-
-  // Debug conversations data
-  useEffect(() => {
-    if (conversationsData?.conversations) {
-      console.log(
-        '💬 Conversations loaded:',
-        conversationsData.conversations.length,
-      );
-      console.log('Conversations:', conversationsData.conversations);
-    }
-  }, [conversationsData]);
 
   // Delete conversation mutation
   const { mutateAsync: deleteConversationMutation } =
@@ -137,12 +125,6 @@ export function useAssistant() {
       const placeholderId = assistantPlaceholder.messageId;
 
       try {
-        console.log('🌊 Starting SSE stream...', {
-          question,
-          isNewConversation,
-          currentConversationId,
-        });
-
         for await (const event of createMessageStream({
           question,
           conversationId: isNewConversation ? undefined : currentConversationId,
@@ -150,8 +132,6 @@ export function useAssistant() {
         })) {
           // Reverted blocking logic ("Stop Jumping") as per user request.
           // Stream will continue to update global state and force navigation.
-
-          console.log('📡 SSE Event received:', event.type, event.data);
 
           // Update streaming status for UI
           const eventType =
@@ -171,10 +151,6 @@ export function useAssistant() {
             'conversationId' in event.data &&
             typeof event.data.conversationId === 'string'
           ) {
-            console.log(
-              '🆕 New conversation created:',
-              event.data.conversationId,
-            );
             setCurrentConversationId(event.data.conversationId);
             // Update streaming ID to follow the conversation
             setStreamingConversationId(event.data.conversationId);
@@ -248,7 +224,6 @@ export function useAssistant() {
           }
         }
 
-        console.log('✅ SSE stream completed');
         // Clear streaming status
         setStreamingStatus({});
         // Refetch to get the final state (Only if we are still close?)

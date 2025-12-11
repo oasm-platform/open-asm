@@ -98,21 +98,21 @@ export function ChatHeader({
             onClick={() => setIsSidebarOpen(false)}
           />
 
-          <div className="absolute top-14 left-0 right-0 z-50 flex justify-center animate-in fade-in slide-in-from-top-5 duration-200 pointer-events-none">
-            <div className="w-[95%] max-w-2xl bg-background/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl pointer-events-auto p-4 flex flex-col gap-3">
+          <div className="fixed inset-0 z-50 flex items-center justify-center animate-in fade-in zoom-in-95 duration-200 pointer-events-none p-4 sm:p-6">
+            <div className="w-full max-w-4xl bg-background/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl pointer-events-auto p-6 flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold ml-1">Chat History</h3>
+                <h3 className="text-lg font-semibold ml-1">Chat History</h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6"
+                  className="h-8 w-8"
                   onClick={() => setIsSidebarOpen(false)}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-5 w-5" />
                 </Button>
               </div>
 
-              <div className="space-y-1 max-h-[60vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+              <div className="space-y-1 max-h-[70vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
                 {[...sessions]
                   .sort(
                     (a, b) =>
