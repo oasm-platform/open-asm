@@ -56,9 +56,26 @@ function FacetedFilterTemplate({
   setValue,
 }: FacetedFilterTemplateProps) {
   const parentRef = useRef(null);
+  const selectedValues = useMemo(() => new Set(paramValues), [paramValues]);
 
+  const sortedOptions = useMemo(() => {
+    if (!options) return [];
+
+    return [...options].sort((a, b) => {
+      const aIsSelected = selectedValues.has(a.value.toString());
+      const bIsSelected = selectedValues.has(b.value.toString());
+
+      // If both are selected or both are not selected, maintain original order
+      if (aIsSelected && bIsSelected) return 0;
+      if (aIsSelected && !bIsSelected) return -1;
+      if (!aIsSelected && bIsSelected) return 1;
+
+      // Otherwise, maintain original order
+      return 0;
+    });
+  }, [options, selectedValues]);
   const rowVirtualizer = useVirtualizer({
-    count: hasNextPage ? options.length + 1 : options.length,
+    count: hasNextPage ? sortedOptions.length + 1 : sortedOptions.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 36,
     overscan: 5,
@@ -70,7 +87,7 @@ function FacetedFilterTemplate({
     const lastItem = virtualItems[virtualItems.length - 1];
     if (
       lastItem &&
-      lastItem.index >= options.length - 1 &&
+      lastItem.index >= sortedOptions.length - 1 &&
       hasNextPage &&
       !isFetchingNextPage
     ) {
@@ -81,11 +98,12 @@ function FacetedFilterTemplate({
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-    options.length,
+    sortedOptions.length,
   ]);
 
-  const selectedValues = useMemo(() => new Set(paramValues), [paramValues]);
   const { filterHandlers } = useAsset();
+
+  // Sort options to show selected items at the top
 
   const handleFilterChange = (value: number | string) => {
     if (selectedValues.has(value.toString())) {
@@ -124,7 +142,7 @@ function FacetedFilterTemplate({
                     {selectedValues.size} selected
                   </Badge>
                 ) : (
-                  options
+                  sortedOptions
                     .filter((option) =>
                       selectedValues.has(option?.value?.toString()),
                     )
@@ -150,7 +168,7 @@ function FacetedFilterTemplate({
             onChangeCapture={(e) => setValue(e.currentTarget.value)}
           />
 
-          {options.length === 0 && !isFetching && (
+          {sortedOptions.length === 0 && !isFetching && (
             <div className="p-2 text-center text-sm text-muted-foreground">
               No results found.
             </div>
@@ -171,8 +189,8 @@ function FacetedFilterTemplate({
               }}
             >
               {virtualItems.map((virtualRow) => {
-                const isLoaderRow = virtualRow.index > options.length - 1;
-                const option = options[virtualRow.index];
+                const isLoaderRow = virtualRow.index > sortedOptions.length - 1;
+                const option = sortedOptions[virtualRow.index];
                 const isSelected = selectedValues.has(
                   option?.value?.toString(),
                 );
