@@ -9,14 +9,14 @@ export class NotificationRecipient extends BaseEntity {
   @Column({ type: 'uuid' })
   notificationId: string;
 
-  @ManyToOne(() => Notification)
+  @ManyToOne(() => Notification, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'notificationId' })
   notification: Notification;
 
   @Column({ type: 'uuid' })
   userId: string;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
 

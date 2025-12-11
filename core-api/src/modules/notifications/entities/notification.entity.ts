@@ -17,7 +17,7 @@ export class Notification extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   workspaceId?: string;
 
-  @ManyToOne(() => Workspace)
+  @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 }
