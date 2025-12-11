@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     task tools
 
 FROM node:22-alpine AS base
-RUN apk add --no-cache curl nmap && npm install -g bun@1.3
+RUN apk add --no-cache curl nmap && npm install -g bun
 
 FROM base AS builder
 

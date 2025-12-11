@@ -2,7 +2,7 @@ FROM node:22-alpine AS base
 # Install BASH to make our lives easier for entrypoint.sh...
 RUN apk add --no-cache curl bash && \
     npm install -g serve && \
-    npm install -g bun@1.3
+    npm install -g bun
 
 WORKDIR /app
 
