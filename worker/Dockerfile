@@ -2,7 +2,7 @@ FROM golang:1.25-alpine AS tools-base
 
 WORKDIR /app
 
-RUN apk add --no-cache gcc musl-dev libpcap-dev && \
+RUN apk add --no-cache gcc musl-dev libpcap-dev nmap && \
     go install github.com/go-task/task/v3/cmd/task@latest
 
 FROM tools-base AS tools
@@ -47,5 +47,5 @@ ENV PATH="/usr/local/bin:$PATH"
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
 CMD ["bun", "dist/index.js"]

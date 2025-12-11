@@ -30,8 +30,5 @@ tasks:
 
   tools:
     cmds:
-      - go install github.com/projectdiscovery/httpx/cmd/httpx@latest
-      - go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-      - go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-      - go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest
-      - go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+      - go install -v github.com/projectdiscovery/pdtm/cmd/pdtm@latest
+      - pdtm -duc -dc -install-go-path -install httpx,subfinder,nuclei,dnsx,naabu
