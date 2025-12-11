@@ -38,8 +38,7 @@ function getRootDomain(domainOrUrl: string): string {
     const parsed = psl.parse(hostname);
 
     if (parsed.error) {
-      const parts = hostname.split('.');
-      return parts.length > 1 ? parts.slice(-2).join('.') : hostname;
+      return hostname;
     }
 
     return parsed.domain || hostname;
