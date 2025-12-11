@@ -26,6 +26,29 @@ type FormValues = {
   value: string;
 };
 
+function getRootDomain(domainOrUrl: string): string {
+  try {
+    let urlString = domainOrUrl.trim();
+    if (!urlString.match(/^[a-zA-Z]+:\/\//)) {
+      urlString = `http://${urlString}`;
+    }
+
+    const url = new URL(urlString);
+    const hostname = url.hostname.toLowerCase();
+    const parts = hostname.split('.');
+    if (parts.length > 2) {
+      const secondLevelTlds = ['co', 'com', 'org', 'net', 'gov', 'edu', 'ac'];
+      if (secondLevelTlds.includes(parts[parts.length - 2])) {
+        return parts.slice(-3).join('.');
+      }
+      return parts.slice(-2).join('.');
+    }
+    return hostname;
+  } catch {
+    return domainOrUrl.trim();
+  }
+}
+
 export function CreateTarget() {
   const [open, setOpen] = useState(false);
   const { selectedWorkspace, workspaces } = useWorkspaceSelector();
@@ -65,32 +88,6 @@ export function CreateTarget() {
           },
         },
       );
-  }
-
-  function getRootDomain(domainOrUrl: string): string {
-    // 1. Prepend protocol if missing to handle naked domains/subdomains without a scheme
-    let urlString = domainOrUrl.trim();
-    if (!urlString.match(/^[a-zA-Z]+:\/\//)) {
-      urlString = `http://${urlString}`;
-    }
-
-    const url = new URL(urlString);
-    let hostname = url.hostname.toLowerCase();
-
-    // Remove port if present
-    if (url.port) {
-      hostname = hostname.replace(`:${url.port}`, '');
-    }
-
-    // 2. Simple logic to extract root domain (may not handle all TLD exceptions perfectly,
-    // but is sufficient for common cases and security target input)
-    const parts = hostname.split('.');
-    if (parts.length > 2) {
-      // Return the last two parts (e.g., 'sub.example.co.uk' -> 'co.uk' is complex,
-      // but 'sub.example.com' -> 'example.com' is achieved by taking the last two parts)
-      return parts.slice(-2).join('.');
-    }
-    return hostname;
   }
 
   const title = isAssetsDiscovery ? 'Start discovery' : 'Create target';
