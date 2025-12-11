@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import psl from 'psl';
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
 
@@ -33,17 +34,15 @@ function getRootDomain(domainOrUrl: string): string {
       urlString = `http://${urlString}`;
     }
 
-    const url = new URL(urlString);
-    const hostname = url.hostname.toLowerCase();
-    const parts = hostname.split('.');
-    if (parts.length > 2) {
-      const secondLevelTlds = ['co', 'com', 'org', 'net', 'gov', 'edu', 'ac'];
-      if (secondLevelTlds.includes(parts[parts.length - 2])) {
-        return parts.slice(-3).join('.');
-      }
-      return parts.slice(-2).join('.');
+    const hostname = new URL(urlString).hostname;
+    const parsed = psl.parse(hostname);
+
+    if (parsed.error) {
+      const parts = hostname.split('.');
+      return parts.length > 1 ? parts.slice(-2).join('.') : hostname;
     }
-    return hostname;
+
+    return parsed.domain || hostname;
   } catch {
     return domainOrUrl.trim();
   }
