@@ -2,14 +2,20 @@ import { useRef, useEffect, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Sparkles } from 'lucide-react';
-import type { ChatInputProps } from '../types/types';
+
+type ChatInputProps = {
+  inputMessage: string;
+  setInputMessage: (value: string) => void;
+  onSendMessage: () => void;
+  isSending: boolean;
+};
 
 export const ChatInput = memo(function ChatInput({
   inputMessage,
   setInputMessage,
   onSendMessage,
   isSending,
-}: Omit<ChatInputProps, 'onKeyPress'>) {
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
