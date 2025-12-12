@@ -1,3 +1,4 @@
+import ExportDataButton from '@/components/ui/export-button';
 import { Tabs } from '@/components/ui/tabs';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useMemo, useState } from 'react';
@@ -57,7 +58,10 @@ export function ListAssets() {
     <div className="w-full">
       {/* FilterFormInfinite always on top */}
       <div className="mb-4">
-        <FilterFormInfinite />
+        <div className="flex justify-between items-center">
+          <FilterFormInfinite />
+          <ExportDataButton api="api/assets/services/export" prefix="assets" />
+        </div>
       </div>
 
       <Tabs

@@ -1825,6 +1825,22 @@ export class Api<
     });
 
   /**
+   * @description Exports all targets in a workspace to a CSV file containing value, last discovered date, and creation date for reporting and analysis purposes.
+   *
+   * @tags Targets
+   * @name TargetsControllerExportTargetsToCsv
+   * @summary Export targets to CSV
+   * @request GET:/api/targets/export
+   */
+  targetsControllerExportTargetsToCsv = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/targets/export`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Fetches detailed information about a specific security testing target using its unique identifier, including configuration and assessment status.
    *
    * @tags Targets
@@ -2515,6 +2531,22 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Exports all services in a workspace to a CSV file containing value, ports, technologies, and TLS information for reporting and analysis purposes.
+   *
+   * @tags Assets
+   * @name AssetsControllerExportServicesToCsv
+   * @summary Export services to CSV
+   * @request GET:/api/assets/services/export
+   */
+  assetsControllerExportServicesToCsv = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/services/export`,
+      method: "GET",
       format: "json",
       ...params,
     });

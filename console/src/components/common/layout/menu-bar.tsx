@@ -32,7 +32,6 @@ import { NewBadge } from '../new-badge';
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
   const { state, isMobile, setOpenMobile } = useSidebar();
-
   const menu = [
     {
       title: 'Overview',
