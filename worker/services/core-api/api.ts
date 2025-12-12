@@ -2536,6 +2536,22 @@ export class Api<
     });
 
   /**
+   * @description Exports all services in a workspace to a CSV file containing value, ports, technologies, and TLS information for reporting and analysis purposes.
+   *
+   * @tags Assets
+   * @name AssetsControllerExportServicesToCsv
+   * @summary Export services to CSV
+   * @request GET:/api/assets/services/export
+   */
+  assetsControllerExportServicesToCsv = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/services/export`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Retrieves detailed information about a specific technology.
    *
    * @tags Technology

@@ -7,6 +7,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useTargetsControllerGetTargetsInWorkspace } from '@/services/apis/gen/queries';
 
+import ExportDataButton from '@/components/ui/export-button';
 import TargetStatus from '@/components/ui/target-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type {
@@ -15,7 +16,6 @@ import type {
 } from '@/services/apis/gen/queries';
 import { useNavigate } from 'react-router-dom';
 import CreateWorkspace from '../workspaces/create-workspace';
-import ExportTargetsButton from './components/export-targets-button';
 
 const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   {
@@ -144,7 +144,9 @@ export function ListTargets() {
       filterColumnKey="value"
       filterValue={filter}
       onFilterChange={setFilter}
-      toolbarComponents={[<ExportTargetsButton />]}
+      toolbarComponents={[
+        <ExportDataButton api="api/targets/export" prefix="targets" />,
+      ]}
       totalItems={total}
       onRowClick={handleRowClick}
       rowClassName="cursor-pointer hover:bg-muted/50 transition-colors"

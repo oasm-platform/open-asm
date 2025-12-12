@@ -858,4 +858,41 @@ export class AssetsService {
     // Save and return the updated asset
     return this.assetRepo.save(asset);
   }
+
+  public async exportServicesForCSV(workspaceId: string): Promise<
+    {
+      value: string;
+      ports: number[];
+      techs: string[];
+      tls: {
+        host?: string;
+        sni?: string;
+        subject_dn?: string;
+        not_after?: string;
+        not_before?: string;
+        tls_connection?: string;
+      } | null;
+    }[]
+  > {
+    const queryBuilder = this.buildBaseQuery(
+      new GetAssetsQueryDto(),
+      workspaceId,
+    ).select([
+      'assetServices.value',
+      'assetServices.port',
+      'httpResponses.tech',
+      'httpResponses.tls',
+    ]);
+
+    const services = await queryBuilder.getMany();
+
+    return services.map((service) => {
+      return {
+        value: service.value,
+        ports: service.port ? [service.port] : [],
+        techs: service.httpResponses?.[0]?.tech || [],
+        tls: service.httpResponses?.[0]?.tls || null,
+      };
+    });
+  }
 }

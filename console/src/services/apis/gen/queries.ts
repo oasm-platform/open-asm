@@ -7792,6 +7792,164 @@ export const useAssetsControllerSwitchAsset = <
 };
 
 /**
+ * Exports all services in a workspace to a CSV file containing value, ports, technologies, and TLS information for reporting and analysis purposes.
+ * @summary Export services to CSV
+ */
+export const assetsControllerExportServicesToCSV = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/assets/services/export`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAssetsControllerExportServicesToCSVQueryKey = () => {
+  return [`/api/assets/services/export`] as const;
+};
+
+export const getAssetsControllerExportServicesToCSVQueryOptions = <
+  TData = Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAssetsControllerExportServicesToCSVQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>
+  > = ({ signal }) =>
+    assetsControllerExportServicesToCSV(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerExportServicesToCSVQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>
+>;
+export type AssetsControllerExportServicesToCSVQueryError = unknown;
+
+export function useAssetsControllerExportServicesToCSV<
+  TData = Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerExportServicesToCSV<
+  TData = Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerExportServicesToCSV<
+  TData = Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Export services to CSV
+ */
+
+export function useAssetsControllerExportServicesToCSV<
+  TData = Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerExportServicesToCSV>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAssetsControllerExportServicesToCSVQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Retrieves detailed information about a specific technology.
  * @summary Get technology information
  */
