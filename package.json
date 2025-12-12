@@ -17,13 +17,9 @@
     "console"
   ],
   "devDependencies": {
-    "@types/psl": "^1.1.3",
     "husky": "^9.1.7"
   },
   "scripts": {
     "prepare": "husky"
-  },
-  "dependencies": {
-    "psl": "^1.15.0"
   }
 }
