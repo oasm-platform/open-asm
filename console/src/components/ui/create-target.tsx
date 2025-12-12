@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogClose,
@@ -8,17 +8,18 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useTargetsControllerCreateTarget } from "@/services/apis/gen/queries";
-import { useQueryClient } from "@tanstack/react-query";
-import { Loader2Icon, Target } from "lucide-react";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useTargetsControllerCreateTarget } from '@/services/apis/gen/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import { Loader2Icon, Target } from 'lucide-react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import psl from 'psl';
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
 
@@ -26,16 +27,37 @@ type FormValues = {
   value: string;
 };
 
+function getRootDomain(domainOrUrl: string): string {
+  try {
+    let urlString = domainOrUrl.trim();
+    if (!urlString.match(/^[a-zA-Z]+:\/\//)) {
+      urlString = `http://${urlString}`;
+    }
+
+    const hostname = new URL(urlString).hostname;
+    const parsed = psl.parse(hostname);
+
+    if (parsed.error) {
+      return hostname;
+    }
+
+    return parsed.domain || hostname;
+  } catch {
+    return domainOrUrl.trim();
+  }
+}
+
 export function CreateTarget() {
   const [open, setOpen] = useState(false);
-  const { selectedWorkspace, workspaces, } = useWorkspaceSelector();
-  const workspaceData = workspaces.find(w => w.id === selectedWorkspace);
+  const { selectedWorkspace, workspaces } = useWorkspaceSelector();
+  const workspaceData = workspaces.find((w) => w.id === selectedWorkspace);
   const isAssetsDiscovery = workspaceData?.isAssetsDiscovery ?? false;
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
   } = useForm<FormValues>();
   const queryClient = useQueryClient();
   const { mutate, isPending } = useTargetsControllerCreateTarget();
@@ -51,15 +73,15 @@ export function CreateTarget() {
         },
         {
           onError: () => {
-            toast.error("Failed to create target");
+            toast.error('Failed to create target');
           },
           onSuccess: (res) => {
             navigate(`/targets/${res.id}?animation=true&page=1&pageSize=100`);
-            toast.success("Target created successfully");
+            toast.success('Target created successfully');
             setOpen(false);
             reset();
             queryClient.refetchQueries({
-              queryKey: ["targets", res.id],
+              queryKey: ['targets', res.id],
             });
           },
         },
@@ -91,12 +113,18 @@ export function CreateTarget() {
                 id="name-1"
                 placeholder="e.g. example.com"
                 autoComplete="off"
-                {...register("value", {
-                  required: "Domain is required.",
+                {...register('value', {
+                  required: 'Domain is required.',
                   validate: (value) =>
                     domainRegex.test(value.trim()) ||
-                    "Please enter a valid domain name (no IP addresses).",
+                    'Please enter a valid domain name (no IP addresses).',
                 })}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const pastedText = e.clipboardData?.getData('text') || '';
+                  const rootDomain = getRootDomain(pastedText);
+                  setValue('value', rootDomain);
+                }}
               />
               {errors.value && (
                 <span className="text-sm text-red-500">

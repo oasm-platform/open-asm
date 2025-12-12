@@ -45,9 +45,6 @@ export class AssetGroupWorkflowSubscriber
     // You can access the entity through event.entity and the database entity through event.databaseEntity
     // Example:
     // const recordId = event.entity?.id || event.databaseEntity?.id;
-    // console.log('Updated columns:', event.updatedColumns);
-    // console.log('Previous values:', event.databaseEntity);
-    // console.log('New values:', event.entity);
   }
 
   /**

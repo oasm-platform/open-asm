@@ -32,6 +32,29 @@ message DomainClassifyResponse {
 }
 
 // ----------------
+// Issue bot service
+// ----------------
+service IssueService {
+  rpc ResolveIssueServers(ResolveIssueRequest) returns (ResolveIssueResponse);
+}
+
+enum IssueType {
+  ISSUE_TYPE_UNSPECIFIED = 0;
+  ISSUE_TYPE_SSL = 1;
+  ISSUE_TYPE_VULNERABILITY = 2;
+}
+
+message ResolveIssueRequest {
+  string question = 1;
+  IssueType issue_type = 2;
+  google.protobuf.Struct metadata = 3;
+}
+
+message ResolveIssueResponse {
+  string message = 1;
+}
+
+// ----------------
 // Nuclei template gen 
 // ----------------
 service NucleiTemplateService {
@@ -165,6 +188,7 @@ service MCPServerService {
   rpc AddMCPServers(AddMCPServersRequest) returns (AddMCPServersResponse);
   rpc UpdateMCPServers(UpdateMCPServersRequest) returns (UpdateMCPServersResponse);
   rpc DeleteMCPServers(DeleteMCPServersRequest) returns (DeleteMCPServersResponse);
+  rpc GetMCPServerHealth(GetMCPServerHealthRequest) returns (GetMCPServerHealthResponse);
 }
 
 message MCPServer {
@@ -216,3 +240,15 @@ message DeleteMCPServersResponse {
   bool success = 1;
   string message = 2;
 }
+
+// Health check for a specific MCP server
+message GetMCPServerHealthRequest {
+  string server_name = 1;  // Name of the server to check
+}
+
+message GetMCPServerHealthResponse {
+  bool is_active = 1;      // true if server is connected and operational
+  string status = 2;       // "active", "disabled", or "error"
+  string error = 3;        // error message if status is "error"
+}
+
