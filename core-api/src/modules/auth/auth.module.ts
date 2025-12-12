@@ -63,7 +63,7 @@ export class AuthModule implements NestModule, OnModuleInit {
     private readonly adapter: HttpAdapterHost,
     @Inject(AUTH_MODULE_OPTIONS_KEY)
     private readonly options: AuthModuleOptions,
-  ) { }
+  ) {}
 
   onModuleInit() {
     // Setup hooks
@@ -126,6 +126,10 @@ export class AuthModule implements NestModule, OnModuleInit {
       // for now i'll just not support a global prefix
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       .use(`${basePath}/*splat`, (req: Request, res: Response) => {
+        //Temporary fix basePath for better-call
+        req.url = req.originalUrl;
+        req.baseUrl = '';
+
         return handler(req, res);
       });
     this.logger.log(
@@ -148,7 +152,6 @@ export class AuthModule implements NestModule, OnModuleInit {
           await originalHook(ctx);
         }
 
-         
         if (hookPath === ctx.path) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           await providerMethod(ctx);
