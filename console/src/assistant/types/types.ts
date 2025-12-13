@@ -39,14 +39,6 @@ export type ChatMessagesProps = {
   messages: Message[];
 };
 
-export type ChatInputProps = {
-  inputMessage: string;
-  setInputMessage: (value: string) => void;
-  onSendMessage: () => void;
-  isSending: boolean;
-  onKeyPress?: (e: React.KeyboardEvent) => void;
-};
-
 export type ChatSidebarProps = {
   sessions: ChatSession[];
   currentSessionId: string;
