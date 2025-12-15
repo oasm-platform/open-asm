@@ -11,6 +11,7 @@
  */
 
 export enum CronSchedule {
+  Disabled = "disabled",
   Value00 = "0 0 * * *",
   Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
@@ -1360,6 +1361,15 @@ export interface DeleteMcpServersResponseDto {
   message?: string;
 }
 
+export interface GetMcpServerHealthResponseDto {
+  /** Whether the server is active and operational */
+  isActive: boolean;
+  /** Server status: active, disabled, or error */
+  status: GetMcpServerHealthResponseDtoStatusEnum;
+  /** Error message if status is error */
+  error?: string;
+}
+
 export interface GetConversationsResponseDto {
   /** List of conversations */
   conversations: {
@@ -1491,6 +1501,7 @@ export interface GetManyMcpPermissionDto {
 }
 
 export enum GetManyTargetResponseDtoScanScheduleEnum {
+  Disabled = "disabled",
   Value00 = "0 0 * * *",
   Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
@@ -1505,6 +1516,7 @@ export enum GetManyTargetResponseDtoStatusEnum {
 }
 
 export enum UpdateTargetDtoScanScheduleEnum {
+  Disabled = "disabled",
   Value00 = "0 0 * * *",
   Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
@@ -1539,6 +1551,7 @@ export enum CreateToolDtoCategoryEnum {
 }
 
 export enum OnScheduleEnum {
+  Disabled = "disabled",
   Value00 = "0 0 * * *",
   Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
@@ -1547,6 +1560,7 @@ export enum OnScheduleEnum {
 }
 
 export enum AssetGroupWorkflowScheduleEnum {
+  Disabled = "disabled",
   Value00 = "0 0 * * *",
   Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
@@ -1555,11 +1569,19 @@ export enum AssetGroupWorkflowScheduleEnum {
 }
 
 export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
+  Disabled = "disabled",
   Value00 = "0 0 * * *",
   Value003 = "0 0 */3 * *",
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
   Value001 = "0 0 1 * *",
+}
+
+/** Server status: active, disabled, or error */
+export enum GetMcpServerHealthResponseDtoStatusEnum {
+  Active = "active",
+  Disabled = "disabled",
+  Error = "error",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -3986,6 +4008,25 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/mcp-servers/${id}`,
       method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Gets the health status of a specific MCP server
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetMcpServerHealth
+   * @summary Get MCP server health
+   * @request GET:/api/ai-assistant/mcp-servers/{serverName}/health
+   */
+  aiAssistantControllerGetMcpServerHealth = (
+    serverName: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers/${serverName}/health`,
+      method: "GET",
       format: "json",
       ...params,
     });

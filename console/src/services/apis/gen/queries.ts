@@ -41,6 +41,7 @@ export type CronSchedule = (typeof CronSchedule)[keyof typeof CronSchedule];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const CronSchedule = {
+  disabled: 'disabled',
   '0_0_*_*_*': '0 0 * * *',
   '0_0_*/3_*_*': '0 0 */3 * *',
   '0_0_*_*_0': '0 0 * * 0',
@@ -74,6 +75,7 @@ export type GetManyTargetResponseDtoScanSchedule =
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const GetManyTargetResponseDtoScanSchedule = {
+  disabled: 'disabled',
   '0_0_*_*_*': '0 0 * * *',
   '0_0_*/3_*_*': '0 0 */3 * *',
   '0_0_*_*_0': '0 0 * * 0',
@@ -119,6 +121,7 @@ export type UpdateTargetDtoScanSchedule =
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const UpdateTargetDtoScanSchedule = {
+  disabled: 'disabled',
   '0_0_*_*_*': '0 0 * * *',
   '0_0_*/3_*_*': '0 0 */3 * *',
   '0_0_*_*_0': '0 0 * * 0',
@@ -925,6 +928,7 @@ export type OnSchedule = (typeof OnSchedule)[keyof typeof OnSchedule];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const OnSchedule = {
+  disabled: 'disabled',
   '0_0_*_*_*': '0 0 * * *',
   '0_0_*/3_*_*': '0 0 */3 * *',
   '0_0_*_*_0': '0 0 * * 0',
@@ -1153,6 +1157,7 @@ export type AssetGroupWorkflowSchedule =
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const AssetGroupWorkflowSchedule = {
+  disabled: 'disabled',
   '0_0_*_*_*': '0 0 * * *',
   '0_0_*/3_*_*': '0 0 */3 * *',
   '0_0_*_*_0': '0 0 * * 0',
@@ -1192,6 +1197,7 @@ export type UpdateAssetGroupWorkflowDtoSchedule =
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const UpdateAssetGroupWorkflowDtoSchedule = {
+  disabled: 'disabled',
   '0_0_*_*_*': '0 0 * * *',
   '0_0_*/3_*_*': '0 0 */3 * *',
   '0_0_*_*_0': '0 0 * * 0',
@@ -1286,6 +1292,28 @@ export type DeleteMcpServersResponseDto = {
   success: boolean;
   /** Response message */
   message?: string;
+};
+
+/**
+ * Server status: active, disabled, or error
+ */
+export type GetMcpServerHealthResponseDtoStatus =
+  (typeof GetMcpServerHealthResponseDtoStatus)[keyof typeof GetMcpServerHealthResponseDtoStatus];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const GetMcpServerHealthResponseDtoStatus = {
+  active: 'active',
+  disabled: 'disabled',
+  error: 'error',
+} as const;
+
+export type GetMcpServerHealthResponseDto = {
+  /** Whether the server is active and operational */
+  isActive: boolean;
+  /** Server status: active, disabled, or error */
+  status: GetMcpServerHealthResponseDtoStatus;
+  /** Error message if status is error */
+  error?: string;
 };
 
 export type GetConversationsResponseDtoConversationsItem = {
@@ -19562,6 +19590,186 @@ export const useAiAssistantControllerDeleteMcpServers = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * Gets the health status of a specific MCP server
+ * @summary Get MCP server health
+ */
+export const aiAssistantControllerGetMcpServerHealth = (
+  serverName: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetMcpServerHealthResponseDto>(
+    {
+      url: `/api/ai-assistant/mcp-servers/${serverName}/health`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetMcpServerHealthQueryKey = (
+  serverName?: string,
+) => {
+  return [`/api/ai-assistant/mcp-servers/${serverName}/health`] as const;
+};
+
+export const getAiAssistantControllerGetMcpServerHealthQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+  TError = unknown,
+>(
+  serverName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetMcpServerHealthQueryKey(serverName);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetMcpServerHealth(serverName, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!serverName,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetMcpServerHealthQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>
+>;
+export type AiAssistantControllerGetMcpServerHealthQueryError = unknown;
+
+export function useAiAssistantControllerGetMcpServerHealth<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+  TError = unknown,
+>(
+  serverName: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServerHealth<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+  TError = unknown,
+>(
+  serverName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetMcpServerHealth<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+  TError = unknown,
+>(
+  serverName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get MCP server health
+ */
+
+export function useAiAssistantControllerGetMcpServerHealth<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+  TError = unknown,
+>(
+  serverName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetMcpServerHealth>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerGetMcpServerHealthQueryOptions(
+    serverName,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * Retrieves all conversations for the current workspace and user
