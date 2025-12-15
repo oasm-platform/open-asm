@@ -260,7 +260,9 @@ export class TargetsService implements OnModuleInit {
         target,
         dto.scanSchedule,
       );
-      jobId = job.repeatJobKey;
+      if (job) {
+        jobId = job.repeatJobKey;
+      }
     }
 
     // Update the target in the database
@@ -291,22 +293,25 @@ export class TargetsService implements OnModuleInit {
   private async updateTargetScanScheduleJob(
     target: Target,
     scanSchedule: CronSchedule,
-  ): Promise<Job<Target>> {
+  ): Promise<Job<Target> | null> {
     // Remove any existing jobs for this target
     if (target.jobId) {
       await this.scanScheduleQueue.removeJobScheduler(target.jobId);
     }
-    const job = await this.scanScheduleQueue.add(
-      target.id, // Job name is the target ID
-      { id: target.id } as Target,
-      {
-        repeat: {
-          pattern: scanSchedule,
+    if (scanSchedule !== CronSchedule.DISABLED) {
+      const job = await this.scanScheduleQueue.add(
+        target.id, // Job name is the target ID
+        { id: target.id } as Target,
+        {
+          repeat: {
+            pattern: scanSchedule,
+          },
         },
-      },
-    );
+      );
 
-    return job;
+      return job;
+    }
+    return null;
   }
 
   /**
@@ -328,7 +333,9 @@ export class TargetsService implements OnModuleInit {
         target,
         target.scanSchedule,
       );
-      await this.repo.update(target.id, { jobId: job.repeatJobKey });
+      if (job) {
+        await this.repo.update(target.id, { jobId: job.repeatJobKey });
+      }
     }
   }
 

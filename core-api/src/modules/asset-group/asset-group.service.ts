@@ -788,17 +788,20 @@ export class AssetGroupService {
         await this.scanScheduleQueue.removeJobScheduler(
           assetGroupWorkspace.jobId,
         );
-        const newJob = await this.scanScheduleQueue.add(
-          assetGroupWorkspace.id,
-          { id: assetGroupWorkspace.id } as AssetGroupWorkflow,
-          {
-            repeat: {
-              pattern: assetGroupWorkspace.schedule,
+
+        if (updateData.schedule !== CronSchedule.DISABLED) {
+          const newJob = await this.scanScheduleQueue.add(
+            assetGroupWorkspace.id,
+            { id: assetGroupWorkspace.id } as AssetGroupWorkflow,
+            {
+              repeat: {
+                pattern: assetGroupWorkspace.schedule,
+              },
             },
-          },
-        );
-        if (newJob.repeatJobKey) {
-          assetGroupWorkspace.jobId = newJob.repeatJobKey;
+          );
+          if (newJob.repeatJobKey) {
+            assetGroupWorkspace.jobId = newJob.repeatJobKey;
+          }
         }
       }
 
