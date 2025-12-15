@@ -20,6 +20,7 @@ import Targets from '@/pages/targets/targets';
 import ToolDetail from '@/pages/tools/components/tool-detail';
 import Tools from '@/pages/tools/tools';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
+import DetailVulnerability from '@/pages/vulnerabilities/detail-vulnerability';
 import Workers from '@/pages/workers/workers';
 import Workflow from '@/pages/workflow/workflow';
 import { createBrowserRouter } from 'react-router-dom';
@@ -100,7 +101,16 @@ export const router = createBrowserRouter([
           },
           {
             path: 'vulnerabilities',
-            element: <Vulnerabilities />,
+            children: [
+              {
+                path: '',
+                element: <Vulnerabilities />,
+              },
+              {
+                path: ':id',
+                element: <DetailVulnerability />,
+              },
+            ],
           },
           {
             element: <Workers />,

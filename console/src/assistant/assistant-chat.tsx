@@ -49,13 +49,6 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage(); // Uses inputMessage
-    }
-  };
-
   const handleNewConversation = () => {
     createNewConversation();
   };
@@ -168,7 +161,6 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
               setInputMessage={setInputMessage}
               onSendMessage={handleSendMessage}
               isSending={isStreaming}
-              onKeyPress={handleKeyPress}
             />
           </div>
         </SheetContent>

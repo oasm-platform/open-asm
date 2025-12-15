@@ -1,7 +1,15 @@
-import { Plus, HistoryIcon, Database, X, Trash2, Trash } from 'lucide-react';
+import {
+  Plus,
+  HistoryIcon,
+  Database,
+  X,
+  Trash2,
+  Trash,
+  MessageSquare,
+} from 'lucide-react';
 import { SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useAssistant } from '@/hooks/use-assistant';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { ChatHeaderProps } from '../types/types';
@@ -22,56 +30,89 @@ export function ChatHeader({
 
   const { deleteConversation, deleteAllConversations } = useAssistant();
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev);
+  }, []);
 
-  // Placeholder functions for MCP and other actions
-  const handleAddMCP = () => {
+  const closeSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+  }, []);
+
+  const handleOpenMcpManager = useCallback(() => {
     setIsMcpManagerOpen(true);
-  };
+  }, []);
 
-  const handleDeleteConversation = async (conversationId: string) => {
-    await deleteConversation(conversationId);
-  };
+  const handleNewChat = useCallback(() => {
+    onCreateNewSession?.();
+    setIsSidebarOpen(false);
+  }, [onCreateNewSession]);
 
-  const handleDeleteAllConversations = async () => {
+  const handleSelectSession = useCallback(
+    (sessionId: string) => {
+      onSelectSession?.(sessionId);
+      setIsSidebarOpen(false);
+    },
+    [onSelectSession],
+  );
+
+  const handleDeleteConversation = useCallback(
+    async (conversationId: string) => {
+      await deleteConversation(conversationId);
+    },
+    [deleteConversation],
+  );
+
+  const handleDeleteAllConversations = useCallback(async () => {
     await deleteAllConversations();
-    setIsSidebarOpen(false); // Close the sidebar after deleting all
-  };
+    setIsSidebarOpen(false);
+  }, [deleteAllConversations]);
+
+  const handleLoadMore = useCallback(() => {
+    setVisibleCount((prev) => prev + 10);
+  }, []);
+
+  const sortedSessions = useMemo(
+    () =>
+      [...sessions].sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime(),
+      ),
+    [sessions],
+  );
+
+  const visibleSessions = useMemo(
+    () => sortedSessions.slice(0, visibleCount),
+    [sortedSessions, visibleCount],
+  );
+
+  const hasMoreSessions = sessions.length > visibleCount;
+  const hasSessions = sessions.length > 0;
 
   return (
     <div className="mb-1">
-      {/* Header bar */}
       <div className="flex items-center justify-between border-b pb-2">
-        {/* Chat Title on the left */}
         <SheetTitle>{title}</SheetTitle>
 
         <div className="flex items-center gap-1">
-          {/* New Chat Button */}
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => {
-              onCreateNewSession?.();
-              setIsSidebarOpen(false);
-            }}
+            onClick={handleNewChat}
             title="New Chat"
           >
             <Plus className="h-4 w-4" />
           </Button>
 
-          {/* Add MCP Button */}
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleAddMCP}
+            onClick={handleOpenMcpManager}
             title="Add MCP"
           >
             <Database className="h-4 w-4" />
           </Button>
 
-          {/* Show Chat List Button */}
           <Button
             variant="ghost"
             size="icon"
@@ -81,21 +122,17 @@ export function ChatHeader({
             <HistoryIcon className="h-4 w-4" />
           </Button>
 
-          {/* Close Button */}
           <Button variant="ghost" size="icon" onClick={onClose} title="Close">
             <X className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* Collapsible sidebar - shown when toggled */}
-      {/* Modal/Overlay for History */}
       {isSidebarOpen && (
         <>
-          {/* Background overlay effect - even darker background */}
           <div
             className="fixed inset-0 z-40 bg-black/70"
-            onClick={() => setIsSidebarOpen(false)}
+            onClick={closeSidebar}
           />
 
           <div className="fixed inset-0 z-50 flex items-center justify-center animate-in fade-in zoom-in-95 duration-200 pointer-events-none p-4 sm:p-6">
@@ -106,114 +143,113 @@ export function ChatHeader({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setIsSidebarOpen(false)}
+                  onClick={closeSidebar}
                 >
                   <X className="h-5 w-5" />
                 </Button>
               </div>
 
               <div className="space-y-1 max-h-[70vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-                {[...sessions]
-                  .sort(
-                    (a, b) =>
-                      new Date(b.createdAt || 0).getTime() -
-                      new Date(a.createdAt || 0).getTime(),
-                  )
-                  .slice(0, visibleCount)
-                  .map((session) => (
-                    <div
-                      key={session.id}
-                      className="flex items-center justify-between group"
-                    >
-                      <Button
-                        variant={
-                          currentSessionId === session.id
-                            ? 'secondary'
-                            : 'ghost'
-                        }
-                        className={`flex-1 justify-between items-center h-auto py-2 px-3 rounded-lg min-w-0 ${
-                          session.unread ? 'font-bold' : ''
-                        }`}
-                        onClick={() => {
-                          onSelectSession?.(session.id);
-                          setIsSidebarOpen(false);
-                        }}
-                      >
-                        <span className="font-medium truncate mr-2 text-left flex-1 text-sm">
-                          {session.title}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground whitespace-nowrap opacity-70 flex-shrink-0 group-hover:hidden">
-                          {session.createdAt
-                            ? new Date(session.createdAt).toLocaleDateString(
-                                undefined,
-                                {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                },
-                              )
-                            : ''}
-                        </span>
-                        <span className="hidden text-[10px] text-red-500 whitespace-nowrap group-hover:flex items-center">
-                          <ConfirmDialog
-                            title="Delete Conversation"
-                            description="Are you sure you want to delete this conversation? This action cannot be undone."
-                            onConfirm={() =>
-                              handleDeleteConversation(session.id)
-                            }
-                            confirmText="Delete"
-                            cancelText="Cancel"
-                            trigger={
-                              <span className="cursor-pointer flex items-center">
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Delete
-                              </span>
-                            }
-                          />
-                        </span>
-                      </Button>
-                    </div>
-                  ))}
-
-                {/* Clear All button at the bottom */}
-                {sessions.length > 0 && (
-                  <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                    <div className="flex items-center justify-between group">
-                      <Button
-                        variant="ghost"
-                        className="flex-1 justify-between items-center h-auto py-2 px-3 rounded-lg text-foreground hover:text-red-500"
-                      >
-                        <span className="font-medium truncate mr-2 text-left flex-1 text-sm">
-                          Clear All Conversations
-                        </span>
-                        <span className="text-[10px] text-muted-foreground whitespace-nowrap opacity-70 flex-shrink-0 group-hover:hidden">
-                          {/* No date shown for Clear All */}
-                        </span>
-                        <span className="hidden text-[10px] text-red-500 whitespace-nowrap group-hover:flex items-center">
-                          <ConfirmDialog
-                            title="Clear All Conversations"
-                            description="Are you sure you want to delete all conversations? This action cannot be undone."
-                            onConfirm={handleDeleteAllConversations}
-                            confirmText="Yes, Clear All"
-                            cancelText="Cancel"
-                            trigger={
-                              <span className="cursor-pointer flex items-center">
-                                <Trash className="h-3 w-3 mr-1" />
-                                Clear All
-                              </span>
-                            }
-                          />
-                        </span>
-                      </Button>
-                    </div>
+                {!hasSessions ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <p className="text-muted-foreground text-sm">
+                      No conversations yet
+                    </p>
+                    <p className="text-muted-foreground/70 text-xs mt-1">
+                      Start a new chat to begin
+                    </p>
                   </div>
+                ) : (
+                  <>
+                    {visibleSessions.map((session) => (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between group"
+                      >
+                        <Button
+                          variant={
+                            currentSessionId === session.id
+                              ? 'secondary'
+                              : 'ghost'
+                          }
+                          className={`flex-1 justify-between items-center h-auto py-2 px-3 rounded-lg min-w-0 ${
+                            session.unread ? 'font-bold' : ''
+                          }`}
+                          onClick={() => handleSelectSession(session.id)}
+                        >
+                          <span className="font-medium truncate mr-2 text-left flex-1 text-sm">
+                            {session.title}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap opacity-70 flex-shrink-0 group-hover:hidden">
+                            {session.createdAt
+                              ? new Date(session.createdAt).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                  },
+                                )
+                              : ''}
+                          </span>
+                          <span className="hidden text-[10px] text-red-500 whitespace-nowrap group-hover:flex items-center">
+                            <ConfirmDialog
+                              title="Delete Conversation"
+                              description="Are you sure you want to delete this conversation? This action cannot be undone."
+                              onConfirm={() =>
+                                handleDeleteConversation(session.id)
+                              }
+                              confirmText="Delete"
+                              cancelText="Cancel"
+                              trigger={
+                                <span className="cursor-pointer flex items-center">
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Delete
+                                </span>
+                              }
+                            />
+                          </span>
+                        </Button>
+                      </div>
+                    ))}
+
+                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                      <div className="flex items-center justify-between group">
+                        <Button
+                          variant="ghost"
+                          className="flex-1 justify-between items-center h-auto py-2 px-3 rounded-lg text-foreground hover:text-red-500"
+                        >
+                          <span className="font-medium truncate mr-2 text-left flex-1 text-sm">
+                            Clear All Conversations
+                          </span>
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap opacity-70 flex-shrink-0 group-hover:hidden" />
+                          <span className="hidden text-[10px] text-red-500 whitespace-nowrap group-hover:flex items-center">
+                            <ConfirmDialog
+                              title="Clear All Conversations"
+                              description="Are you sure you want to delete all conversations? This action cannot be undone."
+                              onConfirm={handleDeleteAllConversations}
+                              confirmText="Yes, Clear All"
+                              cancelText="Cancel"
+                              trigger={
+                                <span className="cursor-pointer flex items-center">
+                                  <Trash className="h-3 w-3 mr-1" />
+                                  Clear All
+                                </span>
+                              }
+                            />
+                          </span>
+                        </Button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
 
-              {sessions.length > visibleCount && (
+              {hasMoreSessions && (
                 <Button
                   variant="ghost"
                   className="w-full text-xs text-muted-foreground hover:text-foreground h-8"
-                  onClick={() => setVisibleCount((prev) => prev + 10)}
+                  onClick={handleLoadMore}
                 >
                   Load more...
                 </Button>
@@ -222,7 +258,7 @@ export function ChatHeader({
           </div>
         </>
       )}
-      {/* MCP Manager Dialog */}
+
       <McpServerManager
         open={isMcpManagerOpen}
         onOpenChange={setIsMcpManagerOpen}

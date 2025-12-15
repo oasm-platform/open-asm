@@ -13,6 +13,11 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
   useAssetsControllerGetIpAssetsInfinite,
@@ -222,7 +227,7 @@ function FacetedFilterTemplate({
                       <>
                         <div
                           className={cn(
-                            'border-primary flex size-4 items-center justify-center rounded-sm border',
+                            'border-primary flex size-4 shrink-0 items-center justify-center rounded-sm border',
                             isSelected
                               ? 'bg-primary text-primary-foreground'
                               : 'opacity-50 [&_svg]:invisible',
@@ -230,7 +235,14 @@ function FacetedFilterTemplate({
                         >
                           <Check className={cn('text-background h-4 w-4')} />
                         </div>
-                        <span>{option.label}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="truncate">{option.label}</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">
+                            {option.label}
+                          </TooltipContent>
+                        </Tooltip>
                       </>
                     )}
                   </CommandItem>
