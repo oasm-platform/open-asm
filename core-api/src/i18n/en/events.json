@@ -1,0 +1,23 @@
+{
+  "notification": {
+    "type": {
+      "SCAN": "Scan",
+      "ASSET": "Asset",
+      "WORKFLOW": "Workflow"
+    },
+    "title": {
+      "SCAN_STARTED": "Scan started",
+      "SCAN_COMPLETED": "Scan completed",
+      "SCAN_FAILED": "Scan failed",
+      "VULNERABILITY_DISCOVERY": "Vulnerability discovery",
+      "WORKFLOW_RUN": "Workflow run"
+    },
+    "content": {
+      "SCAN_STARTED": "Scan started for {target}",
+      "SCAN_COMPLETED": "Scan completed for {target}",
+      "SCAN_FAILED": "Scan failed for {target}",
+      "VULNERABILITY_DISCOVERY": "Found {vulnerabilityCount} vulnerabilities for {target}",
+      "WORKFLOW_RUN": "Workflow run for {workflowName}"
+    }
+  }
+}

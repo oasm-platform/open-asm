@@ -1,0 +1,23 @@
+{
+  "notification": {
+    "type": {
+      "SCAN": "Quét",
+      "ASSET": "Tài sản",
+      "WORKFLOW": "Quy trình"
+    },
+    "title": {
+      "SCAN_STARTED": "Quét bắt đầu",
+      "SCAN_COMPLETED": "Quét hoàn thành",
+      "SCAN_FAILED": "Quét thất bại",
+      "VULNERABILITY_DISCOVERY": "Phát hiện lỗ hổng",
+      "WORKFLOW_RUN": "Chạy quy trình"
+    },
+    "content": {
+      "SCAN_STARTED": "Bắt đầu quét cho {target}",
+      "SCAN_COMPLETED": "Hoàn thành quét cho {target}",
+      "SCAN_FAILED": "Quét thất bại cho {target}",
+      "VULNERABILITY_DISCOVERY": "Tìm thấy {vulnerabilityCount} lỗ hổng cho {target}",
+      "WORKFLOW_RUN": "Chạy quy trình cho {workflowName}"
+    }
+  }
+}

@@ -14,7 +14,7 @@ describe('TechnologyForwarderService', () => {
         {
           provide: RedisService,
           useValue: {
-            client: {
+            cacheClient: {
               get: jest.fn(),
               setex: jest.fn(),
             },
@@ -36,7 +36,7 @@ describe('TechnologyForwarderService', () => {
   describe('fetchTechnologyInfo', () => {
     it('should fetch technology info from GitHub', async () => {
       // Mock Redis to return null (no cache)
-      jest.spyOn(redisService.client, 'get').mockResolvedValue(null);
+      jest.spyOn(redisService.cacheClient, 'get').mockResolvedValue(null);
 
       // Mock fetch for technology data
       global.fetch = jest
@@ -87,7 +87,7 @@ describe('TechnologyForwarderService', () => {
       };
 
       jest
-        .spyOn(redisService.client, 'get')
+        .spyOn(redisService.cacheClient, 'get')
         .mockResolvedValue(JSON.stringify(cachedData));
 
       const result = await service.fetchTechnologyInfo('React');
@@ -96,4 +96,3 @@ describe('TechnologyForwarderService', () => {
     });
   });
 });
-

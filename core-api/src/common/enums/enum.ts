@@ -124,4 +124,30 @@ export enum ApiKeyType {
 export enum BullMQName {
   ASSETS_DISCOVERY_SCHEDULE = 'assets-discovery-schedule',
   ASSET_GROUPS_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
+  NOTIFICATION = 'notification',
+}
+
+export enum NotificationStatus {
+  SENT = 'sent',
+  UNREAD = 'unread',
+  READ = 'read',
+}
+
+export enum NotificationType {
+  SYSTEM = 'SYSTEM',
+  USER = 'USER',
+  GROUP = 'GROUP',
+}
+
+export enum Language {
+  EN = 'en',
+  VI = 'vi',
+}
+
+export enum NotificationEventType {
+  SCAN_STARTED = 'events.notification.content.SCAN_STARTED',
+  SCAN_COMPLETED = 'events.notification.content.SCAN_COMPLETED',
+  SCAN_FAILED = 'events.notification.content.SCAN_FAILED',
+  VULNERABILITY_DISCOVERY = 'events.notification.content.VULNERABILITY_DISCOVERY',
+  WORKFLOW_RUN = 'events.notification.content.WORKFLOW_RUN',
 }

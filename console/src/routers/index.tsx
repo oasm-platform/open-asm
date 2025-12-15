@@ -12,6 +12,7 @@ import EditProviderPage from '@/pages/providers/edit-provider';
 import ProvidersPage from '@/pages/providers/providers';
 import Register from '@/pages/register/register';
 import Search from '@/pages/search/search';
+import NotificationsPage from '@/pages/notifications/notifications';
 import CreateMcpPermission from '@/pages/settings/components/create-mcp-permission';
 import Settings from '@/pages/settings/settings';
 import Studio from '@/pages/studio/studio';
@@ -60,6 +61,10 @@ export const router = createBrowserRouter([
           {
             path: '',
             element: <Dashboard />,
+          },
+          {
+            path: 'notifications',
+            element: <NotificationsPage />,
           },
           {
             path: 'studio',

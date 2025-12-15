@@ -1,4 +1,3 @@
-
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { WEBAPP_ANALYZER_SRC_URL } from '../../common/constants/app.constants';
@@ -19,7 +18,7 @@ export class TechnologyForwarderService {
   constructor(
     private readonly redisService: RedisService,
     private readonly storageService: StorageService,
-  ) { }
+  ) {}
 
   /**
    * Fetch technology information from the webappanalyzer repository
@@ -90,7 +89,7 @@ export class TechnologyForwarderService {
   ): Promise<TechnologyDetailDTO | null> {
     try {
       const key = `${this.CACHE_KEY_PREFIX}${techName}`;
-      const cached = await this.redisService.client.get(key);
+      const cached = await this.redisService.cacheClient.get(key);
 
       if (cached) {
         return JSON.parse(cached) as TechnologyDetailDTO;
@@ -117,7 +116,7 @@ export class TechnologyForwarderService {
   ): Promise<void> {
     try {
       const key = `${this.CACHE_KEY_PREFIX}${techName}`;
-      await this.redisService.client.setex(
+      await this.redisService.cacheClient.setex(
         key,
         this.CACHE_TTL,
         JSON.stringify(techInfo),
@@ -194,7 +193,7 @@ export class TechnologyForwarderService {
     CategoryInfoDTO
   > | null> {
     try {
-      const cached = await this.redisService.client.get(
+      const cached = await this.redisService.cacheClient.get(
         this.CATEGORY_CACHE_KEY,
       );
 
@@ -217,7 +216,7 @@ export class TechnologyForwarderService {
     categories: Record<string, CategoryInfoDTO>,
   ): Promise<void> {
     try {
-      await this.redisService.client.setex(
+      await this.redisService.cacheClient.setex(
         this.CATEGORY_CACHE_KEY,
         this.CACHE_TTL,
         JSON.stringify(categories),
@@ -273,7 +272,11 @@ export class TechnologyForwarderService {
       const { buffer } = await this.storageService.forwardImage(url);
 
       // Upload to storage
-      const uploadResult = this.storageService.uploadFile(fileName, buffer, bucket);
+      const uploadResult = this.storageService.uploadFile(
+        fileName,
+        buffer,
+        bucket,
+      );
 
       // Return the path
       return `/api/storage/${uploadResult.path}`;
