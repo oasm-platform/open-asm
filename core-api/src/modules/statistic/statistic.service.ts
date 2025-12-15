@@ -4,6 +4,7 @@ import { DataSource, MoreThanOrEqual } from 'typeorm';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { GeoIp, GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { AssetsService } from '../assets/assets.service';
+import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
@@ -11,7 +12,6 @@ import { Target } from '../targets/entities/target.entity';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
-import { AssetService } from '../assets/entities/asset-services.entity';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import {
   GetStatisticQueryDto,
@@ -259,8 +259,15 @@ export class StatisticService {
       },
     });
 
+    const now = await this.calculateStatistics([workspaceId]).then((res) => {
+      const data = res[0];
+      data.createdAt = new Date();
+      data.updatedAt = new Date();
+      return data;
+    });
+
     return {
-      data: statistics,
+      data: statistics.concat(now),
       total: statistics.length,
     };
   }
@@ -642,7 +649,19 @@ export class StatisticService {
         // Total calculation
         const totalScore = Math.max(0, 10 - (alpha * Rasset + beta * Rvuln));
 
-        stat.score = totalScore;
+        // Ensure score is exactly 10 when no vulnerabilities and assets exist
+        let finalScore: number;
+        if (vulRisk === 0) {
+          finalScore = 10;
+        } else {
+          finalScore = Math.round(totalScore * 10) / 10;
+        }
+
+        // If the score is a whole number (like 10.0, 9.0), return as integer
+        stat.score =
+          Math.round(finalScore) === finalScore
+            ? Math.round(finalScore)
+            : finalScore;
       } else {
         // If no assets, set score to maximum (best security score)
         stat.score = 10;

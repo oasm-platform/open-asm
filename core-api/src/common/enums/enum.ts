@@ -76,6 +76,7 @@ export enum WorkerScope {
  * Enum representing cron job schedules
  */
 export enum CronSchedule {
+  DISABLED = 'disabled',
   /** Runs daily at 00:00 */
   DAILY = '0 0 * * *',
   /** Runs every 3 days at 00:00 */

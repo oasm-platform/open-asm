@@ -86,7 +86,7 @@ jobs:
             ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.33.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ env.IMAGE_NAME }}-${{ matrix.service }}:dev'
           format: 'sarif'
@@ -95,6 +95,6 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.${{ matrix.service }}.sarif'

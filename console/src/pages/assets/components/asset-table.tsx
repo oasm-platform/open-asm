@@ -15,11 +15,14 @@ export function AssetTable({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
-  const { data, isLoading } = useAssetsControllerGetAssetsInWorkspace({
-    page,
-    limit: pageSize,
-    ...filter,
-  });
+  const { data, isLoading } = useAssetsControllerGetAssetsInWorkspace(
+    {
+      page,
+      limit: pageSize,
+      ...filter,
+    },
+    { query: { queryKey: ['sub-assets-filter', page, pageSize, filter] } },
+  );
 
   const assets = data?.data ?? [];
   const total = data?.total ?? 0;

@@ -1,0 +1,27 @@
+#!/usr/bin/env sh
+# Husky pre-commit hook - Only run lint for console directory
+
+# Get the list of staged files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep "^console/")
+
+# If no console files are staged, skip lint
+if [ -z "$STAGED_FILES" ]; then
+  echo "No console files staged, skipping lint check"
+  exit 0
+fi
+
+echo "Checking lint for console directory..."
+
+# Run lint for console directory only
+cd console
+npm run lint
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+  echo "Lint failed for console directory"
+  echo "Please fix lint errors before committing"
+  exit 1
+fi
+
+echo "Lint passed for console directory"
+exit 0

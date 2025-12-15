@@ -31,6 +31,7 @@ import {
   GetMessagesResponseDto,
   DeleteMessageResponseDto,
 } from './dto/message.dto';
+import type { GetMCPServerHealthResponse } from '@/types/assistant';
 
 @Injectable()
 export class AiAssistantService implements OnModuleInit {
@@ -119,6 +120,14 @@ export class AiAssistantService implements OnModuleInit {
       // Fallback to empty response
       return { mcpServers: {} };
     } catch (error: unknown) {
+      // Check for gRPC CANCELLED status (code 1)
+      const grpcError = error as { code?: number; details?: string };
+      if (grpcError?.code === 1 || grpcError?.details === 'CANCELLED') {
+        this.logger.warn('MCP servers fetch cancelled by client');
+        // Return empty result to avoid crashing the controller
+        return { mcpServers: {} };
+      }
+
       this.logger.error('Failed to get MCP servers', error);
       throw error;
     }
@@ -266,6 +275,43 @@ export class AiAssistantService implements OnModuleInit {
       };
     } catch (error: unknown) {
       this.logger.error('Failed to delete MCP config', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get health status of a specific MCP server
+   */
+  async getMcpServerHealth(
+    serverName: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<{
+    isActive: boolean;
+    status: 'active' | 'disabled' | 'error';
+    error?: string;
+  }> {
+    try {
+      const metadata = this.createMetadata(workspaceId, userId);
+      const response: GetMCPServerHealthResponse = await firstValueFrom(
+        this.mcpServerService.getMcpServerHealth(
+          {
+            serverName,
+          },
+          metadata,
+        ),
+      );
+
+      return {
+        isActive: response.isActive || false,
+        status: (response.status as 'active' | 'disabled' | 'error') || 'error',
+        error: response.error || undefined,
+      };
+    } catch (error: unknown) {
+      this.logger.error(
+        `Failed to get health for MCP server ${serverName}`,
+        error,
+      );
       throw error;
     }
   }

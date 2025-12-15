@@ -17,9 +17,13 @@ export default function AssetValue({
       onClick={(e) => e.stopPropagation()}
     >
       {httpResponse?.favicon_url && (
-        <img src={httpResponse?.favicon_url} className='rounded-full w-5 h-5' alt="favicon" />
+        <img
+          src={httpResponse?.favicon_url}
+          className="rounded-full w-5 h-5"
+          alt="favicon"
+        />
       )}
-      <pre>{value}</pre>
+      <pre className="break-all whitespace-pre-wrap">{value}</pre>
     </a>
   );
 }

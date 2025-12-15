@@ -11,6 +11,7 @@ import {
 import type { JSX } from 'react';
 import { CreateTarget } from '../../ui/create-target';
 import { SearchForm } from '../../ui/search-form';
+import { AssistantChat } from '@/assistant/assistant-chat';
 
 export default function AppBar({ children }: { children: JSX.Element }) {
   const { isMobile } = useSidebar();
@@ -26,6 +27,7 @@ export default function AppBar({ children }: { children: JSX.Element }) {
         </div>
         <div className="ml-auto flex gap-3">
           <CreateTarget />
+          <AssistantChat />
           <GithubBadge />
           <NotificationBell />
         </div>

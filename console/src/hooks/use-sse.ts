@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-export function useSse(url: string, onMessage: (data: any) => void) {
+export function useSse<T>(url: string, onMessage: (data: T) => void) {
   useEffect(() => {
     const eventSource = new EventSource(url, { withCredentials: true });
 

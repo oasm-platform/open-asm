@@ -71,7 +71,7 @@ export default function Score() {
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-xl">Score</span>
             <span className="text-3xl font-bold text-foreground">
-              {scoreValue.toFixed(1)}
+              {scoreValue}
             </span>
           </div>
         </div>

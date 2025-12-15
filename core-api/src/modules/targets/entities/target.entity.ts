@@ -4,7 +4,7 @@ import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsString, Matches } from 'class-validator';
+import { IsEnum, IsOptional, IsString, Matches } from 'class-validator';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
 
@@ -56,7 +56,14 @@ export class Target extends BaseEntity {
   status: JobStatus;
 
   @ApiProperty({ enum: CronSchedule, enumName: 'CronSchedule' })
-  @Column({ type: 'enum', enum: CronSchedule, default: CronSchedule.DAILY })
+  @IsOptional()
+  @IsEnum(CronSchedule)
+  @Column({
+    type: 'enum',
+    enum: CronSchedule,
+    default: CronSchedule.DISABLED,
+    nullable: true,
+  })
   scanSchedule: CronSchedule;
 
   @Column({ nullable: true })
