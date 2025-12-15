@@ -1,17 +1,15 @@
 // src/components/AppBar.tsx
 
-import AppLogo from '@/components/ui/app-logo';
-import { GithubBadge } from '@/components/ui/github-badge';
+import { AssistantChat } from '@/assistant/assistant-chat';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import AppLogo from '@/components/ui/app-logo';
 import {
   SidebarInset,
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
 import type { JSX } from 'react';
-import { CreateTarget } from '../../ui/create-target';
 import { SearchForm } from '../../ui/search-form';
-import { AssistantChat } from '@/assistant/assistant-chat';
 
 export default function AppBar({ children }: { children: JSX.Element }) {
   const { isMobile } = useSidebar();
@@ -26,9 +24,7 @@ export default function AppBar({ children }: { children: JSX.Element }) {
           <SearchForm className="w-1/2" />
         </div>
         <div className="ml-auto flex gap-3">
-          <CreateTarget />
           <AssistantChat />
-          <GithubBadge />
           <NotificationBell />
         </div>
       </header>

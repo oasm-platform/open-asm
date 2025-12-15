@@ -9,7 +9,7 @@ export default function AppLogo({ type }: AppLogoProps) {
   const { state, isMobile } = useSidebar();
   return (
     <Link to={'/'} className="flex h-13 justify-start items-center gap-2">
-      <Radar size={type === 'small' ? 25 : 40} />
+      <Radar size={type === 'small' ? 25 : 30} />
       {(state === 'expanded' || isMobile) && <b className="text-xl">OASM</b>}
     </Link>
   );

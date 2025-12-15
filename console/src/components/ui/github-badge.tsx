@@ -1,10 +1,10 @@
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
-import { Github, Star } from "lucide-react";
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { Github, Star } from 'lucide-react';
 
-const REPO_API = "https://api.github.com/repos/oasm-platform/open-asm";
-const REPO_URL = "https://github.com/oasm-platform/open-asm";
+const REPO_API = 'https://api.github.com/repos/oasm-platform/open-asm';
+const REPO_URL = 'https://github.com/oasm-platform/open-asm';
 
 type RepoResponse = {
   stargazers_count: number;
@@ -12,15 +12,15 @@ type RepoResponse = {
 
 export function GithubBadge() {
   const { data } = useQuery<RepoResponse>({
-    queryKey: ["github", "repo", "oasm-platform/open-asm"],
+    queryKey: ['github', 'repo', 'oasm-platform/open-asm'],
     queryFn: async () => {
       const res = await fetch(REPO_API, {
         headers: {
           // Unauthenticated is fine for public data
-          Accept: "application/vnd.github+json",
+          Accept: 'application/vnd.github+json',
         },
       });
-      if (!res.ok) throw new Error("Failed to load GitHub repo info");
+      if (!res.ok) throw new Error('Failed to load GitHub repo info');
       return (await res.json()) as RepoResponse;
     },
     staleTime: 1000 * 60 * 30, // 30 minutes
@@ -35,13 +35,13 @@ export function GithubBadge() {
       target="_blank"
       rel="noreferrer noopener"
       className={cn(
-        buttonVariants({ variant: "outline", size: "default" }),
-        "gap-2 hidden md:flex"
+        buttonVariants({ variant: 'ghost', size: 'default' }),
+        'gap-2 flex',
       )}
       title="Open GitHub repository"
     >
       <Github className="size-4" />
-      {typeof stars === "number" ? (
+      {typeof stars === 'number' ? (
         <span className="inline-flex items-center gap-1 text-xs">
           <Star className="size-3 fill-yellow-500 stroke-yellow-500" />
           {stars.toLocaleString()}

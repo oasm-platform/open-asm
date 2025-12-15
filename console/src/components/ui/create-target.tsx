@@ -15,11 +15,11 @@ import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useTargetsControllerCreateTarget } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2Icon, Target } from 'lucide-react';
+import psl from 'psl';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import psl from 'psl';
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
 
@@ -93,7 +93,7 @@ export function CreateTarget() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
+        <Button variant="secondary" className="gap-2">
           <Target className="shrink-0" />
           <span className="hidden lg:inline">{title}</span>
         </Button>

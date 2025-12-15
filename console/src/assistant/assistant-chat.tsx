@@ -1,14 +1,14 @@
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { MessageCircle } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
-import { ChatHeader } from './components/chat-header';
-import { ConversationTitle } from './components/conversation-title';
-import { ChatMessages } from './components/chat-messages';
-import { ChatInput } from './components/chat-input';
-import { StreamingStatus } from './components/streaming-status';
 import { useAssistant } from '@/hooks/use-assistant';
+import { cn } from '@/lib/utils';
+import { MessageCircle } from 'lucide-react';
+import { useState } from 'react';
+import { ChatHeader } from './components/chat-header';
+import { ChatInput } from './components/chat-input';
+import { ChatMessages } from './components/chat-messages';
+import { ConversationTitle } from './components/conversation-title';
+import { StreamingStatus } from './components/streaming-status';
 import type { AssistantChatProps } from './types/types';
 
 export function AssistantChat({ onSendMessage }: AssistantChatProps) {
@@ -68,15 +68,12 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
   return (
     <>
       <Button
+        size="lg"
         variant="outline"
-        className="relative gap-2"
+        className="relative rounded-full md:rounded-lg w-10 h-10"
         onClick={() => setOpen(true)}
       >
-        <MessageCircle className="h-4 w-4" />
-        <span className="hidden md:inline">Assistant</span>
-        {messages.length > 0 && (
-          <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-blue-500"></span>
-        )}
+        <MessageCircle className="h-5 w-5" />
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent

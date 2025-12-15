@@ -4,6 +4,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { useNotificationStream } from '@/hooks/use-notification-stream';
 import {
   getNotificationsControllerGetNotificationsInfiniteQueryKey,
   getNotificationsControllerGetUnreadCountQueryKey,
@@ -13,9 +14,8 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { NotificationList } from './notification-list';
-import { useNotificationStream } from '@/hooks/use-notification-stream';
 import { Link } from 'react-router-dom';
+import { NotificationList } from './notification-list';
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -52,7 +52,11 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="relative">
+        <Button
+          variant="outline"
+          size="lg"
+          className="relative rounded-full md:rounded-lg w-10 h-10"
+        >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
