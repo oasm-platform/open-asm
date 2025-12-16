@@ -25,13 +25,29 @@ export class IssuesService {
         ]);
     }
 
-    async createIssue(createIssueDto: CreateIssueDto): Promise<Issue> {
-        const issue = this.issuesRepository.create(createIssueDto);
+    async createIssue(
+        createIssueDto: CreateIssueDto,
+        workspaceId: string,
+        userId: string,
+    ): Promise<Issue> {
+        const lastIssue = await this.issuesRepository.findOne({
+            where: { workspaceId },
+            order: { no: 'DESC' },
+        });
+        const no = (lastIssue?.no || 0) + 1;
+        console.log(userId);
+        const issue = this.issuesRepository.create({
+            ...createIssueDto,
+            workspaceId,
+            createdBy: { id: userId },
+            no,
+        });
         return await this.issuesRepository.save(issue);
     }
 
     async getMany(
         query: GetManyIssuesDto,
+        workspaceId: string,
     ): Promise<GetManyBaseResponseDto<Issue>> {
         const { limit, page, sortOrder } = query;
         let { sortBy } = query;
@@ -42,6 +58,15 @@ export class IssuesService {
 
         const queryBuilder = this.issuesRepository
             .createQueryBuilder('issues')
+            .leftJoinAndSelect('issues.createdBy', 'createdBy')
+            .where('issues.workspaceId = :workspaceId', { workspaceId })
+            .select([
+                'issues',
+                'createdBy.id',
+                'createdBy.name',
+                'createdBy.email',
+                'createdBy.image',
+            ])
             .orderBy(`issues.${sortBy}`, sortOrder)
             .skip((page - 1) * limit)
             .take(limit);

@@ -1515,6 +1515,43 @@ export interface DeleteMessageResponseDto {
   message: string;
 }
 
+export interface Issue {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  title: string;
+  description: string;
+  status: string;
+  sourceType: string;
+  sourceId: string;
+}
+
+export interface CreateIssueDto {
+  title: string;
+  description: string;
+  sourceType: CreateIssueDtoSourceTypeEnum;
+  sourceId: string;
+}
+
+export interface GetManyIssueDto {
+  data: Issue[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface UpdateIssueDto {
+  title?: string;
+  description?: string;
+  sourceType?: UpdateIssueDtoSourceTypeEnum;
+  sourceId?: string;
+  status: UpdateIssueDtoStatusEnum;
+}
+
 export interface McpTool {
   name: string;
   type: string;
@@ -1656,6 +1693,19 @@ export enum GetMcpServerHealthResponseDtoStatusEnum {
   Active = "active",
   Disabled = "disabled",
   Error = "error",
+}
+
+export enum CreateIssueDtoSourceTypeEnum {
+  Vulnerability = "vulnerability",
+}
+
+export enum UpdateIssueDtoSourceTypeEnum {
+  Vulnerability = "vulnerability",
+}
+
+export enum UpdateIssueDtoStatusEnum {
+  Open = "open",
+  Completed = "completed",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -4343,6 +4393,108 @@ export class Api<
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Create a new issue linked to a source (e.g. vulnerability).
+   *
+   * @tags issues
+   * @name IssuesControllerCreate
+   * @summary Create issue
+   * @request POST:/api/issues
+   */
+  issuesControllerCreate = (data: CreateIssueDto, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieve a list of all issues with pagination and filtering.
+   *
+   * @tags issues
+   * @name IssuesControllerGetMany
+   * @summary Get all issues
+   * @request GET:/api/issues
+   */
+  issuesControllerGetMany = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieve details of a specific issue.
+   *
+   * @tags issues
+   * @name IssuesControllerGetById
+   * @summary Get issue by ID
+   * @request GET:/api/issues/{id}
+   */
+  issuesControllerGetById = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Update issue details (e.g. status).
+   *
+   * @tags issues
+   * @name IssuesControllerUpdate
+   * @summary Update issue
+   * @request PATCH:/api/issues/{id}
+   */
+  issuesControllerUpdate = (
+    id: string,
+    data: UpdateIssueDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Remove an issue.
+   *
+   * @tags issues
+   * @name IssuesControllerDelete
+   * @summary Delete issue
+   * @request DELETE:/api/issues/{id}
+   */
+  issuesControllerDelete = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/${id}`,
       method: "DELETE",
       format: "json",
       ...params,

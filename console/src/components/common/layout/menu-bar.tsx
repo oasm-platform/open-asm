@@ -20,12 +20,13 @@ import {
 import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
 import {
   Bug,
+  CircleDot,
   CloudCheck,
   Cpu,
   Group,
   LayoutDashboard,
   SquareTerminal,
-  Target,
+  Target
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
 import { NewBadge } from '../new-badge';
@@ -33,6 +34,7 @@ import { NewBadge } from '../new-badge';
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
   const { state, isMobile, setOpenMobile } = useSidebar();
+
   const menu = [
     {
       title: 'Overview',
@@ -75,6 +77,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Vulnerabilities',
           icon: <Bug />,
           url: '/vulnerabilities',
+        },
+        {
+          title: 'Issues',
+          icon: <CircleDot />,
+          url: '/issues',
         },
       ],
     },

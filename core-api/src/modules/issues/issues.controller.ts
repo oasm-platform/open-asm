@@ -1,5 +1,8 @@
+import { UserContext } from '@/common/decorators/app.decorator';
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -14,18 +17,6 @@ export class IssuesController {
     constructor(private readonly issuesService: IssuesService) { }
 
     @Doc({
-        summary: 'Create issue',
-        description: 'Create a new issue linked to a source (e.g. vulnerability).',
-        response: {
-            serialization: Issue,
-        },
-    })
-    @Post()
-    create(@Body() createIssueDto: CreateIssueDto) {
-        return this.issuesService.createIssue(createIssueDto);
-    }
-
-    @Doc({
         summary: 'Get all issues',
         description: 'Retrieve a list of all issues with pagination and filtering.',
         response: {
@@ -33,8 +24,30 @@ export class IssuesController {
         },
     })
     @Get()
-    getMany(@Query() query: GetManyIssuesDto) {
-        return this.issuesService.getMany(query);
+    getMany(
+        @Query() query: GetManyIssuesDto,
+        @WorkspaceId() workspaceId: string,
+    ) {
+        return this.issuesService.getMany(query, workspaceId);
+    }
+
+    @Doc({
+        summary: 'Create issue',
+        description: 'Create a new issue linked to a source (e.g. vulnerability).',
+        response: {
+            serialization: Issue,
+        },
+        request: {
+            getWorkspaceId: true
+        }
+    })
+    @Post()
+    create(
+        @Body() createIssueDto: CreateIssueDto,
+        @WorkspaceId() workspaceId: string,
+        @UserContext() user: UserContextPayload,
+    ) {
+        return this.issuesService.createIssue(createIssueDto, workspaceId, user.id);
     }
 
     @Doc({

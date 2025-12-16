@@ -5,14 +5,15 @@ import { AssetGroups } from '@/pages/asset-group/asset-groups';
 import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
+import Issues from '@/pages/issues/issues';
 import Login from '@/pages/login/login';
+import NotificationsPage from '@/pages/notifications/notifications';
 import CreateProviderPage from '@/pages/providers/create-provider';
 import DetailProvider from '@/pages/providers/detail-provider';
 import EditProviderPage from '@/pages/providers/edit-provider';
 import ProvidersPage from '@/pages/providers/providers';
 import Register from '@/pages/register/register';
 import Search from '@/pages/search/search';
-import NotificationsPage from '@/pages/notifications/notifications';
 import CreateMcpPermission from '@/pages/settings/components/create-mcp-permission';
 import Settings from '@/pages/settings/settings';
 import Studio from '@/pages/studio/studio';
@@ -20,8 +21,8 @@ import DetailTarget from '@/pages/targets/detail-target';
 import Targets from '@/pages/targets/targets';
 import ToolDetail from '@/pages/tools/components/tool-detail';
 import Tools from '@/pages/tools/tools';
-import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 import DetailVulnerability from '@/pages/vulnerabilities/detail-vulnerability';
+import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 import Workers from '@/pages/workers/workers';
 import Workflow from '@/pages/workflow/workflow';
 import { createBrowserRouter } from 'react-router-dom';
@@ -182,6 +183,15 @@ export const router = createBrowserRouter([
               {
                 path: ':id/edit',
                 element: <EditProviderPage />,
+              },
+            ],
+          },
+          {
+            path: 'issues',
+            children: [
+              {
+                path: '',
+                element: <Issues />,
               },
             ],
           },

@@ -1,4 +1,4 @@
-import { IssueSourceType, IssueStatus, Severity } from '@/common/enums/enum';
+import { IssueSourceType, IssueStatus } from '@/common/enums/enum';
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 
@@ -12,10 +12,7 @@ export class CreateIssueDto {
     @IsString()
     description?: string;
 
-    @ApiProperty({ enum: Severity })
-    @IsEnum(Severity)
-    @IsOptional()
-    severity?: Severity;
+
 
     @ApiProperty({ enum: IssueSourceType })
     @IsEnum(IssueSourceType)
