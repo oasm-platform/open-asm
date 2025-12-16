@@ -58,6 +58,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Groups',
           icon: <Group />,
           url: 'assets/groups',
+          isNew: false,
         },
         {
           title: 'Assets',

@@ -1,0 +1,102 @@
+import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { GetManyIssuesDto } from './dto/get-many-issues.dto';
+import { CreateIssueDto, UpdateIssueDto } from './dto/issue.dto';
+import { Issue } from './entities/issue.entity';
+import { IssuesService } from './issues.service';
+
+@ApiTags('issues')
+@Controller('issues')
+export class IssuesController {
+    constructor(private readonly issuesService: IssuesService) { }
+
+    @Doc({
+        summary: 'Create issue',
+        description: 'Create a new issue linked to a source (e.g. vulnerability).',
+        response: {
+            serialization: Issue,
+        },
+    })
+    @Post()
+    create(@Body() createIssueDto: CreateIssueDto) {
+        return this.issuesService.createIssue(createIssueDto);
+    }
+
+    @Doc({
+        summary: 'Get all issues',
+        description: 'Retrieve a list of all issues with pagination and filtering.',
+        response: {
+            serialization: GetManyResponseDto(Issue),
+        },
+    })
+    @Get()
+    getMany(@Query() query: GetManyIssuesDto) {
+        return this.issuesService.getMany(query);
+    }
+
+    @Doc({
+        summary: 'Get issue by ID',
+        description: 'Retrieve details of a specific issue.',
+        response: {
+            serialization: Issue,
+        },
+        request: {
+            params: [
+                {
+                    name: 'id',
+                    type: String,
+                    description: 'Issue ID',
+                },
+            ],
+        },
+    })
+    @Get(':id')
+    getById(@Param('id') id: string) {
+        return this.issuesService.getById(id);
+    }
+
+    @Doc({
+        summary: 'Update issue',
+        description: 'Update issue details (e.g. status).',
+        response: {
+            serialization: Issue,
+        },
+        request: {
+            params: [
+                {
+                    name: 'id',
+                    type: String,
+                    description: 'Issue ID',
+                },
+            ],
+        },
+    })
+    @Patch(':id')
+    update(@Param('id') id: string, @Body() updateIssueDto: UpdateIssueDto) {
+        return this.issuesService.update(id, updateIssueDto);
+    }
+
+    @Doc({
+        summary: 'Delete issue',
+        description: 'Remove an issue.',
+        response: {
+            serialization: DefaultMessageResponseDto,
+        },
+        request: {
+            params: [
+                {
+                    name: 'id',
+                    type: String,
+                    description: 'Issue ID',
+                },
+            ],
+        },
+    })
+    @Delete(':id')
+    delete(@Param('id') id: string) {
+        return this.issuesService.delete(id);
+    }
+}
