@@ -2,6 +2,7 @@ import { JobDataResultType } from '@/common/types/app.types';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import * as crypto from 'crypto';
 import { DataSource, InsertResult } from 'typeorm';
 import { JobStatus, ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
@@ -13,7 +14,6 @@ import { Job } from '../jobs-registry/entities/job.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterInput } from './data-adapter.interface';
-
 @Injectable()
 export class DataAdapterService {
   constructor(
@@ -230,16 +230,26 @@ export class DataAdapterService {
           .insert()
           .into(Vulnerability)
           .values(
-            data.map((vuln) => ({
-              ...vuln,
-              asset: { id: job.asset.id },
-              jobHistory: { id: job.jobHistory.id },
-              tool: { id: job.tool.id },
-            })),
+            data.map((vuln) => {
+              const stringHash = `${vuln.name}-${job.asset.id}-${job.tool.id}`;
+              const fingerprint = crypto
+                .createHash('md5')
+                .update(stringHash)
+                .digest('hex');
+              return {
+                ...vuln,
+                fingerprint,
+                assetId: job.asset.id,
+                toolId: job.tool.id,
+                asset: { id: job.asset.id },
+                jobHistory: { id: job.jobHistory.id },
+                tool: { id: job.tool.id },
+              };
+            }),
           )
           .orUpdate({
-            conflict_target: ['name', 'toolId', 'assetId'],
-            overwrite: ['updatedAt'],
+            conflict_target: ['fingerprint'],
+            overwrite: ['updatedAt', 'severity'],
           })
           .execute();
       }
@@ -287,8 +297,16 @@ export class DataAdapterService {
     job,
     data,
   }: DataAdapterInput<JobDataResultType>): Promise<void> {
+    // Define type for sync function configuration
+    type SyncFunctionConfig<T = unknown> = {
+      handler: (data: DataAdapterInput<T>) => Promise<void | InsertResult>;
+      validationClass?: new () => object;
+    };
+
     // Map of tool categories to their corresponding sync functions and validation classes
-    const syncFunctions = {
+    const syncFunctions: Partial<
+      Record<ToolCategory, SyncFunctionConfig<any>>
+    > = {
       [ToolCategory.PORTS_SCANNER]: {
         handler: (data: DataAdapterInput<number[]>) => this.portsScanner(data),
       },
@@ -310,11 +328,12 @@ export class DataAdapterService {
         handler: (data: DataAdapterInput<AssetTag[]>) => this.classifier(data),
         validationClass: AssetTag,
       },
+      // Note: ASSISTANT category is handled separately or not supported in this mapping
     };
 
     // Get the appropriate sync function based on category
     if (!job.tool.category) {
-      throw new Error(`Unsupported tool category: ${job.tool.category}`);
+      throw new Error('Tool category is undefined');
     }
 
     const syncFunction = syncFunctions[job.tool.category];
@@ -325,14 +344,10 @@ export class DataAdapterService {
     }
 
     // Validate data before syncing
-    if (
-      'validationClass' in syncFunction &&
-      syncFunction.validationClass &&
-      data !== undefined
-    ) {
+    if (syncFunction.validationClass && data !== undefined) {
       const isValid = await this.validateData(
         data as object | object[],
-        syncFunction.validationClass as new () => object,
+        syncFunction.validationClass,
       );
       if (!isValid) {
         Logger.error('Invalid data', job.category);
@@ -342,9 +357,9 @@ export class DataAdapterService {
       }
     }
 
-    // Call the appropriate sync function
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await syncFunction.handler({ job, data } as DataAdapterInput<any>);
+    // Call the appropriate sync function with proper type assertion
+    const typedData = { job, data } as unknown as DataAdapterInput<any>;
+    await syncFunction.handler(typedData);
 
     return;
   }
