@@ -78,9 +78,9 @@ export default function ExportDataButton({
   };
 
   return (
-    <Button variant="secondary" onClick={handleDownload}>
+    <Button variant="outline" onClick={handleDownload}>
       <Download className="h-4 w-4" />
-      <span className="hidden md:inline">Export</span>
+      <span>Export</span>
     </Button>
   );
 }

@@ -1,13 +1,12 @@
 import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { GetManyIssuesDto } from './dto/get-many-issues.dto';
-import { CreateIssueDto, UpdateIssueDto } from './dto/issue.dto';
+import { ChangeIssueStatusDto, CreateIssueDto, UpdateIssueDto } from './dto/issue.dto';
 import { Issue } from './entities/issue.entity';
 import { IssuesService } from './issues.service';
 
@@ -87,16 +86,11 @@ export class IssuesController {
             ],
         },
     })
-    @Patch(':id')
-    update(@Param('id') id: string, @Body() updateIssueDto: UpdateIssueDto) {
-        return this.issuesService.update(id, updateIssueDto);
-    }
-
     @Doc({
-        summary: 'Delete issue',
-        description: 'Remove an issue.',
+        summary: 'Update issue title',
+        description: 'Update issue title only.',
         response: {
-            serialization: DefaultMessageResponseDto,
+            serialization: Issue,
         },
         request: {
             params: [
@@ -108,8 +102,32 @@ export class IssuesController {
             ],
         },
     })
-    @Delete(':id')
-    delete(@Param('id') id: string) {
-        return this.issuesService.delete(id);
+    @Patch(':id')
+    update(@Param('id') id: string, @Body() updateIssueDto: UpdateIssueDto) {
+        return this.issuesService.update(id, updateIssueDto);
+    }
+
+    @Doc({
+        summary: 'Change issue status',
+        description: 'Change the status of an issue.',
+        response: {
+            serialization: Issue,
+        },
+        request: {
+            params: [
+                {
+                    name: 'id',
+                    type: String,
+                    description: 'Issue ID',
+                },
+            ],
+        },
+    })
+    @Patch(':id/status')
+    changeStatus(
+        @Param('id') id: string,
+        @Body() changeIssueStatusDto: ChangeIssueStatusDto,
+    ) {
+        return this.issuesService.changeStatus(id, changeIssueStatusDto);
     }
 }

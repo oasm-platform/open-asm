@@ -1,32 +1,15 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DataTable } from '@/components/ui/data-table';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useIssuesControllerGetMany, type Issue } from '@/services/apis/gen/queries';
 import { type ColumnDef } from '@tanstack/react-table';
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 import { CheckCircleIcon, CircleIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const timeAgo = (dateFormatted: string) => {
-    const date = new Date(dateFormatted);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    const intervals = {
-        year: 31536000,
-        month: 2592000,
-        week: 604800,
-        day: 86400,
-        hour: 3600,
-        minute: 60,
-    };
+dayjs.extend(relativeTime);
 
-    for (const [unit, value] of Object.entries(intervals)) {
-        const count = Math.floor(seconds / value);
-        if (count >= 1) {
-            return `${count} ${unit}${count > 1 ? 's' : ''} ago`;
-        }
-    }
-    return 'just now';
-};
+
 
 const issueColumns: ColumnDef<Issue>[] = [
     {
@@ -59,18 +42,10 @@ const issueColumns: ColumnDef<Issue>[] = [
                             <span>
                                 <span className="font-medium text-foreground hover:underline cursor-pointer">
                                     {issue.createdBy?.name || 'Unknown'}
-                                </span> opened {timeAgo(issue.createdAt)}
+                                </span> opened {dayjs(issue.createdAt).fromNow()}
                             </span>
                         </div>
                     </div>
-                    {issue.createdBy && (
-                        <div className="ml-4">
-                            <Avatar className="h-6 w-6">
-                                <AvatarImage src={issue.createdBy.image} alt={issue.createdBy.name} />
-                                <AvatarFallback>{issue.createdBy.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                        </div>
-                    )}
                 </div>
             );
         },
@@ -124,6 +99,7 @@ export function ListIssues() {
             sortOrder={sortOrder}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
+            isShowHeader={false}
             onSortChange={(col, order) => {
                 setSortBy(col);
                 setSortOrder(order);

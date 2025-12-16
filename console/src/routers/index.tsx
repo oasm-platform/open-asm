@@ -5,6 +5,7 @@ import { AssetGroups } from '@/pages/asset-group/asset-groups';
 import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
+import IssueDetail from '@/pages/issues/issue-detail';
 import Issues from '@/pages/issues/issues';
 import Login from '@/pages/login/login';
 import NotificationsPage from '@/pages/notifications/notifications';
@@ -192,6 +193,10 @@ export const router = createBrowserRouter([
               {
                 path: '',
                 element: <Issues />,
+              },
+              {
+                path: ':id',
+                element: <IssueDetail />,
               },
             ],
           },

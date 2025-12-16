@@ -93,9 +93,9 @@ export function CreateTarget() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="secondary" className="gap-2">
+        <Button variant="outline" className="gap-2">
           <Target className="shrink-0" />
-          <span className="hidden lg:inline">{title}</span>
+          <span>{title}</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="w-full md:w-3/4 lg:w-[425px]">

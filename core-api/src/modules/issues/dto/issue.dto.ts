@@ -1,5 +1,5 @@
 import { IssueSourceType, IssueStatus } from '@/common/enums/enum';
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class CreateIssueDto {
@@ -25,9 +25,15 @@ export class CreateIssueDto {
     sourceId?: string;
 }
 
-export class UpdateIssueDto extends PartialType(CreateIssueDto) {
+export class UpdateIssueDto {
+    @ApiProperty()
+    @IsString()
+    @IsOptional()
+    title?: string;
+}
+
+export class ChangeIssueStatusDto {
     @ApiProperty({ enum: IssueStatus })
     @IsEnum(IssueStatus)
-    @IsOptional()
-    status?: IssueStatus;
+    status: IssueStatus;
 }
