@@ -3,7 +3,8 @@ import { IssueSourceType, IssueStatus } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { IssueComment } from './issue-comment.entity';
 
 @Entity('issues')
 export class Issue extends BaseEntity {
@@ -22,8 +23,6 @@ export class Issue extends BaseEntity {
         default: IssueStatus.OPEN,
     })
     status: IssueStatus;
-
-
 
     @ApiProperty()
     @Column({
@@ -55,4 +54,7 @@ export class Issue extends BaseEntity {
 
     @Column({ nullable: true })
     createdById: string;
+
+    @OneToMany(() => IssueComment, (comment) => comment.issue)
+    comments: IssueComment[];
 }
