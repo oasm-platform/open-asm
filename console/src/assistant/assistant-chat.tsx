@@ -11,10 +11,14 @@ import { ConversationTitle } from './components/conversation-title';
 import { StreamingStatus } from './components/streaming-status';
 import type { AssistantChatProps } from './types/types';
 
+import { AgentType } from './types/agent-types';
+
 export function AssistantChat({ onSendMessage }: AssistantChatProps) {
   const [open, setOpen] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
-  const [selectedAgentType, setSelectedAgentType] = useState<number>(2);
+  const [selectedAgentType, setSelectedAgentType] = useState<number>(
+    AgentType.Analysis,
+  );
 
   const {
     sessions,

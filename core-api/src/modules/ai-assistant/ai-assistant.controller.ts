@@ -308,7 +308,7 @@ export class AiAssistantController {
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Observable<{ data: string }> {
-    const createMessageDto: CreateMessageDto & { agentType?: number } = {
+    const createMessageDto: CreateMessageDto = {
       question,
       conversationId,
       isCreateConversation: isCreateConversation === 'true',
