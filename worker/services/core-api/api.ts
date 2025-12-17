@@ -466,6 +466,20 @@ export interface GetManyGetIpAssetsDTODto {
   pageCount: number;
 }
 
+export interface GetHostAssetsDTO {
+  host: string;
+  assetCount: number;
+}
+
+export interface GetManyGetHostAssetsDTODto {
+  data: GetHostAssetsDTO[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export interface GetPortAssetsDTO {
   port: string;
   assetCount: number;
@@ -2533,6 +2547,7 @@ export class Api<
       targetIds?: string[];
       ipAddresses?: string[];
       ports?: string[];
+      hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
     },
@@ -2569,6 +2584,7 @@ export class Api<
       targetIds?: string[];
       ipAddresses?: string[];
       ports?: string[];
+      hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
     },
@@ -2576,6 +2592,43 @@ export class Api<
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/ip`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of host with number of assets.
+   *
+   * @tags Assets
+   * @name AssetsControllerGetHostAssets
+   * @summary Get host asset
+   * @request GET:/api/assets/host
+   */
+  assetsControllerGetHostAssets = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      value?: string;
+      targetIds?: string[];
+      ipAddresses?: string[];
+      ports?: string[];
+      hosts?: string[];
+      techs?: string[];
+      statusCodes?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/assets/host`,
       method: "GET",
       query: query,
       format: "json",
@@ -2605,6 +2658,7 @@ export class Api<
       targetIds?: string[];
       ipAddresses?: string[];
       ports?: string[];
+      hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
     },
@@ -2641,6 +2695,7 @@ export class Api<
       targetIds?: string[];
       ipAddresses?: string[];
       ports?: string[];
+      hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
     },
@@ -2677,6 +2732,7 @@ export class Api<
       targetIds?: string[];
       ipAddresses?: string[];
       ports?: string[];
+      hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
     },

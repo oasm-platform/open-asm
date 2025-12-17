@@ -28,6 +28,7 @@ import { AssetService } from './entities/asset-services.entity';
 import { AssetTag } from './entities/asset-tags.entity';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
+import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
 
 // Type cho raw database response từ TLS query
 interface TlsRawData {
@@ -76,7 +77,7 @@ export class AssetsService {
   }
 
   private buildBaseQuery(query: GetAssetsQueryDto, workspaceId: string) {
-    const { targetIds, ipAddresses, ports, techs, statusCodes } = query;
+    const { targetIds, hosts, ipAddresses, ports, techs, statusCodes } = query;
 
     const whereBuilder = {
       targetIds: {
@@ -86,6 +87,10 @@ export class AssetsService {
       techs: {
         value: techs,
         whereClause: `"httpResponses"."tech" && :param`,
+      },
+      hosts: {
+        value: hosts,
+        whereClause: `asset.value = ANY(:param)`,
       },
       ipAddresses: {
         value: ipAddresses,
@@ -142,7 +147,7 @@ export class AssetsService {
    * @param query - The query parameters to filter and paginate the assets.
    * @returns A promise that resolves to a paginated list of assets, including total count and pagination information.
    */
-  public async getManyAsssets(
+  public async getManyAsssetServices(
     query: GetAssetsQueryDto,
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetAssetsResponseDto>> {
@@ -456,6 +461,62 @@ export class AssetsService {
       obj.assetCount = item.assetCount;
       return obj;
     });
+
+    return getManyResponse({ query, data, total });
+  }
+
+  /**
+   * Retrieves a list of IP with number of asset
+   *
+   * @returns A promise that resolves to the list of ip.
+   *
+   */
+  public async getHostAssets(
+    query: GetAssetsQueryDto,
+    workspaceId: string,
+  ): Promise<GetManyBaseResponseDto<GetHostAssetsDTO>> {
+    const offset = (query.page - 1) * query.limit;
+    if (!(query.sortBy in GetHostAssetsDTO)) {
+      query.sortBy = '"assetCount"';
+    }
+
+    const queryBuilder = this.buildBaseQuery(query, workspaceId)
+      .select([
+        'asset.value',
+        'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
+      ])
+      .andWhere('asset.value IS NOT NULL')
+      .groupBy('asset.value');
+
+    if (query.value) {
+      queryBuilder.andWhere('asset.value::text ILIKE :value', {
+        value: `%${query.value}%`,
+      });
+    }
+
+    const totalInDb = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(*)')
+      .from('(' + queryBuilder.getQuery() + ')', 't1')
+      .setParameters(queryBuilder.getParameters())
+      .getRawOne<{ count: number }>();
+
+    const list = await queryBuilder
+      .orderBy(query.sortBy, query.sortOrder)
+      .limit(query.limit)
+      .offset(offset)
+      .getRawMany();
+
+    const total = totalInDb?.count ?? 0;
+
+    const data = list.map(
+      (item: { asset_value: string; assetCount: number }) => {
+        const obj = new GetHostAssetsDTO();
+        obj.host = item.asset_value;
+        obj.assetCount = item.assetCount;
+        return obj;
+      },
+    );
 
     return getManyResponse({ query, data, total });
   }

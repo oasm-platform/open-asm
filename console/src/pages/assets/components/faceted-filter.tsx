@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
+  useAssetsControllerGetHostAssetsInfinite,
   useAssetsControllerGetIpAssetsInfinite,
   useAssetsControllerGetPortAssetsInfinite,
   useAssetsControllerGetStatusCodeAssetsInfinite,
@@ -433,6 +434,47 @@ export function StatusCodesFacetedFilter() {
       paramValues={filterParams.statusCodes}
       title="Status Code"
       filterKey="statusCodes"
+      options={options}
+      hasNextPage={hasNextPage}
+      fetchNextPage={fetchNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      isFetching={isFetching}
+    />
+  );
+}
+
+export function HostsFacetedFilter() {
+  const [open, setOpen] = useState(false);
+  const { filterParams, queryFilterParams } = useAsset();
+  const [value, setValue] = useState('');
+  const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetching } =
+    useAssetsControllerGetHostAssetsInfinite(
+      { ...queryFilterParams, ...filterParams, value: value },
+      {
+        query: {
+          getNextPageParam: (lastGroup) =>
+            lastGroup.hasNextPage ? lastGroup.page + 1 : undefined,
+          enabled: open,
+          initialPageParam: 1,
+          select: (res) => {
+            const items = res?.pages.flatMap((page) => page.data) || [];
+            return items.map((e) => ({
+              value: e.host?.toString() ?? '',
+              label: e.host?.toString() ?? '',
+            }));
+          },
+        },
+      },
+    );
+  const options = useMemo(() => data ?? [], [data]);
+  return (
+    <FacetedFilterTemplate
+      setValue={setValue}
+      open={open}
+      setOpen={setOpen}
+      paramValues={filterParams.hosts}
+      title="Host"
+      filterKey="hosts"
       options={options}
       hasNextPage={hasNextPage}
       fetchNextPage={fetchNextPage}
