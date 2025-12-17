@@ -27,7 +27,7 @@ jobs:
           cache-dependency-path: '${{ matrix.service }}/package-lock.json'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: ${{ matrix.service }}
 
       - name: Run lint
