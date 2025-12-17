@@ -21,6 +21,13 @@ export enum IssueType {
   UNRECOGNIZED = -1,
 }
 
+export enum AgentType {
+  AGENT_TYPE_ORCHESTRATION = 0,
+  AGENT_TYPE_NUCLEI_GENERATOR = 1,
+  AGENT_TYPE_ANALYSIS = 2,
+  UNRECOGNIZED = -1,
+}
+
 export interface HealthCheckRequest {
 }
 
@@ -44,14 +51,6 @@ export interface ResolveIssueRequest {
 
 export interface ResolveIssueResponse {
   message: string;
-}
-
-export interface CreateTemplateRequest {
-  question: string;
-}
-
-export interface CreateTemplateResponse {
-  answer: string;
 }
 
 export interface Conversation {
@@ -123,6 +122,7 @@ export interface CreateMessageRequest {
   question: string;
   conversationId: string;
   isCreateConversation: boolean;
+  agentType: AgentType;
 }
 
 export interface CreateMessageResponse {
@@ -134,6 +134,7 @@ export interface UpdateMessageRequest {
   conversationId: string;
   messageId: string;
   question: string;
+  agentType: AgentType;
 }
 
 export interface UpdateMessageResponse {
@@ -448,80 +449,6 @@ export const ResolveIssueResponse: MessageFns<ResolveIssueResponse> = {
           }
 
           message.message = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-};
-
-function createBaseCreateTemplateRequest(): CreateTemplateRequest {
-  return { question: "" };
-}
-
-export const CreateTemplateRequest: MessageFns<CreateTemplateRequest> = {
-  encode(message: CreateTemplateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.question !== "") {
-      writer.uint32(10).string(message.question);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): CreateTemplateRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCreateTemplateRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.question = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-};
-
-function createBaseCreateTemplateResponse(): CreateTemplateResponse {
-  return { answer: "" };
-}
-
-export const CreateTemplateResponse: MessageFns<CreateTemplateResponse> = {
-  encode(message: CreateTemplateResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.answer !== "") {
-      writer.uint32(10).string(message.answer);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): CreateTemplateResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCreateTemplateResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.answer = reader.string();
           continue;
         }
       }
@@ -1111,7 +1038,7 @@ export const GetMessagesResponse: MessageFns<GetMessagesResponse> = {
 };
 
 function createBaseCreateMessageRequest(): CreateMessageRequest {
-  return { question: "", conversationId: "", isCreateConversation: false };
+  return { question: "", conversationId: "", isCreateConversation: false, agentType: 0 };
 }
 
 export const CreateMessageRequest: MessageFns<CreateMessageRequest> = {
@@ -1124,6 +1051,9 @@ export const CreateMessageRequest: MessageFns<CreateMessageRequest> = {
     }
     if (message.isCreateConversation !== false) {
       writer.uint32(24).bool(message.isCreateConversation);
+    }
+    if (message.agentType !== 0) {
+      writer.uint32(32).int32(message.agentType);
     }
     return writer;
   },
@@ -1157,6 +1087,14 @@ export const CreateMessageRequest: MessageFns<CreateMessageRequest> = {
           }
 
           message.isCreateConversation = reader.bool();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.agentType = reader.int32() as any;
           continue;
         }
       }
@@ -1218,7 +1156,7 @@ export const CreateMessageResponse: MessageFns<CreateMessageResponse> = {
 };
 
 function createBaseUpdateMessageRequest(): UpdateMessageRequest {
-  return { conversationId: "", messageId: "", question: "" };
+  return { conversationId: "", messageId: "", question: "", agentType: 0 };
 }
 
 export const UpdateMessageRequest: MessageFns<UpdateMessageRequest> = {
@@ -1231,6 +1169,9 @@ export const UpdateMessageRequest: MessageFns<UpdateMessageRequest> = {
     }
     if (message.question !== "") {
       writer.uint32(26).string(message.question);
+    }
+    if (message.agentType !== 0) {
+      writer.uint32(32).int32(message.agentType);
     }
     return writer;
   },
@@ -1264,6 +1205,14 @@ export const UpdateMessageRequest: MessageFns<UpdateMessageRequest> = {
           }
 
           message.question = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.agentType = reader.int32() as any;
           continue;
         }
       }
@@ -2114,69 +2063,6 @@ export const IssueServiceService = {
 
 export interface IssueServiceServer extends UntypedServiceImplementation {
   resolveIssueServers: handleUnaryCall<ResolveIssueRequest, ResolveIssueResponse>;
-}
-
-/**
- * ----------------
- * Nuclei template gen
- * ----------------
- */
-
-export interface NucleiTemplateServiceClient {
-  createTemplate(request: CreateTemplateRequest): Observable<CreateTemplateResponse>;
-}
-
-/**
- * ----------------
- * Nuclei template gen
- * ----------------
- */
-
-export interface NucleiTemplateServiceController {
-  createTemplate(
-    request: CreateTemplateRequest,
-  ): Promise<CreateTemplateResponse> | Observable<CreateTemplateResponse> | CreateTemplateResponse;
-}
-
-export function NucleiTemplateServiceControllerMethods() {
-  return function (constructor: Function) {
-    const grpcMethods: string[] = ["createTemplate"];
-    for (const method of grpcMethods) {
-      const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
-      GrpcMethod("NucleiTemplateService", method)(constructor.prototype[method], method, descriptor);
-    }
-    const grpcStreamMethods: string[] = [];
-    for (const method of grpcStreamMethods) {
-      const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
-      GrpcStreamMethod("NucleiTemplateService", method)(constructor.prototype[method], method, descriptor);
-    }
-  };
-}
-
-export const NUCLEI_TEMPLATE_SERVICE_NAME = "NucleiTemplateService";
-
-/**
- * ----------------
- * Nuclei template gen
- * ----------------
- */
-export type NucleiTemplateServiceService = typeof NucleiTemplateServiceService;
-export const NucleiTemplateServiceService = {
-  createTemplate: {
-    path: "/app.NucleiTemplateService/CreateTemplate",
-    requestStream: false,
-    responseStream: false,
-    requestSerialize: (value: CreateTemplateRequest): Buffer =>
-      Buffer.from(CreateTemplateRequest.encode(value).finish()),
-    requestDeserialize: (value: Buffer): CreateTemplateRequest => CreateTemplateRequest.decode(value),
-    responseSerialize: (value: CreateTemplateResponse): Buffer =>
-      Buffer.from(CreateTemplateResponse.encode(value).finish()),
-    responseDeserialize: (value: Buffer): CreateTemplateResponse => CreateTemplateResponse.decode(value),
-  },
-} as const;
-
-export interface NucleiTemplateServiceServer extends UntypedServiceImplementation {
-  createTemplate: handleUnaryCall<CreateTemplateRequest, CreateTemplateResponse>;
 }
 
 /**
