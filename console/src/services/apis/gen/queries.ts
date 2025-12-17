@@ -1458,6 +1458,107 @@ export type DeleteMessageResponseDto = {
   message: string;
 };
 
+export type User = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+};
+
+export type Issue = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  description: string;
+  status: string;
+  sourceType: string;
+  sourceId: string;
+  workspaceId: string;
+  no: number;
+  createdBy: User;
+};
+
+export type GetManyIssueDto = {
+  data: Issue[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type CreateIssueDtoSourceType =
+  (typeof CreateIssueDtoSourceType)[keyof typeof CreateIssueDtoSourceType];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const CreateIssueDtoSourceType = {
+  vulnerability: 'vulnerability',
+} as const;
+
+export type CreateIssueDto = {
+  title: string;
+  description: string;
+  sourceType: CreateIssueDtoSourceType;
+  sourceId: string;
+};
+
+export type UpdateIssueDto = {
+  title: string;
+};
+
+export type ChangeIssueStatusDtoStatus =
+  (typeof ChangeIssueStatusDtoStatus)[keyof typeof ChangeIssueStatusDtoStatus];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ChangeIssueStatusDtoStatus = {
+  open: 'open',
+  completed: 'completed',
+} as const;
+
+export type ChangeIssueStatusDto = {
+  status: ChangeIssueStatusDtoStatus;
+};
+
+export type IssueCommentType =
+  (typeof IssueCommentType)[keyof typeof IssueCommentType];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const IssueCommentType = {
+  content: 'content',
+} as const;
+
+export type IssueComment = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  content: string;
+  createdBy: User;
+  isCanDelete: boolean;
+  isCanEdit: boolean;
+  type: IssueCommentType;
+};
+
+export type CreateIssueCommentDto = {
+  content: string;
+};
+
+export type GetManyIssueCommentDto = {
+  data: IssueComment[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type UpdateIssueCommentDto = {
+  /** Content of the comment */
+  content: string;
+};
+
+export type Object = { [key: string]: unknown };
+
 export type McpTool = {
   name: string;
   type: string;
@@ -1769,6 +1870,22 @@ export type AssetGroupControllerGetAssetsNotInAssetGroupParams = {
 };
 
 export type AssetGroupControllerGetWorkflowsNotInAssetGroupParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type IssuesControllerGetManyParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type IssuesControllerGetCommentsByIssueIdParams = {
   search?: string;
   page?: number;
   limit?: number;
@@ -5602,7 +5719,8 @@ export const getNotificationsControllerGetNotificationsQueryKey = (
 
 export const getNotificationsControllerGetNotificationsInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+    NotificationsControllerGetNotificationsParams['page']
   >,
   TError = unknown,
 >(
@@ -5612,7 +5730,9 @@ export const getNotificationsControllerGetNotificationsInfiniteQueryOptions = <
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
         TError,
-        TData
+        TData,
+        QueryKey,
+        NotificationsControllerGetNotificationsParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -5625,14 +5745,22 @@ export const getNotificationsControllerGetNotificationsInfiniteQueryOptions = <
     getNotificationsControllerGetNotificationsInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
-  > = ({ signal }) =>
-    notificationsControllerGetNotifications(params, requestOptions, signal);
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+    QueryKey,
+    NotificationsControllerGetNotificationsParams['page']
+  > = ({ signal, pageParam }) =>
+    notificationsControllerGetNotifications(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
     Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
     TError,
-    TData
+    TData,
+    QueryKey,
+    NotificationsControllerGetNotificationsParams['page']
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -5644,7 +5772,8 @@ export type NotificationsControllerGetNotificationsInfiniteQueryError = unknown;
 
 export function useNotificationsControllerGetNotificationsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+    NotificationsControllerGetNotificationsParams['page']
   >,
   TError = unknown,
 >(
@@ -5654,14 +5783,17 @@ export function useNotificationsControllerGetNotificationsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
         TError,
-        TData
+        TData,
+        QueryKey,
+        NotificationsControllerGetNotificationsParams['page']
       >
     > &
       Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
           TError,
-          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+          QueryKey
         >,
         'initialData'
       >;
@@ -5673,7 +5805,8 @@ export function useNotificationsControllerGetNotificationsInfinite<
 };
 export function useNotificationsControllerGetNotificationsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+    NotificationsControllerGetNotificationsParams['page']
   >,
   TError = unknown,
 >(
@@ -5683,14 +5816,17 @@ export function useNotificationsControllerGetNotificationsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
         TError,
-        TData
+        TData,
+        QueryKey,
+        NotificationsControllerGetNotificationsParams['page']
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
           TError,
-          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+          Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+          QueryKey
         >,
         'initialData'
       >;
@@ -5702,7 +5838,8 @@ export function useNotificationsControllerGetNotificationsInfinite<
 };
 export function useNotificationsControllerGetNotificationsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+    NotificationsControllerGetNotificationsParams['page']
   >,
   TError = unknown,
 >(
@@ -5712,7 +5849,9 @@ export function useNotificationsControllerGetNotificationsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
         TError,
-        TData
+        TData,
+        QueryKey,
+        NotificationsControllerGetNotificationsParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -5727,7 +5866,8 @@ export function useNotificationsControllerGetNotificationsInfinite<
 
 export function useNotificationsControllerGetNotificationsInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>
+    Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
+    NotificationsControllerGetNotificationsParams['page']
   >,
   TError = unknown,
 >(
@@ -5737,7 +5877,9 @@ export function useNotificationsControllerGetNotificationsInfinite<
       UseInfiniteQueryOptions<
         Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
         TError,
-        TData
+        TData,
+        QueryKey,
+        NotificationsControllerGetNotificationsParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -6024,165 +6166,9 @@ export const notificationsControllerStream = (
   );
 };
 
-export const getNotificationsControllerStreamInfiniteQueryKey = () => {
-  return ['infinate', `/api/notifications/stream`] as const;
-};
-
 export const getNotificationsControllerStreamQueryKey = () => {
   return [`/api/notifications/stream`] as const;
 };
-
-export const getNotificationsControllerStreamInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerStream>>
-  >,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof notificationsControllerStream>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getNotificationsControllerStreamInfiniteQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof notificationsControllerStream>>
-  > = ({ signal }) => notificationsControllerStream(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof notificationsControllerStream>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type NotificationsControllerStreamInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof notificationsControllerStream>>
->;
-export type NotificationsControllerStreamInfiniteQueryError = unknown;
-
-export function useNotificationsControllerStreamInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerStream>>
-  >,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerStream>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerStream>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerStreamInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerStream>>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerStream>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerStream>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerStreamInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerStream>>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Subscribe to notifications stream
- */
-
-export function useNotificationsControllerStreamInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerStream>>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getNotificationsControllerStreamInfiniteQueryOptions(options);
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
 
 export const getNotificationsControllerStreamQueryOptions = <
   TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
@@ -6336,167 +6322,9 @@ export const notificationsControllerGetUnreadCount = (
   );
 };
 
-export const getNotificationsControllerGetUnreadCountInfiniteQueryKey = () => {
-  return ['infinate', `/api/notifications/unread-count`] as const;
-};
-
 export const getNotificationsControllerGetUnreadCountQueryKey = () => {
   return [`/api/notifications/unread-count`] as const;
 };
-
-export const getNotificationsControllerGetUnreadCountInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
-  >,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseInfiniteQueryOptions<
-      Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getNotificationsControllerGetUnreadCountInfiniteQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
-  > = ({ signal }) =>
-    notificationsControllerGetUnreadCount(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type NotificationsControllerGetUnreadCountInfiniteQueryResult =
-  NonNullable<
-    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
-  >;
-export type NotificationsControllerGetUnreadCountInfiniteQueryError = unknown;
-
-export function useNotificationsControllerGetUnreadCountInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
-  >,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerGetUnreadCountInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerGetUnreadCountInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get unread notifications count
- */
-
-export function useNotificationsControllerGetUnreadCountInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getNotificationsControllerGetUnreadCountInfiniteQueryOptions(options);
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
 
 export const getNotificationsControllerGetUnreadCountQueryOptions = <
   TData = Awaited<ReturnType<typeof notificationsControllerGetUnreadCount>>,
@@ -21867,6 +21695,1484 @@ export const useAiAssistantControllerDeleteMessage = <
 > => {
   const mutationOptions =
     getAiAssistantControllerDeleteMessageMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieve a list of all issues with pagination and filtering.
+ * @summary Get all issues
+ */
+export const issuesControllerGetMany = (
+  params?: IssuesControllerGetManyParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyIssueDto>(
+    { url: `/api/issues`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getIssuesControllerGetManyInfiniteQueryKey = (
+  params?: IssuesControllerGetManyParams,
+) => {
+  return ['infinate', `/api/issues`, ...(params ? [params] : [])] as const;
+};
+
+export const getIssuesControllerGetManyQueryKey = (
+  params?: IssuesControllerGetManyParams,
+) => {
+  return [`/api/issues`, ...(params ? [params] : [])] as const;
+};
+
+export const getIssuesControllerGetManyInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetMany>>,
+    IssuesControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: IssuesControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetManyParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getIssuesControllerGetManyInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof issuesControllerGetMany>>,
+    QueryKey,
+    IssuesControllerGetManyParams['page']
+  > = ({ signal, pageParam }) =>
+    issuesControllerGetMany(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof issuesControllerGetMany>>,
+    TError,
+    TData,
+    QueryKey,
+    IssuesControllerGetManyParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IssuesControllerGetManyInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerGetMany>>
+>;
+export type IssuesControllerGetManyInfiniteQueryError = unknown;
+
+export function useIssuesControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetMany>>,
+    IssuesControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | IssuesControllerGetManyParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetManyParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetMany>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetMany>>,
+    IssuesControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: IssuesControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetManyParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetMany>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetMany>>,
+    IssuesControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: IssuesControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetManyParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all issues
+ */
+
+export function useIssuesControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetMany>>,
+    IssuesControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: IssuesControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetManyParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getIssuesControllerGetManyInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getIssuesControllerGetManyQueryOptions = <
+  TData = Awaited<ReturnType<typeof issuesControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: IssuesControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getIssuesControllerGetManyQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof issuesControllerGetMany>>
+  > = ({ signal }) => issuesControllerGetMany(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof issuesControllerGetMany>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IssuesControllerGetManyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerGetMany>>
+>;
+export type IssuesControllerGetManyQueryError = unknown;
+
+export function useIssuesControllerGetMany<
+  TData = Awaited<ReturnType<typeof issuesControllerGetMany>>,
+  TError = unknown,
+>(
+  params: undefined | IssuesControllerGetManyParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetMany>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetMany<
+  TData = Awaited<ReturnType<typeof issuesControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: IssuesControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetMany>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetMany<
+  TData = Awaited<ReturnType<typeof issuesControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: IssuesControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all issues
+ */
+
+export function useIssuesControllerGetMany<
+  TData = Awaited<ReturnType<typeof issuesControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: IssuesControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getIssuesControllerGetManyQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Create a new issue linked to a source (e.g. vulnerability).
+ * @summary Create issue
+ */
+export const issuesControllerCreate = (
+  createIssueDto: CreateIssueDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Issue>(
+    {
+      url: `/api/issues`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createIssueDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIssuesControllerCreateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issuesControllerCreate>>,
+    TError,
+    { data: CreateIssueDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerCreate>>,
+  TError,
+  { data: CreateIssueDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerCreate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerCreate>>,
+    { data: CreateIssueDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return issuesControllerCreate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IssuesControllerCreateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerCreate>>
+>;
+export type IssuesControllerCreateMutationBody = CreateIssueDto;
+export type IssuesControllerCreateMutationError = unknown;
+
+/**
+ * @summary Create issue
+ */
+export const useIssuesControllerCreate = <TError = unknown, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerCreate>>,
+      TError,
+      { data: CreateIssueDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerCreate>>,
+  TError,
+  { data: CreateIssueDto },
+  TContext
+> => {
+  const mutationOptions = getIssuesControllerCreateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieve details of a specific issue.
+ * @summary Get issue by ID
+ */
+export const issuesControllerGetById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Issue>(
+    { url: `/api/issues/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getIssuesControllerGetByIdQueryKey = (id?: string) => {
+  return [`/api/issues/${id}`] as const;
+};
+
+export const getIssuesControllerGetByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof issuesControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getIssuesControllerGetByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof issuesControllerGetById>>
+  > = ({ signal }) => issuesControllerGetById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof issuesControllerGetById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IssuesControllerGetByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerGetById>>
+>;
+export type IssuesControllerGetByIdQueryError = unknown;
+
+export function useIssuesControllerGetById<
+  TData = Awaited<ReturnType<typeof issuesControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetById<
+  TData = Awaited<ReturnType<typeof issuesControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetById<
+  TData = Awaited<ReturnType<typeof issuesControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get issue by ID
+ */
+
+export function useIssuesControllerGetById<
+  TData = Awaited<ReturnType<typeof issuesControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getIssuesControllerGetByIdQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Update issue details (e.g. status).
+ * @summary Update issue
+ */
+export const issuesControllerUpdate = (
+  id: string,
+  updateIssueDto: UpdateIssueDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<Issue>(
+    {
+      url: `/api/issues/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateIssueDto,
+    },
+    options,
+  );
+};
+
+export const getIssuesControllerUpdateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issuesControllerUpdate>>,
+    TError,
+    { id: string; data: UpdateIssueDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateIssueDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerUpdate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerUpdate>>,
+    { id: string; data: UpdateIssueDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return issuesControllerUpdate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IssuesControllerUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerUpdate>>
+>;
+export type IssuesControllerUpdateMutationBody = UpdateIssueDto;
+export type IssuesControllerUpdateMutationError = unknown;
+
+/**
+ * @summary Update issue
+ */
+export const useIssuesControllerUpdate = <TError = unknown, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerUpdate>>,
+      TError,
+      { id: string; data: UpdateIssueDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateIssueDto },
+  TContext
+> => {
+  const mutationOptions = getIssuesControllerUpdateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Change the status of an issue.
+ * @summary Change issue status
+ */
+export const issuesControllerChangeStatus = (
+  id: string,
+  changeIssueStatusDto: ChangeIssueStatusDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<Issue>(
+    {
+      url: `/api/issues/${id}/status`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: changeIssueStatusDto,
+    },
+    options,
+  );
+};
+
+export const getIssuesControllerChangeStatusMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+    TError,
+    { id: string; data: ChangeIssueStatusDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+  TError,
+  { id: string; data: ChangeIssueStatusDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerChangeStatus'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+    { id: string; data: ChangeIssueStatusDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return issuesControllerChangeStatus(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IssuesControllerChangeStatusMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerChangeStatus>>
+>;
+export type IssuesControllerChangeStatusMutationBody = ChangeIssueStatusDto;
+export type IssuesControllerChangeStatusMutationError = unknown;
+
+/**
+ * @summary Change issue status
+ */
+export const useIssuesControllerChangeStatus = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+      TError,
+      { id: string; data: ChangeIssueStatusDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerChangeStatus>>,
+  TError,
+  { id: string; data: ChangeIssueStatusDto },
+  TContext
+> => {
+  const mutationOptions =
+    getIssuesControllerChangeStatusMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Create a new comment for a specific issue.
+ * @summary Create comment for issue
+ */
+export const issuesControllerCreateComment = (
+  issueId: string,
+  createIssueCommentDto: CreateIssueCommentDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<IssueComment>(
+    {
+      url: `/api/issues/${issueId}/comments`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createIssueCommentDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getIssuesControllerCreateCommentMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+    TError,
+    { issueId: string; data: CreateIssueCommentDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+  TError,
+  { issueId: string; data: CreateIssueCommentDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerCreateComment'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+    { issueId: string; data: CreateIssueCommentDto }
+  > = (props) => {
+    const { issueId, data } = props ?? {};
+
+    return issuesControllerCreateComment(issueId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IssuesControllerCreateCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerCreateComment>>
+>;
+export type IssuesControllerCreateCommentMutationBody = CreateIssueCommentDto;
+export type IssuesControllerCreateCommentMutationError = unknown;
+
+/**
+ * @summary Create comment for issue
+ */
+export const useIssuesControllerCreateComment = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+      TError,
+      { issueId: string; data: CreateIssueCommentDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerCreateComment>>,
+  TError,
+  { issueId: string; data: CreateIssueCommentDto },
+  TContext
+> => {
+  const mutationOptions =
+    getIssuesControllerCreateCommentMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieve paginated comments for a specific issue.
+ * @summary Get comments by issue ID
+ */
+export const issuesControllerGetCommentsByIssueId = (
+  issueId: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyIssueCommentDto>(
+    { url: `/api/issues/${issueId}/comments`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getIssuesControllerGetCommentsByIssueIdInfiniteQueryKey = (
+  issueId?: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+) => {
+  return [
+    'infinate',
+    `/api/issues/${issueId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getIssuesControllerGetCommentsByIssueIdQueryKey = (
+  issueId?: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+) => {
+  return [
+    `/api/issues/${issueId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getIssuesControllerGetCommentsByIssueIdInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+    IssuesControllerGetCommentsByIssueIdParams['page']
+  >,
+  TError = unknown,
+>(
+  issueId: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetCommentsByIssueIdParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getIssuesControllerGetCommentsByIssueIdInfiniteQueryKey(issueId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+    QueryKey,
+    IssuesControllerGetCommentsByIssueIdParams['page']
+  > = ({ signal, pageParam }) =>
+    issuesControllerGetCommentsByIssueId(
+      issueId,
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!issueId,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+    TError,
+    TData,
+    QueryKey,
+    IssuesControllerGetCommentsByIssueIdParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IssuesControllerGetCommentsByIssueIdInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>>;
+export type IssuesControllerGetCommentsByIssueIdInfiniteQueryError = unknown;
+
+export function useIssuesControllerGetCommentsByIssueIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+    IssuesControllerGetCommentsByIssueIdParams['page']
+  >,
+  TError = unknown,
+>(
+  issueId: string,
+  params: undefined | IssuesControllerGetCommentsByIssueIdParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetCommentsByIssueIdParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetCommentsByIssueIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+    IssuesControllerGetCommentsByIssueIdParams['page']
+  >,
+  TError = unknown,
+>(
+  issueId: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetCommentsByIssueIdParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetCommentsByIssueIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+    IssuesControllerGetCommentsByIssueIdParams['page']
+  >,
+  TError = unknown,
+>(
+  issueId: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetCommentsByIssueIdParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get comments by issue ID
+ */
+
+export function useIssuesControllerGetCommentsByIssueIdInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+    IssuesControllerGetCommentsByIssueIdParams['page']
+  >,
+  TError = unknown,
+>(
+  issueId: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData,
+        QueryKey,
+        IssuesControllerGetCommentsByIssueIdParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getIssuesControllerGetCommentsByIssueIdInfiniteQueryOptions(
+      issueId,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getIssuesControllerGetCommentsByIssueIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+  TError = unknown,
+>(
+  issueId: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getIssuesControllerGetCommentsByIssueIdQueryKey(issueId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>
+  > = ({ signal }) =>
+    issuesControllerGetCommentsByIssueId(
+      issueId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!issueId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type IssuesControllerGetCommentsByIssueIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>
+>;
+export type IssuesControllerGetCommentsByIssueIdQueryError = unknown;
+
+export function useIssuesControllerGetCommentsByIssueId<
+  TData = Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+  TError = unknown,
+>(
+  issueId: string,
+  params: undefined | IssuesControllerGetCommentsByIssueIdParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetCommentsByIssueId<
+  TData = Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+  TError = unknown,
+>(
+  issueId: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+          TError,
+          Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useIssuesControllerGetCommentsByIssueId<
+  TData = Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+  TError = unknown,
+>(
+  issueId: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get comments by issue ID
+ */
+
+export function useIssuesControllerGetCommentsByIssueId<
+  TData = Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+  TError = unknown,
+>(
+  issueId: string,
+  params?: IssuesControllerGetCommentsByIssueIdParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof issuesControllerGetCommentsByIssueId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getIssuesControllerGetCommentsByIssueIdQueryOptions(
+    issueId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Update a comment by its ID. Only the creator of the comment can update it.
+ * @summary Update comment by ID
+ */
+export const issuesControllerUpdateCommentById = (
+  id: string,
+  updateIssueCommentDto: UpdateIssueCommentDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<IssueComment>(
+    {
+      url: `/api/issues/comments/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateIssueCommentDto,
+    },
+    options,
+  );
+};
+
+export const getIssuesControllerUpdateCommentByIdMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+    TError,
+    { id: string; data: UpdateIssueCommentDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+  TError,
+  { id: string; data: UpdateIssueCommentDto },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerUpdateCommentById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+    { id: string; data: UpdateIssueCommentDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return issuesControllerUpdateCommentById(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IssuesControllerUpdateCommentByIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>
+>;
+export type IssuesControllerUpdateCommentByIdMutationBody =
+  UpdateIssueCommentDto;
+export type IssuesControllerUpdateCommentByIdMutationError = unknown;
+
+/**
+ * @summary Update comment by ID
+ */
+export const useIssuesControllerUpdateCommentById = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+      TError,
+      { id: string; data: UpdateIssueCommentDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerUpdateCommentById>>,
+  TError,
+  { id: string; data: UpdateIssueCommentDto },
+  TContext
+> => {
+  const mutationOptions =
+    getIssuesControllerUpdateCommentByIdMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Delete a comment by its ID. Only the creator of the comment can delete it.
+ * @summary Delete comment by ID
+ */
+export const issuesControllerDeleteCommentById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<Object>(
+    { url: `/api/issues/comments/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getIssuesControllerDeleteCommentByIdMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['issuesControllerDeleteCommentById'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return issuesControllerDeleteCommentById(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IssuesControllerDeleteCommentByIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>
+>;
+
+export type IssuesControllerDeleteCommentByIdMutationError = unknown;
+
+/**
+ * @summary Delete comment by ID
+ */
+export const useIssuesControllerDeleteCommentById = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof issuesControllerDeleteCommentById>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getIssuesControllerDeleteCommentByIdMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

@@ -1,0 +1,21 @@
+
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Commit message format check
+# Require commit messages to start with one of the following:
+# feat(scope): for new features
+# fix(scope): for bug fixes
+# chore(scope): for maintenance tasks
+# docs(scope): for documentation changes
+# style(scope): for code style changes
+# refactor(scope): for code refactoring
+# test(scope): for adding or modifying tests
+# ci(scope): for CI related changes
+
+commit_msg="$1"
+if ! grep -qE "^((feat|fix|hot-fix|perf|chore|docs|style|refactor|test|ci)\(.+\): )|^(Merge branch|Merged)" "$commit_msg"; then
+  echo "Commit message format error!"
+  echo "Commit messages must start with one of: feat(scope):, fix(scope):, chore(scope):, docs(scope):, style(scope):, refactor(scope):, test(scope):, ci(scope):"
+  echo "Example: feat(husky): add husky integration"
+  exit 1
+fi

@@ -1,27 +1,24 @@
 #!/usr/bin/env sh
-# Husky pre-commit hook - Only run lint for console directory
+. "$(dirname -- "$0")/_/husky.sh"
 
-# Get the list of staged files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep "^console/")
+# Prevent commits to main branch
+# branch="$(git rev-parse --abbrev-ref HEAD)"
+# if [ "$branch" = "main" ]; then
+#   echo "Direct commits to the main branch are not allowed."
+#   echo "Please create a feature branch and submit a pull request."
+#   exit 1
+# fi
 
-# If no console files are staged, skip lint
-if [ -z "$STAGED_FILES" ]; then
-  echo "No console files staged, skipping lint check"
-  exit 0
-fi
-
-echo "Checking lint for console directory..."
-
-# Run lint for console directory only
-cd console
-npm run lint
-EXIT_CODE=$?
-
-if [ $EXIT_CODE -ne 0 ]; then
-  echo "Lint failed for console directory"
-  echo "Please fix lint errors before committing"
+# Run lint check
+echo "Running lint check..."
+cd core-api && npm run lint
+if [ $? -ne 0 ]; then
+  echo "Lint check failed in core-api. Please fix lint errors before committing."
   exit 1
 fi
 
-echo "Lint passed for console directory"
-exit 0
+cd ../console && npm run lint
+if [ $? -ne 0 ]; then
+  echo "Lint check failed in console. Please fix lint errors before committing."
+  exit 1
+fi

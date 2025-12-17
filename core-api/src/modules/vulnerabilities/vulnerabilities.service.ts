@@ -19,7 +19,7 @@ export class VulnerabilitiesService {
     private vulnerabilitiesRepository: Repository<Vulnerability>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
-  ) {}
+  ) { }
 
   /**
    * Initiates a vulnerability scan for a given target.
@@ -165,5 +165,16 @@ export class VulnerabilitiesService {
     );
 
     return { data: statistics };
+  }
+
+  /**
+   * Updates the isArchived status of a vulnerability.
+   *
+   * @param id - The ID of the vulnerability to update.
+   * @param isArchived - The new boolean value for isArchived.
+   * @returns A promise that resolves when the update is complete.
+   */
+  async markIsArchived(id: string, isArchived: boolean): Promise<void> {
+    await this.vulnerabilitiesRepository.update({ id }, { isArchived });
   }
 }
