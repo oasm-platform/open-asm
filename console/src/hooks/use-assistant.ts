@@ -87,7 +87,7 @@ export function useAssistant() {
 
   // Send message with streaming
   const sendMessage = useCallback(
-    async (question: string, isNewConversation = false) => {
+    async (question: string, isNewConversation = false, agentType?: number) => {
       setInternalIsStreaming(true);
       // Capture the ID context where this stream started
       const startContextId = isNewConversation
@@ -129,6 +129,7 @@ export function useAssistant() {
           question,
           conversationId: isNewConversation ? undefined : currentConversationId,
           isCreateConversation: isNewConversation,
+          agentType,
         })) {
           // Reverted blocking logic ("Stop Jumping") as per user request.
           // Stream will continue to update global state and force navigation.

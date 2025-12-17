@@ -450,6 +450,7 @@ export class AiAssistantService implements OnModuleInit {
       question: string;
       conversationId?: string;
       isCreateConversation?: boolean;
+      agentType?: number;
     },
     workspaceId: string,
     userId: string,
@@ -460,6 +461,7 @@ export class AiAssistantService implements OnModuleInit {
         question: createMessageDto.question,
         conversationId: createMessageDto.conversationId || '',
         isCreateConversation: createMessageDto.isCreateConversation || false,
+        agentType: createMessageDto.agentType || 0,
       },
       metadata,
     );
@@ -473,6 +475,7 @@ export class AiAssistantService implements OnModuleInit {
     messageId: string,
     updateMessageDto: {
       question: string;
+      agentType?: number;
     },
     workspaceId: string,
     userId: string,
@@ -483,6 +486,7 @@ export class AiAssistantService implements OnModuleInit {
         conversationId,
         messageId,
         question: updateMessageDto.question,
+        agentType: updateMessageDto.agentType || 0,
       },
       metadata,
     );

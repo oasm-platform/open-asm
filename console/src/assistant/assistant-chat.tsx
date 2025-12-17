@@ -14,6 +14,7 @@ import type { AssistantChatProps } from './types/types';
 export function AssistantChat({ onSendMessage }: AssistantChatProps) {
   const [open, setOpen] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
+  const [selectedAgentType, setSelectedAgentType] = useState<number>(2);
 
   const {
     sessions,
@@ -43,7 +44,8 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
     try {
       // If no conversation is selected, create a new one
       const isNewConversation = !currentConversationId;
-      await sendMessage(messageText, isNewConversation);
+      // Pass the selected agent type (default 0)
+      await sendMessage(messageText, isNewConversation, selectedAgentType);
     } catch (error) {
       console.error('❌ Failed to send message:', error);
     }
@@ -158,6 +160,8 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
               setInputMessage={setInputMessage}
               onSendMessage={handleSendMessage}
               isSending={isStreaming}
+              selectedAgentType={selectedAgentType}
+              onSelectAgentType={setSelectedAgentType}
             />
           </div>
         </SheetContent>

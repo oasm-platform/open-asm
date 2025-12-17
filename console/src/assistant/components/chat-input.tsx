@@ -1,13 +1,24 @@
 import { useRef, useEffect, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Sparkles } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Send, Plus, Zap, ShieldCheck } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type ChatInputProps = {
   inputMessage: string;
   setInputMessage: (value: string) => void;
   onSendMessage: () => void;
   isSending: boolean;
+  selectedAgentType: number;
+  onSelectAgentType: (type: number) => void;
 };
 
 export const ChatInput = memo(function ChatInput({
@@ -15,6 +26,8 @@ export const ChatInput = memo(function ChatInput({
   setInputMessage,
   onSendMessage,
   isSending,
+  selectedAgentType,
+  onSelectAgentType,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -58,11 +71,70 @@ export const ChatInput = memo(function ChatInput({
 
   const isDisabled = isSending || inputMessage.trim() === '';
 
+  // Determine which icon to show based on selected agent type
+  const getAgentIcon = () => {
+    switch (selectedAgentType) {
+      case 1:
+        return <Zap className="w-5 h-5 text-yellow-500" />;
+      case 2:
+        return <ShieldCheck className="w-5 h-5 text-blue-500" />;
+      default:
+        // Default (0) - Orchestration mode
+        return <Plus className="w-5 h-5" />;
+    }
+  };
+
+  const getAgentLabel = () => {
+    switch (selectedAgentType) {
+      case 1:
+        return 'Nuclei Generator';
+      case 2:
+        return 'Analysis Agent';
+      default:
+        return 'Auto (Orchestrator)';
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="relative group">
       <div className="relative flex items-end gap-2 bg-background p-1.5 rounded-3xl border border-input shadow-sm focus-within:border-ring focus-within:shadow-md transition-all duration-200">
-        <div className="pl-3 pb-3 text-zinc-500 shrink-0">
-          <Sparkles className="w-5 h-5" />
+        <div className="pl-1 pb-1 shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full text-zinc-500 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                title={`Current Mode: ${getAgentLabel()}`}
+              >
+                {getAgentIcon()}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Assistant Mode</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onSelectAgentType(2)}
+                className={cn(
+                  'cursor-pointer',
+                  selectedAgentType === 2 && 'bg-accent',
+                )}
+              >
+                <ShieldCheck className="w-4 h-4 mr-2 text-blue-500" />
+                <span>Analysis Agent</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSelectAgentType(1)}
+                className={cn(
+                  'cursor-pointer',
+                  selectedAgentType === 1 && 'bg-accent',
+                )}
+              >
+                <Zap className="w-4 h-4 mr-2 text-yellow-500" />
+                <span>Nuclei Generator</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <Textarea
@@ -70,7 +142,7 @@ export const ChatInput = memo(function ChatInput({
           value={inputMessage}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="Ask AI anything..."
+          placeholder={`Ask ${getAgentLabel()}...`}
           rows={1}
           className="flex-1 !bg-transparent border-none outline-none shadow-none ring-0 focus-visible:ring-0 px-2 py-3 text-foreground text-base placeholder:text-muted-foreground font-medium resize-none overflow-y-auto min-h-[44px] max-h-[200px] scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600"
           disabled={isSending}
