@@ -48,25 +48,24 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
   return (
     <div className="flex flex-col lg:flex-row gap-8">
       <div className="flex-1 min-w-0">
-        <div className="space-y-4">
-          {comments.map((comment: IssueComment) => (
-            <div key={comment.id}>
-              <CommentCard
-                comment={comment}
-                issueCreatedBy={issue.createdBy.id}
-                onCommentUpdated={() => {
-                  // Trigger a refetch to get the updated comment from the API
-                  refetchComments();
-                }}
-              />
-            </div>
-          ))}
+        <div>
+          <div>
+            {comments.map((comment: IssueComment) => (
+              <div key={comment.id}>
+                <CommentCard
+                  comment={comment}
+                  issueCreatedBy={issue.createdBy.id}
+                  onCommentUpdated={() => {
+                    // Trigger a refetch to get the updated comment from the API
+                    refetchComments();
+                  }}
+                />
+              </div>
+            ))}
+          </div>
 
           {/* New comment input */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-semibold">Write a comment</span>
-            </div>
             <Textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
@@ -83,23 +82,6 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
               </Button>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="w-full lg:w-64 shrink-0 space-y-6">
-        <div className="space-y-1">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Assignees
-          </h3>
-          <span className="text-sm text-muted-foreground italic">
-            No one assigned
-          </span>
-        </div>
-        <div className="space-y-1">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Labels
-          </h3>
-          <span className="text-sm text-muted-foreground italic">None yet</span>
         </div>
       </div>
     </div>

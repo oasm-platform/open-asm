@@ -10,33 +10,20 @@ dayjs.extend(relativeTime);
 
 const IssueDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { data: issue, isLoading: issueLoading } = useIssuesControllerGetById(
-    id || '',
-  );
-
-  if (issueLoading) {
-    return (
-      <Page title="Issue Detail">
-        <div>Loading...</div>
-      </Page>
-    );
-  }
+  const { data: issue } = useIssuesControllerGetById(id || '');
 
   if (!issue) {
-    return (
-      <Page title="Issue Detail">
-        <div>Issue not found</div>
-      </Page>
-    );
+    return <></>;
   }
 
   const status = issue.status;
 
   return (
     <Page
+      className="w-full xl:w-1/2 mx-auto"
       title={
-        <div className="flex flex-col  items-start gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col items-start gap-2">
+          <div className="flex items-center gap-2 ">
             <span>
               {issue.title}{' '}
               <span className="text-gray-400 font-normal">#{issue.no}</span>
@@ -46,7 +33,7 @@ const IssueDetail = () => {
         </div>
       }
     >
-      <div className="max-w-4xl">
+      <div>
         <div className="flex items-center gap-4 mb-6 pb-6 border-b border-border">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="text-muted-foreground mr-1">
@@ -57,7 +44,6 @@ const IssueDetail = () => {
             </span>
           </div>
         </div>
-
         <IssueComments issue={issue} />
       </div>
     </Page>

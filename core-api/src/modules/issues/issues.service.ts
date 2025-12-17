@@ -71,12 +71,7 @@ export class IssuesService {
 
     // Transform to response DTO format
     const transformedComments = comments.map((comment) => ({
-      id: comment.id,
-      content: comment.content,
-      createdAt: comment.createdAt,
-      updatedAt: comment.updatedAt,
-      isCanDelete: comment.isCanDelete,
-      isCanEdit: comment.isCanEdit,
+      ...comment,
       createdBy: {
         id: comment.createdBy.id,
         name: comment.createdBy.name,

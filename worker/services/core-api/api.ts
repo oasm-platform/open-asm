@@ -1574,6 +1574,8 @@ export interface IssueComment {
   createdBy: User;
   isCanDelete: boolean;
   isCanEdit: boolean;
+  /** @default "content" */
+  type: IssueCommentTypeEnum;
 }
 
 export interface CreateIssueCommentDto {
@@ -1749,6 +1751,11 @@ export enum CreateIssueDtoSourceTypeEnum {
 export enum ChangeIssueStatusDtoStatusEnum {
   Open = "open",
   Completed = "completed",
+}
+
+/** @default "content" */
+export enum IssueCommentTypeEnum {
+  Content = "content",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {

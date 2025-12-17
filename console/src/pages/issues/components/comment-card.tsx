@@ -79,114 +79,124 @@ const CommentCard = ({
   };
 
   return (
-    <div className="border border-border rounded-md bg-card shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/40 border-b border-border rounded-t-md">
-        <div className="flex items-center gap-2 text-sm text-foreground">
-          <Avatar className="h-6 w-6 border border-background bg-background">
-            <AvatarImage alt={comment.createdBy?.name || 'User'} />
-            <AvatarFallback className="text-[10px]">
-              {(comment.createdBy?.name || 'U').charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <span className="font-semibold">
-            {comment.createdBy?.name || 'Unknown'}
-          </span>
-          <span className="text-muted-foreground">
-            {dayjs(comment.createdAt).fromNow()}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs border border-border px-2 py-0.5 rounded-full text-muted-foreground bg-background">
-            {issueCreatedBy === comment.createdBy?.id ? 'Author' : 'Member'}
-          </span>
+    <div className="relative">
+      <div className="border border-border rounded-md bg-card shadow-sm">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2 bg-muted/40 border-b border-border rounded-t-md">
+          <div className="flex items-center gap-2 text-sm text-foreground">
+            <Avatar className="h-6 w-6 border border-background bg-background">
+              <AvatarImage alt={comment.createdBy?.name || 'User'} />
+              <AvatarFallback className="text-[10px]">
+                {(comment.createdBy?.name || 'U').charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <span className="font-semibold">
+              {comment.createdBy?.name || 'Unknown'}
+            </span>
+            <span className="text-muted-foreground">
+              {dayjs(comment.createdAt).fromNow()}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs border border-border px-2 py-0.5 rounded-full text-muted-foreground bg-background">
+              {issueCreatedBy === comment.createdBy?.id ? 'Author' : 'Member'}
+            </span>
 
-          {/* Dropdown Menu for Edit/Delete - only show for own comments */}
-          {isOwnComment && (comment.isCanEdit || comment.isCanDelete) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger disabled={!comment.isCanEdit} asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-muted"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onSelect={handleEdit}
-                >
-                  <Edit3 className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                <ConfirmDialog
-                  title="Delete Comment"
-                  description="Are you sure you want to delete this comment?"
-                  onConfirm={() => {
-                    deleteCommentMutation.mutate(
-                      { id: comment.id },
-                      {
-                        onSuccess: () => {
-                          onCommentUpdated?.();
-                        },
-                      },
-                    );
-                  }}
-                  trigger={
+            {/* Dropdown Menu for Edit/Delete - only show for own comments */}
+            {isOwnComment && (comment.isCanEdit || comment.isCanDelete) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger disabled={!comment.isCanEdit} asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-muted"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent align="end" className="w-40">
+                  {comment.isCanEdit && (
                     <DropdownMenuItem
-                      disabled={!comment.isCanDelete}
-                      className="cursor-pointer text-destructive focus:text-destructive"
+                      className="cursor-pointer"
+                      onSelect={handleEdit}
                     >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
+                      <Edit3 className="mr-2 h-4 w-4" />
+                      Edit
                     </DropdownMenuItem>
+                  )}
+                  {comment.isCanDelete && (
+                    <ConfirmDialog
+                      title="Delete Comment"
+                      description="Are you sure you want to delete this comment?"
+                      onConfirm={() => {
+                        deleteCommentMutation.mutate(
+                          { id: comment.id },
+                          {
+                            onSuccess: () => {
+                              onCommentUpdated?.();
+                            },
+                          },
+                        );
+                      }}
+                      trigger={
+                        <DropdownMenuItem
+                          disabled={!comment.isCanDelete}
+                          className="cursor-pointer text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      }
+                    />
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-4 prose prose-sm max-w-none dark:prose-invert">
+          {isEditing ? (
+            <div className="space-y-3">
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="min-h-[100px] w-full"
+                disabled={updateCommentMutation.isPending}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancel}
+                  disabled={updateCommentMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={
+                    updateCommentMutation.isPending ||
+                    !editContent.trim() ||
+                    editContent === comment.content
                   }
-                />
-              </DropdownMenuContent>
-            </DropdownMenu>
+                >
+                  {updateCommentMutation.isPending ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap leading-relaxed mb-0">
+              {comment.content}
+            </p>
           )}
         </div>
       </div>
-
-      {/* Body */}
-      <div className="p-4 prose prose-sm max-w-none dark:prose-invert">
-        {isEditing ? (
-          <div className="space-y-3">
-            <Textarea
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              className="min-h-[100px] w-full"
-              disabled={updateCommentMutation.isPending}
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCancel}
-                disabled={updateCommentMutation.isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={
-                  updateCommentMutation.isPending ||
-                  !editContent.trim() ||
-                  editContent === comment.content
-                }
-              >
-                {updateCommentMutation.isPending ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <p className="whitespace-pre-wrap leading-relaxed mb-0">
-            {comment.content}
-          </p>
-        )}
+      <div className="h-7 w-full">
+        <div className="w-1 h-7 left-10 absolute border-l-[3px]"></div>
       </div>
     </div>
   );

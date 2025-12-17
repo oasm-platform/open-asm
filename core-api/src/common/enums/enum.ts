@@ -158,3 +158,7 @@ export enum IssueStatus {
 export enum IssueSourceType {
   VULNERABILITY = 'vulnerability',
 }
+
+export enum IssueCommentType {
+  CONTENT = 'content',
+}

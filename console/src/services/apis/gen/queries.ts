@@ -1520,6 +1520,14 @@ export type ChangeIssueStatusDto = {
   status: ChangeIssueStatusDtoStatus;
 };
 
+export type IssueCommentType =
+  (typeof IssueCommentType)[keyof typeof IssueCommentType];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const IssueCommentType = {
+  content: 'content',
+} as const;
+
 export type IssueComment = {
   id: string;
   createdAt: string;
@@ -1528,6 +1536,7 @@ export type IssueComment = {
   createdBy: User;
   isCanDelete: boolean;
   isCanEdit: boolean;
+  type: IssueCommentType;
 };
 
 export type CreateIssueCommentDto = {

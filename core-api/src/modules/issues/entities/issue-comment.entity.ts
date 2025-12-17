@@ -1,4 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { IssueCommentType } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
@@ -32,4 +33,11 @@ export class IssueComment extends BaseEntity {
   @ApiProperty()
   @Column({ default: true })
   isCanEdit: boolean;
+
+  @ApiProperty({
+    enum: IssueCommentType,
+    default: IssueCommentType.CONTENT,
+  })
+  @Column({ default: IssueCommentType.CONTENT })
+  type: IssueCommentType;
 }
