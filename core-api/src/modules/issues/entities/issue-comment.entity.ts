@@ -10,6 +10,7 @@ export class IssueComment extends BaseEntity {
   @Column()
   content: string;
 
+  @ApiProperty({ type: () => User })
   @ManyToOne(() => User)
   @JoinColumn({ name: 'createdById' })
   createdBy: User;
@@ -23,4 +24,12 @@ export class IssueComment extends BaseEntity {
 
   @Column({ nullable: true })
   issueId: string;
+
+  @ApiProperty()
+  @Column({ default: true })
+  isCanDelete: boolean;
+
+  @ApiProperty()
+  @Column({ default: true })
+  isCanEdit: boolean;
 }

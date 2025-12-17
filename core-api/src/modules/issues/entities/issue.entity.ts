@@ -8,53 +8,54 @@ import { IssueComment } from './issue-comment.entity';
 
 @Entity('issues')
 export class Issue extends BaseEntity {
-    @ApiProperty()
-    @Column()
-    title: string;
+  @ApiProperty()
+  @Column()
+  title: string;
 
-    @ApiProperty()
-    @Column({ nullable: true })
-    description?: string;
+  @ApiProperty()
+  @Column({ nullable: true })
+  description?: string;
 
-    @ApiProperty()
-    @Column({
-        type: 'enum',
-        enum: IssueStatus,
-        default: IssueStatus.OPEN,
-    })
-    status: IssueStatus;
+  @ApiProperty()
+  @Column({
+    type: 'enum',
+    enum: IssueStatus,
+    default: IssueStatus.OPEN,
+  })
+  status: IssueStatus;
 
-    @ApiProperty()
-    @Column({
-        type: 'enum',
-        enum: IssueSourceType,
-        nullable: true,
-    })
-    sourceType: IssueSourceType;
+  @ApiProperty()
+  @Column({
+    type: 'enum',
+    enum: IssueSourceType,
+    nullable: true,
+  })
+  sourceType: IssueSourceType;
 
-    @ApiProperty()
-    @Column({ nullable: true })
-    sourceId: string;
+  @ApiProperty()
+  @Column({ nullable: true })
+  sourceId: string;
 
-    @ApiProperty()
-    @Column({ nullable: true })
-    workspaceId: string;
+  @ApiProperty()
+  @Column({ nullable: true })
+  workspaceId: string;
 
-    @ApiProperty()
-    @Column({ type: 'int', default: 0 })
-    no: number;
+  @ApiProperty()
+  @Column({ type: 'int', default: 0 })
+  no: number;
 
-    @ManyToOne(() => Workspace)
-    @JoinColumn({ name: 'workspaceId' })
-    workspace: Workspace;
+  @ManyToOne(() => Workspace)
+  @JoinColumn({ name: 'workspaceId' })
+  workspace: Workspace;
 
-    @ManyToOne(() => User)
-    @JoinColumn({ name: 'createdById' })
-    createdBy: User;
+  @ApiProperty({ type: () => User })
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'createdById' })
+  createdBy: User;
 
-    @Column({ nullable: true })
-    createdById: string;
+  @Column({ nullable: true })
+  createdById: string;
 
-    @OneToMany(() => IssueComment, (comment) => comment.issue)
-    comments: IssueComment[];
+  @OneToMany(() => IssueComment, (comment) => comment.issue)
+  comments: IssueComment[];
 }

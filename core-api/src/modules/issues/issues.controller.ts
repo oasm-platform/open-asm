@@ -7,6 +7,7 @@ import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -21,6 +22,7 @@ import {
   CreateIssueDto,
   UpdateIssueDto,
 } from './dto/issue.dto';
+import { UpdateIssueCommentDto } from './dto/update-issue-comment.dto';
 import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { IssuesService } from './issues.service';
@@ -166,7 +168,7 @@ export class IssuesController {
     summary: 'Get comments by issue ID',
     description: 'Retrieve paginated comments for a specific issue.',
     response: {
-      serialization: IssueComment,
+      serialization: GetManyResponseDto(IssueComment),
     },
   })
   @Get(':issueId/comments')
@@ -175,5 +177,56 @@ export class IssuesController {
     @Query() query: GetManyBaseQueryParams,
   ) {
     return this.issuesService.getCommentsByIssueId(issueId, query);
+  }
+
+  @Doc({
+    summary: 'Update comment by ID',
+    description:
+      'Update a comment by its ID. Only the creator of the comment can update it.',
+    response: {
+      serialization: IssueComment,
+    },
+    request: {
+      params: [
+        {
+          name: 'id',
+          type: String,
+          description: 'Comment ID',
+        },
+      ],
+    },
+  })
+  @Patch('comments/:id')
+  updateCommentById(
+    @Param('id') id: string,
+    @Body() updateCommentDto: UpdateIssueCommentDto,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.issuesService.updateCommentById(id, updateCommentDto, user.id);
+  }
+
+  @Doc({
+    summary: 'Delete comment by ID',
+    description:
+      'Delete a comment by its ID. Only the creator of the comment can delete it.',
+    response: {
+      serialization: Object,
+    },
+    request: {
+      params: [
+        {
+          name: 'id',
+          type: String,
+          description: 'Comment ID',
+        },
+      ],
+    },
+  })
+  @Delete('comments/:id')
+  deleteCommentById(
+    @Param('id') id: string,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.issuesService.deleteCommentById(id, user.id);
   }
 }

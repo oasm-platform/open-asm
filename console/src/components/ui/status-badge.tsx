@@ -10,7 +10,6 @@ interface StatusBadgeProps {
 export const StatusBadge = ({
   status,
   variant = 'outline',
-  className,
 }: StatusBadgeProps) => {
   let statusColor = 'text-gray-500';
   let StatusIcon = CircleIcon;
@@ -22,13 +21,12 @@ export const StatusBadge = ({
     statusColor = 'text-purple-500';
     StatusIcon = CheckCircleIcon;
   }
-
   return (
     <Badge
       variant={variant}
-      className={`${statusColor} h-8 flex items-center gap-1 capitalize ${className || ''}`}
+      className={`${statusColor} flex h-8 items-center gap-1 capitalize font-bold`}
     >
-      <StatusIcon className="h-4 w-4" />
+      <StatusIcon size={24} className="h-10" />
       {status}
     </Badge>
   );

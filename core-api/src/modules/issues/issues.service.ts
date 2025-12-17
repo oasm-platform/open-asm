@@ -14,6 +14,7 @@ import {
   CreateIssueDto,
   UpdateIssueDto,
 } from './dto/issue.dto';
+import { UpdateIssueCommentDto } from './dto/update-issue-comment.dto';
 import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
@@ -74,6 +75,8 @@ export class IssuesService {
       content: comment.content,
       createdAt: comment.createdAt,
       updatedAt: comment.updatedAt,
+      isCanDelete: comment.isCanDelete,
+      isCanEdit: comment.isCanEdit,
       createdBy: {
         id: comment.createdBy.id,
         name: comment.createdBy.name,
@@ -88,6 +91,54 @@ export class IssuesService {
     });
   }
 
+  async updateCommentById(
+    id: string,
+    updateCommentDto: UpdateIssueCommentDto,
+    userId: string,
+  ): Promise<IssueComment> {
+    const comment = await this.issueCommentsRepository.findOne({
+      where: { id },
+      relations: ['createdBy'],
+    });
+
+    if (!comment) {
+      throw new NotFoundException(`Comment with ID ${id} not found`);
+    }
+
+    // Check if the user is the creator of the comment
+    if (comment.createdBy.id !== userId) {
+      throw new Error('Only the creator of the comment can update it');
+    }
+
+    // Update the comment content
+    comment.content = updateCommentDto.content;
+    comment.updatedAt = new Date();
+
+    return await this.issueCommentsRepository.save(comment);
+  }
+
+  async deleteCommentById(
+    id: string,
+    userId: string,
+  ): Promise<{ message: string }> {
+    const comment = await this.issueCommentsRepository.findOne({
+      where: { id },
+      relations: ['createdBy'],
+    });
+
+    if (!comment) {
+      throw new NotFoundException(`Comment with ID ${id} not found`);
+    }
+
+    // Check if the user is the creator of the comment
+    if (comment.createdBy.id !== userId) {
+      throw new Error('Only the creator of the comment can delete it');
+    }
+
+    await this.issueCommentsRepository.remove(comment);
+    return { message: 'Comment deleted successfully' };
+  }
+
   async createIssue(
     createIssueDto: CreateIssueDto,
     workspaceId: string,
@@ -98,13 +149,39 @@ export class IssuesService {
       order: { no: 'DESC' },
     });
     const no = (lastIssue?.no || 0) + 1;
+
+    // Extract description to be used as comment
+    const { description, ...issueData } = createIssueDto;
+
+    // Create issue without description
     const issue = this.issuesRepository.create({
-      ...createIssueDto,
+      ...issueData,
       workspaceId,
       createdBy: { id: userId },
       no,
     });
-    return await this.issuesRepository.save(issue);
+
+    // Use transaction to ensure both issue and comment are created together
+    return await this.issuesRepository.manager.transaction(
+      async (transactionalEntityManager) => {
+        // Save the issue first to get the issueId
+        const savedIssue = await transactionalEntityManager.save(issue);
+
+        // If description exists, create it as a comment
+        if (description) {
+          const comment = this.issueCommentsRepository.create({
+            content: description,
+            issue: { id: savedIssue.id },
+            createdBy: { id: userId },
+            isCanDelete: false,
+            isCanEdit: true,
+          });
+          await transactionalEntityManager.save(comment);
+        }
+
+        return savedIssue;
+      },
+    );
   }
 
   async getMany(
