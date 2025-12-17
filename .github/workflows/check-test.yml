@@ -24,16 +24,11 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: 'core-api/package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd core-api
-          npm ci --ignore-scripts
-        shell: bash
+        run: npm ci --ignore-scripts
+        working-directory: core-api
 
       - name: Run tests
-        run: |
-          cd core-api
-          npm run test
-        shell: bash
+        run: npm run test
+        working-directory: core-api

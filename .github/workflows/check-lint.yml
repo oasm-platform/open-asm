@@ -24,16 +24,11 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: '${{ matrix.service }}/package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd ${{ matrix.service }}
-          npm ci --ignore-scripts
-        shell: bash
+        run: npm ci --ignore-scripts
+        working-directory: ${{ matrix.service }}
 
       - name: Run lint
-        run: |
-          cd ${{ matrix.service }}
-          npm run lint
-        shell: bash
+        run: npm run lint
+        working-directory: ${{ matrix.service }}
