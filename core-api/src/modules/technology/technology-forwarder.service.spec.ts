@@ -1,7 +1,8 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
-import { TechnologyForwarderService } from './technology-forwarder.service';
 import { RedisService } from '../../services/redis/redis.service';
+import { StorageService } from '../storage/storage.service';
+import { TechnologyForwarderService } from './technology-forwarder.service';
 
 describe('TechnologyForwarderService', () => {
   let service: TechnologyForwarderService;
@@ -18,6 +19,15 @@ describe('TechnologyForwarderService', () => {
               get: jest.fn(),
               setex: jest.fn(),
             },
+          },
+        },
+        {
+          provide: StorageService,
+          useValue: {
+            forwardImage: jest
+              .fn()
+              .mockResolvedValue({ buffer: Buffer.from('test') }),
+            uploadFile: jest.fn().mockReturnValue({ path: 'test-path' }),
           },
         },
       ],
@@ -72,6 +82,8 @@ describe('TechnologyForwarderService', () => {
         website: 'https://reactjs.org/',
         categories: [],
         categoryNames: [],
+        iconUrl: '/api/storage/test-path',
+        name: 'React',
       });
     });
 
