@@ -26,7 +26,7 @@ type ChatInputProps = {
 const AGENT_CONFIG = {
   [AgentType.Orchestration]: {
     icon: <Plus className="w-5 h-5" />,
-    label: 'Auto (Orchestrator)',
+    label: 'Open ASM',
     itemClass: '',
     iconClass: 'mr-2',
   },
@@ -38,7 +38,7 @@ const AGENT_CONFIG = {
   },
   [AgentType.Analysis]: {
     icon: <ShieldCheck className="w-5 h-5 text-blue-500" />,
-    label: 'Analysis Agent',
+    label: 'Security Analyst',
     itemClass: '',
     iconClass: 'mr-2 text-blue-500',
   },
@@ -118,27 +118,29 @@ export const ChatInput = memo(function ChatInput({
               <DropdownMenuLabel>Assistant Mode</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => onSelectAgentType(AgentType.Orchestration)}
-                className={cn(
-                  'cursor-pointer',
-                  selectedAgentType === AgentType.Orchestration && 'bg-accent',
-                )}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                <span>Auto (Orchestrator)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onSelectAgentType(AgentType.Analysis)}
+                onClick={() =>
+                  onSelectAgentType(
+                    selectedAgentType === AgentType.Analysis
+                      ? AgentType.Orchestration
+                      : AgentType.Analysis,
+                  )
+                }
                 className={cn(
                   'cursor-pointer',
                   selectedAgentType === AgentType.Analysis && 'bg-accent',
                 )}
               >
                 <ShieldCheck className="w-4 h-4 mr-2 text-blue-500" />
-                <span>Analysis Agent</span>
+                <span>Security Analyst</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => onSelectAgentType(AgentType.NucleiGenerator)}
+                onClick={() =>
+                  onSelectAgentType(
+                    selectedAgentType === AgentType.NucleiGenerator
+                      ? AgentType.Orchestration
+                      : AgentType.NucleiGenerator,
+                  )
+                }
                 className={cn(
                   'cursor-pointer',
                   selectedAgentType === AgentType.NucleiGenerator &&
@@ -146,7 +148,7 @@ export const ChatInput = memo(function ChatInput({
                 )}
               >
                 <Zap className="w-4 h-4 mr-2 text-yellow-500" />
-                <span>Nuclei Generator</span>
+                <span>Nuclei Expert</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

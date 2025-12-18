@@ -17,7 +17,9 @@ import {
   MCPServerService,
   ConversationService,
   MessageService,
+  HealthCheckService,
 } from './ai-assistant.interface';
+
 import { Struct } from '@/types';
 import { GenerateTagsDto } from './dto/generate-tags.dto';
 
@@ -40,6 +42,7 @@ export class AiAssistantService implements OnModuleInit {
   private mcpServerService: MCPServerService;
   private conversationService: ConversationService;
   private messageService: MessageService;
+  private healthCheckService: HealthCheckService;
 
   constructor(
     @Inject('ASSISTANT_PACKAGE') private readonly client: ClientGrpc,
@@ -55,6 +58,8 @@ export class AiAssistantService implements OnModuleInit {
     );
     this.messageService =
       this.client.getService<MessageService>('MessageService');
+    this.healthCheckService =
+      this.client.getService<HealthCheckService>('HealthCheck');
   }
 
   private createMetadata(workspaceId?: string, userId?: string): Metadata {
@@ -66,6 +71,31 @@ export class AiAssistantService implements OnModuleInit {
       metadata.set('x-user-id', userId);
     }
     return metadata;
+  }
+
+  /**
+   * Check health of the AI Assistant
+   */
+  async healthCheck(): Promise<{ message: string }> {
+    try {
+      const response = await firstValueFrom(
+        this.healthCheckService.healthCheck({}),
+      );
+
+      if (response.message === 'OK') {
+        return {
+          message: 'ok',
+        };
+      }
+
+      return {
+        message: 'DISABLED',
+      };
+    } catch {
+      return {
+        message: 'error',
+      };
+    }
   }
 
   /**

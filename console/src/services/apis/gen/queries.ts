@@ -221,6 +221,7 @@ export type CreateFirstAdminDto = {
 
 export type GetMetadataDto = {
   isInit: boolean;
+  isAssistant: boolean;
 };
 
 export type Job = {
@@ -1277,6 +1278,11 @@ export const UpdateAssetGroupWorkflowDtoSchedule = {
 
 export type UpdateAssetGroupWorkflowDto = {
   schedule: UpdateAssetGroupWorkflowDtoSchedule;
+};
+
+export type HealthCheckResponseDto = {
+  /** Health status message */
+  message: string;
 };
 
 export type GenerateTagsResponseDto = {
@@ -20297,6 +20303,162 @@ export const useAssetGroupControllerRunGroupWorkflowScheduler = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * Returns the health status of the AI Assistant backend service.
+ * @summary Check health of the AI Assistant
+ */
+export const aiAssistantControllerHealthCheck = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<HealthCheckResponseDto>(
+    { url: `/api/ai-assistant/health`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAiAssistantControllerHealthCheckQueryKey = () => {
+  return [`/api/ai-assistant/health`] as const;
+};
+
+export const getAiAssistantControllerHealthCheckQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAiAssistantControllerHealthCheckQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>
+  > = ({ signal }) => aiAssistantControllerHealthCheck(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerHealthCheckQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>
+>;
+export type AiAssistantControllerHealthCheckQueryError = unknown;
+
+export function useAiAssistantControllerHealthCheck<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerHealthCheck<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerHealthCheck<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Check health of the AI Assistant
+ */
+
+export function useAiAssistantControllerHealthCheck<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerHealthCheck>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
