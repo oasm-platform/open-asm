@@ -196,7 +196,7 @@ export class IssuesService {
     query: GetManyIssuesDto,
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<Issue>> {
-    const { limit, page, sortOrder } = query;
+    const { limit, page, sortOrder, status, search } = query;
     let { sortBy } = query;
 
     if (!sortBy) {
@@ -213,7 +213,22 @@ export class IssuesService {
         'createdBy.name',
         'createdBy.email',
         'createdBy.image',
-      ])
+      ]);
+
+    // Add status filter if provided
+    if (status && status.length > 0) {
+      queryBuilder.andWhere('issues.status IN (:...status)', { status });
+    }
+
+    // Add search filter if provided
+    if (search) {
+      queryBuilder.andWhere(
+        '(issues.title ILIKE :search OR issues.description ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    queryBuilder
       .orderBy(`issues.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit);

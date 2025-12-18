@@ -39,6 +39,9 @@ export class IssuesController {
     response: {
       serialization: GetManyResponseDto(Issue),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get()
   getMany(

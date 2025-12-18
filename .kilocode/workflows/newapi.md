@@ -125,7 +125,7 @@ npm run test -- <module-path>/<file-name>.service.spec.ts
 **Example:**
 
 ```bash
-npm run test -- src/modules/users/users.service.spec.ts
+cd core-api && npm run test -- src/modules/users/users.service.spec.ts
 ```
 
 - Ensure **all related tests pass**.
@@ -139,7 +139,7 @@ npm run test -- src/modules/users/users.service.spec.ts
 - Run the API generation command:
 
 ```bash
-task gen-api
+task console:gen-api
 ```
 
 - Ensure `/console` client types and methods are updated.

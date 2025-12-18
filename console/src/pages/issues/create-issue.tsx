@@ -53,13 +53,7 @@ export default function CreateIssue() {
     <Page
       isShowButtonGoBack
       className="w-full xl:w-1/2 mx-auto"
-      title={
-        <div className="flex flex-col items-start gap-2">
-          <div className="flex items-center gap-2">
-            <span>Create new issue</span>
-          </div>
-        </div>
-      }
+      title="Create new issue"
     >
       <div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

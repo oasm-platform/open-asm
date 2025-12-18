@@ -1,3 +1,4 @@
+import { IssueStatusFilters } from '@/components/issues/issue-status-filters';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
@@ -8,6 +9,7 @@ import {
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 dayjs.extend(relativeTime);
@@ -50,7 +52,15 @@ export function ListIssues() {
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder, setFilter },
-  } = useServerDataTable();
+  } = useServerDataTable({
+    // Enable URL parameter synchronization for search/filter functionality
+    isUpdateSearchQueryParam: true,
+  });
+
+  // State for status filter
+  const [statusFilters, setStatusFilters] = useState<('open' | 'closed')[]>([
+    'open',
+  ]);
 
   const { data, isLoading } = useIssuesControllerGetMany(
     {
@@ -58,10 +68,22 @@ export function ListIssues() {
       page,
       sortBy: sortBy || 'createdAt',
       sortOrder,
+      // Pass the filter/search parameter to the API call
+      search: filter,
+      // Add status filter if selected - convert to array as expected by API
+      ...(statusFilters.length > 0 && { status: statusFilters }),
     },
     {
       query: {
-        queryKey: ['issues', pageSize, page, sortBy, sortOrder, filter],
+        queryKey: [
+          'issues',
+          pageSize,
+          page,
+          sortBy,
+          sortOrder,
+          filter,
+          statusFilters,
+        ],
       },
     },
   );
@@ -84,11 +106,18 @@ export function ListIssues() {
       sortOrder={sortOrder}
       onPageChange={setPage}
       onPageSizeChange={setPageSize}
+      toolbarComponents={[
+        <IssueStatusFilters
+          onStatusChange={setStatusFilters}
+          defaultStatus="open"
+        />,
+      ]}
       isShowHeader={false}
       onSortChange={(col, order) => {
         setSortBy(col);
         setSortOrder(order);
       }}
+      // Use filterColumnKey to specify which column to filter on
       filterColumnKey="title"
       filterValue={filter}
       onFilterChange={setFilter}
