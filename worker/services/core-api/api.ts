@@ -1750,12 +1750,14 @@ export enum CreateIssueDtoSourceTypeEnum {
 
 export enum ChangeIssueStatusDtoStatusEnum {
   Open = "open",
-  Completed = "completed",
+  Closed = "closed",
 }
 
 /** @default "content" */
 export enum IssueCommentTypeEnum {
   Content = "content",
+  Open = "open",
+  Closed = "closed",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {

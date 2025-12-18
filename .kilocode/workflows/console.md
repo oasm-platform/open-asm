@@ -44,7 +44,7 @@
   - Proper prop validation
   - Clean, readable code structure
   - Follow existing naming conventions
-  - Use appropriate hook functions from `console/src/services/apis/gen/queries.ts` for API calls following the naming convention `use<ControllerName><FunctionName>`, where the controller name and function name are derived from the backend API endpoints
+  - Use appropriate hook functions from `console/src/services/apis/gen/queries.ts` for API calls following the naming convention `use<ControllerName><FunctionName>`, where the controller name and function name are derived from the backend API endpoints. **Note**: Do not read the entire `queries.ts` file as it is very long; instead, search for the specific hook function using the naming pattern `use<ControllerName><FunctionName>`.
 
 - **Important**: All new components should be placed in appropriate subdirectories under `/console/src/components`:
   - Common components: `/components/common`

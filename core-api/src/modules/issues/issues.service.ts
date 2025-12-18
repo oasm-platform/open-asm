@@ -2,7 +2,11 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
-import { IssueSourceType, IssueStatus } from '@/common/enums/enum';
+import {
+  IssueCommentType,
+  IssueSourceType,
+  IssueStatus,
+} from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   ForbiddenException,
@@ -46,11 +50,15 @@ export class IssuesService {
     createCommentDto: CreateIssueCommentDto,
     issueId: string,
     userId: string,
+    isCanDelete = true,
+    isCanEdit = true,
   ): Promise<IssueComment> {
     const comment = this.issueCommentsRepository.create({
       content: createCommentDto.content,
       issue: { id: issueId },
       createdBy: { id: userId },
+      isCanDelete,
+      isCanEdit,
     });
     return await this.issueCommentsRepository.save(comment);
   }
@@ -254,7 +262,6 @@ export class IssuesService {
     userId: string,
   ): Promise<Issue> {
     const issue = await this.getById(id);
-
     // Check if the user is the creator of the issue
     if (issue.createdBy.id !== userId) {
       throw new ForbiddenException(
@@ -265,6 +272,7 @@ export class IssuesService {
     const oldStatus = issue.status;
 
     issue.status = changeIssueStatusDto.status;
+
     const savedIssue = await this.issuesRepository.save(issue);
 
     // Trigger handler if status changed and source exists
@@ -273,11 +281,25 @@ export class IssuesService {
       savedIssue.sourceType &&
       savedIssue.sourceId
     ) {
-      await this.handleStatusChange(
-        savedIssue.sourceType,
-        savedIssue.sourceId,
-        savedIssue.status,
-      );
+      const comment = this.issueCommentsRepository.create({
+        content: savedIssue.status,
+        issue: { id: savedIssue.id } as Issue,
+        createdBy: { id: userId },
+        isCanDelete: false,
+        isCanEdit: false,
+        type:
+          issue.status === IssueStatus.OPEN
+            ? IssueCommentType.OPEN
+            : (IssueCommentType.CLOSED as IssueCommentType),
+      });
+
+      await this.issueCommentsRepository.save(comment);
+
+      // await this.handleStatusChange(
+      //   savedIssue.sourceType,
+      //   savedIssue.sourceId,
+      //   savedIssue.status,
+      // );
     }
 
     return savedIssue;
