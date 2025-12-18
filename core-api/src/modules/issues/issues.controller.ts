@@ -89,22 +89,6 @@ export class IssuesController {
   }
 
   @Doc({
-    summary: 'Update issue',
-    description: 'Update issue details (e.g. status).',
-    response: {
-      serialization: Issue,
-    },
-    request: {
-      params: [
-        {
-          name: 'id',
-          type: String,
-          description: 'Issue ID',
-        },
-      ],
-    },
-  })
-  @Doc({
     summary: 'Update issue title',
     description: 'Update issue title only.',
     response: {
