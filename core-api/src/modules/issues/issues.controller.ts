@@ -120,8 +120,12 @@ export class IssuesController {
     },
   })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateIssueDto: UpdateIssueDto) {
-    return this.issuesService.update(id, updateIssueDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateIssueDto: UpdateIssueDto,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.issuesService.update(id, updateIssueDto, user.id);
   }
 
   @Doc({
@@ -144,8 +148,9 @@ export class IssuesController {
   changeStatus(
     @Param('id') id: string,
     @Body() changeIssueStatusDto: ChangeIssueStatusDto,
+    @UserContext() user: UserContextPayload,
   ) {
-    return this.issuesService.changeStatus(id, changeIssueStatusDto);
+    return this.issuesService.changeStatus(id, changeIssueStatusDto, user.id);
   }
 
   @Doc({

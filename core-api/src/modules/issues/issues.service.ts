@@ -4,7 +4,12 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import { IssueSourceType, IssueStatus } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateIssueCommentDto } from './dto/create-issue-comment.dto';
@@ -221,17 +226,42 @@ export class IssuesService {
     return issue;
   }
 
-  async update(id: string, updateIssueDto: UpdateIssueDto): Promise<Issue> {
+  async update(
+    id: string,
+    updateIssueDto: UpdateIssueDto,
+    userId: string,
+  ): Promise<Issue> {
     const issue = await this.getById(id);
-    Object.assign(issue, updateIssueDto);
+
+    // Check if the user is the creator of the issue
+    if (issue.createdBy.id !== userId) {
+      throw new ForbiddenException(
+        'Only the creator of the issue can update it',
+      );
+    }
+
+    // Only allow updating title for now
+    if (updateIssueDto.title !== undefined) {
+      issue.title = updateIssueDto.title;
+    }
+
     return await this.issuesRepository.save(issue);
   }
 
   async changeStatus(
     id: string,
     changeIssueStatusDto: ChangeIssueStatusDto,
+    userId: string,
   ): Promise<Issue> {
     const issue = await this.getById(id);
+
+    // Check if the user is the creator of the issue
+    if (issue.createdBy.id !== userId) {
+      throw new ForbiddenException(
+        'Only the creator of the issue can change its status',
+      );
+    }
+
     const oldStatus = issue.status;
 
     issue.status = changeIssueStatusDto.status;

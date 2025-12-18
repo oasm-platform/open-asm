@@ -98,6 +98,7 @@
   - Valid input → success case
   - Invalid input / edge cases
   - Error handling (DB errors, dependency failures, etc.)
+  - Mock data containing id must be valid uuid v4 or higher.
 
 - **Mock all external dependencies** (repositories, other services, third-party APIs).
 
