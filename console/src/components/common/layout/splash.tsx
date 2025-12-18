@@ -49,7 +49,7 @@ export default function Splash({ children }: SplashProps) {
     }
   }, [isError, isFetching, failureCount]);
 
-  if (isFetching || (isError && !showError)) {
+  if ((isFetching && !metadata) || (isError && !showError && !metadata)) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Logo width={64} height={64} />
