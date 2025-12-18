@@ -1,5 +1,6 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
+import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 import { UsersService } from '../users/users.service';
 import { RootService } from './root.service';
 
@@ -17,6 +18,12 @@ describe('RootService', () => {
             usersRepository: {
               count: jest.fn(),
             },
+          },
+        },
+        {
+          provide: AiAssistantService,
+          useValue: {
+            healthCheck: jest.fn(),
           },
         },
       ],
