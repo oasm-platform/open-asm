@@ -50,7 +50,10 @@ export function ListIssues() {
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder, setFilter },
-  } = useServerDataTable();
+  } = useServerDataTable({
+    // Enable URL parameter synchronization for search/filter functionality
+    isUpdateSearchQueryParam: true,
+  });
 
   const { data, isLoading } = useIssuesControllerGetMany(
     {
@@ -58,6 +61,8 @@ export function ListIssues() {
       page,
       sortBy: sortBy || 'createdAt',
       sortOrder,
+      // Pass the filter/search parameter to the API call
+      search: filter,
     },
     {
       query: {
@@ -89,6 +94,7 @@ export function ListIssues() {
         setSortBy(col);
         setSortOrder(order);
       }}
+      // Use filterColumnKey to specify which column to filter on
       filterColumnKey="title"
       filterValue={filter}
       onFilterChange={setFilter}

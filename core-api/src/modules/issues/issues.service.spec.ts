@@ -163,6 +163,107 @@ describe('IssuesService', () => {
       expect(result.data).toEqual(mockIssues);
       expect(result.total).toBe(1);
     });
+
+    it('should filter issues by status', async () => {
+      const query = {
+        limit: 10,
+        page: 1,
+        sortOrder: SortOrder.ASC,
+        sortBy: 'createdAt',
+        status: [IssueStatus.OPEN],
+      };
+      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
+      const mockIssues = [mockIssue];
+
+      const queryBuilder: any = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([mockIssues, 1]),
+      };
+
+      repository.createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
+
+      const result = await service.getMany(query, workspaceId);
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        'issues.status IN (:...status)',
+        { status: [IssueStatus.OPEN] },
+      );
+      expect(result.data).toEqual(mockIssues);
+    });
+
+    it('should filter issues by search term', async () => {
+      const query = {
+        limit: 10,
+        page: 1,
+        sortOrder: SortOrder.ASC,
+        sortBy: 'createdAt',
+        search: 'test search',
+      };
+      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
+      const mockIssues = [mockIssue];
+
+      const queryBuilder: any = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([mockIssues, 1]),
+      };
+
+      repository.createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
+
+      const result = await service.getMany(query, workspaceId);
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        '(issues.title ILIKE :search OR issues.description ILIKE :search)',
+        { search: '%test search%' },
+      );
+      expect(result.data).toEqual(mockIssues);
+    });
+
+    it('should filter issues by both status and search term', async () => {
+      const query = {
+        limit: 10,
+        page: 1,
+        sortOrder: SortOrder.ASC,
+        sortBy: 'createdAt',
+        status: [IssueStatus.OPEN, IssueStatus.CLOSED],
+        search: 'test search',
+      };
+      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
+      const mockIssues = [mockIssue];
+
+      const queryBuilder: any = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([mockIssues, 1]),
+      };
+
+      repository.createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
+
+      const result = await service.getMany(query, workspaceId);
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        'issues.status IN (:...status)',
+        { status: [IssueStatus.OPEN, IssueStatus.CLOSED] },
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        '(issues.title ILIKE :search OR issues.description ILIKE :search)',
+        { search: '%test search%' },
+      );
+      expect(result.data).toEqual(mockIssues);
+    });
   });
 
   describe('getById', () => {
