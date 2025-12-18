@@ -11,6 +11,7 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ports?: string[];
     techs?: string[];
     statusCodes?: string[];
+    hosts?: string[];
     page: number;
     sortBy: string;
     sortOrder: 'ASC' | 'DESC';
@@ -33,6 +34,7 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ipAddresses?: string[];
     techs?: string[];
     ports?: string[];
+    hosts?: string[];
     statusCodes?: string[];
   };
   filterHandlers: (key: string, value: string[]) => void;
@@ -54,7 +56,9 @@ export default function AssetProvider({
   refetchInterval?: number;
 }) {
   const [params, setParams] = useSearchParams();
-  const [generatingAssets, setGeneratingAssets] = useState<Set<string>>(new Set());
+  const [generatingAssets, setGeneratingAssets] = useState<Set<string>>(
+    new Set(),
+  );
 
   const { tableParams, tableHandlers } = useServerDataTable({
     defaultSortBy: 'value',
@@ -64,6 +68,7 @@ export default function AssetProvider({
   const ipAddresses = params.getAll('ipAddresses');
   const ports = params.getAll('ports');
   const techs = params.getAll('techs');
+  const hosts = params.getAll('hosts');
   const statusCodes = params.getAll('statusCodes');
 
   const filterHandlers = useCallback(
@@ -103,6 +108,7 @@ export default function AssetProvider({
     ipAddresses: ipAddresses,
     ports: ports,
     techs: techs,
+    hosts: hosts,
     statusCodes: statusCodes,
     page: tableParams.page,
     sortBy: tableParams.sortBy,
@@ -128,6 +134,7 @@ export default function AssetProvider({
         ipAddresses,
         ports,
         techs,
+        hosts,
         statusCodes,
       ],
     },
@@ -146,6 +153,7 @@ export default function AssetProvider({
           ipAddresses,
           ports,
           techs,
+          hosts,
           statusCodes,
         },
         filterHandlers,

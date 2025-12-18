@@ -27,7 +27,7 @@ export class SearchService {
     private readonly assetService: AssetsService,
     private readonly targetService: TargetsService,
     private readonly statisticService: StatisticService,
-  ) { }
+  ) {}
 
   /**
    * Searches for assets and targets in a workspace based on the provided query.
@@ -56,22 +56,22 @@ export class SearchService {
     // Fetch the actual data with calculated limits
     const [assets, targets] = await Promise.all([
       assetsLimit > 0
-        ? this.assetService.getManyAsssets(
-          {
-            ...query,
-            limit: assetsLimit,
-          },
-          workspaceId,
-        )
+        ? this.assetService.getManyAsssetServices(
+            {
+              ...query,
+              limit: assetsLimit,
+            },
+            workspaceId,
+          )
         : { data: [], total: 0, page: 1, pageCount: 0 },
       targetsLimit > 0
         ? this.targetService.getTargetsInWorkspace(
-          {
-            ...query,
-            limit: targetsLimit,
-          },
-          workspaceId,
-        )
+            {
+              ...query,
+              limit: targetsLimit,
+            },
+            workspaceId,
+          )
         : { data: [], total: 0, page: 1, pageCount: 0 },
     ]);
 

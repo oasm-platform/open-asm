@@ -24,6 +24,7 @@ import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { SwitchAssetDto } from './dto/switch-asset.dto';
 import { GetTlsResponseDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -45,7 +46,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getManyAsssets(query, workspaceId);
+    return this.assetsService.getManyAsssetServices(query, workspaceId);
   }
 
   @Doc({
@@ -64,6 +65,24 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetsService.getIpAssets(query, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get host asset',
+    description: 'Retrieves a list of host with number of assets.',
+    response: {
+      serialization: GetManyResponseDto(GetHostAssetsDTO),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('/host')
+  getHostAssets(
+    @Query() query: GetAssetsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getHostAssets(query, workspaceId);
   }
 
   @Doc({

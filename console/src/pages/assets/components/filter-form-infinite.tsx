@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAsset } from '../context/asset-context';
 import {
+  HostsFacetedFilter,
   IpFacetedFilter,
   PortFacetedFilter,
   StatusCodesFacetedFilter,
@@ -25,7 +26,7 @@ export default function FilterFormInfinite() {
     setFilter(debouncedValue);
   }, [debouncedValue, setFilter]);
 
-  const facets = ['ipAddresses', 'statusCodes', 'techs', 'ports'];
+  const facets = ['ipAddresses', 'statusCodes', 'techs', 'ports', 'hosts'];
   const isFiltered = facets.some((e: string) => params.has(e));
 
   return (
@@ -42,6 +43,7 @@ export default function FilterFormInfinite() {
           <PortFacetedFilter />
           <TechsFacetedFilter />
           <StatusCodesFacetedFilter />
+          <HostsFacetedFilter />
         </div>
         {isFiltered && (
           <Button

@@ -56,7 +56,9 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsUUID(4, { each: true })
   @IsOptional()
-  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: string | string[] }): string[] =>
+    Array.isArray(value) ? value : [value],
+  )
   targetIds?: string[];
 
   @ApiProperty({
@@ -64,7 +66,9 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: string | string[] }): string[] =>
+    Array.isArray(value) ? value : [value],
+  )
   ipAddresses?: string[];
 
   @ApiProperty({
@@ -72,7 +76,9 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: string | string[] }): string[] =>
+    Array.isArray(value) ? value : [value],
+  )
   ports?: string[];
 
   @ApiProperty({
@@ -80,7 +86,19 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: string | string[] }): string[] =>
+    Array.isArray(value) ? value : [value],
+  )
+  hosts?: string[];
+
+  @ApiProperty({
+    required: false,
+  })
+  @IsString({ each: true })
+  @IsOptional()
+  @Transform(({ value }: { value: string | string[] }): string[] =>
+    Array.isArray(value) ? value : [value],
+  )
   techs?: string[];
 
   @ApiProperty({
@@ -88,6 +106,8 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   })
   @IsString({ each: true })
   @IsOptional()
-  @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: string | string[] }): string[] =>
+    Array.isArray(value) ? value : [value],
+  )
   statusCodes?: string[];
 }

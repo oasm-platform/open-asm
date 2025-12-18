@@ -71,7 +71,7 @@ export class McpTools {
   })
   async getAssets(params: z.infer<typeof getAssetsSchema>) {
     const { workspaceId, page, limit, value } = params;
-    const response = await this.assetsService.getManyAsssets(
+    const response = await this.assetsService.getManyAsssetServices(
       {
         limit: limit || 100,
         page: page || 1,
