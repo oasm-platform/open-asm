@@ -276,11 +276,7 @@ export class IssuesService {
     const savedIssue = await this.issuesRepository.save(issue);
 
     // Trigger handler if status changed and source exists
-    if (
-      oldStatus !== savedIssue.status &&
-      savedIssue.sourceType &&
-      savedIssue.sourceId
-    ) {
+    if (oldStatus !== savedIssue.status) {
       const comment = this.issueCommentsRepository.create({
         content: savedIssue.status,
         issue: { id: savedIssue.id } as Issue,
