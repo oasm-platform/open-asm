@@ -13,4 +13,6 @@ export class CreateFirstAdminDto {
 export class GetMetadataDto {
   @ApiProperty()
   isInit: boolean;
+  @ApiProperty()
+  isAssistant: boolean;
 }

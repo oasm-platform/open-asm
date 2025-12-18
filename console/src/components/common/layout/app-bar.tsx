@@ -9,10 +9,14 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import type { JSX } from 'react';
+import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
 import { SearchForm } from '../../ui/search-form';
 
 export default function AppBar({ children }: { children: JSX.Element }) {
   const { isMobile } = useSidebar();
+  const { data: metadata } = useRootControllerGetMetadata();
+  const isAssistantEnabled = metadata?.isAssistant ?? false;
+
   return (
     <SidebarInset>
       <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
@@ -24,7 +28,7 @@ export default function AppBar({ children }: { children: JSX.Element }) {
           <SearchForm className="w-1/2" />
         </div>
         <div className="ml-auto flex gap-3">
-          <AssistantChat />
+          {isAssistantEnabled && <AssistantChat />}
           <NotificationBell />
         </div>
       </header>
