@@ -6,12 +6,14 @@ import { SearchHistory } from '@/modules/search/entities/search-history.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { WorkspaceMembers } from '@/modules/workspaces/entities/workspace-members.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
+import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { Account } from './account.entity';
 import { Session } from './session.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
+  @ApiProperty()
   @Column('text')
   name: string;
 

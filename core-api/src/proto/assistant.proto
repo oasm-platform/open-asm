@@ -54,18 +54,7 @@ message ResolveIssueResponse {
   string message = 1;
 }
 
-// ----------------
-// Nuclei template gen 
-// ----------------
-service NucleiTemplateService {
-  rpc CreateTemplate(CreateTemplateRequest) returns (CreateTemplateResponse);
-}
-message CreateTemplateRequest {
-  string question = 1;
-}
-message CreateTemplateResponse {
-  string answer = 1;
-}
+
 
 // ----------------
 // Conversation
@@ -153,6 +142,13 @@ message CreateMessageRequest {
   string question = 1;
   string conversation_id = 2;
   bool is_create_conversation = 3;
+  AgentType agent_type = 4;
+}
+
+enum AgentType {
+  AGENT_TYPE_ORCHESTRATION = 0;
+  AGENT_TYPE_NUCLEI_GENERATOR = 1;
+  AGENT_TYPE_ANALYSIS = 2;
 }
 
 message CreateMessageResponse {
@@ -164,6 +160,7 @@ message UpdateMessageRequest {
   string conversation_id = 1;
   string message_id = 2;
   string question = 3;
+  AgentType agent_type = 4;
 }
 
 message UpdateMessageResponse {
@@ -251,4 +248,3 @@ message GetMCPServerHealthResponse {
   string status = 2;       // "active", "disabled", or "error"
   string error = 3;        // error message if status is "error"
 }
-

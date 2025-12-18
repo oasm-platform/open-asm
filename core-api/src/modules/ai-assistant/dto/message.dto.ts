@@ -63,6 +63,13 @@ export class CreateMessageDto {
   @IsBoolean()
   @IsOptional()
   isCreateConversation?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Agent type for handling the message',
+    example: 0,
+  })
+  @IsOptional()
+  agentType?: number;
 }
 
 export class CreateMessageResponseDto {
@@ -88,6 +95,13 @@ export class UpdateMessageDto {
   @IsString()
   @IsNotEmpty()
   question: string;
+
+  @ApiPropertyOptional({
+    description: 'Agent type for handling the message',
+    example: 0,
+  })
+  @IsOptional()
+  agentType?: number;
 }
 
 export class UpdateMessageResponseDto {

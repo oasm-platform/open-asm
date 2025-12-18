@@ -1529,6 +1529,92 @@ export interface DeleteMessageResponseDto {
   message: string;
 }
 
+export interface User {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+}
+
+export interface Issue {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  title: string;
+  description: string;
+  status: string;
+  sourceType: string;
+  sourceId: string;
+  workspaceId: string;
+  no: number;
+  createdBy: User;
+}
+
+export interface GetManyIssueDto {
+  data: Issue[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface CreateIssueDto {
+  title: string;
+  description: string;
+  sourceType: CreateIssueDtoSourceTypeEnum;
+  sourceId: string;
+}
+
+export interface UpdateIssueDto {
+  title: string;
+}
+
+export interface ChangeIssueStatusDto {
+  status: ChangeIssueStatusDtoStatusEnum;
+}
+
+export interface IssueComment {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  content: string;
+  createdBy: User;
+  isCanDelete: boolean;
+  isCanEdit: boolean;
+  /** @default "content" */
+  type: IssueCommentTypeEnum;
+}
+
+export interface CreateIssueCommentDto {
+  content: string;
+}
+
+export interface GetManyIssueCommentDto {
+  data: IssueComment[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface UpdateIssueCommentDto {
+  /**
+   * Content of the comment
+   * @example "This is an updated comment"
+   */
+  content: string;
+}
+
+export type Object = object;
+
 export interface McpTool {
   name: string;
   type: string;
@@ -1670,6 +1756,22 @@ export enum GetMcpServerHealthResponseDtoStatusEnum {
   Active = "active",
   Disabled = "disabled",
   Error = "error",
+}
+
+export enum CreateIssueDtoSourceTypeEnum {
+  Vulnerability = "vulnerability",
+}
+
+export enum ChangeIssueStatusDtoStatusEnum {
+  Open = "open",
+  Closed = "closed",
+}
+
+/** @default "content" */
+export enum IssueCommentTypeEnum {
+  Content = "content",
+  Open = "open",
+  Closed = "closed",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -4399,6 +4501,208 @@ export class Api<
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieve a list of all issues with pagination and filtering.
+   *
+   * @tags issues
+   * @name IssuesControllerGetMany
+   * @summary Get all issues
+   * @request GET:/api/issues
+   */
+  issuesControllerGetMany = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Create a new issue linked to a source (e.g. vulnerability).
+   *
+   * @tags issues
+   * @name IssuesControllerCreate
+   * @summary Create issue
+   * @request POST:/api/issues
+   */
+  issuesControllerCreate = (data: CreateIssueDto, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieve details of a specific issue.
+   *
+   * @tags issues
+   * @name IssuesControllerGetById
+   * @summary Get issue by ID
+   * @request GET:/api/issues/{id}
+   */
+  issuesControllerGetById = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Update issue details (e.g. status).
+   *
+   * @tags issues
+   * @name IssuesControllerUpdate
+   * @summary Update issue
+   * @request PATCH:/api/issues/{id}
+   */
+  issuesControllerUpdate = (
+    id: string,
+    data: UpdateIssueDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Change the status of an issue.
+   *
+   * @tags issues
+   * @name IssuesControllerChangeStatus
+   * @summary Change issue status
+   * @request PATCH:/api/issues/{id}/status
+   */
+  issuesControllerChangeStatus = (
+    id: string,
+    data: ChangeIssueStatusDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/${id}/status`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Create a new comment for a specific issue.
+   *
+   * @tags issues
+   * @name IssuesControllerCreateComment
+   * @summary Create comment for issue
+   * @request POST:/api/issues/{issueId}/comments
+   */
+  issuesControllerCreateComment = (
+    issueId: string,
+    data: CreateIssueCommentDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/${issueId}/comments`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieve paginated comments for a specific issue.
+   *
+   * @tags issues
+   * @name IssuesControllerGetCommentsByIssueId
+   * @summary Get comments by issue ID
+   * @request GET:/api/issues/{issueId}/comments
+   */
+  issuesControllerGetCommentsByIssueId = (
+    issueId: string,
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/${issueId}/comments`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Update a comment by its ID. Only the creator of the comment can update it.
+   *
+   * @tags issues
+   * @name IssuesControllerUpdateCommentById
+   * @summary Update comment by ID
+   * @request PATCH:/api/issues/comments/{id}
+   */
+  issuesControllerUpdateCommentById = (
+    id: string,
+    data: UpdateIssueCommentDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/comments/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete a comment by its ID. Only the creator of the comment can delete it.
+   *
+   * @tags issues
+   * @name IssuesControllerDeleteCommentById
+   * @summary Delete comment by ID
+   * @request DELETE:/api/issues/comments/{id}
+   */
+  issuesControllerDeleteCommentById = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/issues/comments/${id}`,
       method: "DELETE",
       format: "json",
       ...params,

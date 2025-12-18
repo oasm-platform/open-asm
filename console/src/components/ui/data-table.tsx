@@ -76,7 +76,7 @@ export function DataTable<TData, TValue>({
   onFilterChange,
   onRowClick,
   rowClassName,
-  filterPlaceholder = 'Filter...',
+  filterPlaceholder = 'Search',
   showPagination = true,
   page,
   pageSize,
@@ -163,13 +163,19 @@ export function DataTable<TData, TValue>({
   return (
     <div className="w-full">
       {/* Filter and column visibility controls */}
-      <div className="flex justify-between items-center">
-        <div>
+      {/* Filter and column visibility controls */}
+      <div className="flex flex-col gap-2 md:flex-row-reverse md:justify-between md:items-center">
+        <div className="flex gap-2 w-full justify-end md:w-auto">
+          {toolbarComponents.map((c, i) => (
+            <div key={i}>{c}</div>
+          ))}
+        </div>
+        <div className="w-full md:w-1/2">
           {filterColumnKey && (
             <div className="flex items-center gap-4 py-1">
               <Input
                 placeholder={filterPlaceholder}
-                className="max-w-sm"
+                className="w-full md:max-w-sm"
                 value={searchValue}
                 onChange={(e) => {
                   setSearchValue(e.target.value);
@@ -180,7 +186,6 @@ export function DataTable<TData, TValue>({
 
           {filterComponents}
         </div>
-        <div className="mx-1 gap-2 flex">{toolbarComponents.map((c) => c)}</div>
       </div>
 
       {/* Table */}

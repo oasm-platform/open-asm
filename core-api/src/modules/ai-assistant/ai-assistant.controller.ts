@@ -42,6 +42,9 @@ import {
   UpdateMessageDto,
 } from './dto/message.dto';
 
+// Fix: CreateMessageDto definition in dto/message.dto might need update too, but locally used interface in controller for createMessageStream needs to match service call.
+// The controller constructs a local object of type CreateMessageDto.
+
 @ApiTags('AI Assistant')
 @Controller('ai-assistant')
 @UseGuards(AssistantGuard)
@@ -301,6 +304,7 @@ export class AiAssistantController {
     @Query('question') question: string,
     @Query('conversationId') conversationId: string | undefined,
     @Query('isCreateConversation') isCreateConversation: string | undefined,
+    @Query('agentType') agentType: string | undefined,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Observable<{ data: string }> {
@@ -308,6 +312,7 @@ export class AiAssistantController {
       question,
       conversationId,
       isCreateConversation: isCreateConversation === 'true',
+      agentType: agentType ? parseInt(agentType, 10) : undefined,
     };
 
     return this.aiAssistantService

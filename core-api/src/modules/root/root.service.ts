@@ -2,10 +2,14 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { Injectable } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { CreateFirstAdminDto, GetMetadataDto } from './dto/root.dto';
+import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 
 @Injectable()
 export class RootService {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly aiAssistantService: AiAssistantService,
+  ) {}
 
   public getHealth(): string {
     return 'OK';
@@ -48,8 +52,18 @@ export class RootService {
           DAYS_PER_YEAR,
       },
     });
+
+    let isAssistant = false;
+    try {
+      const health = await this.aiAssistantService.healthCheck();
+      isAssistant = health.message === 'ok';
+    } catch {
+      isAssistant = false;
+    }
+
     return {
       isInit: userCount > 0,
+      isAssistant,
     };
   }
 }

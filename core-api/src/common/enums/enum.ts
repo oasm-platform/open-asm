@@ -145,9 +145,22 @@ export enum Language {
 }
 
 export enum NotificationEventType {
-  SCAN_STARTED = 'events.notification.content.SCAN_STARTED',
-  SCAN_COMPLETED = 'events.notification.content.SCAN_COMPLETED',
   SCAN_FAILED = 'events.notification.content.SCAN_FAILED',
   VULNERABILITY_DISCOVERY = 'events.notification.content.VULNERABILITY_DISCOVERY',
   WORKFLOW_RUN = 'events.notification.content.WORKFLOW_RUN',
+}
+
+export enum IssueStatus {
+  OPEN = 'open',
+  CLOSED = 'closed',
+}
+
+export enum IssueSourceType {
+  VULNERABILITY = 'vulnerability',
+}
+
+export enum IssueCommentType {
+  CONTENT = 'content',
+  OPEN = 'open',
+  CLOSED = 'closed',
 }

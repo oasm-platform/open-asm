@@ -1,13 +1,47 @@
 import { useRef, useEffect, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Sparkles } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Send, Plus, Zap, ShieldCheck } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { AgentType } from '../types/agent-types';
 
 type ChatInputProps = {
   inputMessage: string;
   setInputMessage: (value: string) => void;
   onSendMessage: () => void;
   isSending: boolean;
+  selectedAgentType: number;
+  onSelectAgentType: (type: number) => void;
+};
+
+// Configuration object for Agent Types
+const AGENT_CONFIG = {
+  [AgentType.Orchestration]: {
+    icon: <Plus className="w-5 h-5" />,
+    label: 'Open ASM',
+    itemClass: '',
+    iconClass: 'mr-2',
+  },
+  [AgentType.NucleiGenerator]: {
+    icon: <Zap className="w-5 h-5 text-yellow-500" />,
+    label: 'Nuclei Generator',
+    itemClass: '',
+    iconClass: 'mr-2 text-yellow-500',
+  },
+  [AgentType.Analysis]: {
+    icon: <ShieldCheck className="w-5 h-5 text-blue-500" />,
+    label: 'Security Analyst',
+    itemClass: '',
+    iconClass: 'mr-2 text-blue-500',
+  },
 };
 
 export const ChatInput = memo(function ChatInput({
@@ -15,6 +49,8 @@ export const ChatInput = memo(function ChatInput({
   setInputMessage,
   onSendMessage,
   isSending,
+  selectedAgentType,
+  onSelectAgentType,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -58,11 +94,64 @@ export const ChatInput = memo(function ChatInput({
 
   const isDisabled = isSending || inputMessage.trim() === '';
 
+  // Get current agent config or default to Orchestration
+  const currentAgent =
+    AGENT_CONFIG[selectedAgentType as AgentType] ||
+    AGENT_CONFIG[AgentType.Orchestration];
+
   return (
     <form onSubmit={handleSubmit} className="relative group">
       <div className="relative flex items-end gap-2 bg-background p-1.5 rounded-3xl border border-input shadow-sm focus-within:border-ring focus-within:shadow-md transition-all duration-200">
-        <div className="pl-3 pb-3 text-zinc-500 shrink-0">
-          <Sparkles className="w-5 h-5" />
+        <div className="pl-1 pb-1 shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full text-zinc-500 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                title={`Current Mode: ${currentAgent.label}`}
+              >
+                {currentAgent.icon}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Assistant Mode</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() =>
+                  onSelectAgentType(
+                    selectedAgentType === AgentType.Analysis
+                      ? AgentType.Orchestration
+                      : AgentType.Analysis,
+                  )
+                }
+                className={cn(
+                  'cursor-pointer',
+                  selectedAgentType === AgentType.Analysis && 'bg-accent',
+                )}
+              >
+                <ShieldCheck className="w-4 h-4 mr-2 text-blue-500" />
+                <span>Security Analyst</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  onSelectAgentType(
+                    selectedAgentType === AgentType.NucleiGenerator
+                      ? AgentType.Orchestration
+                      : AgentType.NucleiGenerator,
+                  )
+                }
+                className={cn(
+                  'cursor-pointer',
+                  selectedAgentType === AgentType.NucleiGenerator &&
+                    'bg-accent',
+                )}
+              >
+                <Zap className="w-4 h-4 mr-2 text-yellow-500" />
+                <span>Nuclei Expert</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <Textarea
@@ -70,7 +159,7 @@ export const ChatInput = memo(function ChatInput({
           value={inputMessage}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="Ask AI anything..."
+          placeholder={`Ask ${currentAgent.label}...`}
           rows={1}
           className="flex-1 !bg-transparent border-none outline-none shadow-none ring-0 focus-visible:ring-0 px-2 py-3 text-foreground text-base placeholder:text-muted-foreground font-medium resize-none overflow-y-auto min-h-[44px] max-h-[200px] scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600"
           disabled={isSending}

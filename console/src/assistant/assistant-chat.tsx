@@ -10,10 +10,16 @@ import { ChatMessages } from './components/chat-messages';
 import { ConversationTitle } from './components/conversation-title';
 import { StreamingStatus } from './components/streaming-status';
 import type { AssistantChatProps } from './types/types';
+import { AgentType } from './types/agent-types';
 
 export function AssistantChat({ onSendMessage }: AssistantChatProps) {
   const [open, setOpen] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
+  const [selectedAgentType, setSelectedAgentType] = useState<number>(
+    AgentType.Analysis,
+  );
+
+  const isHealthy = true;
 
   const {
     sessions,
@@ -43,7 +49,8 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
     try {
       // If no conversation is selected, create a new one
       const isNewConversation = !currentConversationId;
-      await sendMessage(messageText, isNewConversation);
+      // Pass the selected agent type (default 0)
+      await sendMessage(messageText, isNewConversation, selectedAgentType);
     } catch (error) {
       console.error('❌ Failed to send message:', error);
     }
@@ -73,8 +80,17 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
         className="relative rounded-full md:rounded-lg w-10 h-10"
         onClick={() => setOpen(true)}
       >
-        <MessageCircle className="h-5 w-5" />
+        <MessageCircle
+          className={cn('h-5 w-5', !isHealthy && 'text-red-500')}
+        />
+        {!isHealthy && (
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+          </span>
+        )}
       </Button>
+
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="right"
@@ -87,6 +103,15 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
             '[&>button]:hidden', // Hide default Sheet close button
           )}
         >
+          {!isHealthy && (
+            <div className="bg-red-50 text-red-500 text-[10px] py-1 px-4 text-center border-b border-red-100 flex items-center justify-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              AI Assistant is currently offline. Some features may not work.
+            </div>
+          )}
           <div className="flex flex-col h-full">
             <ChatHeader
               onClose={() => setOpen(false)}
@@ -158,6 +183,8 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
               setInputMessage={setInputMessage}
               onSendMessage={handleSendMessage}
               isSending={isStreaming}
+              selectedAgentType={selectedAgentType}
+              onSelectAgentType={setSelectedAgentType}
             />
           </div>
         </SheetContent>
