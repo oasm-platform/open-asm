@@ -1,5 +1,5 @@
 import Page from '@/components/common/page';
-import { StatusBadge } from '@/components/ui/status-badge';
+import StatusBadge from '@/components/ui/status-badge';
 import IssueComments from '@/pages/issues/components/issue-comments';
 import { useIssuesControllerGetById } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
@@ -15,9 +15,7 @@ const IssueDetail = () => {
   if (!issue) {
     return <></>;
   }
-
   const status = issue.status;
-
   return (
     <Page
       className="w-full xl:w-1/2 mx-auto"
@@ -29,13 +27,13 @@ const IssueDetail = () => {
               <span className="text-gray-400 font-normal">#{issue.no}</span>
             </span>
           </div>
-          <StatusBadge status={status} />
         </div>
       }
     >
       <div>
         <div className="flex items-center gap-4 mb-6 pb-6 border-b border-border">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <StatusBadge status={status} />
             <span className="text-muted-foreground mr-1">
               <span className="font-medium text-foreground">
                 {issue.createdBy?.name || 'Unknown'}

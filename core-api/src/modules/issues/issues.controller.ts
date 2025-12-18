@@ -2,6 +2,7 @@ import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -120,8 +121,12 @@ export class IssuesController {
     },
   })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateIssueDto: UpdateIssueDto) {
-    return this.issuesService.update(id, updateIssueDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateIssueDto: UpdateIssueDto,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.issuesService.update(id, updateIssueDto, user.id);
   }
 
   @Doc({
@@ -130,22 +135,18 @@ export class IssuesController {
     response: {
       serialization: Issue,
     },
-    request: {
-      params: [
-        {
-          name: 'id',
-          type: String,
-          description: 'Issue ID',
-        },
-      ],
-    },
   })
   @Patch(':id/status')
   changeStatus(
-    @Param('id') id: string,
+    @Param() param: IdQueryParamDto,
     @Body() changeIssueStatusDto: ChangeIssueStatusDto,
+    @UserContext() user: UserContextPayload,
   ) {
-    return this.issuesService.changeStatus(id, changeIssueStatusDto);
+    return this.issuesService.changeStatus(
+      param.id,
+      changeIssueStatusDto,
+      user.id,
+    );
   }
 
   @Doc({

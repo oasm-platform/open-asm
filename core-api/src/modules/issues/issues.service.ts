@@ -2,9 +2,18 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
-import { IssueSourceType, IssueStatus } from '@/common/enums/enum';
+import {
+  IssueCommentType,
+  IssueSourceType,
+  IssueStatus,
+} from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateIssueCommentDto } from './dto/create-issue-comment.dto';
@@ -41,11 +50,15 @@ export class IssuesService {
     createCommentDto: CreateIssueCommentDto,
     issueId: string,
     userId: string,
+    isCanDelete = true,
+    isCanEdit = true,
   ): Promise<IssueComment> {
     const comment = this.issueCommentsRepository.create({
       content: createCommentDto.content,
       issue: { id: issueId },
       createdBy: { id: userId },
+      isCanDelete,
+      isCanEdit,
     });
     return await this.issueCommentsRepository.save(comment);
   }
@@ -221,20 +234,45 @@ export class IssuesService {
     return issue;
   }
 
-  async update(id: string, updateIssueDto: UpdateIssueDto): Promise<Issue> {
+  async update(
+    id: string,
+    updateIssueDto: UpdateIssueDto,
+    userId: string,
+  ): Promise<Issue> {
     const issue = await this.getById(id);
-    Object.assign(issue, updateIssueDto);
+
+    // Check if the user is the creator of the issue
+    if (issue.createdBy.id !== userId) {
+      throw new ForbiddenException(
+        'Only the creator of the issue can update it',
+      );
+    }
+
+    // Only allow updating title for now
+    if (updateIssueDto.title !== undefined) {
+      issue.title = updateIssueDto.title;
+    }
+
     return await this.issuesRepository.save(issue);
   }
 
   async changeStatus(
     id: string,
     changeIssueStatusDto: ChangeIssueStatusDto,
+    userId: string,
   ): Promise<Issue> {
     const issue = await this.getById(id);
+    // Check if the user is the creator of the issue
+    if (issue.createdBy.id !== userId) {
+      throw new ForbiddenException(
+        'Only the creator of the issue can change its status',
+      );
+    }
+
     const oldStatus = issue.status;
 
     issue.status = changeIssueStatusDto.status;
+
     const savedIssue = await this.issuesRepository.save(issue);
 
     // Trigger handler if status changed and source exists
@@ -243,11 +281,25 @@ export class IssuesService {
       savedIssue.sourceType &&
       savedIssue.sourceId
     ) {
-      await this.handleStatusChange(
-        savedIssue.sourceType,
-        savedIssue.sourceId,
-        savedIssue.status,
-      );
+      const comment = this.issueCommentsRepository.create({
+        content: savedIssue.status,
+        issue: { id: savedIssue.id } as Issue,
+        createdBy: { id: userId },
+        isCanDelete: false,
+        isCanEdit: false,
+        type:
+          issue.status === IssueStatus.OPEN
+            ? IssueCommentType.OPEN
+            : (IssueCommentType.CLOSED as IssueCommentType),
+      });
+
+      await this.issueCommentsRepository.save(comment);
+
+      // await this.handleStatusChange(
+      //   savedIssue.sourceType,
+      //   savedIssue.sourceId,
+      //   savedIssue.status,
+      // );
     }
 
     return savedIssue;

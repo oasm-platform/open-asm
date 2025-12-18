@@ -2,13 +2,16 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
   useIssuesControllerCreateComment,
+  useIssuesControllerGetById,
   useIssuesControllerGetCommentsByIssueId,
   type Issue,
   type IssueComment,
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { SendHorizontal } from 'lucide-react';
 import { useState } from 'react';
+import ChangeStatusSelect from './change-status-select';
 import CommentCard from './comment-card';
 
 dayjs.extend(relativeTime);
@@ -18,6 +21,8 @@ interface IssueCommentsProps {
 }
 
 const IssueComments = ({ issue }: IssueCommentsProps) => {
+  const { refetch: refetchIssue } = useIssuesControllerGetById(issue.id);
+
   const { data: commentsData, refetch: refetchComments } =
     useIssuesControllerGetCommentsByIssueId(issue.id, {
       limit: 100,
@@ -73,12 +78,21 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
               className="resize-none min-h-[100px] w-full mb-2"
             />
             <div className="flex justify-end gap-2">
+              <ChangeStatusSelect
+                onSuccess={() => {
+                  refetchIssue();
+                  refetchComments();
+                }}
+                issue={issue}
+              />
               <Button
+                variant="outline"
                 onClick={handleCreateComment}
                 disabled={!newComment.trim() || createCommentMutation.isPending}
                 className="px-4 py-2"
               >
-                {createCommentMutation.isPending ? 'Posting...' : 'Comment'}
+                {createCommentMutation.isPending ? 'Posting...' : 'Comment'}{' '}
+                <SendHorizontal />
               </Button>
             </div>
           </div>

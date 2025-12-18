@@ -152,7 +152,7 @@ export enum NotificationEventType {
 
 export enum IssueStatus {
   OPEN = 'open',
-  COMPLETED = 'completed',
+  CLOSED = 'closed',
 }
 
 export enum IssueSourceType {
@@ -161,4 +161,6 @@ export enum IssueSourceType {
 
 export enum IssueCommentType {
   CONTENT = 'content',
+  OPEN = 'open',
+  CLOSED = 'closed',
 }

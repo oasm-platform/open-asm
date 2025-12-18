@@ -1519,7 +1519,7 @@ export type ChangeIssueStatusDtoStatus =
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ChangeIssueStatusDtoStatus = {
   open: 'open',
-  completed: 'completed',
+  closed: 'closed',
 } as const;
 
 export type ChangeIssueStatusDto = {
@@ -1532,6 +1532,8 @@ export type IssueCommentType =
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const IssueCommentType = {
   content: 'content',
+  open: 'open',
+  closed: 'closed',
 } as const;
 
 export type IssueComment = {

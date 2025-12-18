@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { CheckCircleIcon, CircleIcon } from 'lucide-react';
 
 interface StatusBadgeProps {
@@ -7,10 +6,7 @@ interface StatusBadgeProps {
   className?: string;
 }
 
-export const StatusBadge = ({
-  status,
-  variant = 'outline',
-}: StatusBadgeProps) => {
+export const StatusBadge = ({ status }: StatusBadgeProps) => {
   let statusColor = 'text-gray-500';
   let StatusIcon = CircleIcon;
 
@@ -22,13 +18,12 @@ export const StatusBadge = ({
     StatusIcon = CheckCircleIcon;
   }
   return (
-    <Badge
-      variant={variant}
-      className={`${statusColor} flex h-8 items-center gap-1 capitalize font-bold`}
+    <div
+      className={`${statusColor} flex h-8 items-center gap-1 capitalize font-bold border p-1.5 rounded-md`}
     >
-      <StatusIcon size={24} className="h-10" />
+      <StatusIcon size={20} />
       {status}
-    </Badge>
+    </div>
   );
 };
 
