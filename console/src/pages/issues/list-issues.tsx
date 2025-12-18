@@ -1,3 +1,4 @@
+import { IssueStatusFilters } from '@/components/issues/issue-status-filters';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
@@ -8,6 +9,7 @@ import {
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 dayjs.extend(relativeTime);
@@ -55,6 +57,11 @@ export function ListIssues() {
     isUpdateSearchQueryParam: true,
   });
 
+  // State for status filter
+  const [statusFilters, setStatusFilters] = useState<('open' | 'closed')[]>([
+    'open',
+  ]);
+
   const { data, isLoading } = useIssuesControllerGetMany(
     {
       limit: pageSize,
@@ -63,10 +70,20 @@ export function ListIssues() {
       sortOrder,
       // Pass the filter/search parameter to the API call
       search: filter,
+      // Add status filter if selected - convert to array as expected by API
+      ...(statusFilters.length > 0 && { status: statusFilters }),
     },
     {
       query: {
-        queryKey: ['issues', pageSize, page, sortBy, sortOrder, filter],
+        queryKey: [
+          'issues',
+          pageSize,
+          page,
+          sortBy,
+          sortOrder,
+          filter,
+          statusFilters,
+        ],
       },
     },
   );
@@ -89,6 +106,12 @@ export function ListIssues() {
       sortOrder={sortOrder}
       onPageChange={setPage}
       onPageSizeChange={setPageSize}
+      toolbarComponents={[
+        <IssueStatusFilters
+          onStatusChange={setStatusFilters}
+          defaultStatus="open"
+        />,
+      ]}
       isShowHeader={false}
       onSortChange={(col, order) => {
         setSortBy(col);
