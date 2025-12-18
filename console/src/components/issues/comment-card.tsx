@@ -205,7 +205,7 @@ const CommentCard = ({
       )}
       {comment.type !== IssueCommentType.content && (
         <div>
-          <div className="px-4.5 flex">
+          <div className="pl-4.5  flex">
             {comment.type === IssueCommentType.closed && (
               <CircleCheck className="text-purple-500" />
             )}

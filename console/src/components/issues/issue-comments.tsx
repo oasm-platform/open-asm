@@ -22,7 +22,6 @@ interface IssueCommentsProps {
 
 const IssueComments = ({ issue }: IssueCommentsProps) => {
   const { refetch: refetchIssue } = useIssuesControllerGetById(issue.id);
-
   const { data: commentsData, refetch: refetchComments } =
     useIssuesControllerGetCommentsByIssueId(issue.id, {
       limit: 100,
@@ -76,6 +75,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Leave a comment"
               className="resize-none min-h-[100px] w-full mb-2"
+              disabled={issue.status === 'closed'}
             />
             <div className="flex justify-end gap-2">
               <ChangeStatusSelect
@@ -88,7 +88,11 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
               <Button
                 variant="outline"
                 onClick={handleCreateComment}
-                disabled={!newComment.trim() || createCommentMutation.isPending}
+                disabled={
+                  !newComment.trim() ||
+                  createCommentMutation.isPending ||
+                  issue.status === 'closed'
+                }
                 className="px-4 py-2"
               >
                 {createCommentMutation.isPending ? 'Posting...' : 'Comment'}{' '}
