@@ -1,190 +1,232 @@
-## 🔧 API Development & Modification Workflow (AI IDE)
+## 🔧 API Development & Modification Workflow (AI-Enforced)
 
-> Role: You are a **senior backend engineer** working on this codebase.
-> Requirement: Follow **exactly** the workflow below when implementing any new API endpoint or modifying existing API functionality.
-> Folder: `/core-api/modules`
-
----
-
-### 1. Requirement & API Specification
-
-- **For new APIs**:
-  - Identify **inputs**
-    - Data types
-    - Validation rules
-    - Constraints
-  - Define **outputs**
-    - Response shape
-    - Return types
-    - Success / error codes
-  - Describe **business logic**
-    - Core flow
-    - Error cases
-    - External dependencies (DB, internal services, third-party APIs)
-
-- **For existing API modifications**:
-  - Identify **current behavior** and **desired changes**
-  - Document **breaking changes** and **backward compatibility** impact
-  - Plan **migration strategy** for dependent clients
-
-- For APIs, specify:
-  - HTTP method
-  - Endpoint path
-  - Request body / query parameters
-  - Use `@Doc()` decorator to add Swagger documentation
-  - Important: If the endpoint requires **workspaceId**, set `getWorkspaceId: true` in the request object
-  - Important: Always make DTO for Body, Query, Params and Response and use class-validator for validation (folder /dtos of module)
-
-  Example for new endpoint:
-
-  ```typescript
-  @Doc({
-  summary: 'Summary of the endpoint',
-  description: 'Description of the endpoint',
-  response: {
-      serialization: TypeOfResponseDto,
-  },
-  request: {
-      getWorkspaceId: true, // true if use @WorkspaceId() decorator
-  }
-  })
-  @Post()
-  createIssue(
-  @Body() dto: BodyRequestDto,
-  @WorkspaceId() workspaceId: string, // If you want get workspaceId from request header
-  ) {
-  return this.issuesService.create(createIssueDto, workspaceId);
-  }
-  ```
+> Role: **Senior Backend Engineer (AI Agent)**
+> Scope: `/core-api/modules`
+> Rule: **You MUST execute EVERY step below sequentially. Skipping, merging, or reordering steps is NOT allowed.**
+> Completion is valid **only if all checkpoints are satisfied**.
 
 ---
 
-### 2. Implementation (Controller → Service)
+## Global Execution Rules (Mandatory)
 
-- **For new APIs**:
-  - **Mandatory**: Create a **Controller** and define **at least one new API endpoint**.
-  - **Important**: All new API endpoints **must be declared before any route that contains `/:id` in the path** to avoid unintended route matching.
-  - Implement **only what is required** for the new feature/API.
-  - Create new **Service** methods for the business logic.
+- Follow steps **1 → 7 in order**.
+- Each step must be **explicitly completed** before moving to the next.
+- If any step fails (lint, tests, missing docs, etc.) → **go back and fix before proceeding**.
+- Do NOT assume or auto-skip any step.
+- Do NOT produce a final answer until **Step 7 is completed**.
 
-- **For existing API modifications**:
-  - **Mandatory**: Update existing **Controller** and **Service** methods as needed.
-  - **Backward Compatibility**: Maintain existing API contracts unless breaking changes are explicitly required and approved.
-  - **Deprecation**: Mark old endpoints as deprecated using `@ApiDeprecated()` decorator before removal.
-  - **Migration**: Update existing DTOs or create new DTOs as needed.
+---
 
-- The **Controller must only handle**:
+## 1. Requirement & API Specification (Checkpoint 1)
+
+### A. New API
+
+You MUST explicitly define:
+
+- **Inputs**
+  - Data types
+  - Validation rules
+  - Constraints
+
+- **Outputs**
+  - Response shape
+  - Return types
+  - Success / error codes
+
+- **Business logic**
+  - Core flow
+  - Error scenarios
+  - External dependencies (DB, internal services, third-party APIs)
+
+### B. Existing API Modification
+
+You MUST explicitly document:
+
+- Current behavior
+- Desired changes
+- Breaking changes (if any)
+- Backward compatibility impact
+- Migration strategy for dependent clients
+
+### C. API Definition (Mandatory for all APIs)
+
+- HTTP method
+- Endpoint path
+- Request body / query / params
+- Swagger documentation using `@Doc()`
+- Workspace handling:
+  - If `workspaceId` is required → set `getWorkspaceId: true`
+
+- DTOs:
+  - Body DTO
+  - Query DTO
+  - Params DTO
+  - Response DTO
+  - All DTOs must use `class-validator`
+  - DTOs must live in `/dtos` of the module
+
+> ❌ You may NOT proceed to Step 2 until all items in Step 1 are fully specified.
+
+---
+
+## 2. Implementation: Controller → Service (Checkpoint 2)
+
+### Controller Rules
+
+- MUST exist for new APIs
+- MUST declare **new endpoints BEFORE any `/:id` routes**
+- Handles ONLY:
   - Routing
   - DTO validation
-  - HTTP request/response mapping
+  - Request/response mapping
 
-- The Controller **must delegate all business logic to a Service**.
+- NO business logic
 
-- Implement the **Service**, which contains the complete business logic (new or modified).
+### Service Rules
 
-- Follow project architecture and naming conventions.
+- Contains **all business logic**
+- Strict typing only
+- Use `async/await`
+- English comments **only for non-obvious logic**
 
-- Use strict typing and `async/await`.
+### Entity Rules
 
-- Add **English comments only for non-obvious logic**.
+- If modifying or creating an Entity:
+  - FIRST review all related entities in:
+    - `src/common/entity/*`
+    - Module-specific entities
 
-- **Entity Modification Rule**: If creating or modifying an Entity (database model), **you must first read and understand all existing related Entities** to ensure consistency with the database structure and relationships. This includes reviewing existing Entities in `src/common/entity/*` and module-specific Entities.
+  - Ensure schema consistency and relationships
 
-- **Important Note**: User information should only return (id, name, image) when exposing user data in API responses.
+### User Data Exposure Rule
 
-- **DTO Creation Rule**: **Always** create DTOs for Body, Query, Params, preferably extending from the original entity of the business with the fields being used, and use `@ApiProperty()` for fields that you want to display in swagger and code generation. DTO files should be created in the `/dto` folder of the respective module. **For modifications**: Update existing DTOs or create new DTOs as needed.
+- User info in responses MUST be limited to:
+  - `id`
+  - `name`
+  - `image`
 
-- **Validation Rule**: Always use class-validator to validate input data in DTOs. Input fields such as body should only accept minimum required data and be validated for correct data types.
+### DTO Rules (Strict)
 
----
+- DTOs are **mandatory** for:
+  - Body
+  - Query
+  - Params
+  - Response
 
-### 3. Test-Driven Development (Service Tests)
+- Prefer extending existing entities
+- Use `@ApiProperty()` for Swagger & codegen fields
+- Accept **minimum required input only**
+- Validate all inputs with `class-validator`
 
-- **For new APIs**:
-  - After the required Controller and Service are implemented, **tests for the Service are mandatory**.
-  - Create the test file in the correct module (`*.service.spec.ts`).
-  - Tests must cover:
-    - Valid input → success case
-    - Invalid input / edge cases
-    - Error handling (DB errors, dependency failures, etc.)
-    - Mock data containing id must be valid uuid v4 or higher.
-  - **Mock all external dependencies** (repositories, other services, third-party APIs).
-
-- **For existing API modifications**:
-  - **Mandatory**: Update existing test files or create new tests for modified functionality (`*.service.spec.ts`).
-  - **Regression Testing**: Ensure all existing tests still pass to verify no breaking changes were introduced.
-  - **New Tests**: Add tests for the new/modified functionality and edge cases.
-  - **Backward Compatibility**: Test that existing API contracts still work if maintaining compatibility.
-  - Tests must cover:
-    - Modified functionality → new behavior
-    - Existing functionality → no regression
-    - Error handling for new/modified logic
-    - Mock data containing id must be valid uuid v4 or higher.
-  - **Mock all external dependencies** (repositories, other services, third-party APIs).
-
-- **Controller tests are optional** unless the Controller contains special logic.
+> ❌ Do NOT proceed to Step 3 until Controller and Service are fully implemented and compliant.
 
 ---
 
-### 4. Linting
+## 3. Test-Driven Development: Service Tests (Checkpoint 3)
 
-- Ensure the code passes ESLint with **zero errors and zero warnings**.
-- Fix all lint issues before proceeding.
+### New APIs
+
+- Service tests are **MANDATORY**
+- File: `*.service.spec.ts`
+- Tests MUST cover:
+  - Valid input → success
+  - Invalid input / edge cases
+  - Error handling (DB, dependencies)
+
+### Existing API Modifications
+
+- Update or create service tests
+- Ensure:
+  - New behavior is tested
+  - No regression in existing behavior
+  - Backward compatibility (if required)
+
+### Mocking Rules
+
+- Mock **ALL external dependencies**
+- IDs MUST be valid UUID v4+ using:
+
+```ts
+import { randomUUID } from 'crypto';
+```
+
+> ❌ Do NOT proceed to Step 4 until all required tests are written.
 
 ---
 
-### 5. Test Verification
+## 4. Linting (Checkpoint 4)
 
-- Run **only the tests related to the files that were created or modified**.
-- Use the following command following the NestJS test file pattern:
+- Run ESLint
+- Result MUST be:
+  - **0 errors**
+  - **0 warnings**
+
+> ❌ Any lint issue → fix immediately and re-check.
+
+---
+
+## 5. Test Verification (Checkpoint 5)
+
+- Run ONLY tests related to modified/created files
 
 ```bash
 npm run test -- <module-path>/<file-name>.service.spec.ts
 ```
 
-**Example:**
+Example:
 
 ```bash
-cd core-api && npm run test -- src/modules/users/users.service.spec.ts
+cd core-api
+npm run test -- src/modules/users/users.service.spec.ts
 ```
 
-- Ensure **all related tests pass**.
-- If tests fail → fix the implementation.
-- If requirements change → **update tests first**, then update the code.
+- ALL tests MUST pass
+- If tests fail:
+  - Fix implementation
+  - OR update tests first if requirements changed
+
+> ❌ Do NOT proceed to Step 6 unless tests are green.
 
 ---
 
-### 6. Console API Generation (Required for API Changes)
+## 6. Console API Generation (Checkpoint 6)
 
-- **For new APIs**: Run the API generation command when the API is exposed to the frontend:
+### Required When:
 
-  ```bash
-  task console:gen-api
-  ```
+- New API is exposed to frontend
+- DTOs change
+- Endpoint behavior or contract changes
 
-- **For existing API modifications**: Run the API generation command if the changes affect client-side usage (DTO changes, endpoint modifications, etc.):
+Run:
 
-  ```bash
-  task console:gen-api
-  ```
+```bash
+task console:gen-api
+```
 
-- Ensure `/console` client types and methods are updated.
-- Commit **generated files together with the feature code**.
+- Ensure `/console` client types & methods are updated
+- Generated files MUST be committed with feature code
 
----
-
-### 7. Completion Summary
-
-Provide a short summary including:
-
-- **What was added or changed**
-- **Files modified**
-- Confirmation that **tests pass** and **lint is clean**
-- Status: **Ready for review**
+> ❌ Skipping this step invalidates the implementation.
 
 ---
 
-## Resources
+## 7. Completion Summary (Checkpoint 7)
+
+Provide a final summary including:
+
+- What was added or changed
+- List of modified files
+- Confirmation:
+  - Tests ✅
+  - Lint ✅
+
+- Status: **READY FOR REVIEW**
+
+> ✅ ONLY after this step is completed is the task considered DONE.
+
+---
+
+## Reference
 
 - Base DTOs: `src/common/dto/*`
 - Base Entities: `src/common/entity/*`
