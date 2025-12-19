@@ -158,12 +158,13 @@ export class IssuesService {
     });
     const no = (lastIssue?.no || 0) + 1;
 
-    // Extract description to be used as comment
-    const { description, ...issueData } = createIssueDto;
+    // Extract description and tags to be handled separately
+    const { description, tags, ...issueData } = createIssueDto;
 
-    // Create issue without description
+    // Create issue without description and tags for comment
     const issue = this.issuesRepository.create({
       ...issueData,
+      tags,
       workspaceId,
       createdBy: { id: userId },
       no,
@@ -263,9 +264,14 @@ export class IssuesService {
       );
     }
 
-    // Only allow updating title for now
+    // Update title if provided
     if (updateIssueDto.title !== undefined) {
       issue.title = updateIssueDto.title;
+    }
+
+    // Update tags if provided
+    if (updateIssueDto.tags !== undefined) {
+      issue.tags = updateIssueDto.tags;
     }
 
     return await this.issuesRepository.save(issue);

@@ -134,6 +134,45 @@ describe('IssuesService', () => {
       );
       expect(result).toEqual(mockIssue);
     });
+
+    it('should create a new issue with tags', async () => {
+      const createIssueDto = {
+        title: 'Test Issue',
+        description: 'Test Description',
+        tags: ['tag1', 'tag2', 'tag3'],
+      };
+      const userId = '123e4567-e89b-12d3-a456-426614174002';
+      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
+
+      const mockIssueWithTags = {
+        ...mockIssue,
+        tags: ['tag1', 'tag2', 'tag3'],
+      };
+
+      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
+      jest
+        .spyOn(repository, 'create')
+        .mockReturnValue(mockIssueWithTags as Issue);
+
+      const mockTransactionalEntityManager = {
+        save: jest.fn().mockResolvedValue(mockIssueWithTags as Issue),
+      };
+
+      const mockTransaction = jest
+        .fn()
+        .mockImplementation((callback: (entityManager: any) => any) => {
+          return callback(mockTransactionalEntityManager) as Promise<Issue>;
+        });
+      repository.manager.transaction = mockTransaction;
+
+      const result = await service.createIssue(
+        createIssueDto,
+        workspaceId,
+        userId,
+      );
+      expect(result).toEqual(mockIssueWithTags);
+      expect(result.tags).toEqual(['tag1', 'tag2', 'tag3']);
+    });
   });
 
   describe('getMany', () => {
@@ -300,6 +339,61 @@ describe('IssuesService', () => {
         userId,
       );
       expect(result.title).toBe('Updated Title');
+    });
+
+    it('should update issue tags when user is the creator', async () => {
+      const updateIssueDto = { tags: ['new-tag1', 'new-tag2'] };
+      const userId = '123e4567-e89b-12d3-a456-426614174002';
+
+      const issueWithTags = {
+        ...mockIssue,
+        tags: ['existing-tag'],
+      };
+
+      jest
+        .spyOn(repository, 'findOne')
+        .mockResolvedValue(issueWithTags as Issue);
+      jest.spyOn(repository, 'save').mockResolvedValue({
+        ...issueWithTags,
+        tags: ['new-tag1', 'new-tag2'],
+      } as Issue);
+
+      const result = await service.update(
+        '123e4567-e89b-12d3-a456-426614174000',
+        updateIssueDto,
+        userId,
+      );
+      expect(result.tags).toEqual(['new-tag1', 'new-tag2']);
+    });
+
+    it('should update both title and tags when user is the creator', async () => {
+      const updateIssueDto = {
+        title: 'Updated Title',
+        tags: ['updated-tag1', 'updated-tag2'],
+      };
+      const userId = '123e4567-e89b-12d3-a456-426614174002';
+
+      const issueWithTags = {
+        ...mockIssue,
+        tags: ['existing-tag'],
+      };
+
+      jest
+        .spyOn(repository, 'findOne')
+        .mockResolvedValue(issueWithTags as Issue);
+      jest.spyOn(repository, 'save').mockResolvedValue({
+        ...issueWithTags,
+        title: 'Updated Title',
+        tags: ['updated-tag1', 'updated-tag2'],
+      } as Issue);
+
+      const result = await service.update(
+        '123e4567-e89b-12d3-a456-426614174000',
+        updateIssueDto,
+        userId,
+      );
+      expect(result.title).toBe('Updated Title');
+      expect(result.tags).toEqual(['updated-tag1', 'updated-tag2']);
     });
 
     it('should throw ForbiddenException when user is not the creator', async () => {

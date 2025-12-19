@@ -211,6 +211,183 @@ export interface CreateFirstAdminDto {
 
 export interface GetMetadataDto {
   isInit: boolean;
+  isAssistant: boolean;
+}
+
+export interface GenerateTagsResponseDto {
+  /**
+   * Domain that tags were generated for
+   * @example "example.com"
+   */
+  domain: string;
+  /**
+   * Generated tags
+   * @example ["web","technology","blog"]
+   */
+  tags: string[];
+}
+
+export interface GenerateTagsDto {
+  /**
+   * Domain to generate tags for
+   * @example "example.com"
+   */
+  domain: string;
+}
+
+export interface AddMcpServersResponseDto {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** MCP servers configuration with status */
+  mcpServers: object;
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Error message if operation failed */
+  error?: string;
+}
+
+export interface AddMcpServersDto {
+  /**
+   * MCP servers configuration object
+   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"5cN3KVQ9..."},"disabled":false},"searxng":{"command":"npx","args":["-y","mcp-searxng"],"env":{"SEARXNG_URL":"http://localhost:8081"},"disabled":false}}
+   */
+  mcpServers: object;
+}
+
+export interface UpdateMcpServersResponseDto {
+  /** Config ID */
+  id?: string;
+  /** Workspace ID */
+  workspace_id?: string;
+  /** User ID */
+  user_id?: string;
+  /** Created timestamp */
+  created_at?: string;
+  /** Updated timestamp */
+  updated_at?: string;
+  /** Updated MCP servers configuration with status */
+  mcpServers: object;
+  /** Whether the operation succeeded */
+  success: boolean;
+}
+
+export interface UpdateMcpServersDto {
+  /**
+   * MCP servers configuration object
+   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"updated-key"},"disabled":false}}
+   */
+  mcpServers: object;
+}
+
+export interface DeleteMcpServersResponseDto {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Response message */
+  message?: string;
+}
+
+export interface GetMcpServerHealthResponseDto {
+  /** Whether the server is active and operational */
+  isActive: boolean;
+  /** Server status: active, disabled, or error */
+  status: GetMcpServerHealthResponseDtoStatusEnum;
+  /** Error message if status is error */
+  error?: string;
+}
+
+export interface GetConversationsResponseDto {
+  /** List of conversations */
+  conversations: {
+    conversationId?: string;
+    title?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }[];
+}
+
+export interface UpdateConversationResponseDto {
+  /** Updated conversation */
+  conversation: {
+    conversationId?: string;
+    title?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+}
+
+export interface UpdateConversationDto {
+  /**
+   * New title for the conversation
+   * @example "Updated Conversation Title"
+   */
+  title?: string;
+  /**
+   * New description for the conversation
+   * @example "Updated description"
+   */
+  description?: string;
+}
+
+export interface DeleteConversationResponseDto {
+  /**
+   * Success status
+   * @example true
+   */
+  success: boolean;
+  /**
+   * Response message
+   * @example "Conversation deleted successfully"
+   */
+  message: string;
+}
+
+export interface DeleteConversationsResponseDto {
+  /**
+   * Success status
+   * @example true
+   */
+  success: boolean;
+  /**
+   * Response message
+   * @example "All conversations deleted successfully"
+   */
+  message: string;
+}
+
+export interface GetMessagesResponseDto {
+  /** List of messages in the conversation */
+  messages: {
+    messageId?: string;
+    question?: string;
+    type?: string;
+    content?: string;
+    conversationId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }[];
+}
+
+export interface DeleteMessageResponseDto {
+  /**
+   * Success status
+   * @example true
+   */
+  success: boolean;
+  /**
+   * Response message
+   * @example "Message deleted successfully"
+   */
+  message: string;
 }
 
 export interface Job {
@@ -1353,182 +1530,6 @@ export interface UpdateAssetGroupWorkflowDto {
   schedule: UpdateAssetGroupWorkflowDtoScheduleEnum;
 }
 
-export interface GenerateTagsResponseDto {
-  /**
-   * Domain that tags were generated for
-   * @example "example.com"
-   */
-  domain: string;
-  /**
-   * Generated tags
-   * @example ["web","technology","blog"]
-   */
-  tags: string[];
-}
-
-export interface GenerateTagsDto {
-  /**
-   * Domain to generate tags for
-   * @example "example.com"
-   */
-  domain: string;
-}
-
-export interface AddMcpServersResponseDto {
-  /** Config ID */
-  id?: string;
-  /** Workspace ID */
-  workspace_id?: string;
-  /** User ID */
-  user_id?: string;
-  /** Created timestamp */
-  created_at?: string;
-  /** Updated timestamp */
-  updated_at?: string;
-  /** MCP servers configuration with status */
-  mcpServers: object;
-  /** Whether the operation succeeded */
-  success: boolean;
-  /** Error message if operation failed */
-  error?: string;
-}
-
-export interface AddMcpServersDto {
-  /**
-   * MCP servers configuration object
-   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"5cN3KVQ9..."},"disabled":false},"searxng":{"command":"npx","args":["-y","mcp-searxng"],"env":{"SEARXNG_URL":"http://localhost:8081"},"disabled":false}}
-   */
-  mcpServers: object;
-}
-
-export interface UpdateMcpServersResponseDto {
-  /** Config ID */
-  id?: string;
-  /** Workspace ID */
-  workspace_id?: string;
-  /** User ID */
-  user_id?: string;
-  /** Created timestamp */
-  created_at?: string;
-  /** Updated timestamp */
-  updated_at?: string;
-  /** Updated MCP servers configuration with status */
-  mcpServers: object;
-  /** Whether the operation succeeded */
-  success: boolean;
-}
-
-export interface UpdateMcpServersDto {
-  /**
-   * MCP servers configuration object
-   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"updated-key"},"disabled":false}}
-   */
-  mcpServers: object;
-}
-
-export interface DeleteMcpServersResponseDto {
-  /** Whether the operation succeeded */
-  success: boolean;
-  /** Response message */
-  message?: string;
-}
-
-export interface GetMcpServerHealthResponseDto {
-  /** Whether the server is active and operational */
-  isActive: boolean;
-  /** Server status: active, disabled, or error */
-  status: GetMcpServerHealthResponseDtoStatusEnum;
-  /** Error message if status is error */
-  error?: string;
-}
-
-export interface GetConversationsResponseDto {
-  /** List of conversations */
-  conversations: {
-    conversationId?: string;
-    title?: string;
-    description?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  }[];
-}
-
-export interface UpdateConversationResponseDto {
-  /** Updated conversation */
-  conversation: {
-    conversationId?: string;
-    title?: string;
-    description?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  };
-}
-
-export interface UpdateConversationDto {
-  /**
-   * New title for the conversation
-   * @example "Updated Conversation Title"
-   */
-  title?: string;
-  /**
-   * New description for the conversation
-   * @example "Updated description"
-   */
-  description?: string;
-}
-
-export interface DeleteConversationResponseDto {
-  /**
-   * Success status
-   * @example true
-   */
-  success: boolean;
-  /**
-   * Response message
-   * @example "Conversation deleted successfully"
-   */
-  message: string;
-}
-
-export interface DeleteConversationsResponseDto {
-  /**
-   * Success status
-   * @example true
-   */
-  success: boolean;
-  /**
-   * Response message
-   * @example "All conversations deleted successfully"
-   */
-  message: string;
-}
-
-export interface GetMessagesResponseDto {
-  /** List of messages in the conversation */
-  messages: {
-    messageId?: string;
-    question?: string;
-    type?: string;
-    content?: string;
-    conversationId?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  }[];
-}
-
-export interface DeleteMessageResponseDto {
-  /**
-   * Success status
-   * @example true
-   */
-  success: boolean;
-  /**
-   * Response message
-   * @example "Message deleted successfully"
-   */
-  message: string;
-}
-
 export interface User {
   id: string;
   /** @format date-time */
@@ -1551,6 +1552,7 @@ export interface Issue {
   sourceId: string;
   workspaceId: string;
   no: number;
+  tags: string[];
   createdBy: User;
 }
 
@@ -1566,12 +1568,14 @@ export interface GetManyIssueDto {
 export interface CreateIssueDto {
   title: string;
   description: string;
+  tags?: string[];
   sourceType: CreateIssueDtoSourceTypeEnum;
   sourceId: string;
 }
 
 export interface UpdateIssueDto {
   title: string;
+  tags?: string[];
 }
 
 export interface ChangeIssueStatusDto {
@@ -1682,6 +1686,13 @@ export enum UpdateTargetDtoScanScheduleEnum {
   Value001 = "0 0 1 * *",
 }
 
+/** Server status: active, disabled, or error */
+export enum GetMcpServerHealthResponseDtoStatusEnum {
+  Active = "active",
+  Disabled = "disabled",
+  Error = "error",
+}
+
 export enum NotificationResponseDtoStatusEnum {
   Sent = "sent",
   Unread = "unread",
@@ -1751,13 +1762,6 @@ export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
   Value001 = "0 0 1 * *",
 }
 
-/** Server status: active, disabled, or error */
-export enum GetMcpServerHealthResponseDtoStatusEnum {
-  Active = "active",
-  Disabled = "disabled",
-  Error = "error",
-}
-
 export enum CreateIssueDtoSourceTypeEnum {
   Vulnerability = "vulnerability",
 }
@@ -1795,6 +1799,11 @@ export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
   Assistant = "assistant",
+}
+
+export enum IssuesControllerGetManyParamsStatusEnum {
+  Open = "open",
+  Closed = "closed",
 }
 
 import type {
@@ -2380,6 +2389,232 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/metadata`,
       method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGenerateTags
+   * @summary Generate tags for a domain using AI
+   * @request POST:/api/ai-assistant/generate-tags
+   */
+  aiAssistantControllerGenerateTags = (
+    data: GenerateTagsDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/generate-tags`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all MCP servers for the current workspace and user
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetMcpServers
+   * @summary Get all MCP servers
+   * @request GET:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerGetMcpServers = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Adds one or more MCP servers to the workspace
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerAddMcpServers
+   * @summary Add MCP servers
+   * @request POST:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerAddMcpServers = (
+    data: AddMcpServersDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates one or more MCP servers
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerUpdateMcpServers
+   * @summary Update MCP servers
+   * @request PATCH:/api/ai-assistant/mcp-servers
+   */
+  aiAssistantControllerUpdateMcpServers = (
+    data: UpdateMcpServersDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes MCP config by ID
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteMcpServers
+   * @summary Delete MCP config
+   * @request DELETE:/api/ai-assistant/mcp-servers/{id}
+   */
+  aiAssistantControllerDeleteMcpServers = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Gets the health status of a specific MCP server
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetMcpServerHealth
+   * @summary Get MCP server health
+   * @request GET:/api/ai-assistant/mcp-servers/{serverName}/health
+   */
+  aiAssistantControllerGetMcpServerHealth = (
+    serverName: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/mcp-servers/${serverName}/health`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all conversations for the current workspace and user
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetConversations
+   * @summary Get all conversations
+   * @request GET:/api/ai-assistant/conversations
+   */
+  aiAssistantControllerGetConversations = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes all conversations for the current workspace and user
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteConversations
+   * @summary Delete all conversations
+   * @request DELETE:/api/ai-assistant/conversations
+   */
+  aiAssistantControllerDeleteConversations = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates the title and/or description of a conversation
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerUpdateConversation
+   * @summary Update a conversation
+   * @request PATCH:/api/ai-assistant/conversations/{id}
+   */
+  aiAssistantControllerUpdateConversation = (
+    id: string,
+    data: UpdateConversationDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a specific conversation by ID
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteConversation
+   * @summary Delete a conversation
+   * @request DELETE:/api/ai-assistant/conversations/{id}
+   */
+  aiAssistantControllerDeleteConversation = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all messages in a specific conversation
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetMessages
+   * @summary Get messages in a conversation
+   * @request GET:/api/ai-assistant/conversations/{id}/messages
+   */
+  aiAssistantControllerGetMessages = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${id}/messages`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a specific message by ID
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteMessage
+   * @summary Delete a message
+   * @request DELETE:/api/ai-assistant/conversations/{conversationId}/messages/{messageId}
+   */
+  aiAssistantControllerDeleteMessage = (
+    conversationId: string,
+    messageId: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
+      method: "DELETE",
       format: "json",
       ...params,
     });
@@ -4281,232 +4516,6 @@ export class Api<
     });
 
   /**
-   * @description Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGenerateTags
-   * @summary Generate tags for a domain using AI
-   * @request POST:/api/ai-assistant/generate-tags
-   */
-  aiAssistantControllerGenerateTags = (
-    data: GenerateTagsDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/generate-tags`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves all MCP servers for the current workspace and user
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetMcpServers
-   * @summary Get all MCP servers
-   * @request GET:/api/ai-assistant/mcp-servers
-   */
-  aiAssistantControllerGetMcpServers = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Adds one or more MCP servers to the workspace
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerAddMcpServers
-   * @summary Add MCP servers
-   * @request POST:/api/ai-assistant/mcp-servers
-   */
-  aiAssistantControllerAddMcpServers = (
-    data: AddMcpServersDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Updates one or more MCP servers
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerUpdateMcpServers
-   * @summary Update MCP servers
-   * @request PATCH:/api/ai-assistant/mcp-servers
-   */
-  aiAssistantControllerUpdateMcpServers = (
-    data: UpdateMcpServersDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers`,
-      method: "PATCH",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes MCP config by ID
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerDeleteMcpServers
-   * @summary Delete MCP config
-   * @request DELETE:/api/ai-assistant/mcp-servers/{id}
-   */
-  aiAssistantControllerDeleteMcpServers = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers/${id}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Gets the health status of a specific MCP server
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetMcpServerHealth
-   * @summary Get MCP server health
-   * @request GET:/api/ai-assistant/mcp-servers/{serverName}/health
-   */
-  aiAssistantControllerGetMcpServerHealth = (
-    serverName: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers/${serverName}/health`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves all conversations for the current workspace and user
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetConversations
-   * @summary Get all conversations
-   * @request GET:/api/ai-assistant/conversations
-   */
-  aiAssistantControllerGetConversations = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes all conversations for the current workspace and user
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerDeleteConversations
-   * @summary Delete all conversations
-   * @request DELETE:/api/ai-assistant/conversations
-   */
-  aiAssistantControllerDeleteConversations = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Updates the title and/or description of a conversation
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerUpdateConversation
-   * @summary Update a conversation
-   * @request PATCH:/api/ai-assistant/conversations/{id}
-   */
-  aiAssistantControllerUpdateConversation = (
-    id: string,
-    data: UpdateConversationDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations/${id}`,
-      method: "PATCH",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes a specific conversation by ID
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerDeleteConversation
-   * @summary Delete a conversation
-   * @request DELETE:/api/ai-assistant/conversations/{id}
-   */
-  aiAssistantControllerDeleteConversation = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations/${id}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves all messages in a specific conversation
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetMessages
-   * @summary Get messages in a conversation
-   * @request GET:/api/ai-assistant/conversations/{id}/messages
-   */
-  aiAssistantControllerGetMessages = (id: string, params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations/${id}/messages`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes a specific message by ID
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerDeleteMessage
-   * @summary Delete a message
-   * @request DELETE:/api/ai-assistant/conversations/{conversationId}/messages/{messageId}
-   */
-  aiAssistantControllerDeleteMessage = (
-    conversationId: string,
-    messageId: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
    * @description Retrieve a list of all issues with pagination and filtering.
    *
    * @tags issues
@@ -4516,6 +4525,7 @@ export class Api<
    */
   issuesControllerGetMany = (
     query?: {
+      /** Search term for filtering issues */
       search?: string;
       /** @example 1 */
       page?: number;
@@ -4525,6 +4535,8 @@ export class Api<
       sortBy?: string;
       /** @example "DESC" */
       sortOrder?: string;
+      /** Filter by status */
+      status?: IssuesControllerGetManyParamsStatusEnum[];
     },
     params: RequestParams = {},
   ) =>
@@ -4571,7 +4583,7 @@ export class Api<
     });
 
   /**
-   * @description Update issue details (e.g. status).
+   * @description Update issue title and tags.
    *
    * @tags issues
    * @name IssuesControllerUpdate
