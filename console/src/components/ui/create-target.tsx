@@ -15,7 +15,6 @@ import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useTargetsControllerCreateTarget } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2Icon, Target } from 'lucide-react';
-import psl from 'psl';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -26,26 +25,6 @@ const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
 type FormValues = {
   value: string;
 };
-
-function getRootDomain(domainOrUrl: string): string {
-  try {
-    let urlString = domainOrUrl.trim();
-    if (!urlString.match(/^[a-zA-Z]+:\/\//)) {
-      urlString = `http://${urlString}`;
-    }
-
-    const hostname = new URL(urlString).hostname;
-    const parsed = psl.parse(hostname);
-
-    if (parsed.error) {
-      return hostname;
-    }
-
-    return parsed.domain || hostname;
-  } catch {
-    return domainOrUrl.trim();
-  }
-}
 
 export function CreateTarget() {
   const [open, setOpen] = useState(false);
@@ -122,7 +101,20 @@ export function CreateTarget() {
                 onPaste={(e) => {
                   e.preventDefault();
                   const pastedText = e.clipboardData?.getData('text') || '';
-                  const rootDomain = getRootDomain(pastedText);
+                  const trimmedText = pastedText.trim();
+                  let rootDomain = trimmedText;
+                  if (trimmedText) {
+                    try {
+                      const url = new URL(
+                        trimmedText.includes('://')
+                          ? trimmedText
+                          : `http://${trimmedText}`,
+                      );
+                      rootDomain = url.hostname || trimmedText;
+                    } catch {
+                      rootDomain = trimmedText;
+                    }
+                  }
                   setValue('value', rootDomain);
                 }}
               />
