@@ -44,6 +44,10 @@ export class Issue extends BaseEntity {
   @Column({ type: 'int', default: 0 })
   no: number;
 
+  @ApiProperty({ type: [String] })
+  @Column('simple-array', { nullable: true })
+  tags?: string[];
+
   @ManyToOne(() => Workspace)
   @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;

@@ -1491,6 +1491,7 @@ export type Issue = {
   sourceId: string;
   workspaceId: string;
   no: number;
+  tags: string[];
   createdBy: User;
 };
 
@@ -1514,12 +1515,14 @@ export const CreateIssueDtoSourceType = {
 export type CreateIssueDto = {
   title: string;
   description: string;
+  tags?: string[];
   sourceType: CreateIssueDtoSourceType;
   sourceId: string;
 };
 
 export type UpdateIssueDto = {
   title: string;
+  tags?: string[];
 };
 
 export type ChangeIssueStatusDtoStatus =
@@ -22734,8 +22737,8 @@ export function useIssuesControllerGetById<
 }
 
 /**
- * Update issue title only.
- * @summary Update issue title
+ * Update issue title and tags.
+ * @summary Update issue
  */
 export const issuesControllerUpdate = (
   id: string,
@@ -22798,7 +22801,7 @@ export type IssuesControllerUpdateMutationBody = UpdateIssueDto;
 export type IssuesControllerUpdateMutationError = unknown;
 
 /**
- * @summary Update issue title
+ * @summary Update issue
  */
 export const useIssuesControllerUpdate = <TError = unknown, TContext = unknown>(
   options?: {

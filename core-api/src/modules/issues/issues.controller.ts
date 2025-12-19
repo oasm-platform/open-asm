@@ -92,8 +92,8 @@ export class IssuesController {
   }
 
   @Doc({
-    summary: 'Update issue title',
-    description: 'Update issue title only.',
+    summary: 'Update issue',
+    description: 'Update issue title and tags.',
     response: {
       serialization: Issue,
     },
