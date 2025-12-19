@@ -101,11 +101,20 @@ export function CreateTarget() {
                 onPaste={(e) => {
                   e.preventDefault();
                   const pastedText = e.clipboardData?.getData('text') || '';
-                  const rootDomain = new URL(
-                    pastedText.includes('://')
-                      ? pastedText
-                      : `http://${pastedText}`,
-                  ).hostname;
+                  const trimmedText = pastedText.trim();
+                  let rootDomain = trimmedText;
+                  if (trimmedText) {
+                    try {
+                      const url = new URL(
+                        trimmedText.includes('://')
+                          ? trimmedText
+                          : `http://${trimmedText}`,
+                      );
+                      rootDomain = url.hostname || trimmedText;
+                    } catch {
+                      rootDomain = trimmedText;
+                    }
+                  }
                   setValue('value', rootDomain);
                 }}
               />
