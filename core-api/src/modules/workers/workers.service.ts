@@ -52,8 +52,8 @@ export class WorkersService {
 
     private apiKeyService: ApiKeysService,
 
-    private configService: ConfigService
-  ) { }
+    private configService: ConfigService,
+  ) {}
 
   /**
    * Handles a worker's "alive" signal, which is sent
@@ -109,7 +109,7 @@ export class WorkersService {
           WHEN j.status = '${JobStatus.IN_PROGRESS}' AND j."workerId"::uuid NOT IN (
             SELECT id FROM workers
           ) THEN '${JobStatus.PENDING}'
-          WHEN j.status = '${JobStatus.FAILED}' THEN '${JobStatus.PENDING}'
+          WHEN j.status = '${JobStatus.FAILED}' AND j."retryCount" < 4 THEN '${JobStatus.PENDING}'
           ELSE j.status
         END,
         "workerId" = NULL
@@ -172,8 +172,8 @@ export class WorkersService {
         '(w."workspaceId" = :workspaceId OR w."scope" = :cloudScope)',
         {
           workspaceId,
-          cloudScope: WorkerScope.CLOUD
-        }
+          cloudScope: WorkerScope.CLOUD,
+        },
       );
 
       // For PROVIDER type workers, ensure they have a corresponding workspace_tool record
@@ -184,12 +184,12 @@ export class WorkersService {
           AND wt."toolId" = w."toolId"
           AND wt."isEnabled" = true
         ))`,
-        { workspaceId }
+        { workspaceId },
       );
     } else {
       // If no workspaceId provided, we still want to include cloud workers
       queryBuilder.andWhere('w."scope" = :cloudScope', {
-        cloudScope: WorkerScope.CLOUD
+        cloudScope: WorkerScope.CLOUD,
       });
     }
 
