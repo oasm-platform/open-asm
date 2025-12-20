@@ -23,8 +23,13 @@ import {
   MoreHorizontal,
   RefreshCcwDot,
   Trash2,
+  Reply,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 dayjs.extend(relativeTime);
 
@@ -32,12 +37,55 @@ interface CommentCardProps {
   comment: IssueComment;
   issueCreatedBy: string; // issue.createdBy.id
   onCommentUpdated?: () => void;
+  onReply?: (comment: IssueComment) => void;
 }
+
+const CodeBlock = ({
+  language,
+  value,
+}: {
+  language?: string;
+  value: string;
+}) => {
+  const [copied, setCopied] = useState(false);
+
+  const onCopy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative group my-4">
+      <div className="absolute right-2 top-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 bg-card/80 backdrop-blur-sm hover:bg-card border border-border"
+          onClick={onCopy}
+          title="Copy code"
+        >
+          {copied ? (
+            <Check className="h-4 w-4 text-green-500" />
+          ) : (
+            <Copy className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+      <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono leading-relaxed max-w-none">
+        <code className={language ? `language-${language}` : ''}>
+          {value.trim()}
+        </code>
+      </pre>
+    </div>
+  );
+};
 
 const CommentCard = ({
   comment,
   issueCreatedBy,
   onCommentUpdated,
+  onReply,
 }: CommentCardProps) => {
   const { data: sessionData } = useSession();
   const isOwnComment = sessionData?.user?.id === comment.createdBy?.id;
@@ -109,6 +157,19 @@ const CommentCard = ({
                 {issueCreatedBy === comment.createdBy?.id ? 'Author' : 'Member'}
               </span>
 
+              {/* Reply Button */}
+              {onReply && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-muted"
+                  onClick={() => onReply(comment)}
+                  title="Reply"
+                >
+                  <Reply className="h-4 w-4" />
+                </Button>
+              )}
+
               {/* Dropdown Menu for Edit/Delete - only show for own comments */}
               {isOwnComment && (comment.isCanEdit || comment.isCanDelete) && (
                 <DropdownMenu>
@@ -165,6 +226,52 @@ const CommentCard = ({
 
           {/* Body */}
           <div className="p-4 prose prose-sm max-w-none dark:prose-invert">
+            {comment.repComment && !isEditing && (
+              <div className="mb-4 border border-border/60 rounded bg-muted/20 overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-1 bg-muted/50 border-b border-border/40 text-[11px] text-muted-foreground">
+                  <Reply className="h-3 w-3" />
+                  <span className="font-semibold text-foreground/80">
+                    {comment.repComment.createdBy?.name || 'Unknown'}
+                  </span>
+                </div>
+                <div className="p-2.5 text-[13px] text-muted-foreground/80 italic overflow-hidden relative max-h-[4.5rem]">
+                  <div className="line-clamp-2">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        // Render block elements as fragments/spans to keep text flow flat in preview
+                        p: ({ ...props }) => <span {...props} />,
+                        h1: ({ ...props }) => (
+                          <span className="font-bold" {...props} />
+                        ),
+                        h2: ({ ...props }) => (
+                          <span className="font-bold" {...props} />
+                        ),
+                        h3: ({ ...props }) => (
+                          <span className="font-bold" {...props} />
+                        ),
+                        h4: ({ ...props }) => (
+                          <span className="font-bold" {...props} />
+                        ),
+                        ul: ({ ...props }) => (
+                          <span className="ml-2" {...props} />
+                        ),
+                        ol: ({ ...props }) => (
+                          <span className="ml-2" {...props} />
+                        ),
+                        li: ({ ...props }) => (
+                          <span className="mr-2" {...props} />
+                        ),
+                      }}
+                    >
+                      {comment.repComment.content}
+                    </ReactMarkdown>
+                  </div>
+                  {/* Subtle fade to indicate more content if it's long */}
+                  <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-muted/20 to-transparent pointer-events-none" />
+                </div>
+              </div>
+            )}
             {isEditing ? (
               <div className="space-y-3">
                 <Textarea
@@ -196,9 +303,87 @@ const CommentCard = ({
                 </div>
               </div>
             ) : (
-              <p className="whitespace-pre-wrap leading-relaxed mb-0">
-                {comment.content}
-              </p>
+              <div className="leading-relaxed mb-0">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h1: ({ ...props }) => (
+                      <h1
+                        className="text-xl font-bold border-b pb-2 mb-4 mt-6"
+                        {...props}
+                      />
+                    ),
+                    h2: ({ ...props }) => (
+                      <h2
+                        className="text-lg font-bold border-b pb-1 mb-3 mt-5"
+                        {...props}
+                      />
+                    ),
+                    h3: ({ ...props }) => (
+                      <h3
+                        className="text-base font-bold mb-2 mt-4"
+                        {...props}
+                      />
+                    ),
+                    h4: ({ ...props }) => (
+                      <h4 className="text-sm font-bold mb-2 mt-3" {...props} />
+                    ),
+                    p: ({ ...props }) => (
+                      <p className="mb-4 last:mb-0" {...props} />
+                    ),
+                    ul: ({ ...props }) => (
+                      <ul
+                        className="list-disc pl-6 mb-4 space-y-1"
+                        {...props}
+                      />
+                    ),
+                    ol: ({ ...props }) => (
+                      <ol
+                        className="list-decimal pl-6 mb-4 space-y-1"
+                        {...props}
+                      />
+                    ),
+                    blockquote: ({ ...props }) => (
+                      <blockquote
+                        className="border-l-4 border-muted pl-4 italic my-4"
+                        {...props}
+                      />
+                    ),
+                    code: ({
+                      className,
+                      children,
+                      inline,
+                      ...props
+                    }: {
+                      className?: string;
+                      children?: React.ReactNode;
+                      inline?: boolean;
+                    }) => {
+                      const match = /language-(\w+)/.exec(className || '');
+                      const value = String(children).replace(/\n$/, '');
+
+                      if (!inline && match) {
+                        return <CodeBlock language={match[1]} value={value} />;
+                      }
+
+                      if (!inline && value.includes('\n')) {
+                        return <CodeBlock value={value} />;
+                      }
+
+                      return (
+                        <code
+                          className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono"
+                          {...props}
+                        >
+                          {children}
+                        </code>
+                      );
+                    },
+                  }}
+                >
+                  {comment.content}
+                </ReactMarkdown>
+              </div>
             )}
           </div>
         </div>

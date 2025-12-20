@@ -9,7 +9,7 @@ import {
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { SendHorizontal } from 'lucide-react';
+import { SendHorizontal, Reply } from 'lucide-react';
 import { useState } from 'react';
 import ChangeStatusSelect from './change-status-select';
 import CommentCard from './comment-card';
@@ -29,17 +29,22 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
     });
   const createCommentMutation = useIssuesControllerCreateComment();
   const [newComment, setNewComment] = useState('');
+  const [replyingTo, setReplyingTo] = useState<IssueComment | null>(null);
 
   const handleCreateComment = () => {
     if (newComment.trim()) {
       createCommentMutation.mutate(
         {
           issueId: issue.id,
-          data: { content: newComment },
+          data: {
+            content: newComment,
+            repCommentId: replyingTo?.id,
+          },
         },
         {
           onSuccess: () => {
             setNewComment('');
+            setReplyingTo(null);
             refetchComments();
           },
         },
@@ -63,18 +68,49 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
                     // Trigger a refetch to get the updated comment from the API
                     refetchComments();
                   }}
+                  onReply={(comment) => {
+                    setReplyingTo(comment);
+                    // focus on textarea
+                    const textarea = document.querySelector('textarea');
+                    if (textarea) {
+                      textarea.focus();
+                    }
+                  }}
                 />
               </div>
             ))}
           </div>
 
           {/* New comment input */}
-          <div>
+          <div className="relative">
+            {replyingTo && (
+              <div className="flex items-center justify-between bg-muted/50 p-2 rounded-t-md border border-b-0 border-border text-xs mb-0">
+                <span className="flex items-center gap-1">
+                  <Reply className="h-3 w-3" />
+                  Replying to{' '}
+                  <span className="font-semibold">
+                    {replyingTo.createdBy?.name}
+                  </span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-1 text-muted-foreground hover:text-foreground"
+                  onClick={() => setReplyingTo(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
             <Textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Leave a comment"
-              className="resize-none min-h-[100px] w-full mb-2"
+              placeholder={
+                replyingTo
+                  ? 'Type your reply... (use @cai for AI assistance)'
+                  : 'Leave a comment (use @cai for AI assistance)'
+              }
+              className={`resize-none min-h-[100px] w-full mb-2 ${replyingTo ? 'rounded-t-none border-t-0' : ''}`}
               disabled={issue.status === 'closed'}
             />
             <div className="flex justify-end gap-2">

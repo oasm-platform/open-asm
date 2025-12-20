@@ -12,6 +12,8 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { PencilIcon, Save } from 'lucide-react';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 dayjs.extend(relativeTime);
 
@@ -87,7 +89,12 @@ const IssueDetail = () => {
             <div className="flex flex-col justify-start items-start md:flex-row w-full gap-2">
               <div className="flex items-center w-full gap-2 text-2xl">
                 <h3 className="font-bold tracking-tight">
-                  {issue.title}{' '}
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{ p: 'span' }} // Render as span inside h3
+                  >
+                    {issue.title}
+                  </ReactMarkdown>{' '}
                   <span className="text-gray-400 font-normal">#{issue.no}</span>
                 </h3>
               </div>
