@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -143,6 +143,39 @@
   }
 }
 
-.button{
+.button {
   cursor: pointer;
+}
+
+/* Shadcn-style Scrollbar Styling */
+/* Firefox */
+* {
+  scrollbar-width: initial;
+  scrollbar-color: oklch(from var(--muted-foreground) l c h / 50%) transparent;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: oklch(from var(--muted-foreground) l c h / 50%);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
