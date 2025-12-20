@@ -40,6 +40,7 @@ import {
   JobTimelineResponseDto,
   UpdateResultDto,
 } from './dto/jobs-registry.dto';
+import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 
@@ -49,6 +50,8 @@ export class JobsRegistryService {
     @InjectRepository(Job) public readonly repo: Repository<Job>,
     @InjectRepository(JobHistory)
     public readonly jobHistoryRepo: Repository<JobHistory>,
+    @InjectRepository(JobErrorLog)
+    public readonly jobErrorLogRepo: Repository<JobErrorLog>,
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
     private toolsService: ToolsService,
@@ -538,68 +541,84 @@ export class JobsRegistryService {
       throw new NotFoundException('Job not found');
     }
 
-    const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
+    try {
+      const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
 
-    let dataForSync: JobDataResultType;
-    let pathResult: string | null = null;
+      let dataForSync: JobDataResultType;
 
-    if (isBuiltInTools) {
-      const step = builtInTools.find((tool) => tool.name === job.tool.name);
+      if (isBuiltInTools) {
+        const step = builtInTools.find((tool) => tool.name === job.tool.name);
 
-      if (!step) {
-        throw new Error(`Worker step not found for worker: ${job.tool.name}`);
-      }
+        if (!step) {
+          throw new Error(`Worker step not found for worker: ${job.tool.name}`);
+        }
 
-      const builtInStep = builtInTools.find(
-        (tool) => tool.name === job.tool.name,
-      );
-
-      if (!builtInStep) {
-        throw new Error(`Worker step not found for worker: ${job.tool.name}`);
-      }
-
-      if (!data.raw && !builtInStep) {
-        throw new BadGatewayException('Raw data is required');
-      }
-      dataForSync = builtInStep?.parser?.(data.raw);
-      if (job.isSaveRawResult) {
-        const uploadResult = this.storageService.uploadFile(
-          `${job.id}.txt`,
-          Buffer.from(data.raw, 'utf-8'),
-          'jobs-result',
+        const builtInStep = builtInTools.find(
+          (tool) => tool.name === job.tool.name,
         );
-        pathResult = uploadResult.path;
+
+        if (!builtInStep) {
+          throw new Error(`Worker step not found for worker: ${job.tool.name}`);
+        }
+
+        if (!data.raw && !builtInStep) {
+          throw new BadGatewayException('Raw data is required');
+        }
+        dataForSync = builtInStep?.parser?.(data.raw);
+      } else {
+        dataForSync = data.payload;
       }
-    } else {
-      dataForSync = data.payload;
-    }
 
-    if (job.isSaveData) {
-      await this.dataAdapterService.syncData({
-        data: dataForSync,
-        job,
+      if (job.isSaveData) {
+        await this.dataAdapterService.syncData({
+          data: dataForSync,
+          job,
+        });
+      }
+      if (data?.error) {
+        throw new Error();
+      }
+
+      await this.repo.save({
+        ...job,
+        status: JobStatus.COMPLETED,
+        completedAt: new Date(),
       });
-    }
 
-    const hasError = data?.error;
-    const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
+      const jobForPublish = await this.repo.save({
+        ...job,
+        status: JobStatus.COMPLETED,
+        completedAt: new Date(),
+      });
 
-    const jobForPublish = await this.repo.save({
-      ...job,
-      status: newStatus,
-      completedAt: new Date(),
-      pathResult: pathResult || undefined,
-    });
-
-    if (newStatus === JobStatus.COMPLETED) {
       await this.getNextStepForJob(job);
-    }
 
-    if (job.isPublishEvent) {
-      await this.redis.publish(`jobs:${job.id}`, JSON.stringify(jobForPublish));
-    }
+      if (job.isPublishEvent) {
+        await this.redis.publish(
+          `jobs:${job.id}`,
+          JSON.stringify(jobForPublish),
+        );
+      }
 
-    return { workerId, dto };
+      return { workerId, dto };
+    } catch (e) {
+      await this.handleJobError(dto, job, e);
+      return { workerId, dto };
+    }
+  }
+
+  private async handleJobError(dto: UpdateResultDto, job: Job, error: Error) {
+    await this.repo.save({
+      ...job,
+      status: JobStatus.FAILED,
+      error: error.message,
+      retryCount: job.retryCount + 1,
+    });
+    await this.jobErrorLogRepo.save({
+      job,
+      logMessage: error.message,
+      payload: JSON.stringify(dto.data),
+    });
   }
 
   /**

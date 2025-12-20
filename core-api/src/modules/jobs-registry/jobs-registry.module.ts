@@ -12,11 +12,17 @@ import {
 
 import { NotificationsModule } from '../notifications/notifications.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
+import { JobErrorLog } from './entities/job-error-log.entity';
 
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Job, JobHistory, AssetGroupWorkflow]),
+    TypeOrmModule.forFeature([
+      Job,
+      JobHistory,
+      AssetGroupWorkflow,
+      JobErrorLog,
+    ]),
     NotificationsModule,
     WorkspacesModule,
   ],
