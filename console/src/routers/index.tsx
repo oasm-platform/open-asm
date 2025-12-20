@@ -8,6 +8,7 @@ import Dashboard from '@/pages/dashboard/dashboard';
 import CreateIssue from '@/pages/issues/create-issue';
 import IssueDetail from '@/pages/issues/issue-detail';
 import Issues from '@/pages/issues/issues';
+import JobsRegistryPage from '@/pages/jobs-registry/jobs-registry';
 import Login from '@/pages/login/login';
 import NotificationsPage from '@/pages/notifications/notifications';
 import CreateProviderPage from '@/pages/providers/create-provider';
@@ -202,6 +203,15 @@ export const router = createBrowserRouter([
               {
                 path: ':id',
                 element: <IssueDetail />,
+              },
+            ],
+          },
+          {
+            path: 'jobs',
+            children: [
+              {
+                path: '',
+                element: <JobsRegistryPage />,
               },
             ],
           },

@@ -21,12 +21,13 @@ import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
 import {
   Bug,
   CircleDot,
+  CirclePlay,
   CloudCheck,
   Cpu,
   Group,
   LayoutDashboard,
   SquareTerminal,
-  Target
+  Target,
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
 import { NewBadge } from '../new-badge';
@@ -98,6 +99,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Workers',
           icon: <SquareTerminal />,
           url: '/workers',
+        },
+        {
+          title: 'Jobs Registry',
+          icon: <CirclePlay />,
+          url: '/jobs',
         },
       ],
     },

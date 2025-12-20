@@ -13,6 +13,7 @@ export class Job extends BaseEntity {
   /**
    * The asset this job belongs to.
    */
+  @ApiProperty({ type: () => Asset })
   @ManyToOne(() => Asset, (asset) => asset.jobs, {
     onDelete: 'CASCADE',
   })
@@ -54,6 +55,7 @@ export class Job extends BaseEntity {
   /**
    * The tool used for this job.
    */
+  @ApiProperty({ type: () => Tool })
   @ManyToOne(() => Tool, (tool) => tool.jobs, {
     onDelete: 'CASCADE',
   })
@@ -118,6 +120,7 @@ export class Job extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   assetServiceId?: string;
 
+  @ApiProperty({ type: () => AssetService })
   @ManyToOne(() => AssetService, (assetService) => assetService.jobs, {
     onDelete: 'CASCADE',
   })

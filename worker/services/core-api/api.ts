@@ -390,20 +390,65 @@ export interface DeleteMessageResponseDto {
   message: string;
 }
 
+export interface Asset {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  value: string;
+  targetId: string;
+  isPrimary: boolean;
+  dnsRecords: object;
+  isEnabled: boolean;
+}
+
+export interface Tool {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  description: string;
+  category: ToolCategoryEnum;
+  version: string;
+  logoUrl?: string | null;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: string;
+  providerId: string;
+}
+
+export interface AssetService {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  value: string;
+  port: number;
+  assetId: string;
+  isErrorPage: boolean;
+}
+
 export interface Job {
   id: string;
   /** @format date-time */
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
+  asset: Asset;
   category: string;
   status: string;
   /** @format date-time */
   pickJobAt: string;
+  tool: Tool;
   /** @format date-time */
   completedAt: string;
   command: string;
   assetServiceId: string;
+  assetService: AssetService;
 }
 
 export interface GetManyJobDto {
@@ -759,23 +804,6 @@ export interface WorkerAliveDto {
   token: string;
 }
 
-export interface Tool {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  name: string;
-  description: string;
-  category: ToolCategoryEnum;
-  version: string;
-  logoUrl?: string | null;
-  isInstalled: boolean;
-  isOfficialSupport: boolean;
-  type: string;
-  providerId: string;
-}
-
 export interface WorkerInstance {
   id: string;
   /** @format date-time */
@@ -802,19 +830,6 @@ export interface GetManyWorkerInstanceDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-}
-
-export interface Asset {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  value: string;
-  targetId: string;
-  isPrimary: boolean;
-  dnsRecords: object;
-  isEnabled: boolean;
 }
 
 export interface SearchData {
@@ -1693,6 +1708,15 @@ export enum GetMcpServerHealthResponseDtoStatusEnum {
   Error = "error",
 }
 
+export enum ToolCategoryEnum {
+  Subdomains = "subdomains",
+  HttpProbe = "http_probe",
+  PortsScanner = "ports_scanner",
+  Vulnerabilities = "vulnerabilities",
+  Classifier = "classifier",
+  Assistant = "assistant",
+}
+
 export enum NotificationResponseDtoStatusEnum {
   Sent = "sent",
   Unread = "unread",
@@ -1707,15 +1731,6 @@ export enum CreateNotificationDtoTypeEnum {
   SYSTEM = "SYSTEM",
   USER = "USER",
   GROUP = "GROUP",
-}
-
-export enum ToolCategoryEnum {
-  Subdomains = "subdomains",
-  HttpProbe = "http_probe",
-  PortsScanner = "ports_scanner",
-  Vulnerabilities = "vulnerabilities",
-  Classifier = "classifier",
-  Assistant = "assistant",
 }
 
 export enum VulnerabilityStatisticsDtoSeverityEnum {

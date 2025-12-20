@@ -73,6 +73,8 @@ export class JobsRegistryService {
       .leftJoinAndSelect('job.tool', 'tool')
       .leftJoinAndSelect('job.asset', 'asset')
       .leftJoinAndSelect('asset.target', 'target')
+      .leftJoinAndSelect('job.assetService', 'assetService')
+      .leftJoinAndSelect('job.errorLogs', 'errorLogs')
       .take(query.limit)
       .skip((page - 1) * limit)
       .orderBy(`job.${sortBy}`, sortOrder);

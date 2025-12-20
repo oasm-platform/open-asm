@@ -403,16 +403,70 @@ export type DeleteMessageResponseDto = {
   message: string;
 };
 
+export type AssetDnsRecords = { [key: string]: unknown };
+
+export type Asset = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  value: string;
+  targetId: string;
+  isPrimary: boolean;
+  dnsRecords: AssetDnsRecords;
+  isEnabled: boolean;
+};
+
+export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ToolCategory = {
+  subdomains: 'subdomains',
+  http_probe: 'http_probe',
+  ports_scanner: 'ports_scanner',
+  vulnerabilities: 'vulnerabilities',
+  classifier: 'classifier',
+  assistant: 'assistant',
+} as const;
+
+export type Tool = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  description: string;
+  category: ToolCategory;
+  version: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: string;
+  providerId: string;
+};
+
+export type AssetService = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  value: string;
+  port: number;
+  assetId: string;
+  isErrorPage: boolean;
+};
+
 export type Job = {
   id: string;
   createdAt: string;
   updatedAt: string;
+  asset: Asset;
   category: string;
   status: string;
   pickJobAt: string;
+  tool: Tool;
   completedAt: string;
   command: string;
   assetServiceId: string;
+  assetService: AssetService;
 };
 
 export type GetManyJobDto = {
@@ -787,34 +841,6 @@ export type WorkerAliveDto = {
   token: string;
 };
 
-export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ToolCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  classifier: 'classifier',
-  assistant: 'assistant',
-} as const;
-
-export type Tool = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  name: string;
-  description: string;
-  category: ToolCategory;
-  version: string;
-  /** @nullable */
-  logoUrl?: string | null;
-  isInstalled: boolean;
-  isOfficialSupport: boolean;
-  type: string;
-  providerId: string;
-};
-
 export type WorkerInstance = {
   id: string;
   createdAt: string;
@@ -838,19 +864,6 @@ export type GetManyWorkerInstanceDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-};
-
-export type AssetDnsRecords = { [key: string]: unknown };
-
-export type Asset = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  value: string;
-  targetId: string;
-  isPrimary: boolean;
-  dnsRecords: AssetDnsRecords;
-  isEnabled: boolean;
 };
 
 export type SearchData = {

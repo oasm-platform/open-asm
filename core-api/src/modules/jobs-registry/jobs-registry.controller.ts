@@ -16,7 +16,7 @@ import { JobsRegistryService } from './jobs-registry.service';
 
 @Controller('jobs-registry')
 export class JobsRegistryController {
-  constructor(private readonly jobsRegistryService: JobsRegistryService) { }
+  constructor(private readonly jobsRegistryService: JobsRegistryService) {}
 
   @Doc({
     summary: 'Get Jobs',
@@ -36,6 +36,9 @@ export class JobsRegistryController {
       'Retrieves a timeline of jobs grouped by tool name and target.',
     response: {
       serialization: JobTimelineResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
     },
   })
   @Get('/timeline')
