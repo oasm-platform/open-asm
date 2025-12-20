@@ -175,7 +175,7 @@ export default function AssetGroupWorkflow({
           // If group has no workflow, create a new workflow with this tool
           const workflowPayload = {
             data: {
-              name: `Vulnerability Scan Workflow - ${assetGroupId}`,
+              name: `Group Workflow - ${assetGroupId}`,
               content: {
                 on: {
                   schedule: OnSchedule['0_0_*_*_*'], // Use correct enum value
@@ -187,7 +187,7 @@ export default function AssetGroupWorkflow({
                     run: tool.name,
                   },
                 ],
-                name: `Vulnerability Scan Workflow - ${assetGroupId}`,
+                name: `Group Workflow - ${assetGroupId}`,
               },
               filePath: '', // Empty filePath
             },

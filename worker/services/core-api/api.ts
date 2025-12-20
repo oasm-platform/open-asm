@@ -11,20 +11,20 @@
  */
 
 export enum CronSchedule {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
+  Disabled = 'disabled',
+  Value00 = '0 0 * * *',
+  Value003 = '0 0 */3 * *',
+  Value000 = '0 0 * * 0',
+  Value0014 = '0 0 */14 * *',
+  Value001 = '0 0 1 * *',
 }
 
 export enum JobStatus {
-  Pending = "pending",
-  InProgress = "in_progress",
-  Completed = "completed",
-  Failed = "failed",
-  Cancelled = "cancelled",
+  Pending = 'pending',
+  InProgress = 'in_progress',
+  Completed = 'completed',
+  Failed = 'failed',
+  Cancelled = 'cancelled',
 }
 
 export interface Target {
@@ -1294,7 +1294,7 @@ export interface Workflow {
 export interface CreateWorkflowDto {
   /**
    * Name of the workflow
-   * @example "Vulnerability Scan Workflow"
+   * @example "Group Workflow"
    */
   name: string;
   /** Content of the workflow in JSON format */
@@ -1309,7 +1309,7 @@ export interface CreateWorkflowDto {
 export interface UpdateWorkflowDto {
   /**
    * Name of the workflow
-   * @example "Vulnerability Scan Workflow"
+   * @example "Group Workflow"
    */
   name?: string;
   /** Content of the workflow in JSON format */
@@ -1690,57 +1690,57 @@ export interface GetManyMcpPermissionDto {
 }
 
 export enum GetManyTargetResponseDtoScanScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
+  Disabled = 'disabled',
+  Value00 = '0 0 * * *',
+  Value003 = '0 0 */3 * *',
+  Value000 = '0 0 * * 0',
+  Value0014 = '0 0 */14 * *',
+  Value001 = '0 0 1 * *',
 }
 
 /** @example "DONE" */
 export enum GetManyTargetResponseDtoStatusEnum {
-  RUNNING = "RUNNING",
-  DONE = "DONE",
+  RUNNING = 'RUNNING',
+  DONE = 'DONE',
 }
 
 export enum UpdateTargetDtoScanScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
+  Disabled = 'disabled',
+  Value00 = '0 0 * * *',
+  Value003 = '0 0 */3 * *',
+  Value000 = '0 0 * * 0',
+  Value0014 = '0 0 */14 * *',
+  Value001 = '0 0 1 * *',
 }
 
 /** Server status: active, disabled, or error */
 export enum GetMcpServerHealthResponseDtoStatusEnum {
-  Active = "active",
-  Disabled = "disabled",
-  Error = "error",
+  Active = 'active',
+  Disabled = 'disabled',
+  Error = 'error',
 }
 
 export enum ToolCategoryEnum {
-  Subdomains = "subdomains",
-  HttpProbe = "http_probe",
-  PortsScanner = "ports_scanner",
-  Vulnerabilities = "vulnerabilities",
-  Classifier = "classifier",
-  Assistant = "assistant",
+  Subdomains = 'subdomains',
+  HttpProbe = 'http_probe',
+  PortsScanner = 'ports_scanner',
+  Vulnerabilities = 'vulnerabilities',
+  Classifier = 'classifier',
+  Assistant = 'assistant',
 }
 
 export enum JobHistoryResponseDtoStatusEnum {
-  Pending = "pending",
-  InProgress = "in_progress",
-  Completed = "completed",
-  Failed = "failed",
-  Cancelled = "cancelled",
+  Pending = 'pending',
+  InProgress = 'in_progress',
+  Completed = 'completed',
+  Failed = 'failed',
+  Cancelled = 'cancelled',
 }
 
 export enum NotificationResponseDtoStatusEnum {
-  Sent = "sent",
-  Unread = "unread",
-  Read = "read",
+  Sent = 'sent',
+  Unread = 'unread',
+  Read = 'read',
 }
 
 /**
@@ -1748,97 +1748,97 @@ export enum NotificationResponseDtoStatusEnum {
  * @example "USER"
  */
 export enum CreateNotificationDtoTypeEnum {
-  SYSTEM = "SYSTEM",
-  USER = "USER",
-  GROUP = "GROUP",
+  SYSTEM = 'SYSTEM',
+  USER = 'USER',
+  GROUP = 'GROUP',
 }
 
 export enum VulnerabilityStatisticsDtoSeverityEnum {
-  Info = "info",
-  Low = "low",
-  Medium = "medium",
-  High = "high",
-  Critical = "critical",
+  Info = 'info',
+  Low = 'low',
+  Medium = 'medium',
+  High = 'high',
+  Critical = 'critical',
 }
 
 export enum CreateToolDtoCategoryEnum {
-  Subdomains = "subdomains",
-  HttpProbe = "http_probe",
-  PortsScanner = "ports_scanner",
-  Vulnerabilities = "vulnerabilities",
-  Classifier = "classifier",
-  Assistant = "assistant",
+  Subdomains = 'subdomains',
+  HttpProbe = 'http_probe',
+  PortsScanner = 'ports_scanner',
+  Vulnerabilities = 'vulnerabilities',
+  Classifier = 'classifier',
+  Assistant = 'assistant',
 }
 
 export enum OnScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
+  Disabled = 'disabled',
+  Value00 = '0 0 * * *',
+  Value003 = '0 0 */3 * *',
+  Value000 = '0 0 * * 0',
+  Value0014 = '0 0 */14 * *',
+  Value001 = '0 0 1 * *',
 }
 
 export enum AssetGroupWorkflowScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
+  Disabled = 'disabled',
+  Value00 = '0 0 * * *',
+  Value003 = '0 0 */3 * *',
+  Value000 = '0 0 * * 0',
+  Value0014 = '0 0 */14 * *',
+  Value001 = '0 0 1 * *',
 }
 
 export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
+  Disabled = 'disabled',
+  Value00 = '0 0 * * *',
+  Value003 = '0 0 */3 * *',
+  Value000 = '0 0 * * 0',
+  Value0014 = '0 0 */14 * *',
+  Value001 = '0 0 1 * *',
 }
 
 export enum CreateIssueDtoSourceTypeEnum {
-  Vulnerability = "vulnerability",
+  Vulnerability = 'vulnerability',
 }
 
 export enum ChangeIssueStatusDtoStatusEnum {
-  Open = "open",
-  Closed = "closed",
+  Open = 'open',
+  Closed = 'closed',
 }
 
 /** @default "content" */
 export enum IssueCommentTypeEnum {
-  Content = "content",
-  Open = "open",
-  Closed = "closed",
+  Content = 'content',
+  Open = 'open',
+  Closed = 'closed',
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
-  BuiltIn = "built_in",
-  Provider = "provider",
+  BuiltIn = 'built_in',
+  Provider = 'provider',
 }
 
 export enum ToolsControllerGetManyToolsParamsCategoryEnum {
-  Subdomains = "subdomains",
-  HttpProbe = "http_probe",
-  PortsScanner = "ports_scanner",
-  Vulnerabilities = "vulnerabilities",
-  Classifier = "classifier",
-  Assistant = "assistant",
+  Subdomains = 'subdomains',
+  HttpProbe = 'http_probe',
+  PortsScanner = 'ports_scanner',
+  Vulnerabilities = 'vulnerabilities',
+  Classifier = 'classifier',
+  Assistant = 'assistant',
 }
 
 export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
-  Subdomains = "subdomains",
-  HttpProbe = "http_probe",
-  PortsScanner = "ports_scanner",
-  Vulnerabilities = "vulnerabilities",
-  Classifier = "classifier",
-  Assistant = "assistant",
+  Subdomains = 'subdomains',
+  HttpProbe = 'http_probe',
+  PortsScanner = 'ports_scanner',
+  Vulnerabilities = 'vulnerabilities',
+  Classifier = 'classifier',
+  Assistant = 'assistant',
 }
 
 export enum IssuesControllerGetManyParamsStatusEnum {
-  Open = "open",
-  Closed = "closed",
+  Open = 'open',
+  Closed = 'closed',
 }
 
 import type {
@@ -1846,13 +1846,15 @@ import type {
   AxiosRequestConfig,
   HeadersDefaults,
   ResponseType,
-} from "axios";
-import axios from "axios";
+} from 'axios';
+import axios from 'axios';
 
 export type QueryParamsType = Record<string | number, any>;
 
-export interface FullRequestParams
-  extends Omit<AxiosRequestConfig, "data" | "params" | "url" | "responseType"> {
+export interface FullRequestParams extends Omit<
+  AxiosRequestConfig,
+  'data' | 'params' | 'url' | 'responseType'
+> {
   /** set parameter to `true` for call `securityWorker` for this request */
   secure?: boolean;
   /** request path */
@@ -1869,30 +1871,32 @@ export interface FullRequestParams
 
 export type RequestParams = Omit<
   FullRequestParams,
-  "body" | "method" | "query" | "path"
+  'body' | 'method' | 'query' | 'path'
 >;
 
-export interface ApiConfig<SecurityDataType = unknown>
-  extends Omit<AxiosRequestConfig, "data" | "cancelToken"> {
+export interface ApiConfig<SecurityDataType = unknown> extends Omit<
+  AxiosRequestConfig,
+  'data' | 'cancelToken'
+> {
   securityWorker?: (
-    securityData: SecurityDataType | null,
+    securityData: SecurityDataType | null
   ) => Promise<AxiosRequestConfig | void> | AxiosRequestConfig | void;
   secure?: boolean;
   format?: ResponseType;
 }
 
 export enum ContentType {
-  Json = "application/json",
-  JsonApi = "application/vnd.api+json",
-  FormData = "multipart/form-data",
-  UrlEncoded = "application/x-www-form-urlencoded",
-  Text = "text/plain",
+  Json = 'application/json',
+  JsonApi = 'application/vnd.api+json',
+  FormData = 'multipart/form-data',
+  UrlEncoded = 'application/x-www-form-urlencoded',
+  Text = 'text/plain',
 }
 
 export class HttpClient<SecurityDataType = unknown> {
   public instance: AxiosInstance;
   private securityData: SecurityDataType | null = null;
-  private securityWorker?: ApiConfig<SecurityDataType>["securityWorker"];
+  private securityWorker?: ApiConfig<SecurityDataType>['securityWorker'];
   private secure?: boolean;
   private format?: ResponseType;
 
@@ -1904,7 +1908,7 @@ export class HttpClient<SecurityDataType = unknown> {
   }: ApiConfig<SecurityDataType> = {}) {
     this.instance = axios.create({
       ...axiosConfig,
-      baseURL: axiosConfig.baseURL || "",
+      baseURL: axiosConfig.baseURL || '',
     });
     this.secure = secure;
     this.format = format;
@@ -1917,7 +1921,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected mergeRequestParams(
     params1: AxiosRequestConfig,
-    params2?: AxiosRequestConfig,
+    params2?: AxiosRequestConfig
   ): AxiosRequestConfig {
     const method = params1.method || (params2 && params2.method);
 
@@ -1938,7 +1942,7 @@ export class HttpClient<SecurityDataType = unknown> {
   }
 
   protected stringifyFormItem(formItem: unknown) {
-    if (typeof formItem === "object" && formItem !== null) {
+    if (typeof formItem === 'object' && formItem !== null) {
       return JSON.stringify(formItem);
     } else {
       return `${formItem}`;
@@ -1958,7 +1962,7 @@ export class HttpClient<SecurityDataType = unknown> {
         const isFileType = formItem instanceof Blob || formItem instanceof File;
         formData.append(
           key,
-          isFileType ? formItem : this.stringifyFormItem(formItem),
+          isFileType ? formItem : this.stringifyFormItem(formItem)
         );
       }
 
@@ -1976,7 +1980,7 @@ export class HttpClient<SecurityDataType = unknown> {
     ...params
   }: FullRequestParams): Promise<T> => {
     const secureParams =
-      ((typeof secure === "boolean" ? secure : this.secure) &&
+      ((typeof secure === 'boolean' ? secure : this.secure) &&
         this.securityWorker &&
         (await this.securityWorker(this.securityData))) ||
       {};
@@ -1987,7 +1991,7 @@ export class HttpClient<SecurityDataType = unknown> {
       type === ContentType.FormData &&
       body &&
       body !== null &&
-      typeof body === "object"
+      typeof body === 'object'
     ) {
       body = this.createFormData(body as Record<string, unknown>);
     }
@@ -1996,7 +2000,7 @@ export class HttpClient<SecurityDataType = unknown> {
       type === ContentType.Text &&
       body &&
       body !== null &&
-      typeof body !== "string"
+      typeof body !== 'string'
     ) {
       body = JSON.stringify(body);
     }
@@ -2006,7 +2010,7 @@ export class HttpClient<SecurityDataType = unknown> {
         ...requestParams,
         headers: {
           ...(requestParams.headers || {}),
-          ...(type ? { "Content-Type": type } : {}),
+          ...(type ? { 'Content-Type': type } : {}),
         },
         params: query,
         responseType: responseFormat,
@@ -2038,14 +2042,14 @@ export class Api<
    */
   targetsControllerCreateTarget = (
     data: CreateTargetDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2070,13 +2074,13 @@ export class Api<
       sortOrder?: string;
       value?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2091,8 +2095,8 @@ export class Api<
   targetsControllerExportTargetsToCsv = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets/export`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2107,8 +2111,8 @@ export class Api<
   targetsControllerGetTargetById = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets/${id}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2123,14 +2127,14 @@ export class Api<
   targetsControllerUpdateTarget = (
     id: string,
     data: UpdateTargetDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2145,12 +2149,12 @@ export class Api<
   targetsControllerDeleteTargetFromWorkspace = (
     id: string,
     workspaceId: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets/${id}/workspace/${workspaceId}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -2165,8 +2169,8 @@ export class Api<
   targetsControllerReScanTarget = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/targets/${id}/re-scan`,
-      method: "POST",
-      format: "json",
+      method: 'POST',
+      format: 'json',
       ...params,
     });
 
@@ -2180,14 +2184,14 @@ export class Api<
    */
   workspacesControllerCreateWorkspace = (
     data: CreateWorkspaceDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2216,13 +2220,13 @@ export class Api<
        */
       isArchived?: boolean;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2237,8 +2241,8 @@ export class Api<
   workspacesControllerGetWorkspaceApiKey = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/api-key`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2253,8 +2257,8 @@ export class Api<
   workspacesControllerGetWorkspaceConfigs = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/configs`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2268,14 +2272,14 @@ export class Api<
    */
   workspacesControllerUpdateWorkspaceConfigs = (
     data: UpdateWorkspaceConfigsDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/configs`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2289,12 +2293,12 @@ export class Api<
    */
   workspacesControllerGetWorkspaceById = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2309,14 +2313,14 @@ export class Api<
   workspacesControllerUpdateWorkspace = (
     id: string,
     data: UpdateWorkspaceDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2330,12 +2334,12 @@ export class Api<
    */
   workspacesControllerDeleteWorkspace = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -2350,8 +2354,8 @@ export class Api<
   workspacesControllerRotateApiKey = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}/api-key/rotate`,
-      method: "POST",
-      format: "json",
+      method: 'POST',
+      format: 'json',
       ...params,
     });
 
@@ -2366,14 +2370,14 @@ export class Api<
   workspacesControllerMakeArchived = (
     id: string,
     data: ArchiveWorkspaceDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workspaces/${id}/archived`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2387,7 +2391,7 @@ export class Api<
   rootControllerGetHealth = (params: RequestParams = {}) =>
     this.request<any, any>({
       path: `/api/health`,
-      method: "GET",
+      method: 'GET',
       ...params,
     });
 
@@ -2401,14 +2405,14 @@ export class Api<
    */
   rootControllerCreateFirstAdmin = (
     data: CreateFirstAdminDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/init-admin`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2423,8 +2427,8 @@ export class Api<
   rootControllerGetMetadata = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/metadata`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2438,14 +2442,14 @@ export class Api<
    */
   aiAssistantControllerGenerateTags = (
     data: GenerateTagsDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/generate-tags`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2460,8 +2464,8 @@ export class Api<
   aiAssistantControllerGetMcpServers = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/mcp-servers`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2475,14 +2479,14 @@ export class Api<
    */
   aiAssistantControllerAddMcpServers = (
     data: AddMcpServersDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/mcp-servers`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2496,14 +2500,14 @@ export class Api<
    */
   aiAssistantControllerUpdateMcpServers = (
     data: UpdateMcpServersDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/mcp-servers`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2517,12 +2521,12 @@ export class Api<
    */
   aiAssistantControllerDeleteMcpServers = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/mcp-servers/${id}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -2536,12 +2540,12 @@ export class Api<
    */
   aiAssistantControllerGetMcpServerHealth = (
     serverName: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/mcp-servers/${serverName}/health`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2556,8 +2560,8 @@ export class Api<
   aiAssistantControllerGetConversations = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2572,8 +2576,8 @@ export class Api<
   aiAssistantControllerDeleteConversations = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -2588,14 +2592,14 @@ export class Api<
   aiAssistantControllerUpdateConversation = (
     id: string,
     data: UpdateConversationDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2609,12 +2613,12 @@ export class Api<
    */
   aiAssistantControllerDeleteConversation = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations/${id}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -2629,8 +2633,8 @@ export class Api<
   aiAssistantControllerGetMessages = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations/${id}/messages`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2645,12 +2649,12 @@ export class Api<
   aiAssistantControllerDeleteMessage = (
     conversationId: string,
     messageId: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -2675,13 +2679,13 @@ export class Api<
       sortOrder?: string;
       jobHistoryId: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2695,14 +2699,14 @@ export class Api<
    */
   jobsRegistryControllerCreateJobsForTarget = (
     data: CreateJobsDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2716,12 +2720,12 @@ export class Api<
    */
   jobsRegistryControllerGetNextJob = (
     workerId: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/${workerId}/next`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2736,14 +2740,14 @@ export class Api<
   jobsRegistryControllerUpdateResult = (
     workerId: string,
     data: UpdateResultDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/${workerId}/result`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2767,13 +2771,13 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/histories`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2797,13 +2801,13 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2817,14 +2821,14 @@ export class Api<
    */
   notificationsControllerCreateNotification = (
     data: CreateNotificationDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2839,8 +2843,8 @@ export class Api<
   notificationsControllerStream = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications/stream`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2855,8 +2859,8 @@ export class Api<
   notificationsControllerGetUnreadCount = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications/unread-count`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -2871,8 +2875,8 @@ export class Api<
   notificationsControllerMarkAllAsRead = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications/mark-read`,
-      method: "PATCH",
-      format: "json",
+      method: 'PATCH',
+      format: 'json',
       ...params,
     });
 
@@ -2887,8 +2891,8 @@ export class Api<
   notificationsControllerMarkAllAsUnread = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications/mark-unread`,
-      method: "PATCH",
-      format: "json",
+      method: 'PATCH',
+      format: 'json',
       ...params,
     });
 
@@ -2902,12 +2906,12 @@ export class Api<
    */
   notificationsControllerMarkAsRead = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications/${id}/read`,
-      method: "PATCH",
-      format: "json",
+      method: 'PATCH',
+      format: 'json',
       ...params,
     });
 
@@ -2938,13 +2942,13 @@ export class Api<
       techs?: string[];
       statusCodes?: string[];
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -2975,13 +2979,13 @@ export class Api<
       techs?: string[];
       statusCodes?: string[];
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/ip`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3012,13 +3016,13 @@ export class Api<
       techs?: string[];
       statusCodes?: string[];
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/host`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3049,13 +3053,13 @@ export class Api<
       techs?: string[];
       statusCodes?: string[];
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/port`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3086,13 +3090,13 @@ export class Api<
       techs?: string[];
       statusCodes?: string[];
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/tech`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3123,13 +3127,13 @@ export class Api<
       techs?: string[];
       statusCodes?: string[];
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/status-code`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3144,8 +3148,8 @@ export class Api<
   assetsControllerGetTlsAssets = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/tls`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3160,8 +3164,8 @@ export class Api<
   assetsControllerGetAssetById = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/${id}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3176,14 +3180,14 @@ export class Api<
   assetsControllerUpdateAssetById = (
     id: string,
     data: UpdateAssetDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3197,14 +3201,14 @@ export class Api<
    */
   assetsControllerSwitchAsset = (
     data: SwitchAssetDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/switch`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3219,8 +3223,8 @@ export class Api<
   assetsControllerExportServicesToCsv = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/services/export`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3234,12 +3238,12 @@ export class Api<
    */
   technologyControllerGetTechnologyInfo = (
     name: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/technology/${name}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3254,10 +3258,10 @@ export class Api<
   workersControllerAlive = (data: WorkerAliveDto, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workers/alive`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3272,10 +3276,10 @@ export class Api<
   workersControllerJoin = (data: WorkerJoinDto, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workers/join`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3300,13 +3304,13 @@ export class Api<
       sortOrder?: string;
       workspaceId?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workers`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3333,13 +3337,13 @@ export class Api<
       workspaceId: string;
       isSaveHistory?: boolean;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/search`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3365,13 +3369,13 @@ export class Api<
       workspaceId: string;
       query?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/search/histories`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3386,8 +3390,8 @@ export class Api<
   searchControllerDeleteAllSearchHistories = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/search/histories`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -3401,12 +3405,12 @@ export class Api<
    */
   searchControllerDeleteSearchHistory = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/search/histories/${id}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -3426,13 +3430,13 @@ export class Api<
        */
       workspaceId: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3447,8 +3451,8 @@ export class Api<
   statisticControllerGetTimelineStatistics = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic/timeline`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3463,8 +3467,8 @@ export class Api<
   statisticControllerGetIssuesTimeline = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic/issues-timeline`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3479,8 +3483,8 @@ export class Api<
   statisticControllerGetTopTagsAssets = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic/top-tags-assets`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3495,8 +3499,8 @@ export class Api<
   statisticControllerGetAssetLocations = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic/asset-locations`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3509,12 +3513,12 @@ export class Api<
    * @request GET:/api/statistic/top-assets-vulnerabilities
    */
   statisticControllerGetTopAssetsWithMostVulnerabilities = (
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/statistic/top-assets-vulnerabilities`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3528,7 +3532,7 @@ export class Api<
   vulnerabilitiesControllerScan = (data: ScanDto, params: RequestParams = {}) =>
     this.request<any, any>({
       path: `/api/vulnerabilities/scan`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
       ...params,
@@ -3557,13 +3561,13 @@ export class Api<
       targetIds?: string[];
       q?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/vulnerabilities`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3580,13 +3584,13 @@ export class Api<
       workspaceId: string;
       targetIds?: string[];
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/vulnerabilities/statistics`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3600,12 +3604,12 @@ export class Api<
    */
   vulnerabilitiesControllerGetVulnerabilityById = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/vulnerabilities/${id}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3619,14 +3623,14 @@ export class Api<
    */
   toolsControllerCreateTool = (
     data: CreateToolDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3654,13 +3658,13 @@ export class Api<
       workspaceId?: string;
       providerId?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3674,14 +3678,14 @@ export class Api<
    */
   toolsControllerAddToolToWorkspace = (
     data: AddToolToWorkspaceDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools/add-to-workspace`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3695,14 +3699,14 @@ export class Api<
    */
   toolsControllerInstallTool = (
     data: InstallToolDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools/install`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3716,14 +3720,14 @@ export class Api<
    */
   toolsControllerUninstallTool = (
     data: InstallToolDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools/uninstall`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3738,8 +3742,8 @@ export class Api<
   toolsControllerGetBuiltInTools = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools/built-in-tools`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3755,13 +3759,13 @@ export class Api<
     query?: {
       category?: ToolsControllerGetInstalledToolsParamsCategoryEnum;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools/installed`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3776,8 +3780,8 @@ export class Api<
   toolsControllerGetToolById = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools/${id}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3792,8 +3796,8 @@ export class Api<
   toolsControllerGetToolApiKey = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools/${id}/api-key`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3808,8 +3812,8 @@ export class Api<
   toolsControllerRotateToolApiKey = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/tools/${id}/api-key/rotate`,
-      method: "POST",
-      format: "json",
+      method: 'POST',
+      format: 'json',
       ...params,
     });
 
@@ -3824,8 +3828,8 @@ export class Api<
   workflowsControllerListTemplates = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows/templates`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3851,13 +3855,13 @@ export class Api<
       /** Filter by workflow name */
       name?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3871,14 +3875,14 @@ export class Api<
    */
   workflowsControllerCreateWorkflow = (
     data: CreateWorkflowDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3892,12 +3896,12 @@ export class Api<
    */
   workflowsControllerGetWorkspaceWorkflow = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows/${id}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -3912,14 +3916,14 @@ export class Api<
   workflowsControllerUpdateWorkflow = (
     id: string,
     data: UpdateWorkflowDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3933,12 +3937,12 @@ export class Api<
    */
   workflowsControllerDeleteWorkflow = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/workflows/${id}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -3964,13 +3968,13 @@ export class Api<
       /** @example "OpenAI" */
       name?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/providers`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -3984,14 +3988,14 @@ export class Api<
    */
   providersControllerCreateProvider = (
     data: CreateProviderDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/providers`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4006,8 +4010,8 @@ export class Api<
   providersControllerGetProvider = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/providers/${id}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -4022,14 +4026,14 @@ export class Api<
   providersControllerUpdateProvider = (
     id: string,
     data: UpdateProviderDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/providers/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4043,12 +4047,12 @@ export class Api<
    */
   providersControllerDeleteProvider = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/providers/${id}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -4062,14 +4066,14 @@ export class Api<
    */
   templatesControllerCreateTemplate = (
     data: CreateTemplateDTO,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/templates`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4094,13 +4098,13 @@ export class Api<
       sortOrder?: string;
       value?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/templates`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4114,14 +4118,14 @@ export class Api<
    */
   templatesControllerUploadFile = (
     data: UploadTemplateDTO,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/templates/upload`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4136,14 +4140,14 @@ export class Api<
   templatesControllerRenameFile = (
     templateId: string,
     data: RenameTemplateDTO,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/templates/${templateId}/rename`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4157,12 +4161,12 @@ export class Api<
    */
   templatesControllerGetTemplateById = (
     templateId: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/templates/${templateId}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -4176,12 +4180,12 @@ export class Api<
    */
   templatesControllerDeleteTemplate = (
     templateId: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/templates/${templateId}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -4195,14 +4199,14 @@ export class Api<
    */
   templatesControllerRunTemplate = (
     data: RunTemplateDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/templates/run`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4227,13 +4231,13 @@ export class Api<
       sortOrder?: string;
       targetIds?: string[];
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4247,14 +4251,14 @@ export class Api<
    */
   assetGroupControllerCreate = (
     data: CreateAssetGroupDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4269,8 +4273,8 @@ export class Api<
   assetGroupControllerGetById = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${id}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -4285,14 +4289,14 @@ export class Api<
   assetGroupControllerUpdateAssetGroupById = (
     id: string,
     data: UpdateAssetGroupDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4307,8 +4311,8 @@ export class Api<
   assetGroupControllerDelete = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${id}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -4323,14 +4327,14 @@ export class Api<
   assetGroupControllerAddManyWorkflows = (
     groupId: string,
     data: AddManyWorkflowsToAssetGroupDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${groupId}/workflows`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4345,14 +4349,14 @@ export class Api<
   assetGroupControllerRemoveManyWorkflows = (
     groupId: string,
     data: RemoveManyWorkflowsFromAssetGroupDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${groupId}/workflows`,
-      method: "DELETE",
+      method: 'DELETE',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4367,14 +4371,14 @@ export class Api<
   assetGroupControllerAddManyAssets = (
     groupId: string,
     data: AddManyAssetsToAssetGroupDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${groupId}/assets`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4389,14 +4393,14 @@ export class Api<
   assetGroupControllerRemoveManyAssets = (
     groupId: string,
     data: RemoveManyAssetsFromAssetGroupDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${groupId}/assets`,
-      method: "DELETE",
+      method: 'DELETE',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4421,13 +4425,13 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${assetGroupId}/assets`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4452,13 +4456,13 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${assetGroupId}/workflows`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4483,13 +4487,13 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${assetGroupId}/assets/not-in-group`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4514,13 +4518,13 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/${assetGroupId}/workflows/not-in-group`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4535,14 +4539,14 @@ export class Api<
   assetGroupControllerUpdateAssetGroupWorkflow = (
     id: string,
     data: UpdateAssetGroupWorkflowDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/workflows/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4556,12 +4560,12 @@ export class Api<
    */
   assetGroupControllerRunGroupWorkflowScheduler = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/asset-group/workflows/${id}/run`,
-      method: "POST",
-      format: "json",
+      method: 'POST',
+      format: 'json',
       ...params,
     });
 
@@ -4588,13 +4592,13 @@ export class Api<
       /** Filter by status */
       status?: IssuesControllerGetManyParamsStatusEnum[];
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4609,10 +4613,10 @@ export class Api<
   issuesControllerCreate = (data: CreateIssueDto, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4627,8 +4631,8 @@ export class Api<
   issuesControllerGetById = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/${id}`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -4643,14 +4647,14 @@ export class Api<
   issuesControllerUpdate = (
     id: string,
     data: UpdateIssueDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4665,14 +4669,14 @@ export class Api<
   issuesControllerChangeStatus = (
     id: string,
     data: ChangeIssueStatusDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/${id}/status`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4687,14 +4691,14 @@ export class Api<
   issuesControllerCreateComment = (
     issueId: string,
     data: CreateIssueCommentDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/${issueId}/comments`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4719,13 +4723,13 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/${issueId}/comments`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4740,14 +4744,14 @@ export class Api<
   issuesControllerUpdateCommentById = (
     id: string,
     data: UpdateIssueCommentDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/comments/${id}`,
-      method: "PATCH",
+      method: 'PATCH',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4761,12 +4765,12 @@ export class Api<
    */
   issuesControllerDeleteCommentById = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/comments/${id}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -4788,7 +4792,7 @@ export class Api<
        */
       bucket?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<
       {
@@ -4802,10 +4806,10 @@ export class Api<
       any
     >({
       path: `/api/storage/upload`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.FormData,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4820,11 +4824,11 @@ export class Api<
   storageControllerGetFile = (
     bucket: string,
     path: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<File, any>({
       path: `/api/storage/${bucket}/${path}`,
-      method: "GET",
+      method: 'GET',
       ...params,
     });
 
@@ -4841,13 +4845,13 @@ export class Api<
       /** The URL of the image to forward */
       url: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<File, any>({
       path: `/api/storage/forward`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "blob",
+      format: 'blob',
       ...params,
     });
 
@@ -4862,8 +4866,8 @@ export class Api<
   mcpControllerGetMcpTools = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/mcp/tools`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -4877,14 +4881,14 @@ export class Api<
    */
   mcpControllerCreateMcpPermission = (
     data: CreateMcpPermissionsRequestDto,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/mcp/permissions`,
-      method: "POST",
+      method: 'POST',
       body: data,
       type: ContentType.Json,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4908,13 +4912,13 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
     },
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/mcp/permissions`,
-      method: "GET",
+      method: 'GET',
       query: query,
-      format: "json",
+      format: 'json',
       ...params,
     });
 
@@ -4929,8 +4933,8 @@ export class Api<
   mcpControllerGetMcpApiKey = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/mcp/${id}/api-key`,
-      method: "GET",
-      format: "json",
+      method: 'GET',
+      format: 'json',
       ...params,
     });
 
@@ -4944,12 +4948,12 @@ export class Api<
    */
   mcpControllerDeleteMcpPermissionById = (
     id: string,
-    params: RequestParams = {},
+    params: RequestParams = {}
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/mcp/permissions/${id}`,
-      method: "DELETE",
-      format: "json",
+      method: 'DELETE',
+      format: 'json',
       ...params,
     });
 
@@ -4963,7 +4967,7 @@ export class Api<
   sseControllerSse = (params: RequestParams = {}) =>
     this.request<any, any>({
       path: `/api/mcp`,
-      method: "GET",
+      method: 'GET',
       ...params,
     });
 
@@ -4977,7 +4981,7 @@ export class Api<
   sseControllerMessages = (params: RequestParams = {}) =>
     this.request<any, any>({
       path: `/api/messages`,
-      method: "POST",
+      method: 'POST',
       ...params,
     });
 }

@@ -799,7 +799,7 @@ export class JobsRegistryService {
       updatedAt: Date;
       totalJobs: string; // COUNT returns string in some databases
       status: JobStatus;
-      // workflowName: string;
+      workflowName: string;
     }
 
     // Query job histories with calculated counts and statuses using subqueries
@@ -810,13 +810,13 @@ export class JobsRegistryService {
       .innerJoin('jAsset.target', 'jTarget')
       .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
       .innerJoin('workspaceTarget.workspace', 'workspace')
-      // .innerJoin('jobHistory.workflow', 'workflow')
+      .leftJoin('jobHistory.workflow', 'workflow')
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([
         '"jobHistory".id as "id"',
         '"jobHistory"."createdAt" as "createdAt"',
         '"jobHistory"."updatedAt" as "updatedAt"',
-        // '"workflow"."name" as "workflowName"',
+        '"workflow"."name" as "workflowName"',
         // Subquery to count total jobs for this job history
         '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
         // Subquery with CASE to calculate status based on job statuses
@@ -833,7 +833,7 @@ export class JobsRegistryService {
         ) as "status"`,
       ])
       .groupBy('jobHistory.id')
-      // .addGroupBy('workflow.name')
+      .addGroupBy('workflow.name')
       .orderBy(`jobHistory.${sortBy}`, sortOrder)
       .offset((page - 1) * limit)
       .limit(limit);
@@ -856,7 +856,7 @@ export class JobsRegistryService {
       updatedAt: raw.updatedAt,
       totalJobs: parseInt(raw.totalJobs),
       status: raw.status,
-      // workflowName: raw.workflowName,
+      workflowName: raw.workflowName || 'Manual',
     }));
 
     return getManyResponse({ query, data: transformedData, total });
