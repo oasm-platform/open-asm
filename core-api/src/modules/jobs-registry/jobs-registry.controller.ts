@@ -1,9 +1,13 @@
 import { Public, WorkspaceId } from '@/common/decorators/app.decorator';
 import { WorkerTokenAuth } from '@/common/decorators/worker-token-auth.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import {
+  GetManyBaseQueryParams,
+  GetManyBaseResponseDto,
+} from '@/common/dtos/get-many-base.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobsDto,
   GetNextJobResponseDto,
@@ -80,5 +84,24 @@ export class JobsRegistryController {
     // @WorkspaceId() workspaceId: string,
   ) {
     return this.jobsRegistryService.createJobsForTarget(dto);
+  }
+
+  @Doc({
+    summary: 'Get Many Job Histories',
+    description:
+      'Retrieves a list of job histories in the current workspace with their associated jobs, assets, and targets.',
+    response: {
+      serialization: GetManyResponseDto(JobHistoryResponseDto),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('/histories')
+  getManyJobHistories(
+    @WorkspaceId() workspaceId: string,
+    @Query() query: GetManyBaseQueryParams,
+  ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
+    return this.jobsRegistryService.getManyJobHistories(workspaceId, query);
   }
 }

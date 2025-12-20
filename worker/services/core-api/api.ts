@@ -507,6 +507,25 @@ export interface CreateJobsDto {
   targetId: string;
 }
 
+export interface JobHistoryResponseDto {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  totalJobs: number;
+  status: JobHistoryResponseDtoStatusEnum;
+}
+
+export interface GetManyJobHistoryResponseDtoDto {
+  data: JobHistoryResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export interface Notification {
   id: string;
   /** @format date-time */
@@ -1717,6 +1736,14 @@ export enum ToolCategoryEnum {
   Assistant = "assistant",
 }
 
+export enum JobHistoryResponseDtoStatusEnum {
+  Pending = "pending",
+  InProgress = "in_progress",
+  Completed = "completed",
+  Failed = "failed",
+  Cancelled = "cancelled",
+}
+
 export enum NotificationResponseDtoStatusEnum {
   Sent = "sent",
   Unread = "unread",
@@ -2738,6 +2765,36 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of job histories in the current workspace with their associated jobs, assets, and targets.
+   *
+   * @tags JobsRegistry
+   * @name JobsRegistryControllerGetManyJobHistories
+   * @summary Get Many Job Histories
+   * @request GET:/api/jobs-registry/histories
+   */
+  jobsRegistryControllerGetManyJobHistories = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry/histories`,
+      method: "GET",
+      query: query,
       format: "json",
       ...params,
     });

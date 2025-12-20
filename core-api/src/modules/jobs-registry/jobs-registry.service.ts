@@ -30,6 +30,7 @@ import { StorageService } from '../storage/storage.service';
 import { builtInTools } from '../tools/tools-privider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
+import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobs,
   CreateJobsDto,
@@ -776,5 +777,81 @@ export class JobsRegistryService {
         assetService: true,
       },
     });
+  }
+
+  public async getManyJobHistories(
+    workspaceId: string,
+    query: GetManyBaseQueryParams,
+  ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
+    const { limit, page, sortOrder } = query;
+    let { sortBy } = query;
+
+    if (!(sortBy in JobHistory)) {
+      sortBy = 'createdAt';
+    }
+
+    // Define interface for raw query result
+    interface RawJobHistoryResult {
+      id: string;
+      createdAt: Date;
+      updatedAt: Date;
+      totalJobs: string; // COUNT returns string in some databases
+      status: JobStatus;
+    }
+
+    // Query job histories with calculated counts and statuses using subqueries
+    const qb = this.jobHistoryRepo
+      .createQueryBuilder('jobHistory')
+      .innerJoin('jobHistory.jobs', 'job')
+      .innerJoin('job.asset', 'jAsset')
+      .innerJoin('jAsset.target', 'jTarget')
+      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
+      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .where('workspace.id = :workspaceId', { workspaceId })
+      .select([
+        '"jobHistory".id as "id"',
+        '"jobHistory"."createdAt" as "createdAt"',
+        '"jobHistory"."updatedAt" as "updatedAt"',
+        // Subquery to count total jobs for this job history
+        '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
+        // Subquery with CASE to calculate status based on job statuses
+        `(
+          SELECT 
+            CASE 
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
+              ELSE '${JobStatus.PENDING}'
+            END
+          FROM jobs 
+          WHERE "jobHistoryId" = "jobHistory".id
+        ) as "status"`,
+      ])
+      .groupBy('jobHistory.id')
+      .orderBy(`jobHistory.${sortBy}`, sortOrder)
+      .offset((page - 1) * limit)
+      .limit(limit);
+
+    const rawResults = await qb.getRawMany<RawJobHistoryResult>();
+    const total = await this.jobHistoryRepo
+      .createQueryBuilder('jobHistory')
+      .innerJoin('jobHistory.jobs', 'job')
+      .innerJoin('job.asset', 'jAsset')
+      .innerJoin('jAsset.target', 'jTarget')
+      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
+      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .where('workspace.id = :workspaceId', { workspaceId })
+      .getCount();
+
+    // Transform raw results to match the response DTO structure
+    const transformedData = rawResults.map((raw) => ({
+      id: raw.id,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      totalJobs: parseInt(raw.totalJobs),
+      status: raw.status,
+    }));
+
+    return getManyResponse({ query, data: transformedData, total });
   }
 }
