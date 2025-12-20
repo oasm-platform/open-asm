@@ -23,7 +23,7 @@ export class IssueComment extends BaseEntity {
   @JoinColumn({ name: 'issueId' })
   issue: Issue;
 
-  @Column({ nullable: true })
+  @Column({ nullable: false })
   issueId: string;
 
   @ApiProperty()
@@ -47,5 +47,6 @@ export class IssueComment extends BaseEntity {
 
   @ManyToOne(() => IssueComment)
   @JoinColumn({ name: 'repCommentId' })
+  @ApiProperty({ type: () => IssueComment })
   repComment: IssueComment;
 }

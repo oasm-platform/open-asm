@@ -12,6 +12,7 @@ import {
   IssueCommentType,
   useIssuesControllerDeleteCommentById,
   useIssuesControllerUpdateCommentById,
+  UserRole,
   type IssueComment,
 } from '@/services/apis/gen/queries';
 import { useSession } from '@/utils/authClient';
@@ -111,7 +112,11 @@ const CommentCard = ({
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs border border-border px-2 py-0.5 rounded-full text-muted-foreground bg-background">
-                {issueCreatedBy === comment.createdBy?.id ? 'Author' : 'Member'}
+                {(comment as IssueComment).createdBy.role === UserRole.bot
+                  ? 'Bot'
+                  : issueCreatedBy === comment.createdBy?.id
+                    ? 'Author'
+                    : 'Member'}
               </span>
 
               {/* Reply Button */}
@@ -183,7 +188,7 @@ const CommentCard = ({
 
           {/* Body */}
           <div className="p-4 prose prose-sm max-w-none dark:prose-invert">
-            {comment.repComment && !isEditing && (
+            {comment.repCommentId && !isEditing && (
               <ReplyPreview repliedComment={comment.repComment} />
             )}
             {isEditing ? (

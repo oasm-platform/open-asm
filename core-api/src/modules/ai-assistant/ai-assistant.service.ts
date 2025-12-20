@@ -561,15 +561,13 @@ export class AiAssistantService implements OnModuleInit {
   async resolveIssue(
     question: string,
     issueType: number, // IssueType enum value
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     metadata: Record<string, any>,
     workspaceId?: string,
     userId?: string,
   ): Promise<{ message: string }> {
     try {
       const grpcMetadata = this.createMetadata(workspaceId, userId);
-
-      // Pass metadata directly - the generated client/encoding handles Struct wrapping
-      // const structMetadata = Struct.wrap(metadata);
 
       const response = await firstValueFrom(
         this.issueService.resolveIssueServers(

@@ -71,7 +71,7 @@ export class IssuesService {
     // Check if comment contains "@cai" and call AI assistant if it does
     if (createCommentDto.content.toLowerCase().includes('@cai')) {
       // Call AI assistant asynchronously to avoid blocking the main process
-      this.processCaiRequest(savedComment, issueId, userId).catch((error) => {
+      this.processCaiRequest(savedComment).catch((error) => {
         this.logger.error('Error processing Cai request:', error);
       });
     }
@@ -159,11 +159,9 @@ export class IssuesService {
     // Check if comment contains "@cai" and call AI assistant if it does
     if (updateCommentDto.content.toLowerCase().includes('@cai')) {
       // Call AI assistant asynchronously to avoid blocking the main process
-      this.processCaiRequest(updatedComment, comment.issue.id, userId).catch(
-        (error) => {
-          this.logger.error('Error processing Cai request:', error);
-        },
-      );
+      this.processCaiRequest(updatedComment).catch((error) => {
+        this.logger.error('Error processing Cai request:', error);
+      });
     }
 
     return updatedComment;
@@ -386,16 +384,15 @@ export class IssuesService {
   }
 
   /**
-   * c
    * This method is called when a user includes @cai in their comment
    * It calls the AI assistant and saves the response as a comment from the bot
    */
   private async processCaiRequest(
     originalComment: IssueComment,
-    issueId: string,
-    userId: string,
   ): Promise<void> {
     try {
+      const { issueId, createdBy } = originalComment;
+      const userId = createdBy.id;
       // Get the issue to provide context to the AI assistant
       const issue = await this.issuesRepository.findOne({
         where: { id: issueId },
