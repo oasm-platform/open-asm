@@ -73,6 +73,9 @@ export class JobHistoryResponseDto {
 
   @ApiProperty({ enum: JobStatus })
   status: JobStatus;
+
+  // @ApiProperty()
+  // workflowName: string;
 }
 
 export class GetManyJobHistoriesResponseDto extends GetManyBaseResponseDto<JobHistoryResponseDto> {}

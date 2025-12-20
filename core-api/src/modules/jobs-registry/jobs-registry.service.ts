@@ -30,6 +30,7 @@ import { StorageService } from '../storage/storage.service';
 import { builtInTools } from '../tools/tools-privider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
+import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobs,
@@ -60,9 +61,9 @@ export class JobsRegistryService {
     private redis: RedisService,
   ) {}
   public async getManyJobs(
-    query: GetManyBaseQueryParams,
+    query: GetManyJobsRequestDto,
   ): Promise<GetManyBaseResponseDto<Job>> {
-    const { limit, page, sortOrder } = query;
+    const { limit, page, sortOrder, jobHistoryId } = query;
     let { sortBy } = query;
 
     if (!(sortBy in Job)) {
@@ -76,6 +77,7 @@ export class JobsRegistryService {
       .leftJoinAndSelect('asset.target', 'target')
       .leftJoinAndSelect('job.assetService', 'assetService')
       .leftJoinAndSelect('job.errorLogs', 'errorLogs')
+      .where('job.jobHistoryId = :jobHistoryId', { jobHistoryId })
       .take(query.limit)
       .skip((page - 1) * limit)
       .orderBy(`job.${sortBy}`, sortOrder);
@@ -797,6 +799,7 @@ export class JobsRegistryService {
       updatedAt: Date;
       totalJobs: string; // COUNT returns string in some databases
       status: JobStatus;
+      // workflowName: string;
     }
 
     // Query job histories with calculated counts and statuses using subqueries
@@ -807,11 +810,13 @@ export class JobsRegistryService {
       .innerJoin('jAsset.target', 'jTarget')
       .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
       .innerJoin('workspaceTarget.workspace', 'workspace')
+      // .innerJoin('jobHistory.workflow', 'workflow')
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([
         '"jobHistory".id as "id"',
         '"jobHistory"."createdAt" as "createdAt"',
         '"jobHistory"."updatedAt" as "updatedAt"',
+        // '"workflow"."name" as "workflowName"',
         // Subquery to count total jobs for this job history
         '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
         // Subquery with CASE to calculate status based on job statuses
@@ -828,6 +833,7 @@ export class JobsRegistryService {
         ) as "status"`,
       ])
       .groupBy('jobHistory.id')
+      // .addGroupBy('workflow.name')
       .orderBy(`jobHistory.${sortBy}`, sortOrder)
       .offset((page - 1) * limit)
       .limit(limit);
@@ -850,6 +856,7 @@ export class JobsRegistryService {
       updatedAt: raw.updatedAt,
       totalJobs: parseInt(raw.totalJobs),
       status: raw.status,
+      // workflowName: raw.workflowName,
     }));
 
     return getManyResponse({ query, data: transformedData, total });

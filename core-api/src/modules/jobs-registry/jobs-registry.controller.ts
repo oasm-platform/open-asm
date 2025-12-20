@@ -7,11 +7,11 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobsDto,
   GetNextJobResponseDto,
-  JobTimelineResponseDto,
   UpdateResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
@@ -30,25 +30,25 @@ export class JobsRegistryController {
     },
   })
   @Get('')
-  getManyJobs(@Query() query: GetManyBaseQueryParams) {
+  getManyJobs(@Query() query: GetManyJobsRequestDto) {
     return this.jobsRegistryService.getManyJobs(query);
   }
 
-  @Doc({
-    summary: 'Get Jobs Timeline',
-    description:
-      'Retrieves a timeline of jobs grouped by tool name and target.',
-    response: {
-      serialization: JobTimelineResponseDto,
-    },
-    request: {
-      getWorkspaceId: true,
-    },
-  })
-  @Get('/timeline')
-  getJobsTimeline(@WorkspaceId() workspaceId: string) {
-    return this.jobsRegistryService.getJobsTimeline(workspaceId);
-  }
+  // @Doc({
+  //   summary: 'Get Jobs Timeline',
+  //   description:
+  //     'Retrieves a timeline of jobs grouped by tool name and target.',
+  //   response: {
+  //     serialization: JobTimelineResponseDto,
+  //   },
+  //   request: {
+  //     getWorkspaceId: true,
+  //   },
+  // })
+  // @Get('/timeline')
+  // getJobsTimeline(@WorkspaceId() workspaceId: string) {
+  //   return this.jobsRegistryService.getJobsTimeline(workspaceId);
+  // }
 
   @Doc({
     summary:

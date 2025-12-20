@@ -432,6 +432,17 @@ export interface AssetService {
   isErrorPage: boolean;
 }
 
+export interface JobErrorLog {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  logMessage: string;
+  payload: string;
+  jobId: string;
+}
+
 export interface Job {
   id: string;
   /** @format date-time */
@@ -449,6 +460,7 @@ export interface Job {
   command: string;
   assetServiceId: string;
   assetService: AssetService;
+  errorLogs: JobErrorLog[];
 }
 
 export interface GetManyJobDto {
@@ -458,25 +470,6 @@ export interface GetManyJobDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-}
-
-export interface JobTimelineItem {
-  name: string;
-  target: string;
-  targetId: string;
-  jobHistoryId: string;
-  /** @format date-time */
-  startTime: string;
-  /** @format date-time */
-  endTime: string;
-  status: string;
-  description: string;
-  toolCategory: string;
-  duration: number;
-}
-
-export interface JobTimelineResponseDto {
-  data: JobTimelineItem[];
 }
 
 export interface GetNextJobResponseDto {
@@ -2670,7 +2663,7 @@ export class Api<
    * @request GET:/api/jobs-registry
    */
   jobsRegistryControllerGetManyJobs = (
-    query?: {
+    query: {
       search?: string;
       /** @example 1 */
       page?: number;
@@ -2680,6 +2673,7 @@ export class Api<
       sortBy?: string;
       /** @example "DESC" */
       sortOrder?: string;
+      jobHistoryId: string;
     },
     params: RequestParams = {},
   ) =>
@@ -2708,22 +2702,6 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves a timeline of jobs grouped by tool name and target.
-   *
-   * @tags JobsRegistry
-   * @name JobsRegistryControllerGetJobsTimeline
-   * @summary Get Jobs Timeline
-   * @request GET:/api/jobs-registry/timeline
-   */
-  jobsRegistryControllerGetJobsTimeline = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/jobs-registry/timeline`,
-      method: "GET",
       format: "json",
       ...params,
     });

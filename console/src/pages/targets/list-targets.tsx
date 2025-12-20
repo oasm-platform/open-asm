@@ -37,30 +37,30 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
       );
     },
   },
-  {
-    accessorKey: 'duration',
-    header: 'Duration',
-    cell: ({ row }) => {
-      const status = row.getValue('status');
-      if (status === 'in_progress') {
-        return null;
-      }
+  // {
+  //   accessorKey: 'duration',
+  //   header: 'Duration',
+  //   cell: ({ row }) => {
+  //     const status = row.getValue('status');
+  //     if (status === 'in_progress') {
+  //       return null;
+  //     }
 
-      const value: number = parseInt(row.getValue('duration'));
-      const duration = dayjs.duration(value, 'seconds');
-      const hours = duration.hours();
-      const minutes = duration.minutes();
-      const seconds = duration.seconds();
+  //     const value: number = parseInt(row.getValue('duration'));
+  //     const duration = dayjs.duration(value, 'seconds');
+  //     const hours = duration.hours();
+  //     const minutes = duration.minutes();
+  //     const seconds = duration.seconds();
 
-      return (
-        <div className="text-gray-400 font-semibold">
-          {hours > 0 && `${hours}h`}
-          {minutes > 0 && `${minutes}m`}
-          {seconds > 0 && `${seconds}s`}
-        </div>
-      );
-    },
-  },
+  //     return (
+  //       <div className="text-gray-400 font-semibold">
+  //         {hours > 0 && `${hours}h`}
+  //         {minutes > 0 && `${minutes}m`}
+  //         {seconds > 0 && `${seconds}s`}
+  //       </div>
+  //     );
+  //   },
+  // },
   {
     accessorKey: 'lastDiscoveredAt',
     header: 'Last Discovered At',

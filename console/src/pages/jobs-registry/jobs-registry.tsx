@@ -45,6 +45,7 @@ const JobsRegistryPage = () => {
               onlyIcon
               status={row.original.status as JobStatus}
             />
+            <pre>{row.original.workflowName}</pre>
           </div>
         );
       },

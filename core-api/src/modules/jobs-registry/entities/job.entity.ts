@@ -130,6 +130,7 @@ export class Job extends BaseEntity {
   @Column({ default: 0 })
   retryCount: number;
 
+  @ApiProperty({ type: () => [JobErrorLog] })
   @OneToMany(() => JobErrorLog, (jobErrorLog) => jobErrorLog.job, {
     onDelete: 'CASCADE',
   })
