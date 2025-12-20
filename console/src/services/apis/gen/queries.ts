@@ -1557,10 +1557,20 @@ export type IssueComment = {
   isCanDelete: boolean;
   isCanEdit: boolean;
   type: IssueCommentType;
+  repCommentId?: string;
+  repComment?: {
+    id: string;
+    content: string;
+    createdBy: {
+      id: string;
+      name: string;
+    };
+  };
 };
 
 export type CreateIssueCommentDto = {
   content: string;
+  repCommentId?: string;
 };
 
 export type GetManyIssueCommentDto = {

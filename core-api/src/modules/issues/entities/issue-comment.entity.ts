@@ -40,4 +40,12 @@ export class IssueComment extends BaseEntity {
   })
   @Column({ default: IssueCommentType.CONTENT })
   type: IssueCommentType;
+
+  @ApiProperty({ required: false })
+  @Column({ nullable: true })
+  repCommentId: string;
+
+  @ManyToOne(() => IssueComment)
+  @JoinColumn({ name: 'repCommentId' })
+  repComment: IssueComment;
 }
