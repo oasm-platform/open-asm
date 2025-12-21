@@ -112,10 +112,11 @@ function McpServerManagerContent({
         serversToUpdate = parsed;
       }
 
-      if (Object.keys(serversToUpdate).length === 0) {
-        toast.warning('No servers found in JSON');
-        return;
-      }
+      // Relax: allow empty mcpServers object if user wants to clear all servers
+      // if (Object.keys(serversToUpdate).length === 0) {
+      //   toast.warning('No servers found in JSON');
+      //   return;
+      // }
     } catch (e) {
       const error = e as Error;
       toast.error('Invalid JSON syntax: ' + error.message);
