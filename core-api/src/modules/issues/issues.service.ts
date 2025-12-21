@@ -6,9 +6,8 @@ import {
   IssueCommentType,
   IssueSourceType,
   IssueStatus,
-  Role,
 } from '@/common/enums/enum';
-import { BOT_ID } from '@/common/constants/app.constants';
+import { BOT_USER_DATA } from '@/common/constants/app.constants';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   ForbiddenException,
@@ -474,11 +473,7 @@ export class IssuesService {
         content: response.message,
         issue: { id: issueId },
         createdBy: {
-          id: BOT_ID,
-          name: 'Cai',
-          email: 'bot@oasm.local',
-          role: Role.BOT,
-          emailVerified: true,
+          ...BOT_USER_DATA,
         },
         isCanDelete: false,
         isCanEdit: false,

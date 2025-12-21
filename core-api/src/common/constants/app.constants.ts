@@ -1,3 +1,5 @@
+import { Role } from '../enums/enum';
+
 export const BEFORE_HOOK_KEY = Symbol('BEFORE_HOOK');
 export const AFTER_HOOK_KEY = Symbol('AFTER_HOOK');
 export const HOOK_KEY = Symbol('HOOK');
@@ -19,3 +21,10 @@ export const WEBAPP_ANALYZER_SRC_URL =
 export const GET_WORKSPACE_MCP_TOOL_NAME = 'get_workspaces';
 export const CACHE_STATIC_RESOURCE = 14 * 24 * 60 * 60; // 14 days in seconds
 export const BOT_ID = '019b3ae4-189e-7dfe-b10e-20d847717733';
+export const BOT_USER_DATA = {
+  id: BOT_ID,
+  name: 'Cai',
+  email: 'bot@oasm.local',
+  role: Role.BOT,
+  emailVerified: true,
+};
