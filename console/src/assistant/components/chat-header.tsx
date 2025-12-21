@@ -10,10 +10,15 @@ import {
 import { SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useState, useCallback, useMemo } from 'react';
-import { useAssistant } from '@/hooks/use-assistant';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { ChatHeaderProps } from '../types/types';
 import { McpServerManager } from './mcp-server-manager';
+import {
+  useAiAssistantControllerDeleteConversation,
+  useAiAssistantControllerDeleteConversations,
+  getAiAssistantControllerGetConversationsQueryKey,
+} from '@/services/apis/gen/queries';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function ChatHeader({
   title = 'AI Assistant',
@@ -28,7 +33,11 @@ export function ChatHeader({
   const [isSidebarOpen, setIsSidebarOpen] = useState(showSidebar);
   const [visibleCount, setVisibleCount] = useState(10);
 
-  const { deleteConversation, deleteAllConversations } = useAssistant();
+  const queryClient = useQueryClient();
+  const deleteConversationMutation =
+    useAiAssistantControllerDeleteConversation();
+  const deleteAllConversationsMutation =
+    useAiAssistantControllerDeleteConversations();
 
   const toggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
@@ -57,15 +66,31 @@ export function ChatHeader({
 
   const handleDeleteConversation = useCallback(
     async (conversationId: string) => {
-      await deleteConversation(conversationId);
+      await deleteConversationMutation.mutateAsync({ id: conversationId });
+      queryClient.invalidateQueries({
+        queryKey: getAiAssistantControllerGetConversationsQueryKey(),
+      });
+      // If we deleted the current conversation, we should probably tell the parent
+      if (currentSessionId === conversationId) {
+        onCreateNewSession?.();
+      }
     },
-    [deleteConversation],
+    [
+      deleteConversationMutation,
+      queryClient,
+      currentSessionId,
+      onCreateNewSession,
+    ],
   );
 
   const handleDeleteAllConversations = useCallback(async () => {
-    await deleteAllConversations();
+    await deleteAllConversationsMutation.mutateAsync();
+    queryClient.invalidateQueries({
+      queryKey: getAiAssistantControllerGetConversationsQueryKey(),
+    });
+    onCreateNewSession?.();
     setIsSidebarOpen(false);
-  }, [deleteAllConversations]);
+  }, [deleteAllConversationsMutation, queryClient, onCreateNewSession]);
 
   const handleLoadMore = useCallback(() => {
     setVisibleCount((prev) => prev + 10);
