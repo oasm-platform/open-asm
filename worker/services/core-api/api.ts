@@ -520,6 +520,40 @@ export interface GetManyJobHistoryResponseDtoDto {
   pageCount: number;
 }
 
+export interface On {
+  target: string[];
+  schedule: OnScheduleEnum;
+}
+
+export interface WorkflowJob {
+  name: string;
+  run: string;
+}
+
+export interface WorkflowContent {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+}
+
+export interface Workflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  content: WorkflowContent;
+}
+
+export interface JobHistoryDetailResponseDto {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  workflow: Workflow;
+}
+
 export interface Notification {
   id: string;
   /** @format date-time */
@@ -1267,31 +1301,6 @@ export interface GetManyGetManyWorkflowsResponseDtoDto {
   pageCount: number;
 }
 
-export interface On {
-  target: string[];
-  schedule: OnScheduleEnum;
-}
-
-export interface WorkflowJob {
-  name: string;
-  run: string;
-}
-
-export interface WorkflowContent {
-  on: On;
-  jobs: WorkflowJob[];
-  name: string;
-}
-
-export interface Workflow {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  content: WorkflowContent;
-}
-
 export interface CreateWorkflowDto {
   /**
    * Name of the workflow
@@ -1738,6 +1747,15 @@ export enum JobHistoryResponseDtoStatusEnum {
   Cancelled = "cancelled",
 }
 
+export enum OnScheduleEnum {
+  Disabled = "disabled",
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
 export enum NotificationResponseDtoStatusEnum {
   Sent = "sent",
   Unread = "unread",
@@ -1769,15 +1787,6 @@ export enum CreateToolDtoCategoryEnum {
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
   Assistant = "assistant",
-}
-
-export enum OnScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
 }
 
 export enum AssetGroupWorkflowScheduleEnum {
@@ -2774,6 +2783,25 @@ export class Api<
       path: `/api/jobs-registry/histories`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a job history detail with its associated workflow and jobs.
+   *
+   * @tags JobsRegistry
+   * @name JobsRegistryControllerGetJobHistoryDetail
+   * @summary Get Job History Detail
+   * @request GET:/api/jobs-registry/histories/{id}
+   */
+  jobsRegistryControllerGetJobHistoryDetail = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry/histories/${id}`,
+      method: "GET",
       format: "json",
       ...params,
     });

@@ -1,105 +1,70 @@
-import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { JobStatus } from '@/common/enums/enum';
-import type { TestingModule } from '@nestjs/testing';
-import { Test } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
 import { DataSource, type Repository } from 'typeorm';
+import { DataAdapterService } from '../data-adapter/data-adapter.service';
+import { StorageService } from '../storage/storage.service';
+import { ToolsService } from '../tools/tools.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
 
-describe('JobsRegistryService', () => {
+describe('JobsRegistryService - getJobHistoryDetail', () => {
   let service: JobsRegistryService;
-  let mockJobRepository: Partial<Repository<Job>>;
-  let mockJobHistoryRepository: Partial<Repository<JobHistory>>;
-  let mockJobErrorLogRepository: Partial<Repository<JobErrorLog>>;
+  let jobHistoryRepo: Repository<JobHistory>;
+  let jobRepo: Repository<Job>;
 
   beforeEach(async () => {
-    mockJobRepository = {
-      find: jest.fn(),
-      findOne: jest.fn(),
-      save: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnThis(),
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
-      leftJoin: jest.fn().mockReturnThis(),
-      innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      take: jest.fn().mockReturnThis(),
-      skip: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      getMany: jest.fn(),
-      getManyAndCount: jest.fn(),
-    } as any;
-
-    mockJobHistoryRepository = {
-      find: jest.fn(),
-      findOne: jest.fn(),
-      save: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnThis(),
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
-      leftJoin: jest.fn().mockReturnThis(),
-      innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      take: jest.fn().mockReturnThis(),
-      skip: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      getMany: jest.fn(),
-      getManyAndCount: jest.fn(),
-    } as any;
-
-    mockJobErrorLogRepository = {
-      find: jest.fn(),
-      findOne: jest.fn(),
-      save: jest.fn(),
-    } as any;
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JobsRegistryService,
         {
           provide: getRepositoryToken(Job),
-          useValue: mockJobRepository,
+          useValue: {
+            find: jest.fn(),
+          },
         },
         {
           provide: getRepositoryToken(JobHistory),
-          useValue: mockJobHistoryRepository,
+          useValue: {
+            findOne: jest.fn(),
+            createQueryBuilder: () => ({
+              innerJoin: jest.fn().mockReturnThis(),
+              innerJoinAndSelect: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              getExists: jest.fn(),
+            }),
+          },
         },
         {
           provide: getRepositoryToken(JobErrorLog),
-          useValue: mockJobErrorLogRepository,
+          useValue: {
+            save: jest.fn(),
+          },
         },
         {
           provide: DataSource,
           useValue: {
-            createQueryRunner: jest.fn(),
             getRepository: jest.fn(),
-            query: jest.fn(),
           },
         },
         {
-          provide: 'DataAdapterService',
+          provide: DataAdapterService,
           useValue: {
             syncData: jest.fn(),
           },
         },
         {
-          provide: 'ToolsService',
+          provide: ToolsService,
           useValue: {
-            toolsRepository: {
-              find: jest.fn(),
-            },
             getToolByNames: jest.fn(),
           },
         },
         {
-          provide: 'StorageService',
-          useValue: {
-            upload: jest.fn(),
-          },
+          provide: StorageService,
+          useValue: {},
         },
         {
           provide: 'RedisService',
@@ -111,227 +76,102 @@ describe('JobsRegistryService', () => {
     }).compile();
 
     service = module.get<JobsRegistryService>(JobsRegistryService);
+    jobHistoryRepo = module.get<Repository<JobHistory>>(
+      getRepositoryToken(JobHistory),
+    );
+    jobRepo = module.get<Repository<Job>>(getRepositoryToken(Job));
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
+  describe('getJobHistoryDetail', () => {
+    const mockWorkspaceId = 'workspace-123';
+    const mockJobHistoryId = 'history-123';
 
-  describe('getManyJobHistories', () => {
-    it('should return job histories with totalJobs and calculated status', async () => {
-      const workspaceId = randomUUID();
-      const mockJobHistories = [
+    it('should return job history detail with workflow and jobs', async () => {
+      const mockJobHistory = {
+        id: mockJobHistoryId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        workflow: {
+          id: 'workflow-123',
+          name: 'Test Workflow',
+          content: {
+            on: { target: ['test.com'] },
+            jobs: [{ name: 'scan', run: 'nuclei' }],
+            name: 'Test Workflow',
+          },
+        },
+      };
+
+      const mockJobs = [
         {
-          id: randomUUID(),
+          id: 'job-1',
+          status: 'COMPLETED',
+          category: 'VULNERABILITY',
           createdAt: new Date(),
           updatedAt: new Date(),
-          jobs: [
-            {
-              id: randomUUID(),
-              status: JobStatus.COMPLETED,
-              category: 'SUBDOMAINS',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              asset: { id: randomUUID(), value: 'test.com' },
-              tool: { id: randomUUID(), name: 'subfinder' },
-            },
-            {
-              id: randomUUID(),
-              status: JobStatus.COMPLETED,
-              category: 'SUBDOMAINS',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              asset: { id: randomUUID(), value: 'test.com' },
-              tool: { id: randomUUID(), name: 'subfinder' },
-            },
-          ],
+          tool: { id: 'tool-1', name: 'nuclei' },
+          asset: {
+            id: 'asset-1',
+            value: 'test.com',
+            target: { id: 'target-1', value: 'test.com' },
+          },
+          assetService: null,
+          errorLogs: [],
+          workerId: 'worker-1',
         },
       ];
 
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getManyAndCount: jest
-          .fn()
-          .mockResolvedValue([mockJobHistories, mockJobHistories.length]),
-      };
-
       jest
-        .spyOn(mockJobHistoryRepository, 'createQueryBuilder')
-        .mockReturnValue(mockQueryBuilder as any);
+        .spyOn(jobHistoryRepo, 'findOne')
+        .mockResolvedValue(mockJobHistory as any);
+      jest.spyOn(jobHistoryRepo, 'createQueryBuilder').mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      } as any);
+      jest.spyOn(jobRepo, 'find').mockResolvedValue(mockJobs as any);
 
-      const result = await service.getManyJobHistories(workspaceId, {
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: SortOrder.DESC,
-      });
+      const result = await service.getJobHistoryDetail(
+        mockWorkspaceId,
+        mockJobHistoryId,
+      );
 
       expect(result).toBeDefined();
-      expect(result.data).toHaveLength(1);
-      expect(result.total).toBe(1);
-      expect(result.data[0].totalJobs).toBe(2);
-      expect(result.data[0].status).toBe(JobStatus.COMPLETED);
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'workspace.id = :workspaceId',
-        { workspaceId },
-      );
+      expect(result.id).toBe(mockJobHistoryId);
+      expect(result.workflow).toBeDefined();
     });
 
-    it('should calculate status as IN_PROGRESS when any job is in progress', async () => {
-      const workspaceId = randomUUID();
-      const mockJobHistories = [
-        {
-          id: randomUUID(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          jobs: [
-            {
-              id: randomUUID(),
-              status: JobStatus.COMPLETED,
-              category: 'SUBDOMAINS',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              asset: { id: randomUUID(), value: 'test.com' },
-              tool: { id: randomUUID(), name: 'subfinder' },
-            },
-            {
-              id: randomUUID(),
-              status: JobStatus.IN_PROGRESS,
-              category: 'SUBDOMAINS',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              asset: { id: randomUUID(), value: 'test.com' },
-              tool: { id: randomUUID(), name: 'subfinder' },
-            },
-          ],
-        },
-      ];
+    it('should throw NotFoundException when job history not found', async () => {
+      jest.spyOn(jobHistoryRepo, 'findOne').mockResolvedValue(null);
 
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getManyAndCount: jest
-          .fn()
-          .mockResolvedValue([mockJobHistories, mockJobHistories.length]),
+      await expect(
+        service.getJobHistoryDetail(mockWorkspaceId, mockJobHistoryId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when job history does not belong to workspace', async () => {
+      const mockJobHistory = {
+        id: mockJobHistoryId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       jest
-        .spyOn(mockJobHistoryRepository, 'createQueryBuilder')
-        .mockReturnValue(mockQueryBuilder as any);
-
-      const result = await service.getManyJobHistories(workspaceId, {
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: SortOrder.DESC,
-      });
-
-      expect(result.data[0].totalJobs).toBe(2);
-      expect(result.data[0].status).toBe(JobStatus.IN_PROGRESS);
-    });
-
-    it('should calculate status as FAILED when any job is failed', async () => {
-      const workspaceId = randomUUID();
-      const mockJobHistories = [
-        {
-          id: randomUUID(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          jobs: [
-            {
-              id: randomUUID(),
-              status: JobStatus.COMPLETED,
-              category: 'SUBDOMAINS',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              asset: { id: randomUUID(), value: 'test.com' },
-              tool: { id: randomUUID(), name: 'subfinder' },
-            },
-            {
-              id: randomUUID(),
-              status: JobStatus.FAILED,
-              category: 'SUBDOMAINS',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              asset: { id: randomUUID(), value: 'test.com' },
-              tool: { id: randomUUID(), name: 'subfinder' },
-            },
-          ],
-        },
-      ];
-
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        .spyOn(jobHistoryRepo, 'findOne')
+        .mockResolvedValue(mockJobHistory as any);
+      jest.spyOn(jobHistoryRepo, 'createQueryBuilder').mockReturnValue({
         innerJoin: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getManyAndCount: jest
-          .fn()
-          .mockResolvedValue([mockJobHistories, mockJobHistories.length]),
-      };
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(false),
+      } as any);
 
-      jest
-        .spyOn(mockJobHistoryRepository, 'createQueryBuilder')
-        .mockReturnValue(mockQueryBuilder as any);
-
-      const result = await service.getManyJobHistories(workspaceId, {
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: SortOrder.DESC,
-      });
-
-      expect(result.data[0].totalJobs).toBe(2);
-      expect(result.data[0].status).toBe(JobStatus.FAILED);
-    });
-
-    it('should handle empty jobs array', async () => {
-      const workspaceId = randomUUID();
-      const mockJobHistories = [
-        {
-          id: randomUUID(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          jobs: [],
-        },
-      ];
-
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getManyAndCount: jest
-          .fn()
-          .mockResolvedValue([mockJobHistories, mockJobHistories.length]),
-      };
-
-      jest
-        .spyOn(mockJobHistoryRepository, 'createQueryBuilder')
-        .mockReturnValue(mockQueryBuilder as any);
-
-      const result = await service.getManyJobHistories(workspaceId, {
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: SortOrder.DESC,
-      });
-
-      expect(result.data[0].totalJobs).toBe(0);
-      expect(result.data[0].status).toBe(JobStatus.COMPLETED); // Default when no jobs
+      await expect(
+        service.getJobHistoryDetail(mockWorkspaceId, mockJobHistoryId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

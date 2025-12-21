@@ -31,6 +31,7 @@ import { builtInTools } from '../tools/tools-privider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
+import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobs,
@@ -860,5 +861,53 @@ export class JobsRegistryService {
     }));
 
     return getManyResponse({ query, data: transformedData, total });
+  }
+
+  public async getJobHistoryDetail(
+    workspaceId: string,
+    id: string,
+  ): Promise<JobHistoryDetailResponseDto> {
+    const jobHistory = await this.jobHistoryRepo.findOne({
+      where: {
+        id,
+      },
+      relations: {
+        workflow: true,
+        jobs: {
+          tool: true,
+          asset: {
+            target: true,
+          },
+          assetService: true,
+          errorLogs: true,
+        },
+      },
+    });
+
+    if (!jobHistory) {
+      throw new NotFoundException('Job history not found');
+    }
+
+    // Verify that the job history belongs to the workspace
+    const belongsToWorkspace = await this.jobHistoryRepo
+      .createQueryBuilder('jobHistory')
+      .innerJoin('jobHistory.jobs', 'job')
+      .innerJoin('job.asset', 'jAsset')
+      .innerJoin('jAsset.target', 'jTarget')
+      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
+      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .where('jobHistory.id = :id', { id })
+      .andWhere('workspace.id = :workspaceId', { workspaceId })
+      .getExists();
+
+    if (!belongsToWorkspace) {
+      throw new NotFoundException('Job history not found in workspace');
+    }
+    return {
+      id: jobHistory.id,
+      createdAt: jobHistory.createdAt,
+      updatedAt: jobHistory.updatedAt,
+      workflow: jobHistory.workflow,
+    };
   }
 }

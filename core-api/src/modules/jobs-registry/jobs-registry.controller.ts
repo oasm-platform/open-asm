@@ -8,6 +8,7 @@ import {
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
+import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobsDto,
@@ -103,5 +104,24 @@ export class JobsRegistryController {
     @Query() query: GetManyBaseQueryParams,
   ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
     return this.jobsRegistryService.getManyJobHistories(workspaceId, query);
+  }
+
+  @Doc({
+    summary: 'Get Job History Detail',
+    description:
+      'Retrieves a job history detail with its associated workflow and jobs.',
+    response: {
+      serialization: JobHistoryDetailResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('/histories/:id')
+  getJobHistoryDetail(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') id: string,
+  ): Promise<JobHistoryDetailResponseDto> {
+    return this.jobsRegistryService.getJobHistoryDetail(workspaceId, id);
   }
 }

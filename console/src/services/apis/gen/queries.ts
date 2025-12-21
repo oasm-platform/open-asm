@@ -546,6 +546,48 @@ export type GetManyJobHistoryResponseDtoDto = {
   pageCount: number;
 };
 
+export type OnSchedule = (typeof OnSchedule)[keyof typeof OnSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const OnSchedule = {
+  disabled: 'disabled',
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type On = {
+  target: string[];
+  schedule: OnSchedule;
+};
+
+export type WorkflowJob = {
+  name: string;
+  run: string;
+};
+
+export type WorkflowContent = {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+};
+
+export type Workflow = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  content: WorkflowContent;
+};
+
+export type JobHistoryDetailResponseDto = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  workflow: Workflow;
+};
+
 export type Notification = {
   id: string;
   createdAt: string;
@@ -1222,41 +1264,6 @@ export type GetManyGetManyWorkflowsResponseDtoDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-};
-
-export type OnSchedule = (typeof OnSchedule)[keyof typeof OnSchedule];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const OnSchedule = {
-  disabled: 'disabled',
-  '0_0_*_*_*': '0 0 * * *',
-  '0_0_*/3_*_*': '0 0 */3 * *',
-  '0_0_*_*_0': '0 0 * * 0',
-  '0_0_*/14_*_*': '0 0 */14 * *',
-  '0_0_1_*_*': '0 0 1 * *',
-} as const;
-
-export type On = {
-  target: string[];
-  schedule: OnSchedule;
-};
-
-export type WorkflowJob = {
-  name: string;
-  run: string;
-};
-
-export type WorkflowContent = {
-  on: On;
-  jobs: WorkflowJob[];
-  name: string;
-};
-
-export type Workflow = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  content: WorkflowContent;
 };
 
 export type CreateWorkflowDto = {
@@ -7390,6 +7397,182 @@ export function useJobsRegistryControllerGetManyJobHistories<
 } {
   const queryOptions = getJobsRegistryControllerGetManyJobHistoriesQueryOptions(
     params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves a job history detail with its associated workflow and jobs.
+ * @summary Get Job History Detail
+ */
+export const jobsRegistryControllerGetJobHistoryDetail = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<JobHistoryDetailResponseDto>(
+    { url: `/api/jobs-registry/histories/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getJobsRegistryControllerGetJobHistoryDetailQueryKey = (
+  id?: string,
+) => {
+  return [`/api/jobs-registry/histories/${id}`] as const;
+};
+
+export const getJobsRegistryControllerGetJobHistoryDetailQueryOptions = <
+  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getJobsRegistryControllerGetJobHistoryDetailQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>
+  > = ({ signal }) =>
+    jobsRegistryControllerGetJobHistoryDetail(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type JobsRegistryControllerGetJobHistoryDetailQueryResult = NonNullable<
+  Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>
+>;
+export type JobsRegistryControllerGetJobHistoryDetailQueryError = unknown;
+
+export function useJobsRegistryControllerGetJobHistoryDetail<
+  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+          TError,
+          Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useJobsRegistryControllerGetJobHistoryDetail<
+  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+          TError,
+          Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useJobsRegistryControllerGetJobHistoryDetail<
+  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get Job History Detail
+ */
+
+export function useJobsRegistryControllerGetJobHistoryDetail<
+  TData = Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof jobsRegistryControllerGetJobHistoryDetail>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getJobsRegistryControllerGetJobHistoryDetailQueryOptions(
+    id,
     options,
   );
 
