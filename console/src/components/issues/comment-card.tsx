@@ -135,7 +135,10 @@ const CommentCard = ({
               {/* Dropdown Menu for Edit/Delete - only show for own comments */}
               {isOwnComment && (comment.isCanEdit || comment.isCanDelete) && (
                 <DropdownMenu>
-                  <DropdownMenuTrigger disabled={!comment.isCanEdit} asChild>
+                  <DropdownMenuTrigger
+                    disabled={!comment.isCanEdit && !comment.isCanDelete}
+                    asChild
+                  >
                     <Button
                       variant="ghost"
                       size="sm"
@@ -188,7 +191,7 @@ const CommentCard = ({
 
           {/* Body */}
           <div className="p-4 prose prose-sm max-w-none dark:prose-invert">
-            {comment.repCommentId && !isEditing && (
+            {comment.repCommentId && comment.repComment && !isEditing && (
               <ReplyPreview repliedComment={comment.repComment} />
             )}
             {isEditing ? (

@@ -2,7 +2,13 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { IssueCommentType } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import {
+  Column,
+  DeleteDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+} from 'typeorm';
 import { Issue } from './issue.entity';
 
 @Entity('issue_comments')
@@ -49,4 +55,7 @@ export class IssueComment extends BaseEntity {
   @JoinColumn({ name: 'repCommentId' })
   @ApiProperty({ type: () => IssueComment })
   repComment: IssueComment;
+
+  @DeleteDateColumn()
+  deletedAt: Date;
 }

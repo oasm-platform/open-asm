@@ -84,8 +84,10 @@ export class IssuesService {
 
     const queryBuilder = this.issueCommentsRepository
       .createQueryBuilder('issueComments')
+      .withDeleted()
       .leftJoinAndSelect('issueComments.createdBy', 'createdBy')
       .where('issueComments.issueId = :issueId', { issueId })
+      .andWhere('issueComments.deletedAt IS NULL')
       .select([
         'issueComments',
         'createdBy.id',
@@ -93,6 +95,7 @@ export class IssuesService {
         'createdBy.role',
         'repComment.id',
         'repComment.content',
+        'repComment.deletedAt',
         'repCreatedBy.id',
         'repCreatedBy.name',
       ])
@@ -115,7 +118,9 @@ export class IssuesService {
       repComment: comment.repComment
         ? {
             id: comment.repComment.id,
-            content: comment.repComment.content,
+            content: comment.repComment.deletedAt
+              ? 'The comment has been deleted.'
+              : comment.repComment.content,
             createdBy: {
               id: comment.repComment.createdBy.id,
               name: comment.repComment.createdBy.name,
@@ -185,7 +190,7 @@ export class IssuesService {
       throw new Error('Only the creator of the comment can delete it');
     }
 
-    await this.issueCommentsRepository.remove(comment);
+    await this.issueCommentsRepository.softDelete(id);
     return { message: 'Comment deleted successfully' };
   }
 
