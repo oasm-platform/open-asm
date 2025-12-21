@@ -1,4 +1,4 @@
-import { Trash2, MessageCircle, Calendar } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { ChatSession } from '../../types/types';
@@ -23,25 +23,14 @@ export function ChatHistoryItem({
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer',
+        'group relative flex items-center justify-between gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer',
         isActive
           ? 'bg-secondary/50 border-primary/20'
           : 'bg-card border-transparent hover:bg-muted/50 hover:border-border',
       )}
       onClick={onSelect}
     >
-      <div
-        className={cn(
-          'h-10 w-10 flex-shrink-0 rounded-md flex items-center justify-center',
-          isActive
-            ? 'bg-primary/20 text-primary'
-            : 'bg-muted text-muted-foreground',
-        )}
-      >
-        <MessageCircle className="h-5 w-5" />
-      </div>
-
-      <div className="flex-1 min-w-0 pr-8">
+      <div className="flex-1 min-w-0 flex items-center justify-between pr-8">
         <h4
           className={cn(
             'text-sm font-medium truncate',
@@ -51,8 +40,7 @@ export function ChatHistoryItem({
           {session.title || 'Untitled Conversation'}
         </h4>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-          <Calendar className="h-3 w-3" />
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground ml-4 whitespace-nowrap opacity-70">
           <span>{format(date, 'MMM d, yyyy • HH:mm')}</span>
         </div>
       </div>
