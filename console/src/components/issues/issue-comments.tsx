@@ -4,6 +4,7 @@ import {
   useIssuesControllerCreateComment,
   useIssuesControllerGetById,
   useIssuesControllerGetCommentsByIssueId,
+  useRootControllerGetMetadata,
   type Issue,
   type IssueComment,
 } from '@/services/apis/gen/queries';
@@ -30,7 +31,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
   const createCommentMutation = useIssuesControllerCreateComment();
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<IssueComment | null>(null);
-
+  const isAssistant = useRootControllerGetMetadata().data?.isAssistant;
   const handleCreateComment = () => {
     if (newComment.trim()) {
       createCommentMutation.mutate(
@@ -106,9 +107,11 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder={
-                replyingTo
-                  ? 'Type your reply... (use @cai for AI assistance)'
-                  : 'Leave a comment (use @cai for AI assistance)'
+                isAssistant
+                  ? 'Leave a comment (Use @cai for AI assistance)'
+                  : replyingTo
+                    ? 'Type your reply to this comment...'
+                    : 'Add a comment to share your thoughts on this issue...'
               }
               className={`resize-none min-h-[100px] w-full mb-2 ${replyingTo ? 'rounded-t-none border-t-0' : ''}`}
               disabled={issue.status === 'closed'}
