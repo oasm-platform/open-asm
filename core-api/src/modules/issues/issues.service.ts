@@ -7,6 +7,7 @@ import {
   IssueSourceType,
   IssueStatus,
 } from '@/common/enums/enum';
+import { BOT_USER_DATA } from '@/common/constants/app.constants';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   ForbiddenException,
@@ -28,6 +29,7 @@ import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
 import { IssueSourceHandler } from './interfaces/source-handler.interface';
+import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 
 @Injectable()
 export class IssuesService {
@@ -40,6 +42,7 @@ export class IssuesService {
     @InjectRepository(IssueComment)
     private issueCommentsRepository: Repository<IssueComment>,
     private readonly vulnerabilityHandler: VulnerabilitySourceHandler,
+    private readonly aiAssistantService: AiAssistantService,
   ) {
     this.sourceHandlers = new Map([
       [IssueSourceType.VULNERABILITY, this.vulnerabilityHandler],
@@ -55,12 +58,24 @@ export class IssuesService {
   ): Promise<IssueComment> {
     const comment = this.issueCommentsRepository.create({
       content: createCommentDto.content,
+      repCommentId: createCommentDto.repCommentId,
       issue: { id: issueId },
       createdBy: { id: userId },
       isCanDelete,
       isCanEdit,
     });
-    return await this.issueCommentsRepository.save(comment);
+
+    const savedComment = await this.issueCommentsRepository.save(comment);
+
+    // Check if comment contains "@cai" and call AI assistant if it does
+    if (createCommentDto.content.toLowerCase().includes('@cai')) {
+      // Call AI assistant asynchronously to avoid blocking the main process
+      this.processCaiRequest(savedComment).catch((error) => {
+        this.logger.error('Error processing Cai request:', error);
+      });
+    }
+
+    return savedComment;
   }
 
   async getCommentsByIssueId(issueId: string, query: GetManyBaseQueryParams) {
@@ -68,14 +83,23 @@ export class IssuesService {
 
     const queryBuilder = this.issueCommentsRepository
       .createQueryBuilder('issueComments')
+      .withDeleted()
       .leftJoinAndSelect('issueComments.createdBy', 'createdBy')
       .where('issueComments.issueId = :issueId', { issueId })
+      .andWhere('issueComments.deletedAt IS NULL')
       .select([
         'issueComments',
         'createdBy.id',
         'createdBy.name',
         'createdBy.role',
+        'repComment.id',
+        'repComment.content',
+        'repComment.deletedAt',
+        'repCreatedBy.id',
+        'repCreatedBy.name',
       ])
+      .leftJoin('issueComments.repComment', 'repComment')
+      .leftJoin('repComment.createdBy', 'repCreatedBy')
       .orderBy('issueComments.createdAt', 'ASC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -90,6 +114,18 @@ export class IssuesService {
         name: comment.createdBy.name,
         role: comment.createdBy.role,
       },
+      repComment: comment.repComment
+        ? {
+            id: comment.repComment.id,
+            content: comment.repComment.deletedAt
+              ? 'The comment has been deleted.'
+              : comment.repComment.content,
+            createdBy: {
+              id: comment.repComment.createdBy.id,
+              name: comment.repComment.createdBy.name,
+            },
+          }
+        : null,
     }));
 
     return getManyResponse({
@@ -106,7 +142,7 @@ export class IssuesService {
   ): Promise<IssueComment> {
     const comment = await this.issueCommentsRepository.findOne({
       where: { id },
-      relations: ['createdBy'],
+      relations: ['createdBy', 'issue'],
     });
 
     if (!comment) {
@@ -122,7 +158,17 @@ export class IssuesService {
     comment.content = updateCommentDto.content;
     comment.updatedAt = new Date();
 
-    return await this.issueCommentsRepository.save(comment);
+    const updatedComment = await this.issueCommentsRepository.save(comment);
+
+    // Check if comment contains "@cai" and call AI assistant if it does
+    if (updateCommentDto.content.toLowerCase().includes('@cai')) {
+      // Call AI assistant asynchronously to avoid blocking the main process
+      this.processCaiRequest(updatedComment).catch((error) => {
+        this.logger.error('Error processing Cai request:', error);
+      });
+    }
+
+    return updatedComment;
   }
 
   async deleteCommentById(
@@ -143,7 +189,7 @@ export class IssuesService {
       throw new Error('Only the creator of the comment can delete it');
     }
 
-    await this.issueCommentsRepository.remove(comment);
+    await this.issueCommentsRepository.softDelete(id);
     return { message: 'Comment deleted successfully' };
   }
 
@@ -338,6 +384,105 @@ export class IssuesService {
       await handler.onStatusChange(sourceId, status);
     } else {
       this.logger.warn(`No handler found for source type: ${sourceType}`);
+    }
+  }
+
+  /**
+   * This method is called when a user includes @cai in their comment
+   * It calls the AI assistant and saves the response as a comment from the bot
+   */
+  private async processCaiRequest(
+    originalComment: IssueComment,
+  ): Promise<void> {
+    try {
+      const { issueId, createdBy } = originalComment;
+      const userId = createdBy.id;
+      // Get the issue to provide context to the AI assistant
+      const issue = await this.issuesRepository.findOne({
+        where: { id: issueId },
+        relations: ['createdBy'],
+      });
+
+      if (!issue) {
+        this.logger.error(`Issue with ID ${issueId} not found`);
+        return;
+      }
+
+      // Determine issue type based on source type
+      // Default to 0 (General) as requested, to avoid forcing vulnerability prompts on general content
+      const issueType = 0; // IssueType.ISSUE_TYPE_UNSPECIFIED
+
+      // if (issue.sourceType === IssueSourceType.VULNERABILITY) {
+      //   issueType = 2; // IssueType.ISSUE_TYPE_VULNERABILITY
+      // }
+
+      let commentsContext = '';
+
+      // If this comment is a reply, ONLY use the context of the replied comment
+      if (originalComment.repCommentId) {
+        const repliedComment = await this.issueCommentsRepository.findOne({
+          where: { id: originalComment.repCommentId },
+          relations: ['createdBy'],
+        });
+
+        if (repliedComment) {
+          commentsContext = `[${repliedComment.createdBy.name}]: ${repliedComment.content}`;
+        }
+      } else {
+        // Fetch recent comments to provide conversation context
+        const recentComments = await this.issueCommentsRepository.find({
+          where: { issue: { id: issueId } },
+          order: { createdAt: 'DESC' },
+          take: 10,
+          relations: ['createdBy'],
+        });
+
+        // Format comments for context (chronological order)
+        commentsContext = recentComments
+          .reverse()
+          .map((c) => `[${c.createdBy.name}]: ${c.content}`)
+          .join('\n');
+      }
+
+      // Prepare metadata with issue information
+      const metadata = {
+        issueId: issue.id,
+        issueTitle: issue.title,
+        issueDescription: issue.description,
+        issueStatus: issue.status,
+        issueSourceType: issue.sourceType,
+        issueSourceId: issue.sourceId,
+        workspaceId: issue.workspaceId,
+        commentId: originalComment.id,
+        commentContent: originalComment.content,
+        userId: userId,
+        issueCommentsHistory: commentsContext, // Add history here
+      };
+
+      // Call AI assistant to resolve the issue
+      const response = await this.aiAssistantService.resolveIssue(
+        originalComment.content,
+        issueType,
+        metadata,
+        issue.workspaceId,
+        userId,
+      );
+
+      // Create a new comment from the bot with the AI response
+      const botComment = this.issueCommentsRepository.create({
+        content: response.message,
+        issue: { id: issueId },
+        createdBy: {
+          ...BOT_USER_DATA,
+        },
+        isCanDelete: false,
+        isCanEdit: false,
+        repCommentId: originalComment.id,
+      });
+
+      await this.issueCommentsRepository.save(botComment);
+    } catch (error) {
+      this.logger.error('Error in processCaiRequest:', error);
     }
   }
 }

@@ -6,6 +6,8 @@ export enum Role {
   ADMIN = 'admin',
   /** Regular user */
   USER = 'user',
+  /** Bot user */
+  BOT = 'bot',
 }
 
 /**

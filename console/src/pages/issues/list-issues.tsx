@@ -11,6 +11,8 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 dayjs.extend(relativeTime);
 
@@ -27,7 +29,12 @@ const issueColumns: ColumnDef<Issue>[] = [
           <StatusBadge status={status} className="h-8 px-2" />
           <div className="flex-1 flex flex-col gap-1">
             <div className="font-semibold text-base text-foreground">
-              {issue.title}
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{ p: 'div' }} // Render paragraph as div to avoid nesting issues if needed, or stick to default
+              >
+                {issue.title}
+              </ReactMarkdown>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>#{issue.no || issue.id?.slice(0, 8)}</span>

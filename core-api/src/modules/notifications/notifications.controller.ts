@@ -21,7 +21,7 @@ import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { NotificationResponseDto } from './dto/notification.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 
-@ApiTags('notifications')
+@ApiTags('Notifications')
 @Controller('notifications')
 @UseGuards(AuthGuard)
 export class NotificationsController {

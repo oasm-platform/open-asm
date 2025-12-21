@@ -1,18 +1,32 @@
 import { Role } from '@/common/enums/enum';
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
 import { AuthService } from './../auth/auth.service';
+import { BOT_ID, BOT_USER_DATA } from '@/common/constants/app.constants';
 
 @Injectable()
-export class UsersService {
+export class UsersService implements OnModuleInit {
   constructor(
     @InjectRepository(User)
     public usersRepository: Repository<User>,
     private authService: AuthService,
-  ) { }
+  ) {}
 
+  async onModuleInit() {
+    // Check if bot already exists in DB
+    const existingBot = await this.usersRepository.findOne({
+      where: { id: BOT_ID },
+    });
+
+    if (!existingBot) {
+      // Create bot user if not exists
+      const bot = this.usersRepository.create(BOT_USER_DATA);
+
+      await this.usersRepository.save(bot);
+    }
+  }
   /**
    * Creates the first admin user in the system.
    * @param email The email address to use for the admin user.

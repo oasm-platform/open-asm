@@ -18,6 +18,7 @@ import {
   ConversationService,
   MessageService,
   HealthCheckService,
+  IssueService,
 } from './ai-assistant.interface';
 
 import { Struct } from '@/types';
@@ -43,6 +44,7 @@ export class AiAssistantService implements OnModuleInit {
   private conversationService: ConversationService;
   private messageService: MessageService;
   private healthCheckService: HealthCheckService;
+  private issueService: IssueService;
 
   constructor(
     @Inject('ASSISTANT_PACKAGE') private readonly client: ClientGrpc,
@@ -60,6 +62,7 @@ export class AiAssistantService implements OnModuleInit {
       this.client.getService<MessageService>('MessageService');
     this.healthCheckService =
       this.client.getService<HealthCheckService>('HealthCheck');
+    this.issueService = this.client.getService<IssueService>('IssueService');
   }
 
   private createMetadata(workspaceId?: string, userId?: string): Metadata {
@@ -548,6 +551,40 @@ export class AiAssistantService implements OnModuleInit {
       };
     } catch (error: unknown) {
       this.logger.error('Failed to delete message', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Resolve issue using AI assistant
+   */
+  async resolveIssue(
+    question: string,
+    issueType: number, // IssueType enum value
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    metadata: Record<string, any>,
+    workspaceId?: string,
+    userId?: string,
+  ): Promise<{ message: string }> {
+    try {
+      const grpcMetadata = this.createMetadata(workspaceId, userId);
+
+      const response = await firstValueFrom(
+        this.issueService.resolveIssueServers(
+          {
+            question,
+            issueType,
+            metadata: metadata,
+          },
+          grpcMetadata,
+        ),
+      );
+
+      return {
+        message: response.message || '',
+      };
+    } catch (error: unknown) {
+      this.logger.error('Failed to resolve issue with AI assistant', error);
       throw error;
     }
   }
