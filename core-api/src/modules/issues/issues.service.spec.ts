@@ -80,12 +80,15 @@ describe('IssuesService', () => {
         find: jest.fn(),
         save: jest.fn(),
         remove: jest.fn(),
+        softDelete: jest.fn(),
         create: jest.fn(),
         getManyAndCount: jest.fn(),
         createQueryBuilder: jest.fn(() => ({
+          withDeleted: jest.fn().mockReturnThis(),
           leftJoinAndSelect: jest.fn().mockReturnThis(),
           leftJoin: jest.fn().mockReturnThis(),
           where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
           select: jest.fn().mockReturnThis(),
           orderBy: jest.fn().mockReturnThis(),
           skip: jest.fn().mockReturnThis(),
@@ -534,9 +537,11 @@ describe('IssuesService', () => {
       };
 
       jest.spyOn(commentRepository, 'createQueryBuilder').mockReturnValue({
+        withDeleted: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
@@ -594,9 +599,7 @@ describe('IssuesService', () => {
         ...mockIssueComment,
         createdBy: { id: userId },
       } as IssueComment);
-      jest
-        .spyOn(commentRepository, 'remove')
-        .mockResolvedValue(mockIssueComment as IssueComment);
+      jest.spyOn(commentRepository, 'softDelete').mockResolvedValue({} as any);
 
       const result = await service.deleteCommentById('1', userId);
       expect(result.message).toBe('Comment deleted successfully');
