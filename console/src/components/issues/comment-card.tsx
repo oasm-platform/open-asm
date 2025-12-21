@@ -112,7 +112,7 @@ const CommentCard = ({
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs border border-border px-2 py-0.5 rounded-full text-muted-foreground bg-background">
-                {(comment as IssueComment).createdBy.role === UserRole.bot
+                {comment.createdBy?.role === UserRole.bot
                   ? 'Bot'
                   : issueCreatedBy === comment.createdBy?.id
                     ? 'Author'

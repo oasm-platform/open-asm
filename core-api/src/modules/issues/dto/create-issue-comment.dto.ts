@@ -5,9 +5,6 @@ export class CreateIssueCommentDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsString()
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
   content: string;
 
   @ApiProperty({ required: false })
