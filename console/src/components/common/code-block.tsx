@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import type { ComponentPropsWithoutRef } from 'react';
 
 interface CodeBlockProps extends ComponentPropsWithoutRef<'div'> {
-  language: string;
+  language?: string;
   value: string;
 }
 
