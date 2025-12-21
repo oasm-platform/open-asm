@@ -534,6 +534,7 @@ export type JobHistoryResponseDto = {
   updatedAt: string;
   totalJobs: number;
   status: JobHistoryResponseDtoStatus;
+  workflowName: string;
 };
 
 export type GetManyJobHistoryResponseDtoDto = {

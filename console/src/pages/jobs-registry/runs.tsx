@@ -24,12 +24,17 @@ import { useState } from 'react';
 export default function Runs() {
   const { id: jobHistoryId } = useParams<{ id: string }>();
   const [jobError, setJobError] = useState<Job | null>();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+
   const { data, isLoading } = useJobsRegistryControllerGetManyJobs({
     search: '',
-    page: 1,
-    limit: 100,
-    sortBy: 'createdAt',
-    sortOrder: 'DESC',
+    page,
+    limit: pageSize,
+    sortBy,
+    sortOrder,
     jobHistoryId: jobHistoryId || '',
   });
 
@@ -116,14 +121,18 @@ export default function Runs() {
         columns={columns}
         data={data?.data || []}
         isLoading={isLoading}
-        page={1}
-        pageSize={100}
+        page={data?.page || 1}
+        pageSize={data?.limit || 100}
         totalItems={data?.total || 0}
-        onPageChange={() => {}}
-        onPageSizeChange={() => {}}
-        sortBy="createdAt"
-        sortOrder="DESC"
-        onSortChange={() => {}}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSortChange={(newSortBy, newSortOrder) => {
+          setSortBy(newSortBy);
+          setSortOrder(newSortOrder);
+          setPage(1); // Reset to first page when sorting changes
+        }}
         showColumnVisibility={true}
         showPagination={true}
         onRowClick={(row) => {

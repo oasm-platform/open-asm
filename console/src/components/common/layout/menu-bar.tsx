@@ -119,12 +119,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <WorkspaceSwitcher />
         )}
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="gap-1 md:gap-3">
         {menu.map((item) => (
-          <SidebarGroup key={item.title}>
+          <SidebarGroup key={item.title} className="py-0">
             <SidebarGroupContent>
-              <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
-              <SidebarMenu>
+              <SidebarGroupLabel className="font-bold text-md">
+                {item.title}
+              </SidebarGroupLabel>
+              <SidebarMenu className="gap-0.5">
                 {item.items.map((item) => {
                   // Ensure all URLs are absolute for comparison
                   const toUrl = item.url.startsWith('/')

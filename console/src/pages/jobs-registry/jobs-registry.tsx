@@ -10,11 +10,17 @@ import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { Calendar } from 'lucide-react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 dayjs.extend(duration);
 
 const JobsRegistryPage = () => {
   const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+
   const {
     data: jobsData,
     isLoading,
@@ -22,10 +28,10 @@ const JobsRegistryPage = () => {
     error,
   } = useJobsRegistryControllerGetManyJobHistories(
     {
-      page: 1,
-      limit: 100,
-      sortBy: 'createdAt',
-      sortOrder: 'DESC',
+      page,
+      limit: pageSize,
+      sortBy,
+      sortOrder,
     },
     {
       query: {
@@ -45,7 +51,7 @@ const JobsRegistryPage = () => {
               onlyIcon
               status={row.original.status as JobStatus}
             />
-            <pre>{row.original.workflowName}</pre>
+            <pre>{row.original?.workflowName || 'Manual run'}</pre>
           </div>
         );
       },
@@ -100,8 +106,15 @@ const JobsRegistryPage = () => {
         page={jobsData?.page || 1}
         pageSize={jobsData?.limit || 100}
         totalItems={jobsData?.total || 100}
-        onPageChange={() => {}}
-        onPageSizeChange={() => {}}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSortChange={(newSortBy, newSortOrder) => {
+          setSortBy(newSortBy);
+          setSortOrder(newSortOrder);
+          setPage(1); // Reset to first page when sorting changes
+        }}
         showPagination={true}
         onRowClick={(row) => {
           navigate(`/jobs/runs/${row.id}`);
