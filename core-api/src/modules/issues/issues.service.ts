@@ -27,6 +27,7 @@ import {
 import { UpdateIssueCommentDto } from './dto/update-issue-comment.dto';
 import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
+import { User } from '../auth/entities/user.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
 import { IssueSourceHandler } from './interfaces/source-handler.interface';
 import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
@@ -474,7 +475,7 @@ export class IssuesService {
         issue: { id: issueId },
         createdBy: {
           ...BOT_USER_DATA,
-        },
+        } as User,
         isCanDelete: false,
         isCanEdit: false,
         repCommentId: originalComment.id,
