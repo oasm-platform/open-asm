@@ -13,6 +13,7 @@ import type {
 } from '../../types/mcp';
 import { McpServerTabs } from './mcp-server-tabs';
 import { useMcp } from '../../context/mcp-context';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface McpServerItemProps {
   name: string;
@@ -87,17 +88,21 @@ export function McpServerItem({
 
         {/* Actions Row */}
         <div className="flex items-center gap-2 ml-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(name);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <ConfirmDialog
+            title="Delete MCP Server"
+            description={`Are you sure you want to delete the MCP server '${name}'?`}
+            onConfirm={() => onDelete(name)}
+            confirmText="Delete"
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            }
+          />
 
           <Button
             variant="ghost"

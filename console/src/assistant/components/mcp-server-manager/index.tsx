@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -55,10 +55,10 @@ function McpServerManagerContent({
     setPendingToolChanges,
   } = useMcp();
 
-  const mcpServers = (data?.mcpServers || {}) as Record<
-    string,
-    McpServerConfigWithStatus
-  >;
+  const mcpServers = useMemo(
+    () => (data?.mcpServers || {}) as Record<string, McpServerConfigWithStatus>,
+    [data],
+  );
 
   // Sync pending configs with server data initially or on reset
   useEffect(() => {
@@ -66,101 +66,20 @@ function McpServerManagerContent({
     setPendingToolChanges({});
   }, [data, setPendingConfigs, setPendingToolChanges]);
 
-  // Force refresh MCP servers from backend
-  const handleRefresh = () => {
-    refetch().catch((err) => {
-      console.debug('Manual refresh encountered error/cancel:', err);
-    });
-    toast.success('Refreshing MCP servers...');
-  };
-
-  // Show the entire current configuration in JSON
-  const handleEditGlobalJson = () => {
-    const cleanConfig: Record<string, McpServerConfig> = {};
-    Object.entries(mcpServers).forEach(([key, val]) => {
-      cleanConfig[key] = {
-        command: val.command,
-        args: val.args,
-        env: val.env,
-        url: val.url,
-        headers: val.headers,
-        disabled: val.disabled,
-        timeout: val.timeout,
-        allowed_tools: val.allowed_tools,
-      };
-    });
-
-    setJsonInput(JSON.stringify({ mcpServers: cleanConfig }, null, 2));
-    setShowEditor(true);
-  };
-
-  const handleJsonSubmit = async () => {
-    let serversToUpdate: Record<string, McpServerConfig> = {};
-
-    try {
-      const parsed = JSON.parse(jsonInput);
-
-      if (parsed.mcpServers) {
-        serversToUpdate = parsed.mcpServers;
-      } else {
-        if (parsed.command || parsed.url) {
-          toast.error(
-            'JSON seems to be a single server config. Please wrap it in a server name key, e.g. { "my-server": { ... } }',
-          );
-          return;
-        }
-        serversToUpdate = parsed;
-      }
-
-      // Relax: allow empty mcpServers object if user wants to clear all servers
-      // if (Object.keys(serversToUpdate).length === 0) {
-      //   toast.warning('No servers found in JSON');
-      //   return;
-      // }
-    } catch (e) {
-      const error = e as Error;
-      toast.error('Invalid JSON syntax: ' + error.message);
-      return;
-    }
-
-    try {
-      await updateServerMutation.mutateAsync({
-        data: { mcpServers: serversToUpdate },
-      });
-
-      toast.success(
-        `Successfully imported ${Object.keys(serversToUpdate).length} server(s)`,
-      );
-      refetch();
-      setShowEditor(false);
-      setPendingToolChanges({});
-    } catch (error) {
-      console.error('Import failed:', error);
-      const apiError = error as ApiError;
-      const msg =
-        apiError.response?.data?.message ||
-        apiError.message ||
-        'Failed to import servers';
-      toast.error(`Import Error: ${msg}`);
-    }
-  };
-
-  const handleToolToggle = async (serverName: string) => {
-    // Get the pending changes for this server
-    const pendingAllowedTools = pendingToolChanges[serverName];
-
-    if (pendingAllowedTools === undefined) {
-      // No pending changes, user probably clicked Save without making changes
-      return;
-    }
-
-    try {
-      // Build complete server config with all servers to avoid deletion,
-      // but update the allowed_tools for the target server.
-      const allServers: Record<string, McpServerConfig> = {};
+  // Helper to extract clean config from servers (removing backend-added status fields)
+  const getCleanServersConfig = useCallback(
+    (updates?: {
+      name: string;
+      config?: Partial<McpServerConfig>;
+      remove?: boolean;
+    }) => {
+      const cleanConfig: Record<string, McpServerConfig> = {};
 
       Object.entries(mcpServers).forEach(([key, val]) => {
-        allServers[key] = {
+        // Skip if this is the one we're removing
+        if (updates?.remove && updates.name === key) return;
+
+        cleanConfig[key] = {
           command: val.command,
           args: val.args,
           env: val.env,
@@ -168,67 +87,113 @@ function McpServerManagerContent({
           headers: val.headers,
           disabled: val.disabled,
           timeout: val.timeout,
-          // Update allowed_tools only for the target server
-          allowed_tools:
-            key === serverName ? pendingAllowedTools : val.allowed_tools,
+          allowed_tools: val.allowed_tools,
+          // Apply updates if this is the target server
+          ...(updates?.name === key ? updates.config : {}),
         };
       });
 
-      await updateServerMutation.mutateAsync({
-        data: {
-          mcpServers: allServers,
-        },
-      });
+      return cleanConfig;
+    },
+    [mcpServers],
+  );
 
-      toast.success(`Updated tools for ${serverName}`);
-      refetch();
-    } catch (error) {
-      console.error('Failed to update tools:', error);
-      toast.error('Failed to update tools');
+  // Centralized update function
+  const updateServers = useCallback(
+    async (
+      newConfigs: Record<string, McpServerConfig>,
+      successMsg?: string,
+    ) => {
+      try {
+        await updateServerMutation.mutateAsync({
+          data: { mcpServers: newConfigs },
+        });
+
+        if (showEditor) {
+          setJsonInput(JSON.stringify({ mcpServers: newConfigs }, null, 2));
+        }
+
+        if (successMsg) toast.success(successMsg);
+        refetch();
+        return true;
+      } catch (error) {
+        const apiError = error as ApiError;
+        const msg =
+          apiError.response?.data?.message ||
+          apiError.message ||
+          'Failed to update servers';
+        toast.error(`Error: ${msg}`);
+        return false;
+      }
+    },
+    [updateServerMutation, showEditor, setJsonInput, refetch],
+  );
+
+  const handleRefresh = () => {
+    refetch().catch((err) => {
+      console.debug('Manual refresh encountered error/cancel:', err);
+    });
+    toast.success('Refreshing MCP servers...');
+  };
+
+  const handleEditGlobalJson = () => {
+    const cleanConfig = getCleanServersConfig();
+    setJsonInput(JSON.stringify({ mcpServers: cleanConfig }, null, 2));
+    setShowEditor(true);
+  };
+
+  const handleJsonSubmit = async () => {
+    try {
+      const parsed = JSON.parse(jsonInput);
+      const serversToUpdate = parsed.mcpServers || parsed;
+
+      if (parsed.command || parsed.url) {
+        toast.error(
+          'JSON seems to be a single server config. Please wrap it in a server name key.',
+        );
+        return;
+      }
+
+      const success = await updateServers(
+        serversToUpdate,
+        `Successfully imported ${Object.keys(serversToUpdate).length} server(s)`,
+      );
+      if (success) {
+        setShowEditor(false);
+        setPendingToolChanges({});
+      }
+    } catch (e) {
+      toast.error('Invalid JSON syntax: ' + (e as Error).message);
     }
+  };
+
+  const handleToolToggle = async (serverName: string) => {
+    const pendingAllowedTools = pendingToolChanges[serverName];
+    if (pendingAllowedTools === undefined) return;
+
+    const newConfigs = getCleanServersConfig({
+      name: serverName,
+      config: { allowed_tools: pendingAllowedTools },
+    });
+
+    await updateServers(newConfigs, `Updated tools for ${serverName}`);
   };
 
   const handleToggle = async (name: string, currentConfig: McpServerConfig) => {
-    try {
-      // Build complete server config with all servers to avoid deletion
-      const allServers: Record<string, McpServerConfig> = {};
+    const newConfigs = getCleanServersConfig({
+      name,
+      config: { disabled: !currentConfig.disabled },
+    });
 
-      // Include all existing servers
-      Object.entries(mcpServers).forEach(([serverName, serverConfig]) => {
-        allServers[serverName] = {
-          command: serverConfig.command,
-          args: serverConfig.args,
-          env: serverConfig.env,
-          url: serverConfig.url,
-          headers: serverConfig.headers,
-          timeout: serverConfig.timeout,
-          allowed_tools: serverConfig.allowed_tools,
-          // Toggle disabled flag only for the target server
-          disabled:
-            serverName === name
-              ? !currentConfig.disabled
-              : serverConfig.disabled,
-        };
-      });
-
-      await updateServerMutation.mutateAsync({
-        data: {
-          mcpServers: allServers,
-        },
-      });
-      refetch();
-      toast.success(
-        `Server ${name} ${currentConfig.disabled ? 'enabled' : 'disabled'}`,
-      );
-    } catch {
-      toast.error('Failed to toggle server');
-    }
+    await updateServers(
+      newConfigs,
+      `Server ${name} ${currentConfig.disabled ? 'enabled' : 'disabled'}`,
+    );
   };
 
   const handleDelete = async (name: string) => {
-    toast.info(
-      `To delete '${name}', please use 'Edit Project MCP' and remove it from the JSON configuration.`,
-    );
+    const newConfigs = getCleanServersConfig({ name, remove: true });
+    await updateServers(newConfigs, `Server '${name}' deleted successfully`);
   };
 
   return (
@@ -246,7 +211,6 @@ function McpServerManagerContent({
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-0">
-          {/* Top Section: Server List & Actions */}
           <div
             className={`bg-background border-b overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
               showEditor ? 'h-1/2' : 'h-full'
@@ -263,7 +227,6 @@ function McpServerManagerContent({
             />
           </div>
 
-          {/* Bottom Section: Editor */}
           {showEditor && (
             <McpServerEditor
               onSubmit={handleJsonSubmit}
