@@ -1,4 +1,5 @@
 import { IssueStatusFilters } from '@/components/issues/issue-status-filters';
+import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
@@ -9,6 +10,7 @@ import {
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { Tag } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -45,6 +47,28 @@ const issueColumns: ColumnDef<Issue>[] = [
                 </span>{' '}
                 opened {dayjs(issue.createdAt).fromNow()}
               </span>
+              {issue.tags && issue.tags.length > 0 && (
+                <>
+                  <span>•</span>
+                  <div className="flex items-center gap-1">
+                    {issue.tags.slice(0, 3).map((tag, idx) => (
+                      <Badge
+                        key={idx}
+                        variant="outline"
+                        className="h-5 px-1.5 text-[10px] gap-0.5"
+                      >
+                        <Tag size={10} />
+                        {tag}
+                      </Badge>
+                    ))}
+                    {issue.tags.length > 3 && (
+                      <span className="text-muted-foreground text-[10px]">
+                        +{issue.tags.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

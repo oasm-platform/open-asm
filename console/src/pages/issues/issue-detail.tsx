@@ -1,5 +1,6 @@
 import Page from '@/components/common/page';
 import IssueComments from '@/components/issues/issue-comments';
+import IssueTags from '@/components/issues/issue-tags';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import StatusBadge from '@/components/ui/status-badge';
@@ -113,6 +114,16 @@ const IssueDetail = () => {
               </span>{' '}
               opened this issue {dayjs(issue.createdAt).fromNow()}
             </span>
+          </div>
+        </div>
+        <div className="mb-6 pb-6 border-b border-border">
+          <div className="flex items-start gap-4">
+            <span className="text-sm font-medium text-muted-foreground min-w-[60px]">
+              Tags
+            </span>
+            <div className="flex-1">
+              <IssueTags issue={issue} onUpdate={refetch} />
+            </div>
           </div>
         </div>
         <IssueComments issue={issue} />
