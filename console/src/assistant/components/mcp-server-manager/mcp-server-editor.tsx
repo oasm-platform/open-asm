@@ -58,7 +58,7 @@ export function McpServerEditor({
         </span>
         <Button onClick={onSubmit} disabled={isPending}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save Configuration
+          Save
         </Button>
       </div>
     </div>

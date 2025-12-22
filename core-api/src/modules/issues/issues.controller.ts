@@ -28,7 +28,7 @@ import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { IssuesService } from './issues.service';
 
-@ApiTags('issues')
+@ApiTags('Issues')
 @Controller('issues')
 export class IssuesController {
   constructor(private readonly issuesService: IssuesService) {}

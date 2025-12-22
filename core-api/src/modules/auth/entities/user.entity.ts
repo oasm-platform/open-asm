@@ -26,6 +26,7 @@ export class User extends BaseEntity {
   @Column('text', { nullable: true })
   image?: string;
 
+  @ApiProperty({ enum: Role })
   @Column({ type: 'enum', enum: Role, default: Role.USER })
   role: Role;
 
