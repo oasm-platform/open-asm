@@ -10,12 +10,7 @@ import {
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import { Bug, Loader2 } from 'lucide-react';
-import {
-  useLocation,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AssetProvider from '../assets/context/asset-context';
 import { ListAssets } from '../assets/list-assets';
@@ -31,8 +26,7 @@ const TABS = [
 ];
 
 export function DetailTarget() {
-  const { id } = useParams<{ id: string }>();
-  const tab = useLocation().pathname.split('/').pop();
+  const { id, tab } = useParams<{ id: string; tab: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 

@@ -48,7 +48,7 @@ const tabList = [
 export function ListAssets() {
   const { workspaces } = useWorkspaceSelector();
   const [searchParams] = useSearchParams();
-  const tab = searchParams.get('tab') || 'asset';
+  const tab = searchParams.get('tab') || 'service';
   const navigate = useNavigate();
 
   const handleTabChange = (value: string) => {
