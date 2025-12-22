@@ -61,6 +61,7 @@ export const ConfirmDialog = ({
   const clonedTrigger = React.cloneElement(trigger, {
     onClick: (e: React.MouseEvent) => {
       e.preventDefault(); // Prevent default to avoid dropdown closing
+      e.stopPropagation(); // Prevent bubbling up to parent elements
       setOpen(true);
     },
     onMouseDown: (e: React.MouseEvent) => {

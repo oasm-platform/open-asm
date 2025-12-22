@@ -12,6 +12,7 @@ import {
   IssueCommentType,
   useIssuesControllerDeleteCommentById,
   useIssuesControllerUpdateCommentById,
+  UserRole,
   type IssueComment,
 } from '@/services/apis/gen/queries';
 import { useSession } from '@/utils/authClient';
@@ -23,8 +24,11 @@ import {
   MoreHorizontal,
   RefreshCcwDot,
   Trash2,
+  Reply,
 } from 'lucide-react';
 import { useState } from 'react';
+import { ReplyPreview } from './reply-preview';
+import { CommentContent } from './comment-content';
 
 dayjs.extend(relativeTime);
 
@@ -32,12 +36,14 @@ interface CommentCardProps {
   comment: IssueComment;
   issueCreatedBy: string; // issue.createdBy.id
   onCommentUpdated?: () => void;
+  onReply?: (comment: IssueComment) => void;
 }
 
 const CommentCard = ({
   comment,
   issueCreatedBy,
   onCommentUpdated,
+  onReply,
 }: CommentCardProps) => {
   const { data: sessionData } = useSession();
   const isOwnComment = sessionData?.user?.id === comment.createdBy?.id;
@@ -106,13 +112,33 @@ const CommentCard = ({
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs border border-border px-2 py-0.5 rounded-full text-muted-foreground bg-background">
-                {issueCreatedBy === comment.createdBy?.id ? 'Author' : 'Member'}
+                {comment.createdBy?.role === UserRole.bot
+                  ? 'Bot'
+                  : issueCreatedBy === comment.createdBy?.id
+                    ? 'Author'
+                    : 'Member'}
               </span>
+
+              {/* Reply Button */}
+              {onReply && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-muted"
+                  onClick={() => onReply(comment)}
+                  title="Reply"
+                >
+                  <Reply className="h-4 w-4" />
+                </Button>
+              )}
 
               {/* Dropdown Menu for Edit/Delete - only show for own comments */}
               {isOwnComment && (comment.isCanEdit || comment.isCanDelete) && (
                 <DropdownMenu>
-                  <DropdownMenuTrigger disabled={!comment.isCanEdit} asChild>
+                  <DropdownMenuTrigger
+                    disabled={!comment.isCanEdit && !comment.isCanDelete}
+                    asChild
+                  >
                     <Button
                       variant="ghost"
                       size="sm"
@@ -165,6 +191,9 @@ const CommentCard = ({
 
           {/* Body */}
           <div className="p-4 prose prose-sm max-w-none dark:prose-invert">
+            {comment.repCommentId && comment.repComment && !isEditing && (
+              <ReplyPreview repliedComment={comment.repComment} />
+            )}
             {isEditing ? (
               <div className="space-y-3">
                 <Textarea
@@ -196,9 +225,7 @@ const CommentCard = ({
                 </div>
               </div>
             ) : (
-              <p className="whitespace-pre-wrap leading-relaxed mb-0">
-                {comment.content}
-              </p>
+              <CommentContent content={comment.content} />
             )}
           </div>
         </div>

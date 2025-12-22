@@ -1,24 +1,41 @@
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { UserContext, WorkspaceId } from '../../common/decorators/app.decorator';
+import {
+  UserContext,
+  WorkspaceId,
+} from '../../common/decorators/app.decorator';
 import { WorkspaceOwnerGuard } from '../../common/guards/workspace-owner.guard';
 import { UserContextPayload } from '../../common/interfaces/app.interface';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
-import { GetManyWorkflowsQueryDto, GetManyWorkflowsResponseDto } from './dto/get-many-workflows.dto';
+import {
+  GetManyWorkflowsQueryDto,
+  GetManyWorkflowsResponseDto,
+} from './dto/get-many-workflows.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import { Workflow } from './entities/workflow.entity';
 import { WorkflowsService } from './workflows.service';
 
-@ApiTags('workflows')
+@ApiTags('Workflows')
 @Controller('workflows')
 export class WorkflowsController {
-  constructor(private readonly workflowsService: WorkflowsService) { }
+  constructor(private readonly workflowsService: WorkflowsService) {}
 
   @Doc({
     summary: 'Get all workflow templates',
-    description: 'Retrieves a list of all available workflow templates in YAML format.',
+    description:
+      'Retrieves a list of all available workflow templates in YAML format.',
     response: {
       serialization: GetManyResponseDto(String),
       description: 'List of workflow template filenames',
@@ -31,7 +48,8 @@ export class WorkflowsController {
 
   @Doc({
     summary: 'Get many workflows',
-    description: 'Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.',
+    description:
+      'Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.',
     response: {
       serialization: GetManyResponseDto(GetManyWorkflowsResponseDto),
       description: 'Paginated list of workflows',
@@ -76,7 +94,8 @@ export class WorkflowsController {
 
   @Doc({
     summary: 'Get workflow by ID',
-    description: 'Retrieves a specific workflow by its ID within the specified workspace.',
+    description:
+      'Retrieves a specific workflow by its ID within the specified workspace.',
     response: {
       serialization: Workflow,
       description: 'Workflow object',
@@ -112,7 +131,9 @@ export class WorkflowsController {
     @Body() updateWorkflowDto: UpdateWorkflowDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.workflowsService.updateWorkflow(id, updateWorkflowDto, { id: workspaceId });
+    return this.workflowsService.updateWorkflow(id, updateWorkflowDto, {
+      id: workspaceId,
+    });
   }
 
   @Doc({

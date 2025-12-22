@@ -179,7 +179,7 @@ export class UpdateMcpServersDto {
       },
     },
   })
-  @IsNotEmpty()
+  @IsObject()
   mcpServers: Record<string, McpServerConfig>;
 }
 

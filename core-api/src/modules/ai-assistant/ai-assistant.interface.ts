@@ -35,6 +35,8 @@ import type {
   DeleteMessageResponse,
   HealthCheckRequest,
   HealthCheckResponse,
+  ResolveIssueRequest,
+  ResolveIssueResponse,
 } from '@/types/assistant';
 
 /**
@@ -125,4 +127,14 @@ export interface HealthCheckService {
     request: HealthCheckRequest,
     metadata?: unknown,
   ): Observable<HealthCheckResponse>;
+}
+
+/**
+ * Issue Service Client
+ */
+export interface IssueService {
+  resolveIssueServers(
+    request: ResolveIssueRequest,
+    metadata?: unknown,
+  ): Observable<ResolveIssueResponse>;
 }

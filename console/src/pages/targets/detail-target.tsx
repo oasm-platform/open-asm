@@ -21,17 +21,16 @@ import SettingTarget from './setting-target';
 
 // Define tabs configuration
 const TABS = [
-  { value: 'assets', label: 'Assets' },
+  { value: 'asset-services', label: 'Asset Services' },
   { value: 'vulnerabilities', label: 'Vulnerabilities' },
 ];
 
 export function DetailTarget() {
-  const { id } = useParams<{ id: string }>();
+  const { id, tab } = useParams<{ id: string; tab: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const animation = searchParams.get('animation') === 'true';
-  const tab = searchParams.get('tab');
 
   const {
     data: target,
@@ -44,15 +43,10 @@ export function DetailTarget() {
 
   const { mutate: scanVulnerabilities } = useVulnerabilitiesControllerScan();
 
-  // Determine active tab, default to "assets" if not specified
-  const activeTab = TABS.some((t) => t.value === tab) ? tab : 'assets';
+  const activeTab = TABS.some((t) => t.value === tab) ? tab : 'asset-services';
 
-  // Handle tab change
   const handleTabChange = (value: string) => {
-    // Create new search params with the selected tab
-    const newSearchParams = new URLSearchParams(searchParams);
-    newSearchParams.set('tab', value);
-    navigate(`?${newSearchParams.toString()}`);
+    navigate(`/targets/${id}/${value}`);
   };
 
   if (isLoading) {
@@ -148,7 +142,7 @@ export function DetailTarget() {
             />
           )}
         </div>
-        <TabsContent value="assets">
+        <TabsContent value="asset-services">
           {animation &&
             (target.status === JobStatus.in_progress ||
               target.status === JobStatus.pending) && (
