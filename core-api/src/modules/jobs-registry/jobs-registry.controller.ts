@@ -13,6 +13,7 @@ import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobsDto,
   GetNextJobResponseDto,
+  JobTimelineResponseDto,
   UpdateResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
@@ -21,7 +22,7 @@ import { JobsRegistryService } from './jobs-registry.service';
 
 @Controller('jobs-registry')
 export class JobsRegistryController {
-  constructor(private readonly jobsRegistryService: JobsRegistryService) {}
+  constructor(private readonly jobsRegistryService: JobsRegistryService) { }
 
   @Doc({
     summary: 'Get Jobs',
@@ -35,21 +36,21 @@ export class JobsRegistryController {
     return this.jobsRegistryService.getManyJobs(query);
   }
 
-  // @Doc({
-  //   summary: 'Get Jobs Timeline',
-  //   description:
-  //     'Retrieves a timeline of jobs grouped by tool name and target.',
-  //   response: {
-  //     serialization: JobTimelineResponseDto,
-  //   },
-  //   request: {
-  //     getWorkspaceId: true,
-  //   },
-  // })
-  // @Get('/timeline')
-  // getJobsTimeline(@WorkspaceId() workspaceId: string) {
-  //   return this.jobsRegistryService.getJobsTimeline(workspaceId);
-  // }
+  @Doc({
+    summary: 'Get Jobs Timeline',
+    description:
+      'Retrieves a timeline of jobs grouped by tool name and target.',
+    response: {
+      serialization: JobTimelineResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('/timeline')
+  getJobsTimeline(@WorkspaceId() workspaceId: string) {
+    return this.jobsRegistryService.getJobsTimeline(workspaceId);
+  }
 
   @Doc({
     summary:
