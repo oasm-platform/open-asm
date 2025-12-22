@@ -34,7 +34,7 @@ export default function AssetTab() {
 
   return (
     <>
-      <TabsContent value="asset" className="overflow-hidden">
+      <TabsContent value="service" className="overflow-hidden">
         <DataTable
           data={assets}
           columns={assetColumns}

@@ -27,7 +27,7 @@ import DetailVulnerability from '@/pages/vulnerabilities/detail-vulnerability';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 import Workers from '@/pages/workers/workers';
 import Workflow from '@/pages/workflow/workflow';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
 import ProtectedRoute from './ProtectedRoute';
@@ -103,7 +103,16 @@ export const router = createBrowserRouter([
               },
               {
                 path: ':id',
-                element: <DetailTarget />,
+                children: [
+                  {
+                    index: true,
+                    element: <Navigate to="asset-services" replace />,
+                  },
+                  {
+                    path: ':tab',
+                    element: <DetailTarget />,
+                  },
+                ],
               },
             ],
           },
