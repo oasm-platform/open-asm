@@ -33,7 +33,7 @@ const JobsTimeline = () => {
     });
 
     // Group by jobHistoryId first, then by target
-    const groupedByJobHistory = data?.data.reduce((acc, item) => {
+    const groupedByJobHistory = data?.data.reduce((acc: Record<string, Record<string, TimelineItemWithJobHistory[]>>, item) => {
         const jobHistoryId = item.jobHistoryId || 'unknown';
         if (!acc[jobHistoryId]) {
             acc[jobHistoryId] = {};
@@ -41,7 +41,7 @@ const JobsTimeline = () => {
         if (!acc[jobHistoryId][item.target]) {
             acc[jobHistoryId][item.target] = [];
         }
-        acc[jobHistoryId][item.target].push(item);
+        acc[jobHistoryId][item.target].push(item as TimelineItemWithJobHistory);
         return acc;
     }, {} as Record<string, Record<string, TimelineItemWithJobHistory[]>>) || {};
 
@@ -79,10 +79,10 @@ const JobsTimeline = () => {
                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                             </div>
                         )}
-                        {Object.entries(groupedByJobHistory).map(([jobHistoryId, targets]) => (
+                        {Object.entries(groupedByJobHistory as Record<string, Record<string, TimelineItemWithJobHistory[]>>).map(([jobHistoryId, targets]) => (
                             <div key={jobHistoryId} className="mb-4 p-2 border-b">
                                 {/* <div className="font-medium text-lg mb-3">Job History: {jobHistoryId}</div> */}
-                                {Object.entries(targets).map(([target, items]) => (
+                                {Object.entries(targets as Record<string, TimelineItemWithJobHistory[]>).map(([target, items]) => (
                                     <div key={`${jobHistoryId}-${target}`} className="mb-2 ml-2">
                                         <div
                                             className="font-medium text-md mb-1 hover:text-primary hover:cursor-pointer"
@@ -94,7 +94,7 @@ const JobsTimeline = () => {
                                         <div className="relative pl-2">
                                             {/* Extended timeline connecting bar centered with dots */}
                                             <div className="absolute left-2 top-4 -translate-x-1/2 w-[2px] bg-primary" style={{ height: `calc(100% - 1rem)` }}></div>
-                                            {items.map((item, index) => (
+                                            {(items as TimelineItemWithJobHistory[]).map((item, index: number) => (
                                                 <div key={`${item.name}-${index}`} className="relative py-2">
                                                     {/* Timeline dot positioned at the top left */}
                                                     <div className="absolute left-0 top-4 -translate-x-1/2 -translate-y-1/2 z-0">

@@ -1,7 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { CodeBlock } from '@/assistant/components/code-block';
+import { CodeBlock } from '@/components/common/code-block';
 import Page from '@/components/common/page';
 import { DataTable } from '@/components/ui/data-table';
 import {
