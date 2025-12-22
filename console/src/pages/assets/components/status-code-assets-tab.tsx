@@ -31,7 +31,7 @@ export default function StatusCodeAssetsTab() {
 
   return (
     <>
-      <TabsContent value="statusCode" className="overflow-hidden">
+      <TabsContent value="status-code" className="overflow-hidden">
         <CollapsibleDataTable
           data={statusCodeAssets}
           columns={statusCodeAssetsColumn}

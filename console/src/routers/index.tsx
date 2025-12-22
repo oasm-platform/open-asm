@@ -103,7 +103,16 @@ export const router = createBrowserRouter([
               },
               {
                 path: ':id',
-                element: <DetailTarget />,
+                children: [
+                  {
+                    path: 'asset-services',
+                    element: <DetailTarget />,
+                  },
+                  {
+                    path: 'vulnerabilities',
+                    element: <DetailTarget />,
+                  },
+                ],
               },
             ],
           },

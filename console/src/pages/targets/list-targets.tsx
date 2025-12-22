@@ -123,7 +123,7 @@ export function ListTargets() {
   if (!data && !isLoading) return <div>Error loading targets.</div>;
 
   const handleRowClick = (target: GetManyTargetResponseDto) => {
-    navigate(`/targets/${target.id}`);
+    navigate(`/targets/${target.id}/asset-services`);
   };
 
   return (
