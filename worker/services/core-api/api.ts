@@ -520,38 +520,13 @@ export interface GetManyJobHistoryResponseDtoDto {
   pageCount: number;
 }
 
-export interface On {
-  target: string[];
-  schedule: OnScheduleEnum;
-}
-
-export interface WorkflowJob {
-  name: string;
-  run: string;
-}
-
-export interface WorkflowContent {
-  on: On;
-  jobs: WorkflowJob[];
-  name: string;
-}
-
-export interface Workflow {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  content: WorkflowContent;
-}
-
 export interface JobHistoryDetailResponseDto {
   id: string;
   /** @format date-time */
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
-  workflow: Workflow;
+  tools: Tool[];
 }
 
 export interface Notification {
@@ -1301,6 +1276,31 @@ export interface GetManyGetManyWorkflowsResponseDtoDto {
   pageCount: number;
 }
 
+export interface On {
+  target: string[];
+  schedule: OnScheduleEnum;
+}
+
+export interface WorkflowJob {
+  name: string;
+  run: string;
+}
+
+export interface WorkflowContent {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+}
+
+export interface Workflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  content: WorkflowContent;
+}
+
 export interface CreateWorkflowDto {
   /**
    * Name of the workflow
@@ -1747,15 +1747,6 @@ export enum JobHistoryResponseDtoStatusEnum {
   Cancelled = "cancelled",
 }
 
-export enum OnScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
-}
-
 export enum NotificationResponseDtoStatusEnum {
   Sent = "sent",
   Unread = "unread",
@@ -1787,6 +1778,15 @@ export enum CreateToolDtoCategoryEnum {
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
   Assistant = "assistant",
+}
+
+export enum OnScheduleEnum {
+  Disabled = "disabled",
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
 }
 
 export enum AssetGroupWorkflowScheduleEnum {

@@ -27,6 +27,7 @@ import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
+import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-privider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
@@ -903,11 +904,25 @@ export class JobsRegistryService {
     if (!belongsToWorkspace) {
       throw new NotFoundException('Job history not found in workspace');
     }
+
+    let tools: Tool[] | undefined = [];
+    const instaledTools = await this.toolsService.getInstalledTools(
+      {},
+      workspaceId,
+    );
+    // Map jobs to tools
+    tools = jobHistory.workflow?.content.jobs
+      .map((job) => {
+        const tool = instaledTools.data.find((tool) => tool.name === job.run);
+        return tool;
+      })
+      .filter((tool) => tool !== undefined);
+
     return {
       id: jobHistory.id,
       createdAt: jobHistory.createdAt,
       updatedAt: jobHistory.updatedAt,
-      workflow: jobHistory.workflow,
+      tools,
     };
   }
 }

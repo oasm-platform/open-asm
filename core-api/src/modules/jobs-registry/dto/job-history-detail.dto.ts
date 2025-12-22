@@ -2,7 +2,6 @@ import { JobStatus, ToolCategory } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
-import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class JobHistoryJobItemDetail {
@@ -71,6 +70,6 @@ export class JobHistoryDetailResponseDto {
   @ApiProperty()
   updatedAt: Date;
 
-  @ApiProperty({ type: () => Workflow })
-  workflow?: Workflow;
+  @ApiProperty({ type: () => [Tool] })
+  tools?: Tool[];
 }
