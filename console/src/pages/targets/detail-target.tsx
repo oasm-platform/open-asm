@@ -1,8 +1,8 @@
 import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import JobStatusBadge from '@/components/ui/job-status';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import TargetStatus from '@/components/ui/target-status';
 import {
   JobStatus,
   useTargetsControllerGetTargetById,
@@ -79,7 +79,7 @@ export function DetailTarget() {
       header={
         <div className="flex items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
-            <TargetStatus status={target.status} />
+            <JobStatusBadge status={target.status} />
           </div>
           <div className="flex items-center gap-3">
             <p className="text-muted-foreground hidden md:block">

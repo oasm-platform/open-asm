@@ -27,9 +27,13 @@ import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
+import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-privider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
+import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
+import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
+import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobs,
   CreateJobsDto,
@@ -40,6 +44,7 @@ import {
   JobTimelineResponseDto,
   UpdateResultDto,
 } from './dto/jobs-registry.dto';
+import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 
@@ -49,6 +54,8 @@ export class JobsRegistryService {
     @InjectRepository(Job) public readonly repo: Repository<Job>,
     @InjectRepository(JobHistory)
     public readonly jobHistoryRepo: Repository<JobHistory>,
+    @InjectRepository(JobErrorLog)
+    public readonly jobErrorLogRepo: Repository<JobErrorLog>,
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
     private toolsService: ToolsService,
@@ -56,9 +63,9 @@ export class JobsRegistryService {
     private redis: RedisService,
   ) {}
   public async getManyJobs(
-    query: GetManyBaseQueryParams,
+    query: GetManyJobsRequestDto,
   ): Promise<GetManyBaseResponseDto<Job>> {
-    const { limit, page, sortOrder } = query;
+    const { limit, page, sortOrder, jobHistoryId } = query;
     let { sortBy } = query;
 
     if (!(sortBy in Job)) {
@@ -70,6 +77,9 @@ export class JobsRegistryService {
       .leftJoinAndSelect('job.tool', 'tool')
       .leftJoinAndSelect('job.asset', 'asset')
       .leftJoinAndSelect('asset.target', 'target')
+      .leftJoinAndSelect('job.assetService', 'assetService')
+      .leftJoinAndSelect('job.errorLogs', 'errorLogs')
+      .where('job.jobHistoryId = :jobHistoryId', { jobHistoryId })
       .take(query.limit)
       .skip((page - 1) * limit)
       .orderBy(`job.${sortBy}`, sortOrder);
@@ -538,68 +548,84 @@ export class JobsRegistryService {
       throw new NotFoundException('Job not found');
     }
 
-    const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
+    try {
+      const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
 
-    let dataForSync: JobDataResultType;
-    let pathResult: string | null = null;
+      let dataForSync: JobDataResultType;
 
-    if (isBuiltInTools) {
-      const step = builtInTools.find((tool) => tool.name === job.tool.name);
+      if (isBuiltInTools) {
+        const step = builtInTools.find((tool) => tool.name === job.tool.name);
 
-      if (!step) {
-        throw new Error(`Worker step not found for worker: ${job.tool.name}`);
-      }
+        if (!step) {
+          throw new Error(`Worker step not found for worker: ${job.tool.name}`);
+        }
 
-      const builtInStep = builtInTools.find(
-        (tool) => tool.name === job.tool.name,
-      );
-
-      if (!builtInStep) {
-        throw new Error(`Worker step not found for worker: ${job.tool.name}`);
-      }
-
-      if (!data.raw && !builtInStep) {
-        throw new BadGatewayException('Raw data is required');
-      }
-      dataForSync = builtInStep?.parser?.(data.raw);
-      if (job.isSaveRawResult) {
-        const uploadResult = this.storageService.uploadFile(
-          `${job.id}.txt`,
-          Buffer.from(data.raw, 'utf-8'),
-          'jobs-result',
+        const builtInStep = builtInTools.find(
+          (tool) => tool.name === job.tool.name,
         );
-        pathResult = uploadResult.path;
+
+        if (!builtInStep) {
+          throw new Error(`Worker step not found for worker: ${job.tool.name}`);
+        }
+
+        if (!data.raw && !builtInStep) {
+          throw new BadGatewayException('Raw data is required');
+        }
+        dataForSync = builtInStep?.parser?.(data.raw);
+      } else {
+        dataForSync = data.payload;
       }
-    } else {
-      dataForSync = data.payload;
-    }
 
-    if (job.isSaveData) {
-      await this.dataAdapterService.syncData({
-        data: dataForSync,
-        job,
+      if (job.isSaveData) {
+        await this.dataAdapterService.syncData({
+          data: dataForSync,
+          job,
+        });
+      }
+      if (data?.error) {
+        throw new Error();
+      }
+
+      await this.repo.save({
+        ...job,
+        status: JobStatus.COMPLETED,
+        completedAt: new Date(),
       });
-    }
 
-    const hasError = data?.error;
-    const newStatus = hasError ? JobStatus.FAILED : JobStatus.COMPLETED;
+      const jobForPublish = await this.repo.save({
+        ...job,
+        status: JobStatus.COMPLETED,
+        completedAt: new Date(),
+      });
 
-    const jobForPublish = await this.repo.save({
-      ...job,
-      status: newStatus,
-      completedAt: new Date(),
-      pathResult: pathResult || undefined,
-    });
-
-    if (newStatus === JobStatus.COMPLETED) {
       await this.getNextStepForJob(job);
-    }
 
-    if (job.isPublishEvent) {
-      await this.redis.publish(`jobs:${job.id}`, JSON.stringify(jobForPublish));
-    }
+      if (job.isPublishEvent) {
+        await this.redis.publish(
+          `jobs:${job.id}`,
+          JSON.stringify(jobForPublish),
+        );
+      }
 
-    return { workerId, dto };
+      return { workerId, dto };
+    } catch (e) {
+      await this.handleJobError(dto, job, e);
+      return { workerId, dto };
+    }
+  }
+
+  private async handleJobError(dto: UpdateResultDto, job: Job, error: Error) {
+    await this.repo.save({
+      ...job,
+      status: JobStatus.FAILED,
+      error: error.message,
+      retryCount: job.retryCount + 1,
+    });
+    await this.jobErrorLogRepo.save({
+      job,
+      logMessage: error.message,
+      payload: JSON.stringify(dto.data),
+    });
   }
 
   /**
@@ -755,5 +781,148 @@ export class JobsRegistryService {
         assetService: true,
       },
     });
+  }
+
+  public async getManyJobHistories(
+    workspaceId: string,
+    query: GetManyBaseQueryParams,
+  ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
+    const { limit, page, sortOrder } = query;
+    let { sortBy } = query;
+
+    if (!(sortBy in JobHistory)) {
+      sortBy = 'createdAt';
+    }
+
+    // Define interface for raw query result
+    interface RawJobHistoryResult {
+      id: string;
+      createdAt: Date;
+      updatedAt: Date;
+      totalJobs: string; // COUNT returns string in some databases
+      status: JobStatus;
+      workflowName: string;
+    }
+
+    // Query job histories with calculated counts and statuses using subqueries
+    const qb = this.jobHistoryRepo
+      .createQueryBuilder('jobHistory')
+      .innerJoin('jobHistory.jobs', 'job')
+      .innerJoin('job.asset', 'jAsset')
+      .innerJoin('jAsset.target', 'jTarget')
+      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
+      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .leftJoin('jobHistory.workflow', 'workflow')
+      .where('workspace.id = :workspaceId', { workspaceId })
+      .select([
+        '"jobHistory".id as "id"',
+        '"jobHistory"."createdAt" as "createdAt"',
+        '"jobHistory"."updatedAt" as "updatedAt"',
+        '"workflow"."name" as "workflowName"',
+        // Subquery to count total jobs for this job history
+        '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
+        // Subquery with CASE to calculate status based on job statuses
+        `(
+          SELECT 
+            CASE 
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.FAILED}') > 0 THEN '${JobStatus.FAILED}'
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.IN_PROGRESS}') > 0 THEN '${JobStatus.IN_PROGRESS}'
+              WHEN COUNT(*) FILTER (WHERE status = '${JobStatus.COMPLETED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.COMPLETED}'
+              ELSE '${JobStatus.PENDING}'
+            END
+          FROM jobs 
+          WHERE "jobHistoryId" = "jobHistory".id
+        ) as "status"`,
+      ])
+      .groupBy('jobHistory.id')
+      .addGroupBy('workflow.name')
+      .orderBy(`jobHistory.${sortBy}`, sortOrder)
+      .offset((page - 1) * limit)
+      .limit(limit);
+
+    const rawResults = await qb.getRawMany<RawJobHistoryResult>();
+    const total = await this.jobHistoryRepo
+      .createQueryBuilder('jobHistory')
+      .innerJoin('jobHistory.jobs', 'job')
+      .innerJoin('job.asset', 'jAsset')
+      .innerJoin('jAsset.target', 'jTarget')
+      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
+      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .where('workspace.id = :workspaceId', { workspaceId })
+      .getCount();
+
+    // Transform raw results to match the response DTO structure
+    const transformedData = rawResults.map((raw) => ({
+      id: raw.id,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      totalJobs: parseInt(raw.totalJobs),
+      status: raw.status,
+      workflowName: raw.workflowName || 'Manual',
+    }));
+
+    return getManyResponse({ query, data: transformedData, total });
+  }
+
+  public async getJobHistoryDetail(
+    workspaceId: string,
+    id: string,
+  ): Promise<JobHistoryDetailResponseDto> {
+    const jobHistory = await this.jobHistoryRepo.findOne({
+      where: {
+        id,
+      },
+      relations: {
+        workflow: true,
+        jobs: {
+          tool: true,
+          asset: {
+            target: true,
+          },
+          assetService: true,
+          errorLogs: true,
+        },
+      },
+    });
+
+    if (!jobHistory) {
+      throw new NotFoundException('Job history not found');
+    }
+
+    // Verify that the job history belongs to the workspace
+    const belongsToWorkspace = await this.jobHistoryRepo
+      .createQueryBuilder('jobHistory')
+      .innerJoin('jobHistory.jobs', 'job')
+      .innerJoin('job.asset', 'jAsset')
+      .innerJoin('jAsset.target', 'jTarget')
+      .innerJoin('jTarget.workspaceTargets', 'workspaceTarget')
+      .innerJoin('workspaceTarget.workspace', 'workspace')
+      .where('jobHistory.id = :id', { id })
+      .andWhere('workspace.id = :workspaceId', { workspaceId })
+      .getExists();
+
+    if (!belongsToWorkspace) {
+      throw new NotFoundException('Job history not found in workspace');
+    }
+
+    let tools: Tool[] | undefined = [];
+    const instaledTools = await this.toolsService.getInstalledTools(
+      {},
+      workspaceId,
+    );
+    // Map jobs to tools
+    tools = jobHistory.workflow?.content.jobs
+      .map((job) => {
+        const tool = instaledTools.data.find((tool) => tool.name === job.run);
+        return tool;
+      })
+      .filter((tool) => tool !== undefined);
+
+    return {
+      id: jobHistory.id,
+      createdAt: jobHistory.createdAt,
+      updatedAt: jobHistory.updatedAt,
+      tools,
+    };
   }
 }

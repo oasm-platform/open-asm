@@ -4,7 +4,8 @@ import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { JobErrorLog } from './job-error-log.entity';
 import { JobHistory } from './job-history.entity';
 
 @Entity('jobs')
@@ -12,6 +13,7 @@ export class Job extends BaseEntity {
   /**
    * The asset this job belongs to.
    */
+  @ApiProperty({ type: () => Asset })
   @ManyToOne(() => Asset, (asset) => asset.jobs, {
     onDelete: 'CASCADE',
   })
@@ -53,6 +55,7 @@ export class Job extends BaseEntity {
   /**
    * The tool used for this job.
    */
+  @ApiProperty({ type: () => Tool })
   @ManyToOne(() => Tool, (tool) => tool.jobs, {
     onDelete: 'CASCADE',
   })
@@ -92,8 +95,8 @@ export class Job extends BaseEntity {
   isSaveData?: boolean;
 
   /**
- * Flag to publish event redis for all system.
- */
+   * Flag to publish event redis for all system.
+   */
   @Column({ default: false })
   isPublishEvent?: boolean;
 
@@ -117,10 +120,19 @@ export class Job extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   assetServiceId?: string;
 
+  @ApiProperty({ type: () => AssetService })
   @ManyToOne(() => AssetService, (assetService) => assetService.jobs, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'assetServiceId' })
   assetService?: AssetService;
 
+  @Column({ default: 0 })
+  retryCount: number;
+
+  @ApiProperty({ type: () => [JobErrorLog] })
+  @OneToMany(() => JobErrorLog, (jobErrorLog) => jobErrorLog.job, {
+    onDelete: 'CASCADE',
+  })
+  errorLogs: JobErrorLog[];
 }

@@ -1,142 +1,205 @@
-## ♻️ Refactoring Development Workflow (AI IDE)
+## ♻️ Refactoring Development Workflow (AI IDE – Optimized)
 
-> Role: You are a **senior software engineer** working on refactoring code in this codebase.
-> Requirement: Follow **exactly** the workflow below when implementing any refactoring changes.
-> Applies to: All directories in the project
-
----
-
-### 1. Refactoring Analysis & Planning
-
-- **Identify refactoring scope** and objectives
-  - What code needs to be refactored (specific files, functions, classes)
-  - Why refactoring is needed (code smells, performance, maintainability, readability)
-  - Expected outcomes and benefits
-
-- Conduct **impact analysis**
-  - Identify all files and components that depend on the code to be refactored
-  - Map out usage patterns and call chains
-  - Identify potential breaking changes
-
-- Define **refactoring approach**
-  - Extract methods/classes
-  - Rename variables/functions for clarity
-  - Simplify complex logic
-  - Improve modularity and separation of concerns
-  - Apply design patterns where appropriate
-
-- Create **migration plan** for breaking changes
-  - How to handle dependent code
-  - Backward compatibility strategy
-  - Testing strategy during refactoring
+> **Role**: Senior Software Engineer performing code refactoring.
+>
+> **Core Goal**: Improve internal code quality (readability, maintainability, structure, typing, internal performance) **WITHOUT changing behavior**, **WITHOUT modifying existing tests**, and **ALL tests must pass after refactoring**.
+>
+> **Scope**: Applies to all directories in the project.
 
 ---
 
-### 2. Implementation (Refactoring)
+## 0. Non-Negotiable Principles
 
-- **Mandatory**: Perform **behavior-preserving transformations** only.
-  - Refactoring should not change the external behavior of the code
-  - Focus on improving internal structure and readability
-  - Maintain all existing functionality and contracts
+1. **Strict Behavior Preservation**
+   - Same input → **exact same output** as before refactoring
+   - No changes to side-effects, error handling, timing, or public contracts
 
-- The **Refactoring must follow**:
-  - Strict TypeScript typing (preserve existing types, improve where possible)
-  - No functional changes to the code's behavior
-  - Clean, readable code structure improvements
-  - Follow existing naming conventions unless renaming for clarity
-  - Preserve existing public APIs and interfaces
+2. **Tests Are the Source of Truth**
+   - Existing tests define the correct behavior
+   - **Do not modify or delete existing tests**
 
-- **Refactoring Rules**:
-  - **First Rule**: Never combine refactoring with feature additions - keep them separate
-  - **Second Rule**: Make small, incremental changes and test frequently
-  - **Third Rule**: Preserve all existing test cases and ensure they still pass
-  - **Fourth Rule**: Update documentation and comments to reflect structural changes
+3. **Clear Separation**
+   - Refactoring ≠ Feature development
+   - Refactoring ≠ Bug fixing
+   - If logic must change → **stop and create a separate PR**
 
-- **Testing Rule**: Ensure comprehensive test coverage exists before starting refactoring to catch any accidental behavioral changes.
-
-- **Safety Rule**: If refactoring introduces any functional changes, stop and create a separate PR for the feature/fix instead of combining with refactoring.
+4. **Incremental & Safe Changes**
+   - Small, controlled steps
+   - Validate with tests after each step
 
 ---
 
-### 3. Test-Driven Development (Refactoring Tests)
+## 1. Refactoring Analysis & Planning
 
-- **Before refactoring**, run all existing tests to establish baseline:
-  - Execute all tests related to the code being refactored
-  - Ensure all tests pass before making changes
-  - Document any pre-existing test failures
+### 1.1 Define Refactoring Scope
 
-- **During refactoring**, run tests frequently after each small change:
-  - Verify that no functionality has been accidentally altered
-  - Catch behavioral changes immediately
-  - Maintain confidence in the refactoring process
+- Explicitly list:
+  - Files
+  - Functions / Classes / Modules
 
-- **After refactoring**, run comprehensive test suite:
-  - All original tests should still pass
-  - Run integration tests to ensure no hidden dependencies broke
-  - Add new tests if the refactored code reveals uncovered scenarios
+- Identify concrete **code smells**:
+  - Duplicated logic
+  - Large or multi-responsibility functions
+  - Unclear naming
+  - Tight coupling
+  - Weak or unsafe typing
 
-- Tests should verify:
-  - Same input produces same output (behavior preservation)
-  - Error handling still works as expected
-  - Performance characteristics are maintained or improved
-  - Edge cases still function correctly
+### 1.2 Impact Analysis
 
-- **Mock all external dependencies** to ensure refactoring doesn't affect integration points.
+- Trace all:
+  - Callers
+  - Dependencies
+  - Public APIs / exports
 
----
+- Highlight:
+  - High-risk areas
+  - Sensitive logic (auth, money, state, async, concurrency)
 
-### 4. Linting & Code Quality
+### 1.3 Refactoring Strategy
 
-- Ensure the code passes ESLint with **zero errors and zero warnings**.
-- Run ESLint on the modified files:
+Select **only 1–2 techniques per iteration**:
 
-  ```bash
-  # For backend
-  cd core-api && npx eslint src/path/to/modified/files.ts
-
-  # For frontend
-  cd console && npx eslint src/path/to/modified/files.tsx
-  ```
-
-- Fix all lint issues before proceeding.
-- **Zero tolerance rule**: No linting violations allowed in refactored code.
-- **Improvement rule**: Use refactoring opportunity to improve code style and consistency where possible.
-
-### 5. Integration Testing
-
-- Run **full test suites** to ensure no regressions were introduced:
-
-  ```bash
-  # Backend
-  cd core-api && npm run test
-
-  # Frontend
-  cd console && npm run test
-  ```
-
-- **Dependency verification**: Test all dependent components to ensure they still work with refactored code.
-- **Performance testing**: Verify that refactoring didn't introduce performance regressions (if performance is critical for the refactored code).
-
-### 6. Documentation & Comments
-
-- Update **English comments** to reflect structural changes made during refactoring.
-- Update any inline documentation that references the refactored code structure.
-- **No functional comments**: Don't add comments explaining what the code does differently (it shouldn't be doing anything differently).
-
-### 7. Completion Summary
-
-Provide a short summary including:
-
-- **What was refactored** and why
-- **Files modified** during the refactoring
-- **Breaking changes** (if any) and how they were handled
-- **Tests passed** - confirmation that all functionality remains intact
-- Status: **Ready for review**
+- Extract functions / classes
+- Rename for clarity
+- Simplify control flow (guard clauses, early returns)
+- Improve module boundaries
+- Improve TypeScript typing (no runtime behavior changes)
 
 ---
 
-## Resources
+## 2. Baseline Verification (MANDATORY)
 
-- Existing test suites: `core-api/test/*`, `console/src/**/*.test.*`
-- ESLint configurations: `core-api/eslint.config.mjs`, `console/eslint.config.js`
-- Project coding standards: `.clinerules/rules/oasm-coding-rules.md`
+### 2.1 Test Existence Gate (Hard Rule)
+
+- For **every service file being refactored**:
+  - If **no corresponding test file exists** → **tests MUST be added first**
+  - New tests must describe the **current (legacy) behavior** exactly
+  - **Refactoring is forbidden** until:
+    - The new tests pass 100%
+    - Tests accurately lock in existing behavior
+
+> ⚠️ These tests exist to **freeze current behavior**, not to improve or change logic.
+
+### 2.2 Establish Baseline
+
+Before modifying any production code:
+
+1. Run **all related tests** (including newly added ones)
+2. Verify:
+   - All tests **pass**
+   - If any test fails → **stop refactoring and handle separately**
+
+---
+
+## 3. Refactoring Implementation
+
+### 3.1 Implementation Rules
+
+- Only internal structural changes are allowed
+
+- Do **not** change:
+  - Public APIs
+  - Function signatures
+  - Error messages
+  - Returned data shapes
+
+- Allowed actions:
+  - Add private helpers
+  - Add types / interfaces
+  - Split files **without changing exports**
+
+### 3.2 Per-Step Safety Checklist
+
+After **each small refactoring step**:
+
+- [ ] Code compiles
+- [ ] Relevant tests pass
+- [ ] No snapshot or assertion changes
+
+---
+
+## 4. Refactoring-Driven Testing (Guard Rails)
+
+### During Refactoring
+
+- Run tests **frequently**
+- Tests must immediately catch:
+  - Accidental logic changes
+  - Broken edge cases
+
+### After Completion
+
+- Run the **full test suite**
+- Forbidden actions:
+  - Skipping tests
+  - Updating snapshots just to make tests pass
+
+> ⚠️ New tests may be added **only if**:
+>
+> - Existing behavior is not fully covered
+> - New tests describe **existing behavior**, not new behavior
+
+---
+
+## 5. Linting & Code Quality Gate
+
+- ESLint requirements:
+  - **Zero errors**
+  - **Zero warnings**
+
+```bash
+# Backend
+cd core-api && npx eslint src/path/to/modified/files.ts
+
+# Frontend
+cd console && npx eslint src/path/to/modified/files.tsx
+```
+
+- Use refactoring opportunities to:
+  - Normalize formatting
+  - Remove dead code
+  - Align naming conventions
+
+---
+
+## 6. Integration & Safety Verification
+
+- Run full test suites:
+
+```bash
+# Backend
+cd core-api && npm run test
+
+# Frontend
+cd console && npm run test
+```
+
+- Confirm:
+  - No regressions
+  - No performance degradation (if code is performance-critical)
+
+---
+
+## 7. Documentation & Comments
+
+- Update **English comments** if structure changes
+- Do **not** add comments describing new behavior
+- Comments must reflect **structure only**, not logic changes
+
+---
+
+## 8. Completion Summary (MANDATORY)
+
+Provide a concise report:
+
+- **What was refactored and why**
+- **List of modified files**
+- **Confirmation of behavior preservation**
+- **All tests passing**
+- Status: **Ready for Review**
+
+---
+
+### AI IDE Enforcement Keywords
+
+> "Behavior-preserving refactor only. Tests define truth. No logic changes. Small, safe, incremental steps."

@@ -1,4 +1,4 @@
-version: "3"
+version: '3'
 
 tasks:
   # Development environment setup and start
@@ -8,7 +8,7 @@ tasks:
     cmds:
       - npm run dev
     env:
-      NODE_ENV: "development"
+      NODE_ENV: 'development'
   # Production build
   # Creates optimized production build of the application
   # Includes minification and bundling
@@ -20,6 +20,11 @@ tasks:
   install:
     cmds:
       - npm install
+  # Run tests
+  # Executes unit and integration tests for the console application
+  test:
+    cmds:
+      - npm run test
   # API documentation generation
   # Generates API documentation after ensuring API server is ready
   # Waits for API server health check before generating docs

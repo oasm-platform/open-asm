@@ -16,6 +16,11 @@ tasks:
       NODE_ENV: 'production'
   install: npm install
   proto: npm run proto:generate
+  # Run tests
+  # Executes unit and integration tests for the core-api application
+  test:
+    cmds:
+      - npm run test
   clean:
     cmds:
       - rm -rf ./husky
