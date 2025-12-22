@@ -1,19 +1,31 @@
+import { RedisService } from '@/services/redis/redis.service';
 import { NotFoundException } from '@nestjs/common';
-import { Test, type TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, type Repository } from 'typeorm';
+import type { Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
-import { ToolsService } from '../tools/tools.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
 
+// Mock the ToolsService module to avoid circular dependency
+jest.mock('../tools/tools.service', () => ({
+  ToolsService: jest.fn().mockImplementation(() => ({
+    getToolByNames: jest.fn(),
+    getInstalledTools: jest.fn(),
+  })),
+}));
+
+import { ToolsService } from '../tools/tools.service';
+
 describe('JobsRegistryService - getJobHistoryDetail', () => {
   let service: JobsRegistryService;
   let jobHistoryRepo: Repository<JobHistory>;
-  let jobRepo: Repository<Job>;
+  let toolsService: ToolsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -29,13 +41,7 @@ describe('JobsRegistryService - getJobHistoryDetail', () => {
           provide: getRepositoryToken(JobHistory),
           useValue: {
             findOne: jest.fn(),
-            createQueryBuilder: () => ({
-              innerJoin: jest.fn().mockReturnThis(),
-              innerJoinAndSelect: jest.fn().mockReturnThis(),
-              where: jest.fn().mockReturnThis(),
-              andWhere: jest.fn().mockReturnThis(),
-              getExists: jest.fn(),
-            }),
+            createQueryBuilder: jest.fn(),
           },
         },
         {
@@ -60,6 +66,7 @@ describe('JobsRegistryService - getJobHistoryDetail', () => {
           provide: ToolsService,
           useValue: {
             getToolByNames: jest.fn(),
+            getInstalledTools: jest.fn(),
           },
         },
         {
@@ -67,7 +74,7 @@ describe('JobsRegistryService - getJobHistoryDetail', () => {
           useValue: {},
         },
         {
-          provide: 'RedisService',
+          provide: RedisService,
           useValue: {
             publish: jest.fn(),
           },
@@ -79,7 +86,7 @@ describe('JobsRegistryService - getJobHistoryDetail', () => {
     jobHistoryRepo = module.get<Repository<JobHistory>>(
       getRepositoryToken(JobHistory),
     );
-    jobRepo = module.get<Repository<Job>>(getRepositoryToken(Job));
+    toolsService = module.get<ToolsService>(ToolsService);
   });
 
   describe('getJobHistoryDetail', () => {
@@ -100,30 +107,44 @@ describe('JobsRegistryService - getJobHistoryDetail', () => {
             name: 'Test Workflow',
           },
         },
+        jobs: [
+          {
+            id: 'job-1',
+            status: 'COMPLETED',
+            category: 'VULNERABILITY',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            tool: { id: 'tool-1', name: 'nuclei' },
+            asset: {
+              id: 'asset-1',
+              value: 'test.com',
+              target: { id: 'target-1', value: 'test.com' },
+            },
+            assetService: null,
+            errorLogs: [],
+            workerId: 'worker-1',
+          },
+        ],
       };
 
-      const mockJobs = [
-        {
-          id: 'job-1',
-          status: 'COMPLETED',
-          category: 'VULNERABILITY',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          tool: { id: 'tool-1', name: 'nuclei' },
-          asset: {
-            id: 'asset-1',
-            value: 'test.com',
-            target: { id: 'target-1', value: 'test.com' },
+      const mockInstalledTools = {
+        data: [
+          {
+            id: 'tool-1',
+            name: 'nuclei',
+            description: 'Nuclei Scanner',
+            category: 'VULNERABILITY',
           },
-          assetService: null,
-          errorLogs: [],
-          workerId: 'worker-1',
-        },
-      ];
+        ],
+        total: 1,
+        page: 1,
+        limit: 10,
+      };
 
       jest
         .spyOn(jobHistoryRepo, 'findOne')
         .mockResolvedValue(mockJobHistory as any);
+
       jest.spyOn(jobHistoryRepo, 'createQueryBuilder').mockReturnValue({
         innerJoin: jest.fn().mockReturnThis(),
         innerJoinAndSelect: jest.fn().mockReturnThis(),
@@ -131,7 +152,10 @@ describe('JobsRegistryService - getJobHistoryDetail', () => {
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
       } as any);
-      jest.spyOn(jobRepo, 'find').mockResolvedValue(mockJobs as any);
+
+      jest
+        .spyOn(toolsService, 'getInstalledTools')
+        .mockResolvedValue(mockInstalledTools as any);
 
       const result = await service.getJobHistoryDetail(
         mockWorkspaceId,
@@ -140,7 +164,9 @@ describe('JobsRegistryService - getJobHistoryDetail', () => {
 
       expect(result).toBeDefined();
       expect(result.id).toBe(mockJobHistoryId);
-      expect(result.workflow).toBeDefined();
+      expect(result.tools).toBeDefined();
+      expect(result.tools?.length).toBe(1);
+      expect(result.tools?.[0].name).toBe('nuclei');
     });
 
     it('should throw NotFoundException when job history not found', async () => {
@@ -156,11 +182,39 @@ describe('JobsRegistryService - getJobHistoryDetail', () => {
         id: mockJobHistoryId,
         createdAt: new Date(),
         updatedAt: new Date(),
+        workflow: {
+          id: 'workflow-123',
+          name: 'Test Workflow',
+          content: {
+            on: { target: ['test.com'] },
+            jobs: [{ name: 'scan', run: 'nuclei' }],
+            name: 'Test Workflow',
+          },
+        },
+        jobs: [
+          {
+            id: 'job-1',
+            status: 'COMPLETED',
+            category: 'VULNERABILITY',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            tool: { id: 'tool-1', name: 'nuclei' },
+            asset: {
+              id: 'asset-1',
+              value: 'test.com',
+              target: { id: 'target-1', value: 'test.com' },
+            },
+            assetService: null,
+            errorLogs: [],
+            workerId: 'worker-1',
+          },
+        ],
       };
 
       jest
         .spyOn(jobHistoryRepo, 'findOne')
         .mockResolvedValue(mockJobHistory as any);
+
       jest.spyOn(jobHistoryRepo, 'createQueryBuilder').mockReturnValue({
         innerJoin: jest.fn().mockReturnThis(),
         innerJoinAndSelect: jest.fn().mockReturnThis(),

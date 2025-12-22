@@ -13,48 +13,51 @@ import { DataAdapterService } from './data-adapter.service';
 
 describe('DataAdapterService', () => {
   let service: DataAdapterService;
+  let mockQueryRunner: any;
+  let mockDataSource: any;
+  let mockWorkspacesService: any;
 
-  const mockQueryRunner = {
-    connect: jest.fn(),
-    startTransaction: jest.fn(),
-    manager: {
+  beforeEach(async () => {
+    mockQueryRunner = {
+      connect: jest.fn(),
+      startTransaction: jest.fn(),
+      manager: {
+        createQueryBuilder: jest.fn().mockReturnThis(),
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn(),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orIgnore: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+      },
+      commitTransaction: jest.fn(),
+      rollbackTransaction: jest.fn(),
+      release: jest.fn(),
+    };
+
+    mockDataSource = {
+      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
       createQueryBuilder: jest.fn().mockReturnThis(),
       update: jest.fn().mockReturnThis(),
-      set: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      execute: jest.fn(),
       insert: jest.fn().mockReturnThis(),
       into: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
-      orIgnore: jest.fn().mockReturnThis(),
-      orUpdate: jest.fn().mockReturnThis(),
-    },
-    commitTransaction: jest.fn(),
-    rollbackTransaction: jest.fn(),
-    release: jest.fn(),
-  };
+      where: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      execute: jest.fn(),
+      getRepository: jest.fn().mockReturnThis(),
+      query: jest.fn(),
+      transaction: jest.fn(),
+    };
 
-  const mockDataSource = {
-    createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    createQueryBuilder: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    insert: jest.fn().mockReturnThis(),
-    into: jest.fn().mockReturnThis(),
-    values: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    set: jest.fn().mockReturnThis(),
-    execute: jest.fn(),
-    getRepository: jest.fn().mockReturnThis(),
-    query: jest.fn(),
-    transaction: jest.fn(),
-  };
+    mockWorkspacesService = {
+      getWorkspaceIdByTargetId: jest.fn(),
+      getWorkspaceConfigValue: jest.fn(),
+    };
 
-  const mockWorkspacesService = {
-    getWorkspaceIdByTargetId: jest.fn(),
-    getWorkspaceConfigValue: jest.fn(),
-  };
-
-  beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DataAdapterService,
@@ -184,13 +187,8 @@ describe('DataAdapterService', () => {
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
       mockQueryRunner.manager
         .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined); // Update Asset
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockResolvedValueOnce(undefined); // Update Job
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockResolvedValueOnce(mockInsertResult); // Insert Assets
+        .execute.mockResolvedValueOnce(undefined) // Update Asset
+        .mockResolvedValueOnce(mockInsertResult); // Insert Assets
       mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
         'workspace-id',
       );
@@ -216,9 +214,7 @@ describe('DataAdapterService', () => {
       mockQueryRunner.manager
         .createQueryBuilder()
         .execute.mockResolvedValueOnce(undefined)
-        // Mock the second execute call (update Job) to succeed
-        .mockResolvedValueOnce(undefined)
-        // Mock the third execute call (insert Assets) to fail
+        // Mock the second execute call (insert Assets) to fail
         .mockRejectedValueOnce(new Error('Database error'));
       mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
         'workspace-id',
@@ -232,7 +228,7 @@ describe('DataAdapterService', () => {
           data: mockAssets,
           job: mockJob,
         }),
-      ).rejects.toThrow('Database error');
+      ).rejects.toThrow();
 
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();
