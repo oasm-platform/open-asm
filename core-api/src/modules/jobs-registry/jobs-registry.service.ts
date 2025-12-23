@@ -921,11 +921,14 @@ export class JobsRegistryService {
       })
       .filter((tool) => tool !== undefined);
 
+    const { id: historyId, createdAt, updatedAt, jobs } = jobHistory;
+
     return {
-      id: jobHistory.id,
-      createdAt: jobHistory.createdAt,
-      updatedAt: jobHistory.updatedAt,
+      id: historyId,
+      createdAt,
+      updatedAt,
       tools,
+      jobs: jobs || [],
     };
   }
 

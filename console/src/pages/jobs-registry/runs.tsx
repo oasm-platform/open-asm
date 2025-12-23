@@ -15,6 +15,7 @@ import JobStatusBadge from '@/components/ui/job-status';
 import type { Job } from '@/services/apis/gen/queries';
 import {
   JobStatus,
+  useJobsRegistryControllerGetJobHistoryDetail,
   useJobsRegistryControllerGetManyJobs,
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
@@ -25,6 +26,8 @@ export default function Runs() {
   const { id: jobHistoryId } = useParams<{ id: string }>();
   const [jobError, setJobError] = useState<Job | null>();
   const [page, setPage] = useState(1);
+  const { data: jobHistoryDetail } =
+    useJobsRegistryControllerGetJobHistoryDetail(jobHistoryId || '');
   const [pageSize, setPageSize] = useState(100);
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
@@ -37,6 +40,8 @@ export default function Runs() {
     sortOrder,
     jobHistoryId: jobHistoryId || '',
   });
+
+  console.log(jobHistoryDetail);
 
   const getTitle = (row: Job) => {
     const value = row?.assetService
