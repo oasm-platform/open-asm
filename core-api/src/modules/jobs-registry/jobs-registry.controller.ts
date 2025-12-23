@@ -1,10 +1,12 @@
 import { Public, WorkspaceId } from '@/common/decorators/app.decorator';
 import { WorkerTokenAuth } from '@/common/decorators/worker-token-auth.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
+import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
@@ -22,7 +24,7 @@ import { JobsRegistryService } from './jobs-registry.service';
 
 @Controller('jobs-registry')
 export class JobsRegistryController {
-  constructor(private readonly jobsRegistryService: JobsRegistryService) { }
+  constructor(private readonly jobsRegistryService: JobsRegistryService) {}
 
   @Doc({
     summary: 'Get Jobs',
@@ -124,5 +126,24 @@ export class JobsRegistryController {
     @Param('id') id: string,
   ): Promise<JobHistoryDetailResponseDto> {
     return this.jobsRegistryService.getJobHistoryDetail(workspaceId, id);
+  }
+
+  @Doc({
+    summary: 'Re-run a job',
+    description:
+      'Reset job status to pending, clear workerId, and increment retry count',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('/:id/re-run')
+  reRunJob(
+    @WorkspaceId() workspaceId: string,
+    @Param() params: IdQueryParamDto,
+  ) {
+    return this.jobsRegistryService.reRunJob(workspaceId, params.id);
   }
 }

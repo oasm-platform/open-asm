@@ -925,4 +925,45 @@ export class JobsRegistryService {
       tools,
     };
   }
+
+  public async reRunJob(
+    workspaceId: string,
+    jobId: string,
+  ): Promise<{ message: string }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Verify job exists and belongs to workspace
+      const job = await queryRunner.manager
+        .createQueryBuilder(Job, 'job')
+        .innerJoin('job.asset', 'asset')
+        .innerJoin('asset.target', 'target')
+        .innerJoin('target.workspaceTargets', 'workspaceTarget')
+        .innerJoin('workspaceTarget.workspace', 'workspace')
+        .where('job.id = :jobId', { jobId })
+        .andWhere('workspace.id = :workspaceId', { workspaceId })
+        .getOne();
+
+      if (!job) {
+        throw new NotFoundException('Job not found in workspace');
+      }
+
+      // Update job status, clear workerId, and increment retryCount
+      job.status = JobStatus.PENDING;
+      job.workerId = undefined;
+      job.retryCount = job.retryCount + 1;
+
+      await queryRunner.manager.save(job);
+
+      await queryRunner.commitTransaction();
+
+      return { message: 'Job re-run successfully' };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
 }
