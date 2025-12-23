@@ -30,7 +30,7 @@ export class CreateIssueDto {
 }
 
 export class UpdateIssueDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
   title?: string;

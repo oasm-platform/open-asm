@@ -8,7 +8,6 @@ import { Pencil, Tag, X } from 'lucide-react';
 import {
   useCallback,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -32,13 +31,6 @@ const IssueTags = ({ issue, onUpdate, isEditable = true }: IssueTagsProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { mutate: updateIssue, isPending } = useIssuesControllerUpdate();
-
-  // Sync tag list when issue data changes (e.g., after refetch)
-  useMemo(() => {
-    if (!isEditing) {
-      setTagList(issue.tags ?? []);
-    }
-  }, [issue.tags, isEditing]);
 
   // Focus input when entering edit mode
   useLayoutEffect(() => {
@@ -117,7 +109,6 @@ const IssueTags = ({ issue, onUpdate, isEditable = true }: IssueTagsProps) => {
         id: issue.id,
         data: {
           tags: tagList,
-          title: issue.title,
         },
       },
       {
@@ -132,16 +123,16 @@ const IssueTags = ({ issue, onUpdate, isEditable = true }: IssueTagsProps) => {
         },
       },
     );
-  }, [updateIssue, issue.id, issue.title, tagList, onUpdate]);
+  }, [updateIssue, issue.id, tagList, onUpdate]);
 
   // Read-only view
   if (!isEditing) {
     return (
       <div className="flex flex-wrap items-center gap-2">
         {tagList.length > 0 ? (
-          tagList.map((tag, index) => (
+          tagList.map((tag) => (
             <Badge
-              key={index}
+              key={tag}
               variant="outline"
               className="flex items-center gap-1 h-6 rounded-md"
             >
@@ -171,22 +162,22 @@ const IssueTags = ({ issue, onUpdate, isEditable = true }: IssueTagsProps) => {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2 items-center border rounded-md p-2 min-h-10 bg-transparent">
-        {tagList.map((tag, index) => (
+        {tagList.map((tag) => (
           <Badge
-            key={index}
+            key={tag}
             variant="outline"
             className="flex items-center gap-1 h-7 rounded-md cursor-pointer hover:bg-destructive/10"
-            onClick={() => removeTag(tag)}
           >
             <Tag size={14} />
             {tag}
             <button
               type="button"
-              className="ml-1 rounded-full hover:bg-destructive/20"
+              className="ml-1 rounded-full cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 removeTag(tag);
               }}
+              aria-label={`Remove ${tag}`}
             >
               <X size={12} />
             </button>

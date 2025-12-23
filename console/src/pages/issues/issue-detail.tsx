@@ -74,9 +74,7 @@ const IssueDetail = () => {
 
   return (
     <Page className="w-full">
-      {/* GitHub-style Header */}
-      <header className="mb-6 pb-4 border-b border-border">
-        {/* Title Row */}
+      <div className="mb-6 pb-4 border-b border-border">
         <div className="mb-2">
           {isEditing ? (
             <div className="flex items-center gap-2">
@@ -132,7 +130,6 @@ const IssueDetail = () => {
           )}
         </div>
 
-        {/* Status & Metadata Row */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <StatusBadge status={issue.status} />
           <span>
@@ -142,18 +139,14 @@ const IssueDetail = () => {
             opened this issue {dayjs(issue.createdAt).fromNow()}
           </span>
         </div>
-      </header>
+      </div>
 
-      {/* Two-column Layout */}
       <div className="flex flex-col lg:flex-row lg:items-start gap-8">
-        {/* Main Content - Comments Timeline */}
-        <main className="flex-1 min-w-0 order-2 lg:order-1">
+        <div className="flex-1 min-w-0 order-2 lg:order-1">
           <IssueComments issue={issue} />
-        </main>
+        </div>
 
-        {/* Sidebar - Metadata */}
-        <aside className="w-full lg:w-64 shrink-0 order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start space-y-6">
-          {/* Labels Section */}
+        <div className="w-full lg:w-64 shrink-0 order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start space-y-6">
           <div>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Labels
@@ -163,13 +156,15 @@ const IssueDetail = () => {
 
           <Separator />
 
-          {/* Author Section */}
           <div>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Author
             </h3>
             <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6">
+              <Avatar
+                className="h-6 w-6"
+                aria-label={`Author: ${issue.createdBy?.name || 'Unknown'}`}
+              >
                 <AvatarFallback className="text-xs">
                   {issue.createdBy?.name?.charAt(0).toUpperCase() || (
                     <User size={14} />
@@ -184,7 +179,7 @@ const IssueDetail = () => {
               Created {dayjs(issue.createdAt).fromNow()}
             </p>
           </div>
-        </aside>
+        </div>
       </div>
     </Page>
   );

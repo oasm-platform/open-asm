@@ -51,9 +51,9 @@ const issueColumns: ColumnDef<Issue>[] = [
                 <>
                   <span>•</span>
                   <div className="flex items-center gap-1">
-                    {issue.tags.slice(0, 3).map((tag, idx) => (
+                    {issue.tags.slice(0, 3).map((tag) => (
                       <Badge
-                        key={idx}
+                        key={tag}
                         variant="outline"
                         className="h-5 px-1.5 text-[10px] gap-0.5"
                       >

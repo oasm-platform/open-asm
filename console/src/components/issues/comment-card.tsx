@@ -29,6 +29,7 @@ import {
 import { useState } from 'react';
 import { ReplyPreview } from './reply-preview';
 import { CommentContent } from './comment-content';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 dayjs.extend(relativeTime);
 
@@ -89,6 +90,19 @@ const CommentCard = ({
     setIsEditing(false);
     setEditContent(comment.content);
   };
+
+  const textareaRef = useHotkeys<HTMLTextAreaElement>(
+    'enter',
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleSave();
+    },
+    {
+      enableOnFormTags: ['TEXTAREA'],
+      preventDefault: true,
+    },
+  );
 
   return (
     <div className="relative">
@@ -197,6 +211,7 @@ const CommentCard = ({
             {isEditing ? (
               <div className="space-y-3">
                 <Textarea
+                  ref={textareaRef}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   className="min-h-[100px] w-full"
