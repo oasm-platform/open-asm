@@ -12,6 +12,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { SendHorizontal, Reply } from 'lucide-react';
 import { useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import ChangeStatusSelect from './change-status-select';
 import CommentCard from './comment-card';
 
@@ -32,6 +33,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<IssueComment | null>(null);
   const isAssistant = useRootControllerGetMetadata().data?.isAssistant;
+
   const handleCreateComment = () => {
     if (newComment.trim()) {
       createCommentMutation.mutate(
@@ -53,6 +55,18 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
     }
   };
 
+  const textareaRef = useHotkeys<HTMLTextAreaElement>(
+    'enter',
+    (e) => {
+      e.preventDefault();
+      handleCreateComment();
+    },
+    {
+      enableOnFormTags: ['TEXTAREA'],
+      preventDefault: true,
+    },
+  );
+
   const comments = commentsData?.data || [];
 
   return (
@@ -66,12 +80,10 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
                   comment={comment}
                   issueCreatedBy={issue.createdBy.id}
                   onCommentUpdated={() => {
-                    // Trigger a refetch to get the updated comment from the API
                     refetchComments();
                   }}
                   onReply={(comment) => {
                     setReplyingTo(comment);
-                    // focus on textarea
                     const textarea = document.querySelector('textarea');
                     if (textarea) {
                       textarea.focus();
@@ -83,7 +95,13 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
           </div>
 
           {/* New comment input */}
-          <div className="relative">
+          <form
+            className="relative"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreateComment();
+            }}
+          >
             {replyingTo && (
               <div className="flex items-center justify-between bg-muted/50 p-2 rounded-t-md border border-b-0 border-border text-xs mb-0">
                 <span className="flex items-center gap-1">
@@ -94,6 +112,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
                   </span>
                 </span>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   className="h-auto p-1 text-muted-foreground hover:text-foreground"
@@ -104,6 +123,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
               </div>
             )}
             <Textarea
+              ref={textareaRef}
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder={
@@ -111,22 +131,22 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
                   ? 'Leave a comment (Use @cai for AI assistance)'
                   : replyingTo
                     ? 'Type your reply to this comment...'
-                    : 'Add a comment to share your thoughts on this issue...'
+                    : 'Press Enter to submit comment...'
               }
               className={`resize-none min-h-[100px] w-full mb-2 ${replyingTo ? 'rounded-t-none border-t-0' : ''}`}
               disabled={issue.status === 'closed'}
             />
             <div className="flex justify-end gap-2">
               <ChangeStatusSelect
+                issue={issue}
                 onSuccess={() => {
                   refetchIssue();
                   refetchComments();
                 }}
-                issue={issue}
               />
               <Button
+                type="submit"
                 variant="outline"
-                onClick={handleCreateComment}
                 disabled={
                   !newComment.trim() ||
                   createCommentMutation.isPending ||
@@ -138,7 +158,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
                 <SendHorizontal />
               </Button>
             </div>
-          </div>
+          </form>
         </div>
       </div>
     </div>
