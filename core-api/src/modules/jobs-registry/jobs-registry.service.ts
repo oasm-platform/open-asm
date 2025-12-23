@@ -927,17 +927,20 @@ export class JobsRegistryService {
     };
   }
 
-  public async reRunJob(
-    workspaceId: string,
+  /**
+   * Verifies that a job exists and belongs to the specified workspace
+   * @param jobId the ID of the job to verify
+   * @param workspaceId the ID of the workspace to check against
+   * @returns the job if it exists and belongs to the workspace
+   * @throws NotFoundException if job not found in workspace
+   */
+  private async verifyJobBelongsToWorkspace(
     jobId: string,
-  ): Promise<{ message: string }> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    workspaceId: string,
+  ): Promise<Job> {
     try {
-      // Verify job exists and belongs to workspace
-      const job = await queryRunner.manager
-        .createQueryBuilder(Job, 'job')
+      const job = await this.repo
+        .createQueryBuilder('job')
         .innerJoin('job.asset', 'asset')
         .innerJoin('asset.target', 'target')
         .innerJoin('target.workspaceTargets', 'workspaceTarget')
@@ -949,6 +952,28 @@ export class JobsRegistryService {
       if (!job) {
         throw new NotFoundException('Job not found in workspace');
       }
+
+      return job;
+    } catch (error) {
+      // If it's already a NotFoundException, re-throw it
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      // For other errors (like database errors), re-throw them as-is
+      throw error;
+    }
+  }
+
+  public async reRunJob(
+    workspaceId: string,
+    jobId: string,
+  ): Promise<{ message: string }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Verify job exists and belongs to workspace
+      const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
 
       // Update job status, clear workerId, and increment retryCount
       job.status = JobStatus.PENDING;
@@ -977,19 +1002,7 @@ export class JobsRegistryService {
     await queryRunner.startTransaction();
     try {
       // Verify job exists and belongs to workspace
-      const job = await queryRunner.manager
-        .createQueryBuilder(Job, 'job')
-        .innerJoin('job.asset', 'asset')
-        .innerJoin('asset.target', 'target')
-        .innerJoin('target.workspaceTargets', 'workspaceTarget')
-        .innerJoin('workspaceTarget.workspace', 'workspace')
-        .where('job.id = :jobId', { jobId })
-        .andWhere('workspace.id = :workspaceId', { workspaceId })
-        .getOne();
-
-      if (!job) {
-        throw new NotFoundException('Job not found in workspace');
-      }
+      const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
 
       // Delete the job
       await queryRunner.manager.remove(job);

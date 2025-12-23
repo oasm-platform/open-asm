@@ -16,7 +16,11 @@ describe('JobsRegistryService', () => {
   let service: JobsRegistryService;
 
   const mockJobRepository = {
-    createQueryBuilder: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    getOne: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
   };
@@ -105,11 +109,6 @@ describe('JobsRegistryService', () => {
         connect: jest.fn(),
         startTransaction: jest.fn(),
         manager: {
-          createQueryBuilder: jest.fn().mockReturnThis(),
-          innerJoin: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getOne: jest.fn().mockResolvedValue(mockJob),
           save: jest.fn().mockResolvedValue({
             ...mockJob,
             status: JobStatus.PENDING,
@@ -123,15 +122,13 @@ describe('JobsRegistryService', () => {
       };
 
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(mockJob);
 
       const result = await service.reRunJob(mockWorkspaceId, mockJobId);
 
+      expect(mockJobRepository.createQueryBuilder).toHaveBeenCalledWith('job');
       expect(mockQueryRunner.connect).toHaveBeenCalled();
       expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.manager.createQueryBuilder).toHaveBeenCalledWith(
-        Job,
-        'job',
-      );
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(result).toEqual({ message: 'Job re-run successfully' });
 
@@ -160,6 +157,7 @@ describe('JobsRegistryService', () => {
       };
 
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(null);
 
       await expect(
         service.reRunJob(mockWorkspaceId, mockJobId),
@@ -176,17 +174,14 @@ describe('JobsRegistryService', () => {
         connect: jest.fn(),
         startTransaction: jest.fn(),
         manager: {
-          createQueryBuilder: jest.fn().mockReturnThis(),
-          innerJoin: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getOne: jest.fn().mockRejectedValue(new Error('Database error')),
+          save: jest.fn(),
         },
         rollbackTransaction: jest.fn(),
         release: jest.fn(),
       };
 
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockRejectedValue(new Error('Database error'));
 
       await expect(
         service.reRunJob(mockWorkspaceId, mockJobId),
@@ -215,11 +210,6 @@ describe('JobsRegistryService', () => {
         connect: jest.fn(),
         startTransaction: jest.fn(),
         manager: {
-          createQueryBuilder: jest.fn().mockReturnThis(),
-          innerJoin: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getOne: jest.fn().mockResolvedValue(mockJob),
           remove: jest.fn().mockResolvedValue(mockJob),
         },
         commitTransaction: jest.fn(),
@@ -228,15 +218,13 @@ describe('JobsRegistryService', () => {
       };
 
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(mockJob);
 
       const result = await service.deleteJob(mockWorkspaceId, mockJobId);
 
+      expect(mockJobRepository.createQueryBuilder).toHaveBeenCalledWith('job');
       expect(mockQueryRunner.connect).toHaveBeenCalled();
       expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.manager.createQueryBuilder).toHaveBeenCalledWith(
-        Job,
-        'job',
-      );
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(result).toEqual({ message: 'Job deleted successfully' });
 
@@ -260,6 +248,7 @@ describe('JobsRegistryService', () => {
       };
 
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(null);
 
       await expect(
         service.deleteJob(mockWorkspaceId, mockJobId),
@@ -287,6 +276,7 @@ describe('JobsRegistryService', () => {
       };
 
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockRejectedValue(new Error('Database error'));
 
       await expect(
         service.deleteJob(mockWorkspaceId, mockJobId),
