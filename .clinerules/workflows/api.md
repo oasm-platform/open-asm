@@ -71,6 +71,52 @@ You MUST explicitly document:
 
 ## 2. Implementation: Controller → Service (Checkpoint 2)
 
+### REST API Standards Compliance
+
+#### HTTP Methods (CRUD Operations)
+
+- **GET** - Retrieve resources (READ)
+  - Use for fetching data without side effects
+  - Idempotent operations
+  - Examples: `GET /users`, `GET /users/:id`
+
+- **POST** - Create new resources (CREATE)
+  - Use for creating new entities
+  - Request body contains data to create the resource
+  - Examples: `POST /users`, `POST /users/:id/activate`
+
+- **PUT** - Update entire resource (UPDATE)
+  - Use for complete resource replacement
+  - Request body contains complete resource data
+  - Examples: `PUT /users/:id`
+
+- **PATCH** - Partial resource update (UPDATE)
+  - Use for partial updates
+  - Request body contains only fields to update
+  - Examples: `PATCH /users/:id`
+
+- **DELETE** - Remove resources (DELETE)
+  - Use for deleting resources
+  - Examples: `DELETE /users/:id`
+
+#### Endpoint Routing Standards
+
+- Use **plural nouns** for resource collections
+  - ✅ `GET /users`, `GET /products`, `GET /orders`
+  - ❌ `GET /user`, `GET /product`, `GET /order`
+
+- Use **hierarchical structure** for relationships
+  - ✅ `GET /users/:userId/orders`, `GET /users/:userId/orders/:orderId`
+  - ❌ `GET /user-orders/:userId`, `GET /order/:orderId/user/:userId`
+
+- Use **descriptive action endpoints** when CRUD doesn't apply
+  - ✅ `POST /users/:id/activate`, `POST /users/:id/deactivate`
+  - ❌ `POST /activate-user/:id`, `POST /users/activate/:id`
+
+- Maintain **consistent parameter naming**
+  - Use `:resourceId` format (e.g., `:userId`, `:orderId`)
+  - Avoid generic `:id` when multiple resources in path
+
 ### Controller Rules
 
 - MUST exist for new APIs
@@ -117,6 +163,12 @@ You MUST explicitly document:
 - Use `@ApiProperty()` for Swagger & codegen fields
 - Accept **minimum required input only**
 - Validate all inputs with `class-validator`
+
+### Success Message Response Rule (POST/PUT/DELETE)
+
+- For APIs that perform create (POST), update (PUT/PATCH), or delete (DELETE) operations and need to return a success message, use `DefaultMessageResponseDto` from `core-api/src/common/dtos/default-message-response.dto.ts`
+- This DTO provides a standardized success message response format with a `message` field
+- Example usage for successful operations: `{ "message": "Success" }`
 
 > ❌ Do NOT proceed to Step 3 until Controller and Service are fully implemented and compliant.
 

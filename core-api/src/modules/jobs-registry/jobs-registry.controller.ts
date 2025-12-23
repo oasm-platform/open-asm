@@ -1,12 +1,24 @@
 import { Public, WorkspaceId } from '@/common/decorators/app.decorator';
 import { WorkerTokenAuth } from '@/common/decorators/worker-token-auth.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
+import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
@@ -22,7 +34,7 @@ import { JobsRegistryService } from './jobs-registry.service';
 
 @Controller('jobs-registry')
 export class JobsRegistryController {
-  constructor(private readonly jobsRegistryService: JobsRegistryService) { }
+  constructor(private readonly jobsRegistryService: JobsRegistryService) {}
 
   @Doc({
     summary: 'Get Jobs',
@@ -76,16 +88,20 @@ export class JobsRegistryController {
     return this.jobsRegistryService.updateResult(workerId, dto);
   }
 
+  @UseGuards(WorkspaceOwnerGuard)
   @Doc({
     summary:
       'Creates a new job associated with the given asset and worker name.',
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Post()
   createJobsForTarget(
     @Body() dto: CreateJobsDto,
-    // @WorkspaceId() workspaceId: string,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.jobsRegistryService.createJobsForTarget(dto);
+    return this.jobsRegistryService.createJobsForTarget(dto, workspaceId);
   }
 
   @Doc({
@@ -124,5 +140,63 @@ export class JobsRegistryController {
     @Param('id') id: string,
   ): Promise<JobHistoryDetailResponseDto> {
     return this.jobsRegistryService.getJobHistoryDetail(workspaceId, id);
+  }
+
+  @UseGuards(WorkspaceOwnerGuard)
+  @Doc({
+    summary: 'Re-run a job',
+    description:
+      'Reset job status to pending, clear workerId, and increment retry count',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('/:id/re-run')
+  reRunJob(
+    @WorkspaceId() workspaceId: string,
+    @Param() params: IdQueryParamDto,
+  ) {
+    return this.jobsRegistryService.reRunJob(workspaceId, params.id);
+  }
+
+  @UseGuards(WorkspaceOwnerGuard)
+  @Doc({
+    summary: 'Cancel a job',
+    description: 'Cancel a job by its ID in the specified workspace',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('/:id/cancel')
+  cancelJob(
+    @WorkspaceId() workspaceId: string,
+    @Param() params: IdQueryParamDto,
+  ) {
+    return this.jobsRegistryService.cancelJob(workspaceId, params.id);
+  }
+
+  @UseGuards(WorkspaceOwnerGuard)
+  @Doc({
+    summary: 'Delete a job',
+    description: 'Delete a job by its ID in the specified workspace',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete('/:id')
+  deleteJob(
+    @WorkspaceId() workspaceId: string,
+    @Param() params: IdQueryParamDto,
+  ) {
+    return this.jobsRegistryService.deleteJob(workspaceId, params.id);
   }
 }

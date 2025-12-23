@@ -19,6 +19,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -58,7 +59,7 @@ export class JobsRegistryService {
     public readonly jobErrorLogRepo: Repository<JobErrorLog>,
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
-    private toolsService: ToolsService,
+    @Optional() private toolsService: ToolsService,
     private storageService: StorageService,
     private redis: RedisService,
   ) {}
@@ -512,10 +513,12 @@ export class JobsRegistryService {
   /**
    * Creates jobs for a target.
    * @param dto the data transfer object containing the target ID and tool IDs
+   * @param workspaceId the workspace ID
    * @returns an object with a success message
    */
   public async createJobsForTarget(
     dto: CreateJobsDto,
+    workspaceId: string,
   ): Promise<DefaultMessageResponseDto> {
     const tools = await this.toolsService.toolsRepository.find({
       where: { id: In(dto.toolIds) },
@@ -523,7 +526,7 @@ export class JobsRegistryService {
 
     await Promise.all(
       tools.map((tool) =>
-        this.createNewJob({ tool, targetIds: [dto.targetId] }),
+        this.createNewJob({ tool, targetIds: [dto.targetId], workspaceId }),
       ),
     );
 
@@ -924,5 +927,123 @@ export class JobsRegistryService {
       updatedAt: jobHistory.updatedAt,
       tools,
     };
+  }
+
+  /**
+   * Verifies that a job exists and belongs to the specified workspace
+   * @param jobId the ID of the job to verify
+   * @param workspaceId the ID of the workspace to check against
+   * @returns the job if it exists and belongs to the workspace
+   * @throws NotFoundException if job not found in workspace
+   */
+  private async verifyJobBelongsToWorkspace(
+    jobId: string,
+    workspaceId: string,
+  ): Promise<Job> {
+    try {
+      const job = await this.repo
+        .createQueryBuilder('job')
+        .innerJoin('job.asset', 'asset')
+        .innerJoin('asset.target', 'target')
+        .innerJoin('target.workspaceTargets', 'workspaceTarget')
+        .innerJoin('workspaceTarget.workspace', 'workspace')
+        .where('job.id = :jobId', { jobId })
+        .andWhere('workspace.id = :workspaceId', { workspaceId })
+        .getOne();
+
+      if (!job) {
+        throw new NotFoundException('Job not found in workspace');
+      }
+
+      return job;
+    } catch (error) {
+      // If it's already a NotFoundException, re-throw it
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      // For other errors (like database errors), re-throw them as-is
+      throw error;
+    }
+  }
+
+  public async reRunJob(
+    workspaceId: string,
+    jobId: string,
+  ): Promise<{ message: string }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Verify job exists and belongs to workspace
+      const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
+
+      // Update job status, clear workerId, and increment retryCount
+      job.status = JobStatus.PENDING;
+      job.workerId = undefined;
+      job.retryCount = job.retryCount + 1;
+
+      await queryRunner.manager.save(job);
+
+      await queryRunner.commitTransaction();
+
+      return { message: 'Job re-run successfully' };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  public async cancelJob(
+    workspaceId: string,
+    jobId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Verify job exists and belongs to workspace
+      const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
+
+      // Update job status to cancelled
+      job.status = JobStatus.CANCELLED;
+
+      await queryRunner.manager.save(job);
+
+      await queryRunner.commitTransaction();
+
+      return { message: 'Job cancelled successfully' };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  public async deleteJob(
+    workspaceId: string,
+    jobId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Verify job exists and belongs to workspace
+      const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
+
+      // Delete the job
+      await queryRunner.manager.remove(job);
+
+      await queryRunner.commitTransaction();
+
+      return { message: 'Job deleted successfully' };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }
