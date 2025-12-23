@@ -1574,6 +1574,7 @@ export interface User {
   /** @format date-time */
   updatedAt: string;
   name: string;
+  role: UserRoleEnum;
 }
 
 export interface Issue {
@@ -1631,10 +1632,13 @@ export interface IssueComment {
   isCanEdit: boolean;
   /** @default "content" */
   type: IssueCommentTypeEnum;
+  repCommentId?: string;
+  repComment: IssueComment;
 }
 
 export interface CreateIssueCommentDto {
   content: string;
+  repCommentId?: string;
 }
 
 export interface GetManyIssueCommentDto {
@@ -1805,6 +1809,12 @@ export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
   Value001 = "0 0 1 * *",
+}
+
+export enum UserRoleEnum {
+  Admin = "admin",
+  User = "user",
+  Bot = "bot",
 }
 
 export enum CreateIssueDtoSourceTypeEnum {
@@ -2809,7 +2819,7 @@ export class Api<
   /**
    * @description Retrieve a paginated list of notifications for the current user
    *
-   * @tags notifications
+   * @tags Notifications
    * @name NotificationsControllerGetNotifications
    * @summary Get all notifications
    * @request GET:/api/notifications
@@ -2839,7 +2849,7 @@ export class Api<
   /**
    * @description Create a new notification for a specific user or group of users
    *
-   * @tags notifications
+   * @tags Notifications
    * @name NotificationsControllerCreateNotification
    * @summary Create a notification
    * @request POST:/api/notifications
@@ -2860,7 +2870,7 @@ export class Api<
   /**
    * @description Subscribe to a Server-Sent Events (SSE) stream for real-time notifications
    *
-   * @tags notifications
+   * @tags Notifications
    * @name NotificationsControllerStream
    * @summary Subscribe to notifications stream
    * @request GET:/api/notifications/stream
@@ -2876,7 +2886,7 @@ export class Api<
   /**
    * @description Get the total count of unread notifications for the current user
    *
-   * @tags notifications
+   * @tags Notifications
    * @name NotificationsControllerGetUnreadCount
    * @summary Get unread notifications count
    * @request GET:/api/notifications/unread-count
@@ -2892,7 +2902,7 @@ export class Api<
   /**
    * @description Mark all notifications as read for the current user
    *
-   * @tags notifications
+   * @tags Notifications
    * @name NotificationsControllerMarkAllAsRead
    * @summary Mark all notifications as read
    * @request PATCH:/api/notifications/mark-read
@@ -2908,7 +2918,7 @@ export class Api<
   /**
    * @description Mark all notifications as unread for the current user
    *
-   * @tags notifications
+   * @tags Notifications
    * @name NotificationsControllerMarkAllAsUnread
    * @summary Mark all notifications as unread
    * @request PATCH:/api/notifications/mark-unread
@@ -2924,7 +2934,7 @@ export class Api<
   /**
    * @description Mark a single notification as read by its ID
    *
-   * @tags notifications
+   * @tags Notifications
    * @name NotificationsControllerMarkAsRead
    * @summary Mark a specific notification as read
    * @request PATCH:/api/notifications/{id}/read
@@ -3845,7 +3855,7 @@ export class Api<
   /**
    * @description Retrieves a list of all available workflow templates in YAML format.
    *
-   * @tags workflows
+   * @tags Workflows
    * @name WorkflowsControllerListTemplates
    * @summary Get all workflow templates
    * @request GET:/api/workflows/templates
@@ -3861,7 +3871,7 @@ export class Api<
   /**
    * @description Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
    *
-   * @tags workflows
+   * @tags Workflows
    * @name WorkflowsControllerGetManyWorkflows
    * @summary Get many workflows
    * @request GET:/api/workflows
@@ -3893,7 +3903,7 @@ export class Api<
   /**
    * @description Creates a new workflow with the provided data.
    *
-   * @tags workflows
+   * @tags Workflows
    * @name WorkflowsControllerCreateWorkflow
    * @summary Create workflow
    * @request POST:/api/workflows
@@ -3914,7 +3924,7 @@ export class Api<
   /**
    * @description Retrieves a specific workflow by its ID within the specified workspace.
    *
-   * @tags workflows
+   * @tags Workflows
    * @name WorkflowsControllerGetWorkspaceWorkflow
    * @summary Get workflow by ID
    * @request GET:/api/workflows/{id}
@@ -3933,7 +3943,7 @@ export class Api<
   /**
    * @description Updates an existing workflow with the provided data.
    *
-   * @tags workflows
+   * @tags Workflows
    * @name WorkflowsControllerUpdateWorkflow
    * @summary Update workflow
    * @request PATCH:/api/workflows/{id}
@@ -3955,7 +3965,7 @@ export class Api<
   /**
    * @description Deletes a workflow by its ID.
    *
-   * @tags workflows
+   * @tags Workflows
    * @name WorkflowsControllerDeleteWorkflow
    * @summary Delete workflow
    * @request DELETE:/api/workflows/{id}
@@ -4597,7 +4607,7 @@ export class Api<
   /**
    * @description Retrieve a list of all issues with pagination and filtering.
    *
-   * @tags issues
+   * @tags Issues
    * @name IssuesControllerGetMany
    * @summary Get all issues
    * @request GET:/api/issues
@@ -4630,7 +4640,7 @@ export class Api<
   /**
    * @description Create a new issue linked to a source (e.g. vulnerability).
    *
-   * @tags issues
+   * @tags Issues
    * @name IssuesControllerCreate
    * @summary Create issue
    * @request POST:/api/issues
@@ -4648,7 +4658,7 @@ export class Api<
   /**
    * @description Retrieve details of a specific issue.
    *
-   * @tags issues
+   * @tags Issues
    * @name IssuesControllerGetById
    * @summary Get issue by ID
    * @request GET:/api/issues/{id}
@@ -4664,7 +4674,7 @@ export class Api<
   /**
    * @description Update issue title and tags.
    *
-   * @tags issues
+   * @tags Issues
    * @name IssuesControllerUpdate
    * @summary Update issue
    * @request PATCH:/api/issues/{id}
@@ -4686,7 +4696,7 @@ export class Api<
   /**
    * @description Change the status of an issue.
    *
-   * @tags issues
+   * @tags Issues
    * @name IssuesControllerChangeStatus
    * @summary Change issue status
    * @request PATCH:/api/issues/{id}/status
@@ -4708,7 +4718,7 @@ export class Api<
   /**
    * @description Create a new comment for a specific issue.
    *
-   * @tags issues
+   * @tags Issues
    * @name IssuesControllerCreateComment
    * @summary Create comment for issue
    * @request POST:/api/issues/{issueId}/comments
@@ -4730,7 +4740,7 @@ export class Api<
   /**
    * @description Retrieve paginated comments for a specific issue.
    *
-   * @tags issues
+   * @tags Issues
    * @name IssuesControllerGetCommentsByIssueId
    * @summary Get comments by issue ID
    * @request GET:/api/issues/{issueId}/comments
@@ -4761,7 +4771,7 @@ export class Api<
   /**
    * @description Update a comment by its ID. Only the creator of the comment can update it.
    *
-   * @tags issues
+   * @tags Issues
    * @name IssuesControllerUpdateCommentById
    * @summary Update comment by ID
    * @request PATCH:/api/issues/comments/{id}
@@ -4783,7 +4793,7 @@ export class Api<
   /**
    * @description Delete a comment by its ID. Only the creator of the comment can delete it.
    *
-   * @tags issues
+   * @tags Issues
    * @name IssuesControllerDeleteCommentById
    * @summary Delete comment by ID
    * @request DELETE:/api/issues/comments/{id}
@@ -4883,7 +4893,7 @@ export class Api<
   /**
    * @description Returns a flattened array of all tools from all MCP modules.
    *
-   * @tags Mcp
+   * @tags MCP
    * @name McpControllerGetMcpTools
    * @summary Get all tools from all registered MCP modules.
    * @request GET:/api/mcp/tools
@@ -4899,7 +4909,7 @@ export class Api<
   /**
    * @description Creates new MCP permissions based on the provided values.
    *
-   * @tags Mcp
+   * @tags MCP
    * @name McpControllerCreateMcpPermission
    * @summary Create MCP permissions for a user.
    * @request POST:/api/mcp/permissions
@@ -4920,7 +4930,7 @@ export class Api<
   /**
    * @description Returns the MCP permissions associated with the current user.
    *
-   * @tags Mcp
+   * @tags MCP
    * @name McpControllerGetMcpPermissions
    * @summary Get MCP permissions for a user.
    * @request GET:/api/mcp/permissions
@@ -4950,7 +4960,7 @@ export class Api<
   /**
    * @description Returns the API key associated with the specified MCP permission ID.
    *
-   * @tags Mcp
+   * @tags MCP
    * @name McpControllerGetMcpApiKey
    * @summary Get the API key for a specific MCP permission.
    * @request GET:/api/mcp/{id}/api-key
@@ -4966,7 +4976,7 @@ export class Api<
   /**
    * @description Deletes the MCP permission associated with the current user by ID and also deletes the related API key.
    *
-   * @tags Mcp
+   * @tags MCP
    * @name McpControllerDeleteMcpPermissionById
    * @summary Delete MCP permission by ID.
    * @request DELETE:/api/mcp/permissions/{id}

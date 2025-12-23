@@ -59,6 +59,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
     'enter',
     (e) => {
       e.preventDefault();
+      e.stopPropagation();
       handleCreateComment();
     },
     {
@@ -99,7 +100,6 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
             className="relative"
             onSubmit={(e) => {
               e.preventDefault();
-              handleCreateComment();
             }}
           >
             {replyingTo && (
@@ -131,7 +131,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
                   ? 'Leave a comment (Use @cai for AI assistance)'
                   : replyingTo
                     ? 'Type your reply to this comment...'
-                    : 'Press Enter to submit comment...'
+                    : 'Add your comment here...'
               }
               className={`resize-none min-h-[100px] w-full mb-2 ${replyingTo ? 'rounded-t-none border-t-0' : ''}`}
               disabled={issue.status === 'closed'}
@@ -153,6 +153,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
                   issue.status === 'closed'
                 }
                 className="px-4 py-2"
+                onClick={handleCreateComment}
               >
                 {createCommentMutation.isPending ? 'Posting...' : 'Comment'}{' '}
                 <SendHorizontal />
