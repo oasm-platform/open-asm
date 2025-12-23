@@ -1,9 +1,15 @@
 import { Public, WorkspaceId } from '@/common/decorators/app.decorator';
 import { WorkerTokenAuth } from '@/common/decorators/worker-token-auth.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import {
+  GetManyBaseQueryParams,
+  GetManyBaseResponseDto,
+} from '@/common/dtos/get-many-base.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
+import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
+import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobsDto,
   GetNextJobResponseDto,
@@ -26,7 +32,7 @@ export class JobsRegistryController {
     },
   })
   @Get('')
-  getManyJobs(@Query() query: GetManyBaseQueryParams) {
+  getManyJobs(@Query() query: GetManyJobsRequestDto) {
     return this.jobsRegistryService.getManyJobs(query);
   }
 
@@ -36,6 +42,9 @@ export class JobsRegistryController {
       'Retrieves a timeline of jobs grouped by tool name and target.',
     response: {
       serialization: JobTimelineResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
     },
   })
   @Get('/timeline')
@@ -77,5 +86,43 @@ export class JobsRegistryController {
     // @WorkspaceId() workspaceId: string,
   ) {
     return this.jobsRegistryService.createJobsForTarget(dto);
+  }
+
+  @Doc({
+    summary: 'Get Many Job Histories',
+    description:
+      'Retrieves a list of job histories in the current workspace with their associated jobs, assets, and targets.',
+    response: {
+      serialization: GetManyResponseDto(JobHistoryResponseDto),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('/histories')
+  getManyJobHistories(
+    @WorkspaceId() workspaceId: string,
+    @Query() query: GetManyBaseQueryParams,
+  ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
+    return this.jobsRegistryService.getManyJobHistories(workspaceId, query);
+  }
+
+  @Doc({
+    summary: 'Get Job History Detail',
+    description:
+      'Retrieves a job history detail with its associated workflow and jobs.',
+    response: {
+      serialization: JobHistoryDetailResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('/histories/:id')
+  getJobHistoryDetail(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') id: string,
+  ): Promise<JobHistoryDetailResponseDto> {
+    return this.jobsRegistryService.getJobHistoryDetail(workspaceId, id);
   }
 }

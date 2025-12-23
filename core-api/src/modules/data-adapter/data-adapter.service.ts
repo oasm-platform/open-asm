@@ -1,16 +1,15 @@
 import { JobDataResultType } from '@/common/types/app.types';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { DataSource, InsertResult } from 'typeorm';
-import { JobStatus, ToolCategory } from '../../common/enums/enum';
+import { ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
-import { Job } from '../jobs-registry/entities/job.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterInput } from './data-adapter.interface';
@@ -59,14 +58,6 @@ export class DataAdapterService {
         .set({ isPrimary: true, dnsRecords: primaryAssets?.dnsRecords })
         .execute();
 
-      // Update Job status -> COMPLETED
-      await queryRunner.manager
-        .createQueryBuilder()
-        .update(Job)
-        .set({ status: JobStatus.COMPLETED })
-        .where({ id: job.id })
-        .execute();
-
       const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(
         job.asset.target.id,
       );
@@ -93,15 +84,7 @@ export class DataAdapterService {
       return insertResult;
     } catch (error) {
       await queryRunner.rollbackTransaction();
-
-      await this.dataSource
-        .createQueryBuilder()
-        .update(Job)
-        .set({ status: JobStatus.FAILED })
-        .where({ id: job.id })
-        .execute();
-
-      throw error;
+      throw new Error(error);
     } finally {
       await queryRunner.release();
     }
@@ -297,70 +280,75 @@ export class DataAdapterService {
     job,
     data,
   }: DataAdapterInput<JobDataResultType>): Promise<void> {
-    // Define type for sync function configuration
-    type SyncFunctionConfig<T = unknown> = {
-      handler: (data: DataAdapterInput<T>) => Promise<void | InsertResult>;
-      validationClass?: new () => object;
-    };
+    try {
+      // Define type for sync function configuration
+      type SyncFunctionConfig<T = unknown> = {
+        handler: (data: DataAdapterInput<T>) => Promise<void | InsertResult>;
+        validationClass?: new () => object;
+      };
 
-    // Map of tool categories to their corresponding sync functions and validation classes
-    const syncFunctions: Partial<
-      Record<ToolCategory, SyncFunctionConfig<any>>
-    > = {
-      [ToolCategory.PORTS_SCANNER]: {
-        handler: (data: DataAdapterInput<number[]>) => this.portsScanner(data),
-      },
-      [ToolCategory.SUBDOMAINS]: {
-        handler: (data: DataAdapterInput<Asset[]>) => this.subdomains(data),
-        // validationClass: Asset,
-      },
-      [ToolCategory.HTTP_PROBE]: {
-        handler: (data: DataAdapterInput<HttpResponse>) =>
-          this.httpResponses(data),
-        // validationClass: HttpResponse, // no validate for now
-      },
-      [ToolCategory.VULNERABILITIES]: {
-        handler: (data: DataAdapterInput<Vulnerability[]>) =>
-          this.vulnerabilities(data),
-        // validationClass: Vulnerability,
-      },
-      [ToolCategory.CLASSIFIER]: {
-        handler: (data: DataAdapterInput<AssetTag[]>) => this.classifier(data),
-        validationClass: AssetTag,
-      },
-      // Note: ASSISTANT category is handled separately or not supported in this mapping
-    };
+      // Map of tool categories to their corresponding sync functions and validation classes
+      const syncFunctions: Partial<
+        Record<ToolCategory, SyncFunctionConfig<any>>
+      > = {
+        [ToolCategory.PORTS_SCANNER]: {
+          handler: (data: DataAdapterInput<number[]>) =>
+            this.portsScanner(data),
+        },
+        [ToolCategory.SUBDOMAINS]: {
+          handler: (data: DataAdapterInput<Asset[]>) => this.subdomains(data),
+          // validationClass: Asset,
+        },
+        [ToolCategory.HTTP_PROBE]: {
+          handler: (data: DataAdapterInput<HttpResponse>) =>
+            this.httpResponses(data),
+          // validationClass: HttpResponse, // no validate for now
+        },
+        [ToolCategory.VULNERABILITIES]: {
+          handler: (data: DataAdapterInput<Vulnerability[]>) =>
+            this.vulnerabilities(data),
+          // validationClass: Vulnerability,
+        },
+        [ToolCategory.CLASSIFIER]: {
+          handler: (data: DataAdapterInput<AssetTag[]>) =>
+            this.classifier(data),
+          validationClass: AssetTag,
+        },
+        // Note: ASSISTANT category is handled separately or not supported in this mapping
+      };
 
-    // Get the appropriate sync function based on category
-    if (!job.tool.category) {
-      throw new Error('Tool category is undefined');
-    }
-
-    const syncFunction = syncFunctions[job.tool.category];
-
-    // Check if we have a function for this category
-    if (!syncFunction) {
-      throw new Error(`Unsupported tool category: ${job.tool.category}`);
-    }
-
-    // Validate data before syncing
-    if (syncFunction.validationClass && data !== undefined) {
-      const isValid = await this.validateData(
-        data as object | object[],
-        syncFunction.validationClass,
-      );
-      if (!isValid) {
-        Logger.error('Invalid data', job.category);
-        throw new BadRequestException(
-          `Data validation failed for category: ${job.tool.category}`,
-        );
+      // Get the appropriate sync function based on category
+      if (!job.tool.category) {
+        throw new Error('Tool category is undefined');
       }
+
+      const syncFunction = syncFunctions[job.tool.category];
+
+      // Check if we have a function for this category
+      if (!syncFunction) {
+        throw new Error(`Unsupported tool category: ${job.tool.category}`);
+      }
+
+      // Validate data before syncing
+      if (syncFunction.validationClass && data !== undefined) {
+        const isValid = await this.validateData(
+          data as object | object[],
+          syncFunction.validationClass,
+        );
+        if (!isValid) {
+          throw new Error(
+            `Data validation failed for category: ${job.tool.category}`,
+          );
+        }
+      }
+
+      // Call the appropriate sync function with proper type assertion
+      const typedData = { job, data } as unknown as DataAdapterInput<any>;
+      await syncFunction.handler(typedData);
+
+      return;
+    } catch (error) {
+      throw new Error(error);
     }
-
-    // Call the appropriate sync function with proper type assertion
-    const typedData = { job, data } as unknown as DataAdapterInput<any>;
-    await syncFunction.handler(typedData);
-
-    return;
   }
 }

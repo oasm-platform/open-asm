@@ -390,20 +390,77 @@ export interface DeleteMessageResponseDto {
   message: string;
 }
 
+export interface Asset {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  value: string;
+  targetId: string;
+  isPrimary: boolean;
+  dnsRecords: object;
+  isEnabled: boolean;
+}
+
+export interface Tool {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  description: string;
+  category: ToolCategoryEnum;
+  version: string;
+  logoUrl?: string | null;
+  isInstalled: boolean;
+  isOfficialSupport: boolean;
+  type: string;
+  providerId: string;
+}
+
+export interface AssetService {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  value: string;
+  port: number;
+  assetId: string;
+  isErrorPage: boolean;
+}
+
+export interface JobErrorLog {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  logMessage: string;
+  payload: string;
+  jobId: string;
+}
+
 export interface Job {
   id: string;
   /** @format date-time */
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
+  asset: Asset;
   category: string;
   status: string;
   /** @format date-time */
   pickJobAt: string;
+  tool: Tool;
   /** @format date-time */
   completedAt: string;
   command: string;
   assetServiceId: string;
+  assetService: AssetService;
+  errorLogs: JobErrorLog[];
 }
 
 export interface GetManyJobDto {
@@ -413,25 +470,6 @@ export interface GetManyJobDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-}
-
-export interface JobTimelineItem {
-  name: string;
-  target: string;
-  targetId: string;
-  jobHistoryId: string;
-  /** @format date-time */
-  startTime: string;
-  /** @format date-time */
-  endTime: string;
-  status: string;
-  description: string;
-  toolCategory: string;
-  duration: number;
-}
-
-export interface JobTimelineResponseDto {
-  data: JobTimelineItem[];
 }
 
 export interface GetNextJobResponseDto {
@@ -460,6 +498,35 @@ export interface UpdateResultDto {
 export interface CreateJobsDto {
   toolIds: string[];
   targetId: string;
+}
+
+export interface JobHistoryResponseDto {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  totalJobs: number;
+  status: JobHistoryResponseDtoStatusEnum;
+  workflowName: string;
+}
+
+export interface GetManyJobHistoryResponseDtoDto {
+  data: JobHistoryResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface JobHistoryDetailResponseDto {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  tools: Tool[];
 }
 
 export interface Notification {
@@ -759,23 +826,6 @@ export interface WorkerAliveDto {
   token: string;
 }
 
-export interface Tool {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  name: string;
-  description: string;
-  category: ToolCategoryEnum;
-  version: string;
-  logoUrl?: string | null;
-  isInstalled: boolean;
-  isOfficialSupport: boolean;
-  type: string;
-  providerId: string;
-}
-
 export interface WorkerInstance {
   id: string;
   /** @format date-time */
@@ -802,19 +852,6 @@ export interface GetManyWorkerInstanceDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-}
-
-export interface Asset {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  value: string;
-  targetId: string;
-  isPrimary: boolean;
-  dnsRecords: object;
-  isEnabled: boolean;
 }
 
 export interface SearchData {
@@ -1267,7 +1304,7 @@ export interface Workflow {
 export interface CreateWorkflowDto {
   /**
    * Name of the workflow
-   * @example "Vulnerability Scan Workflow"
+   * @example "Group Workflow"
    */
   name: string;
   /** Content of the workflow in JSON format */
@@ -1282,7 +1319,7 @@ export interface CreateWorkflowDto {
 export interface UpdateWorkflowDto {
   /**
    * Name of the workflow
-   * @example "Vulnerability Scan Workflow"
+   * @example "Group Workflow"
    */
   name?: string;
   /** Content of the workflow in JSON format */
@@ -1693,6 +1730,23 @@ export enum GetMcpServerHealthResponseDtoStatusEnum {
   Error = "error",
 }
 
+export enum ToolCategoryEnum {
+  Subdomains = "subdomains",
+  HttpProbe = "http_probe",
+  PortsScanner = "ports_scanner",
+  Vulnerabilities = "vulnerabilities",
+  Classifier = "classifier",
+  Assistant = "assistant",
+}
+
+export enum JobHistoryResponseDtoStatusEnum {
+  Pending = "pending",
+  InProgress = "in_progress",
+  Completed = "completed",
+  Failed = "failed",
+  Cancelled = "cancelled",
+}
+
 export enum NotificationResponseDtoStatusEnum {
   Sent = "sent",
   Unread = "unread",
@@ -1707,15 +1761,6 @@ export enum CreateNotificationDtoTypeEnum {
   SYSTEM = "SYSTEM",
   USER = "USER",
   GROUP = "GROUP",
-}
-
-export enum ToolCategoryEnum {
-  Subdomains = "subdomains",
-  HttpProbe = "http_probe",
-  PortsScanner = "ports_scanner",
-  Vulnerabilities = "vulnerabilities",
-  Classifier = "classifier",
-  Assistant = "assistant",
 }
 
 export enum VulnerabilityStatisticsDtoSeverityEnum {
@@ -2628,7 +2673,7 @@ export class Api<
    * @request GET:/api/jobs-registry
    */
   jobsRegistryControllerGetManyJobs = (
-    query?: {
+    query: {
       search?: string;
       /** @example 1 */
       page?: number;
@@ -2638,6 +2683,7 @@ export class Api<
       sortBy?: string;
       /** @example "DESC" */
       sortOrder?: string;
+      jobHistoryId: string;
     },
     params: RequestParams = {},
   ) =>
@@ -2666,22 +2712,6 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves a timeline of jobs grouped by tool name and target.
-   *
-   * @tags JobsRegistry
-   * @name JobsRegistryControllerGetJobsTimeline
-   * @summary Get Jobs Timeline
-   * @request GET:/api/jobs-registry/timeline
-   */
-  jobsRegistryControllerGetJobsTimeline = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/jobs-registry/timeline`,
-      method: "GET",
       format: "json",
       ...params,
     });
@@ -2723,6 +2753,55 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of job histories in the current workspace with their associated jobs, assets, and targets.
+   *
+   * @tags JobsRegistry
+   * @name JobsRegistryControllerGetManyJobHistories
+   * @summary Get Many Job Histories
+   * @request GET:/api/jobs-registry/histories
+   */
+  jobsRegistryControllerGetManyJobHistories = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry/histories`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a job history detail with its associated workflow and jobs.
+   *
+   * @tags JobsRegistry
+   * @name JobsRegistryControllerGetJobHistoryDetail
+   * @summary Get Job History Detail
+   * @request GET:/api/jobs-registry/histories/{id}
+   */
+  jobsRegistryControllerGetJobHistoryDetail = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry/histories/${id}`,
+      method: "GET",
       format: "json",
       ...params,
     });
