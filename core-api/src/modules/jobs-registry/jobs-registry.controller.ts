@@ -8,7 +8,15 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
@@ -145,5 +153,23 @@ export class JobsRegistryController {
     @Param() params: IdQueryParamDto,
   ) {
     return this.jobsRegistryService.reRunJob(workspaceId, params.id);
+  }
+
+  @Doc({
+    summary: 'Delete a job',
+    description: 'Delete a job by its ID in the specified workspace',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete('/:id')
+  deleteJob(
+    @WorkspaceId() workspaceId: string,
+    @Param() params: IdQueryParamDto,
+  ) {
+    return this.jobsRegistryService.deleteJob(workspaceId, params.id);
   }
 }

@@ -7,7 +7,6 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
-import { ToolsService } from '../tools/tools.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
@@ -40,14 +39,6 @@ describe('JobsRegistryService', () => {
     syncData: jest.fn(),
   };
 
-  const mockToolsService = {
-    getToolByNames: jest.fn(),
-    getInstalledTools: jest.fn(),
-    toolsRepository: {
-      find: jest.fn(),
-    },
-  };
-
   const mockStorageService = {
     upload: jest.fn(),
   };
@@ -59,7 +50,6 @@ describe('JobsRegistryService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        JobsRegistryService,
         {
           provide: getRepositoryToken(Job),
           useValue: mockJobRepository,
@@ -81,10 +71,6 @@ describe('JobsRegistryService', () => {
           useValue: mockDataAdapterService,
         },
         {
-          provide: ToolsService,
-          useValue: mockToolsService,
-        },
-        {
           provide: StorageService,
           useValue: mockStorageService,
         },
@@ -92,6 +78,7 @@ describe('JobsRegistryService', () => {
           provide: RedisService,
           useValue: mockRedisService,
         },
+        JobsRegistryService,
       ],
     }).compile();
 
@@ -203,6 +190,106 @@ describe('JobsRegistryService', () => {
 
       await expect(
         service.reRunJob(mockWorkspaceId, mockJobId),
+      ).rejects.toThrow('Database error');
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteJob', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+    const mockJobId = 'job-uuid';
+    const mockJob = {
+      id: mockJobId,
+      status: JobStatus.COMPLETED,
+      workerId: 'worker-uuid',
+      retryCount: 0,
+      asset: {
+        target: {
+          id: 'target-uuid',
+        },
+      },
+    };
+
+    it('should successfully delete a job', async () => {
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: {
+          createQueryBuilder: jest.fn().mockReturnThis(),
+          innerJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockResolvedValue(mockJob),
+          remove: jest.fn().mockResolvedValue(mockJob),
+        },
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+
+      const result = await service.deleteJob(mockWorkspaceId, mockJobId);
+
+      expect(mockQueryRunner.connect).toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.createQueryBuilder).toHaveBeenCalledWith(
+        Job,
+        'job',
+      );
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(result).toEqual({ message: 'Job deleted successfully' });
+
+      // Verify the job was removed
+      expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith(mockJob);
+    });
+
+    it('should throw NotFoundException when job not found in workspace', async () => {
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: {
+          createQueryBuilder: jest.fn().mockReturnThis(),
+          innerJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockResolvedValue(null),
+        },
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+
+      await expect(
+        service.deleteJob(mockWorkspaceId, mockJobId),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.deleteJob(mockWorkspaceId, mockJobId),
+      ).rejects.toThrow('Job not found in workspace');
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+    });
+
+    it('should rollback transaction when error occurs', async () => {
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: {
+          createQueryBuilder: jest.fn().mockReturnThis(),
+          innerJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockRejectedValue(new Error('Database error')),
+        },
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+
+      await expect(
+        service.deleteJob(mockWorkspaceId, mockJobId),
       ).rejects.toThrow('Database error');
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
     });

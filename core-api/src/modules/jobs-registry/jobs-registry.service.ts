@@ -19,6 +19,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -58,7 +59,7 @@ export class JobsRegistryService {
     public readonly jobErrorLogRepo: Repository<JobErrorLog>,
     private dataSource: DataSource,
     private dataAdapterService: DataAdapterService,
-    private toolsService: ToolsService,
+    @Optional() private toolsService: ToolsService,
     private storageService: StorageService,
     private redis: RedisService,
   ) {}
@@ -959,6 +960,43 @@ export class JobsRegistryService {
       await queryRunner.commitTransaction();
 
       return { message: 'Job re-run successfully' };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  public async deleteJob(
+    workspaceId: string,
+    jobId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Verify job exists and belongs to workspace
+      const job = await queryRunner.manager
+        .createQueryBuilder(Job, 'job')
+        .innerJoin('job.asset', 'asset')
+        .innerJoin('asset.target', 'target')
+        .innerJoin('target.workspaceTargets', 'workspaceTarget')
+        .innerJoin('workspaceTarget.workspace', 'workspace')
+        .where('job.id = :jobId', { jobId })
+        .andWhere('workspace.id = :workspaceId', { workspaceId })
+        .getOne();
+
+      if (!job) {
+        throw new NotFoundException('Job not found in workspace');
+      }
+
+      // Delete the job
+      await queryRunner.manager.remove(job);
+
+      await queryRunner.commitTransaction();
+
+      return { message: 'Job deleted successfully' };
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
