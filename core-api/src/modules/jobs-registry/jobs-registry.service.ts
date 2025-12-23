@@ -995,6 +995,33 @@ export class JobsRegistryService {
     }
   }
 
+  public async cancelJob(
+    workspaceId: string,
+    jobId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Verify job exists and belongs to workspace
+      const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
+
+      // Update job status to cancelled
+      job.status = JobStatus.CANCELLED;
+
+      await queryRunner.manager.save(job);
+
+      await queryRunner.commitTransaction();
+
+      return { message: 'Job cancelled successfully' };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   public async deleteJob(
     workspaceId: string,
     jobId: string,

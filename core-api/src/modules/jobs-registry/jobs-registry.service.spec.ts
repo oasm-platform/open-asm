@@ -190,6 +190,107 @@ describe('JobsRegistryService', () => {
     });
   });
 
+  describe('cancelJob', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+    const mockJobId = 'job-uuid';
+    const mockJob = {
+      id: mockJobId,
+      status: JobStatus.IN_PROGRESS,
+      workerId: 'worker-uuid',
+      retryCount: 0,
+      asset: {
+        target: {
+          id: 'target-uuid',
+        },
+      },
+    };
+
+    it('should successfully cancel a job', async () => {
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: {
+          save: jest.fn().mockResolvedValue({
+            ...mockJob,
+            status: JobStatus.CANCELLED,
+          }),
+        },
+        commitTransaction: jest.fn(),
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(mockJob);
+
+      const result = await service.cancelJob(mockWorkspaceId, mockJobId);
+
+      expect(mockJobRepository.createQueryBuilder).toHaveBeenCalledWith('job');
+      expect(mockQueryRunner.connect).toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(result).toEqual({ message: 'Job cancelled successfully' });
+
+      // Verify the job status was updated to cancelled
+      expect(mockQueryRunner.manager.save).toHaveBeenCalledWith({
+        ...mockJob,
+        status: JobStatus.CANCELLED,
+      });
+    });
+
+    it('should throw NotFoundException when job not found in workspace', async () => {
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: {
+          createQueryBuilder: jest.fn().mockReturnThis(),
+          innerJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockResolvedValue(null),
+        },
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockResolvedValue(null);
+
+      await expect(
+        service.cancelJob(mockWorkspaceId, mockJobId),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.cancelJob(mockWorkspaceId, mockJobId),
+      ).rejects.toThrow('Job not found in workspace');
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+    });
+
+    it('should rollback transaction when error occurs', async () => {
+      const mockQueryRunner = {
+        connect: jest.fn(),
+        startTransaction: jest.fn(),
+        manager: {
+          createQueryBuilder: jest.fn().mockReturnThis(),
+          innerJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockRejectedValue(new Error('Database error')),
+        },
+        rollbackTransaction: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockJobRepository.getOne.mockRejectedValue(new Error('Database error'));
+
+      await expect(
+        service.cancelJob(mockWorkspaceId, mockJobId),
+      ).rejects.toThrow('Database error');
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+    });
+  });
+
   describe('deleteJob', () => {
     const mockWorkspaceId = 'workspace-uuid';
     const mockJobId = 'job-uuid';

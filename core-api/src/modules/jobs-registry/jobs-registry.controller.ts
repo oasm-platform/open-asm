@@ -164,6 +164,25 @@ export class JobsRegistryController {
 
   @UseGuards(WorkspaceOwnerGuard)
   @Doc({
+    summary: 'Cancel a job',
+    description: 'Cancel a job by its ID in the specified workspace',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('/:id/cancel')
+  cancelJob(
+    @WorkspaceId() workspaceId: string,
+    @Param() params: IdQueryParamDto,
+  ) {
+    return this.jobsRegistryService.cancelJob(workspaceId, params.id);
+  }
+
+  @UseGuards(WorkspaceOwnerGuard)
+  @Doc({
     summary: 'Delete a job',
     description: 'Delete a job by its ID in the specified workspace',
     response: {

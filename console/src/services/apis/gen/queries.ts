@@ -7864,6 +7864,94 @@ export const useJobsRegistryControllerReRunJob = <
 };
 
 /**
+ * Cancel a job by its ID in the specified workspace
+ * @summary Cancel a job
+ */
+export const jobsRegistryControllerCancelJob = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/jobs-registry/${id}/cancel`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getJobsRegistryControllerCancelJobMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['jobsRegistryControllerCancelJob'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return jobsRegistryControllerCancelJob(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type JobsRegistryControllerCancelJobMutationResult = NonNullable<
+  Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>
+>;
+
+export type JobsRegistryControllerCancelJobMutationError = unknown;
+
+/**
+ * @summary Cancel a job
+ */
+export const useJobsRegistryControllerCancelJob = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof jobsRegistryControllerCancelJob>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getJobsRegistryControllerCancelJobMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Delete a job by its ID in the specified workspace
  * @summary Delete a job
  */
