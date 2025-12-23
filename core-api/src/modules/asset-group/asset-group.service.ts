@@ -855,28 +855,34 @@ export class AssetGroupService {
       );
     }
 
-    const firstJobs = workflow.content.jobs.map((j) => j.run)[0];
+    // Get the first job's tool name
+    const firstJobToolName = workflow.content.jobs[0]?.run;
 
-    // Require tools installed
+    if (!firstJobToolName) {
+      throw new BadRequestException('Workflow does not have any jobs defined.');
+    }
+
+    // Require tool to be installed
     const tools = await this.toolsService.getToolByNames({
-      names: [firstJobs],
+      names: [firstJobToolName],
       isInstalled: true,
     });
 
     if (!tools || tools.length === 0) {
-      throw new BadRequestException(`Tools is not installed in the workspace.`);
+      throw new BadRequestException(
+        `Tool "${firstJobToolName}" is not installed in the workspace.`,
+      );
     }
 
-    await Promise.all(
-      tools.map((tool) =>
-        this.jobRegistryService.createNewJob({
-          tool,
-          assetIds: assets.map((a) => a.id),
-          workflow: workflow,
-          priority: tool.priority,
-        }),
-      ),
-    );
+    // Only use the first tool found (should be exactly one)
+    const tool = tools[0];
+
+    await this.jobRegistryService.createNewJob({
+      tool,
+      assetIds: assets.map((a) => a.id),
+      workflow: workflow,
+      priority: tool.priority,
+    });
     return {
       message: `Run scheduler for asset group workflow with ID ${assetGroupWorkflowId}`,
     };
