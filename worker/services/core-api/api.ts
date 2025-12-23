@@ -2868,6 +2868,22 @@ export class Api<
     });
 
   /**
+   * @description Delete a job by its ID in the specified workspace
+   *
+   * @tags JobsRegistry
+   * @name JobsRegistryControllerDeleteJob
+   * @summary Delete a job
+   * @request DELETE:/api/jobs-registry/{id}
+   */
+  jobsRegistryControllerDeleteJob = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Retrieve a paginated list of notifications for the current user
    *
    * @tags Notifications

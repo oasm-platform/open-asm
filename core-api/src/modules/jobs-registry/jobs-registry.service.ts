@@ -513,10 +513,12 @@ export class JobsRegistryService {
   /**
    * Creates jobs for a target.
    * @param dto the data transfer object containing the target ID and tool IDs
+   * @param workspaceId the workspace ID
    * @returns an object with a success message
    */
   public async createJobsForTarget(
     dto: CreateJobsDto,
+    workspaceId: string,
   ): Promise<DefaultMessageResponseDto> {
     const tools = await this.toolsService.toolsRepository.find({
       where: { id: In(dto.toolIds) },
@@ -524,7 +526,7 @@ export class JobsRegistryService {
 
     await Promise.all(
       tools.map((tool) =>
-        this.createNewJob({ tool, targetIds: [dto.targetId] }),
+        this.createNewJob({ tool, targetIds: [dto.targetId], workspaceId }),
       ),
     );
 

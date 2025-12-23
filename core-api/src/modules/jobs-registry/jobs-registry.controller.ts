@@ -7,6 +7,7 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -16,6 +17,7 @@ import {
   Param,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
@@ -86,16 +88,20 @@ export class JobsRegistryController {
     return this.jobsRegistryService.updateResult(workerId, dto);
   }
 
+  @UseGuards(WorkspaceOwnerGuard)
   @Doc({
     summary:
       'Creates a new job associated with the given asset and worker name.',
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Post()
   createJobsForTarget(
     @Body() dto: CreateJobsDto,
-    // @WorkspaceId() workspaceId: string,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.jobsRegistryService.createJobsForTarget(dto);
+    return this.jobsRegistryService.createJobsForTarget(dto, workspaceId);
   }
 
   @Doc({
@@ -136,6 +142,7 @@ export class JobsRegistryController {
     return this.jobsRegistryService.getJobHistoryDetail(workspaceId, id);
   }
 
+  @UseGuards(WorkspaceOwnerGuard)
   @Doc({
     summary: 'Re-run a job',
     description:
@@ -155,6 +162,7 @@ export class JobsRegistryController {
     return this.jobsRegistryService.reRunJob(workspaceId, params.id);
   }
 
+  @UseGuards(WorkspaceOwnerGuard)
   @Doc({
     summary: 'Delete a job',
     description: 'Delete a job by its ID in the specified workspace',
