@@ -21,20 +21,32 @@ export class TriggerWorkflowService implements OnModuleInit {
       this.getWorkflowByEvent(event)
         .then(async (workflow: Workflow | null) => {
           if (workflow) {
-            const firstJobs = workflow.content.jobs.map((j) => j.run)[0];
+            // Get the first job's tool name
+            const firstJobToolName = workflow.content.jobs[0]?.run;
+
+            if (!firstJobToolName) {
+              Logger.error('Workflow does not have any jobs defined.');
+              return;
+            }
+
             const tools = await this.toolsService.getToolByNames({
-              names: [firstJobs],
+              names: [firstJobToolName],
             });
-            await Promise.all(
-              tools.map((tool) =>
-                this.jobRegistryService.createNewJob({
-                  tool,
-                  targetIds: [payload.id],
-                  workflow: workflow,
-                  priority: tool.priority,
-                }),
-              ),
-            );
+
+            if (!tools || tools.length === 0) {
+              Logger.error(`Tool "${firstJobToolName}" not found.`);
+              return;
+            }
+
+            // Only use the first tool found (should be exactly one)
+            const tool = tools[0];
+
+            await this.jobRegistryService.createNewJob({
+              tool,
+              targetIds: [payload.id],
+              workflow: workflow,
+              priority: tool.priority,
+            });
           }
         })
         .catch((error) => {
