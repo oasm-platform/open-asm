@@ -16,30 +16,26 @@ import type { Job } from '@/services/apis/gen/queries';
 import {
   JobStatus,
   useJobsRegistryControllerGetJobHistoryDetail,
-  useJobsRegistryControllerGetManyJobs,
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
-import { Calendar, Clock } from 'lucide-react';
+import {
+  ArrowRight,
+  Calendar,
+  CircleCheck,
+  Clock,
+  Loader2Icon,
+} from 'lucide-react';
 import { useState } from 'react';
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams<{ id: string }>();
   const [jobError, setJobError] = useState<Job | null>();
-  const [page, setPage] = useState(1);
   const { data: jobHistoryDetail } =
-    useJobsRegistryControllerGetJobHistoryDetail(jobHistoryId || '');
-  const [pageSize, setPageSize] = useState(100);
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
-
-  const { data, isLoading } = useJobsRegistryControllerGetManyJobs({
-    search: '',
-    page,
-    limit: pageSize,
-    sortBy,
-    sortOrder,
-    jobHistoryId: jobHistoryId || '',
-  });
+    useJobsRegistryControllerGetJobHistoryDetail(jobHistoryId || '', {
+      query: {
+        refetchInterval: 1000,
+      },
+    });
 
   console.log(jobHistoryDetail);
 
@@ -106,40 +102,116 @@ export default function Runs() {
               {updatedAt.format('YYYY-MM-DD HH:mm:ss')}
             </span>
 
-            <span className="flex gap-2 items-center">
-              <Clock size={20} />
-              {hours > 0 && `${hours}h `}
-              {minutes > 0 && `${minutes}m `}
-              {seconds}s
-            </span>
+            {row.original.status !== JobStatus.in_progress && (
+              <span className="flex gap-2 items-center">
+                <Clock size={20} />
+                {hours > 0 && `${hours}h `}
+                {minutes > 0 && `${minutes}m `}
+                {seconds}s
+              </span>
+            )}
           </div>
         );
       },
     },
   ];
 
+  const getToolStatus = (toolIndex: number) => {
+    const tools = jobHistoryDetail?.tools || [];
+
+    // Check if any previous tool in the workflow is still running
+    for (let i = 0; i < toolIndex; i++) {
+      const prevTool = tools[i];
+      const prevToolJobs =
+        jobHistoryDetail?.jobs?.filter((job) => job.tool.id === prevTool.id) ||
+        [];
+
+      if (prevToolJobs.length > 0) {
+        const hasPrevRunning = prevToolJobs.some(
+          (job) => job.status === JobStatus.in_progress,
+        );
+        if (hasPrevRunning) return 'running';
+
+        const allPrevCompleted = prevToolJobs.every(
+          (job) => job.status === JobStatus.completed,
+        );
+        if (!allPrevCompleted) return 'running';
+      }
+    }
+
+    // Check current tool jobs
+    const currentTool = tools[toolIndex];
+    const currentToolJobs =
+      jobHistoryDetail?.jobs?.filter((job) => job.tool.id === currentTool.id) ||
+      [];
+
+    if (currentToolJobs.length === 0) return null;
+
+    const hasRunning = currentToolJobs.some(
+      (job) => job.status === JobStatus.in_progress,
+    );
+    if (hasRunning) return 'running';
+
+    const allCompleted = currentToolJobs.every(
+      (job) => job.status === JobStatus.completed,
+    );
+    if (allCompleted) return 'completed';
+
+    return 'running';
+  };
+
   const navigate = useNavigate();
   return (
     <Page isShowButtonGoBack title="Jobs registry - runs">
+      {/* Tools Section */}
+      {jobHistoryDetail?.tools && jobHistoryDetail.tools.length > 0 && (
+        <div className="mb-6 p-4 border rounded-lg bg-card">
+          <h3 className="text-lg font-semibold mb-4">Workflow</h3>
+          <div className="flex items-center gap-4 flex-wrap">
+            {jobHistoryDetail.tools.map((tool, index) => {
+              const status = getToolStatus(index);
+              return (
+                <div key={tool.id} className="flex items-center gap-2">
+                  <Link
+                    to={`/tools/${tool.id}`}
+                    className="flex items-center gap-2 hover:opacity-80"
+                  >
+                    <Image
+                      url={tool.logoUrl}
+                      width={40}
+                      height={40}
+                      className="rounded-full border"
+                    />
+                    <span className="font-medium">{tool.name}</span>
+                    {status === 'running' && (
+                      <Loader2Icon className="animate-spin h-4 w-4" />
+                    )}
+                    {status === 'completed' && (
+                      <CircleCheck className="text-green-500" />
+                    )}
+                  </Link>
+                  {index < jobHistoryDetail.tools.length - 1 && (
+                    <ArrowRight className="text-muted-foreground" size={16} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <DataTable
         isShowHeader={false}
         columns={columns}
-        data={data?.data || []}
-        isLoading={isLoading}
-        page={data?.page || 1}
-        pageSize={data?.limit || 100}
-        totalItems={data?.total || 0}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSortChange={(newSortBy, newSortOrder) => {
-          setSortBy(newSortBy);
-          setSortOrder(newSortOrder);
-          setPage(1); // Reset to first page when sorting changes
-        }}
+        data={(jobHistoryDetail?.jobs || []).sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )}
         showColumnVisibility={true}
-        showPagination={true}
+        showPagination={false}
+        page={1}
+        pageSize={jobHistoryDetail?.jobs?.length || 0}
+        totalItems={jobHistoryDetail?.jobs?.length || 0}
         onRowClick={(row) => {
           if (row.status === JobStatus.failed) {
             setJobError(row);
