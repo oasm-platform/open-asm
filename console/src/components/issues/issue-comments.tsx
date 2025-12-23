@@ -145,6 +145,7 @@ const IssueComments = ({ issue }: IssueCommentsProps) => {
                 }}
               />
               <Button
+                type="submit"
                 variant="outline"
                 disabled={
                   !newComment.trim() ||
