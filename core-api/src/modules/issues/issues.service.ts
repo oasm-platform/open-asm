@@ -1,3 +1,4 @@
+import { BOT_USER_DATA } from '@/common/constants/app.constants';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
@@ -7,7 +8,6 @@ import {
   IssueSourceType,
   IssueStatus,
 } from '@/common/enums/enum';
-import { BOT_USER_DATA } from '@/common/constants/app.constants';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   ForbiddenException,
@@ -17,6 +17,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
+import { User } from '../auth/entities/user.entity';
 import { CreateIssueCommentDto } from './dto/create-issue-comment.dto';
 import { GetManyIssuesDto } from './dto/get-many-issues.dto';
 import {
@@ -27,10 +29,8 @@ import {
 import { UpdateIssueCommentDto } from './dto/update-issue-comment.dto';
 import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
-import { User } from '../auth/entities/user.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
 import { IssueSourceHandler } from './interfaces/source-handler.interface';
-import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 
 @Injectable()
 export class IssuesService {
@@ -286,13 +286,19 @@ export class IssuesService {
     return getManyResponse({ query, data: issues, total });
   }
 
-  async getById(id: string): Promise<Issue> {
+  async getById(id: string, workspaceId?: string): Promise<Issue> {
     const issue = await this.issuesRepository.findOne({
       where: { id },
       relations: ['createdBy'],
     });
     if (!issue) {
       throw new NotFoundException(`Issue with ID ${id} not found`);
+    }
+    // If workspaceId is provided, check if the issue belongs to the workspace
+    if (workspaceId && issue.workspaceId !== workspaceId) {
+      throw new ForbiddenException(
+        'You do not have permission to access this issue',
+      );
     }
     return issue;
   }

@@ -77,6 +77,7 @@ export class IssuesController {
       serialization: Issue,
     },
     request: {
+      getWorkspaceId: true,
       params: [
         {
           name: 'id',
@@ -87,8 +88,8 @@ export class IssuesController {
     },
   })
   @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.issuesService.getById(id);
+  getById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
+    return this.issuesService.getById(id, workspaceId);
   }
 
   @Doc({

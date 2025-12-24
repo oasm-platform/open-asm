@@ -4,11 +4,11 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
 import { IssuesService } from './issues.service';
-import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 
 describe('IssuesService', () => {
   let service: IssuesService;
@@ -323,11 +323,26 @@ describe('IssuesService', () => {
   });
 
   describe('getById', () => {
-    it('should return an issue by id', async () => {
+    it('should return an issue by id without workspaceId check', async () => {
       jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
 
       const result = await service.getById('1');
       expect(result).toEqual(mockIssue);
+    });
+
+    it('should return an issue when workspaceId matches', async () => {
+      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
+
+      const result = await service.getById(mockIssue.id, mockIssue.workspaceId);
+      expect(result).toEqual(mockIssue);
+    });
+
+    it('should throw ForbiddenException when workspaceId does not match', async () => {
+      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
+
+      await expect(
+        service.getById(mockIssue.id, 'different-workspace-id'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw NotFoundException if issue not found', async () => {
