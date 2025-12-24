@@ -65,6 +65,8 @@ export default function Runs() {
     }, new Map<string, Job[]>());
   }, [jobHistoryDetail?.jobs]);
 
+  console.log(jobHistoryDetail);
+
   const getTitle = (row: Job) => {
     const value = row?.assetService
       ? `${row.assetService.value}`

@@ -1,3 +1,4 @@
+import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Severity } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { Injectable } from '@nestjs/common';
@@ -19,7 +20,7 @@ export class VulnerabilitiesService {
     private vulnerabilitiesRepository: Repository<Vulnerability>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
-  ) { }
+  ) {}
 
   /**
    * Initiates a vulnerability scan for a given target.
@@ -59,9 +60,16 @@ export class VulnerabilitiesService {
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
       .where('workspaces.id = :workspaceId', { workspaceId })
-      .orderBy(`vulnerabilities.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit);
+
+    // Handle severity sorting with proper order
+    if (sortBy === 'severity') {
+      const { select, orderBy } = this.buildSeverityOrderQuery(sortOrder);
+      queryBuilder.addSelect(select, 'severity_order').orderBy(orderBy, 'ASC');
+    } else {
+      queryBuilder.orderBy(`vulnerabilities.${sortBy}`, sortOrder);
+    }
 
     if (targetIds) {
       queryBuilder.andWhere('targets.id IN (:...targetIds)', { targetIds });
@@ -176,5 +184,26 @@ export class VulnerabilitiesService {
    */
   async markIsArchived(id: string, isArchived: boolean): Promise<void> {
     await this.vulnerabilitiesRepository.update({ id }, { isArchived });
+  }
+
+  /**
+   * Builds the SQL CASE expression for severity ordering.
+   *
+   * @param sortOrder - The sort order ('ASC' or 'DESC').
+   * @returns An object containing the select expression and order by field.
+   */
+  private buildSeverityOrderQuery(sortOrder: SortOrder | undefined): {
+    select: string;
+    orderBy: string;
+  } {
+    const severityCase =
+      sortOrder === SortOrder.ASC
+        ? `CASE vulnerabilities.severity WHEN '${Severity.INFO}' THEN 1 WHEN '${Severity.LOW}' THEN 2 WHEN '${Severity.MEDIUM}' THEN 3 WHEN '${Severity.HIGH}' THEN 4 WHEN '${Severity.CRITICAL}' THEN 5 END`
+        : `CASE vulnerabilities.severity WHEN '${Severity.INFO}' THEN 5 WHEN '${Severity.LOW}' THEN 4 WHEN '${Severity.MEDIUM}' THEN 3 WHEN '${Severity.HIGH}' THEN 2 WHEN '${Severity.CRITICAL}' THEN 1 END`;
+
+    return {
+      select: severityCase,
+      orderBy: 'severity_order',
+    };
   }
 }
