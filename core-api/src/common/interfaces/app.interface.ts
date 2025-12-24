@@ -54,6 +54,14 @@ export interface RequestWithMetadata extends Request {
     role: Role;
   };
   mcp?: {
-    permissions: McpPermission
-  }
+    permissions: McpPermission;
+  };
+}
+
+export interface Technology {
+  name: string;
+  description: string;
+  iconUrl: string;
+  categoryNames: string[];
+  website: string;
 }

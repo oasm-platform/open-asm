@@ -67,6 +67,8 @@ export default function Runs() {
 
   console.log(jobHistoryDetail);
 
+  console.log(jobHistoryDetail);
+
   const getTitle = (row: Job) => {
     const value = row?.assetService
       ? `${row.assetService.value}`
