@@ -66,10 +66,12 @@ export class TechnologyForwarderService implements OnModuleInit {
         stats.successCount += result.isSuccess ? 1 : 0;
         stats.errorCount += result.isError ? 1 : 0;
         stats.totalTechnologiesCached += result.technologiesCached;
-
-        if (letter !== 'z') {
-          await this.delay(this.FETCH_DELAY_MS);
+        if (result.isSuccess){
+          continue;
         }
+          if (letter !== 'z') {
+            await this.delay(this.FETCH_DELAY_MS);
+          }
       } catch (error) {
         stats.errorCount++;
         this.logger.error(`Error processing technology file ${letter}.json:`, error);
@@ -126,8 +128,15 @@ export class TechnologyForwarderService implements OnModuleInit {
    * @returns True if already processed
    */
   private async isFileAlreadyProcessed(statusKey: string): Promise<boolean> {
-    const cached = await this.redisService.cacheClient.get(statusKey);
-    return cached === this.STATUS_TRUE;
+    try {
+      const cached = await this.redisService.cacheClient.get(statusKey);
+      const isProcessed = cached === this.STATUS_TRUE;
+      this.logger.debug(`Status check for ${statusKey}: cached='${cached}', isProcessed=${isProcessed}`);
+      return isProcessed;
+    } catch (error) {
+      this.logger.error(`Error checking status for ${statusKey}:`, error);
+      return false;
+    }
   }
 
   /**
