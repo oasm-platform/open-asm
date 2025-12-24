@@ -8,12 +8,29 @@ import {
   TechnologyDetailDTO,
 } from './dto/technology-detail.dto';
 
+/**
+ * Custom error for file not found scenarios
+ */
+class FileNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FileNotFoundError';
+  }
+}
+
 @Injectable()
 export class TechnologyForwarderService implements OnModuleInit {
   private readonly logger = new Logger(TechnologyForwarderService.name);
   private readonly CACHE_KEY_PREFIX = 'technology:';
   private readonly CATEGORY_CACHE_KEY = 'categories';
   private readonly CACHE_TTL = 60 * 60 * 24 * 30;
+
+  // Constants for file processing
+  private readonly FETCH_DELAY_MS = 1000;
+  private readonly ALPHABET = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  private readonly STATUS_TRUE = 'true';
+  private readonly DEFAULT_ICON_EXTENSION = 'svg';
+  private readonly ICONS_BUCKET = 'cached-static';
 
   constructor(
     private readonly redisService: RedisService,
@@ -37,91 +54,135 @@ export class TechnologyForwarderService implements OnModuleInit {
 
   /**
    * Fetch and cache all technology data from A-Z files
-   * Fetches each file with 1-second delay to avoid rate limiting
+   * Fetches each file with delay to avoid rate limiting
    * Stores individual technologies with key format: technology:${techName}
    */
   private async fetchAndCacheAllTechnologies(): Promise<void> {
-    const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');
-    let successCount = 0;
-    let errorCount = 0;
-    let totalTechnologiesCached = 0;
+    const stats = { successCount: 0, errorCount: 0, totalTechnologiesCached: 0 };
 
-    for (const letter of alphabet) {
+    for (const letter of this.ALPHABET) {
       try {
-        const fileName = `${letter}.json`;
-        const url = `${WEBAPP_ANALYZER_SRC_URL}/technologies/${fileName}`;
-        this.logger.debug(`Fetching technology data from: ${url}`);
-        const rawKey = this.CACHE_KEY_PREFIX + 'status:' + fileName;
-        const cachedRaw = await this.redisService.cacheClient.get(rawKey);
-        if (cachedRaw) {
-          continue;
-        }
-        const response = await fetch(url);
+        const result = await this.processTechnologyFile(letter);
+        stats.successCount += result.isSuccess ? 1 : 0;
+        stats.errorCount += result.isError ? 1 : 0;
+        stats.totalTechnologiesCached += result.technologiesCached;
 
-        if (response.ok) {
-          const data: Record<string, unknown> =
-            (await response.json()) as Record<string, unknown>;
-
-          await this.redisService.cacheClient.set(rawKey, 'true');
-          // Cache each technology individually with key: technology:${techName}
-          let technologiesInFile = 0;
-          for (const [techName, techData] of Object.entries(data)) {
-            try {
-              const techKey = `technology:${techName}`;
-
-              // Check if already cached
-              const existing = await this.redisService.cacheClient.get(techKey);
-              if (!existing) {
-                // Cache without expiration (permanent storage)
-                await this.redisService.cacheClient.set(
-                  techKey,
-                  JSON.stringify(techData),
-                );
-                technologiesInFile++;
-                totalTechnologiesCached++;
-              }
-            } catch (techError) {
-              this.logger.error(
-                `Error caching technology ${techName}:`,
-                techError,
-              );
-            }
-          }
-
-          successCount++;
-          this.logger.debug(
-            `Successfully cached ${technologiesInFile} technologies from file: ${fileName}`,
-          );
-        } else if (response.status === 404) {
-          // File doesn't exist, skip with debug log
-          this.logger.debug(
-            `Technology file ${fileName} not found (404), skipping...`,
-          );
-          successCount++; // Count as success since 404 is expected for some files
-        } else {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        // 1-second delay to avoid rate limiting
         if (letter !== 'z') {
-          // Don't delay after the last file
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await this.delay(this.FETCH_DELAY_MS);
         }
       } catch (error) {
-        errorCount++;
-        this.logger.error(
-          `Error fetching technology file ${letter}.json:`,
-          error,
-        );
-
-        // Continue with next file even if current one fails
-        continue;
+        stats.errorCount++;
+        this.logger.error(`Error processing technology file ${letter}.json:`, error);
       }
     }
 
     this.logger.log(
-      `Technology data fetch completed. Files: ${successCount}, Errors: ${errorCount}, Total technologies cached: ${totalTechnologiesCached}`,
+      `Technology data fetch completed. Files: ${stats.successCount}, Errors: ${stats.errorCount}, Total technologies cached: ${stats.totalTechnologiesCached}`,
     );
+  }
+
+  /**
+   * Process a single technology file for a given letter
+   * @param letter The letter representing the file to process
+   * @returns Processing result with success status and cached count
+   */
+  private async processTechnologyFile(letter: string): Promise<{
+    isSuccess: boolean;
+    isError: boolean;
+    technologiesCached: number;
+  }> {
+    const fileName = `${letter}.json`;
+    const statusKey = `${this.CACHE_KEY_PREFIX}status:${fileName}`;
+
+    // Skip if already processed
+    if (await this.isFileAlreadyProcessed(statusKey)) {
+      return { isSuccess: true, isError: false, technologiesCached: 0 };
+    }
+
+    try {
+      const data = await this.fetchTechnologyFileData(fileName);
+      const technologiesCached = await this.cacheTechnologiesFromData(data);
+
+      await this.redisService.cacheClient.set(statusKey, this.STATUS_TRUE);
+
+      this.logger.debug(
+        `Successfully cached ${technologiesCached} technologies from file: ${fileName}`,
+      );
+
+      return { isSuccess: true, isError: false, technologiesCached };
+    } catch (error) {
+      if (error instanceof FileNotFoundError) {
+        this.logger.debug(`Technology file ${fileName} not found (404), skipping...`);
+        return { isSuccess: true, isError: false, technologiesCached: 0 };
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a technology file has already been processed
+   * @param statusKey The Redis key for the file status
+   * @returns True if already processed
+   */
+  private async isFileAlreadyProcessed(statusKey: string): Promise<boolean> {
+    const cached = await this.redisService.cacheClient.get(statusKey);
+    return cached === this.STATUS_TRUE;
+  }
+
+  /**
+   * Fetch technology data from a specific file
+   * @param fileName The name of the file to fetch
+   * @returns The parsed JSON data
+   */
+  private async fetchTechnologyFileData(fileName: string): Promise<Record<string, unknown>> {
+    const url = `${WEBAPP_ANALYZER_SRC_URL}/technologies/${fileName}`;
+    this.logger.debug(`Fetching technology data from: ${url}`);
+
+    const response = await fetch(url);
+
+    if (response.status === 404) {
+      throw new FileNotFoundError(`File ${fileName} not found`);
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return (await response.json()) as Record<string, unknown>;
+  }
+
+  /**
+   * Cache individual technologies from parsed data
+   * @param data The parsed technology data
+   * @returns Number of technologies cached
+   */
+  private async cacheTechnologiesFromData(data: Record<string, unknown>): Promise<number> {
+    let cachedCount = 0;
+
+    for (const [techName, techData] of Object.entries(data)) {
+      try {
+        const techKey = `${this.CACHE_KEY_PREFIX}${techName}`;
+
+        if (!(await this.redisService.cacheClient.get(techKey))) {
+          await this.redisService.cacheClient.set(techKey, JSON.stringify(techData));
+          cachedCount++;
+        }
+      } catch (techError) {
+        this.logger.error(`Error caching technology ${techName}:`, techError);
+      }
+    }
+
+    return cachedCount;
+  }
+
+  /**
+   * Create a delay promise
+   * @param ms Milliseconds to delay
+   * @returns Promise that resolves after the delay
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -227,6 +288,25 @@ export class TechnologyForwarderService implements OnModuleInit {
       return [];
     }
 
+    try {
+      const cachedResults = await this.batchGetCachedTechnologies(techNames);
+      return await Promise.all(
+        techNames.map((techName, index) =>
+          this.enrichSingleTechnology(techName, cachedResults[index])
+        )
+      );
+    } catch (error) {
+      this.logger.error('Error in batch enriching technologies:', error);
+      return techNames.map(() => new TechnologyDetailDTO());
+    }
+  }
+
+  /**
+   * Get cached technology data for multiple technologies in batch
+   * @param techNames Array of technology names
+   * @returns Array of cached data strings or null
+   */
+  private async batchGetCachedTechnologies(techNames: string[]): Promise<(string | null)[]> {
     const luaScript = `
       local prefix = ARGV[1]
       local keys = {}
@@ -236,52 +316,44 @@ export class TechnologyForwarderService implements OnModuleInit {
       return redis.call('MGET', unpack(keys))
     `;
 
+    return await this.redisService.cacheClient.eval(
+      luaScript,
+      0,
+      this.CACHE_KEY_PREFIX,
+      ...techNames,
+    ) as (string | null)[];
+  }
+
+  /**
+   * Enrich a single technology with categories and icon URL
+   * @param techName The name of the technology
+   * @param cachedData The cached JSON string or null
+   * @returns Enriched technology DTO
+   */
+  private async enrichSingleTechnology(
+    techName: string,
+    cachedData: string | null
+  ): Promise<TechnologyDetailDTO> {
+    if (!cachedData) {
+      return new TechnologyDetailDTO();
+    }
+
     try {
-      const results = (await this.redisService.cacheClient.eval(
-        luaScript,
-        0,
-        this.CACHE_KEY_PREFIX,
-        ...techNames,
-      )) as (string | null)[];
+      const techInfo = JSON.parse(cachedData) as TechnologyDetailDTO;
+      techInfo.name = techName;
 
-      return Promise.all(
-        techNames.map(async (techName, index) => {
-          const cached = results[index];
-          if (cached) {
-            try {
-              const techInfo = JSON.parse(cached) as TechnologyDetailDTO;
-              techInfo.name = techName;
+      const categories = await this.getCategoriesForTechnology(techInfo);
+      const categoryNames = categories?.map(category => category.name) || [];
 
-              // Enrich with categories
-              const categories =
-                await this.getCategoriesForTechnology(techInfo);
-              const categoryNames =
-                categories?.map((category) => category.name) || [];
-
-              return {
-                ...techInfo,
-                categories,
-                categoryNames,
-                iconUrl: techInfo.icon
-                  ? await this.getIconUrl(techInfo.icon)
-                  : '',
-              };
-            } catch (parseError) {
-              this.logger.error(
-                `Error parsing cached data for ${techName}:`,
-                parseError,
-              );
-              return new TechnologyDetailDTO();
-            }
-          } else {
-            return new TechnologyDetailDTO();
-          }
-        }),
-      );
-    } catch (error) {
-      this.logger.error('Error in batch enriching technologies:', error);
-      // Fallback to empty DTOs
-      return techNames.map(() => new TechnologyDetailDTO());
+      return {
+        ...techInfo,
+        categories,
+        categoryNames,
+        iconUrl: techInfo.icon ? await this.getIconUrl(techInfo.icon) : '',
+      };
+    } catch (parseError) {
+      this.logger.error(`Error parsing cached data for ${techName}:`, parseError);
+      return new TechnologyDetailDTO();
     }
   }
 
@@ -395,32 +467,39 @@ export class TechnologyForwarderService implements OnModuleInit {
     if (!iconName) {
       return '';
     }
-    // Determine the file extension
-    const hasDot = iconName.includes('.');
-    const extension = hasDot ? '' : '.svg';
-    const url = `${WEBAPP_ANALYZER_SRC_URL}/images/icons/${iconName}${extension}`;
-
-    // Extract actual extension for bucket
-    const actualExt = hasDot ? iconName.split('.').pop() : 'svg';
-    const bucket = `cached-static`;
-    const fileName = `${createHash('md5').update(url).digest('hex')}.${actualExt}`;
 
     try {
-      // Fetch the image
+      const { url, fileName } = this.buildIconPaths(iconName);
       const { buffer } = await this.storageService.forwardImage(url);
-
-      // Upload to storage
       const uploadResult = this.storageService.uploadFile(
         fileName,
         buffer,
-        bucket,
+        this.ICONS_BUCKET,
       );
 
-      // Return the path
       return `/api/storage/${uploadResult.path}`;
     } catch (error) {
       this.logger.error(`Error processing icon ${iconName}:`, error);
       return '';
     }
+  }
+
+  /**
+   * Build the source URL and target file name for an icon
+   * @param iconName The name of the icon
+   * @returns Object containing the source URL and target file name
+   */
+  private buildIconPaths(iconName: string): { url: string; fileName: string } {
+    const hasExtension = iconName.includes('.');
+    const extension = hasExtension ? '' : `.${this.DEFAULT_ICON_EXTENSION}`;
+    const url = `${WEBAPP_ANALYZER_SRC_URL}/images/icons/${iconName}${extension}`;
+
+    const actualExtension = hasExtension
+      ? iconName.split('.').pop() || this.DEFAULT_ICON_EXTENSION
+      : this.DEFAULT_ICON_EXTENSION;
+
+    const fileName = `${createHash('md5').update(url).digest('hex')}.${actualExtension}`;
+
+    return { url, fileName };
   }
 }
