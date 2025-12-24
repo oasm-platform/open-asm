@@ -74,3 +74,4 @@ core-api/.storage/*
 .kiro/steering/byterover-rules.md
 .qoder/rules/byterover-rules.md
 .agent/*
+.kilocode/*

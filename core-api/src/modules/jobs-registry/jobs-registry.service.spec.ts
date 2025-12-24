@@ -7,6 +7,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
+import { ToolsService } from '../tools/tools.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
@@ -51,6 +52,10 @@ describe('JobsRegistryService', () => {
     publish: jest.fn(),
   };
 
+  const mockToolsService = {
+    getInstalledTools: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -82,11 +87,17 @@ describe('JobsRegistryService', () => {
           provide: RedisService,
           useValue: mockRedisService,
         },
+        {
+          provide: ToolsService,
+          useValue: mockToolsService,
+        },
         JobsRegistryService,
       ],
     }).compile();
 
     service = module.get<JobsRegistryService>(JobsRegistryService);
+    // Manually set optional toolsService since @Optional() dependencies may not be injected in tests
+    (service as any).toolsService = mockToolsService;
   });
 
   describe('reRunJob', () => {
@@ -383,6 +394,89 @@ describe('JobsRegistryService', () => {
         service.deleteJob(mockWorkspaceId, mockJobId),
       ).rejects.toThrow('Database error');
       expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+    });
+  });
+
+  describe('getJobHistoryDetail', () => {
+    const mockWorkspaceId = 'workspace-uuid';
+    const mockHistoryId = 'history-uuid';
+    const mockJobs = [
+      {
+        id: 'job-1',
+        status: JobStatus.COMPLETED,
+        tool: { name: 'test-tool' },
+      },
+    ];
+    const mockJobHistory = {
+      id: mockHistoryId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      jobs: mockJobs,
+      workflow: {
+        content: {
+          jobs: [{ run: 'test-tool' }],
+        },
+      },
+    };
+
+    it('should return job history detail with jobs', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockToolsService.getInstalledTools.mockResolvedValue({
+        data: [{ name: 'test-tool' }],
+      });
+
+      const result = await service.getJobHistoryDetail(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(mockJobHistoryRepository.findOne).toHaveBeenCalledWith({
+        where: { id: mockHistoryId },
+        relations: {
+          workflow: true,
+          jobs: {
+            tool: true,
+            asset: { target: true },
+            assetService: true,
+            errorLogs: true,
+          },
+        },
+      });
+      expect(result).toEqual({
+        id: mockHistoryId,
+        createdAt: mockJobHistory.createdAt,
+        updatedAt: mockJobHistory.updatedAt,
+        tools: [{ name: 'test-tool' }],
+        jobs: mockJobs,
+      });
+    });
+
+    it('should throw NotFoundException when job history not found', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when job history not in workspace', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(false),
+      });
+
+      await expect(
+        service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

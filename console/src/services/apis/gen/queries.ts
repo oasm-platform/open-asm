@@ -568,6 +568,7 @@ export type JobHistoryDetailResponseDto = {
   createdAt: string;
   updatedAt: string;
   tools: Tool[];
+  jobs: Job[];
 };
 
 export type Notification = {
