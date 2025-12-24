@@ -18,6 +18,7 @@ import { TechnologyDetailDTO } from '../technology/dto/technology-detail.dto';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
+import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
@@ -28,7 +29,6 @@ import { AssetService } from './entities/asset-services.entity';
 import { AssetTag } from './entities/asset-tags.entity';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
-import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
 
 // Type cho raw database response từ TLS query
 interface TlsRawData {
