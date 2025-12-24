@@ -25,8 +25,6 @@ import {
   useJobsRegistryControllerCancelJob,
   useJobsRegistryControllerDeleteJob,
   useJobsRegistryControllerGetJobHistoryDetail,
-  useJobsRegistryControllerGetJobHistoryDetail,
-  useJobsRegistryControllerGetManyJobs,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
