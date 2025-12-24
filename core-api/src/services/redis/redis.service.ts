@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 
@@ -8,7 +8,7 @@ import { Redis } from 'ioredis';
  * to simplify publishing, subscribing, and key management.
  */
 @Injectable()
-export class RedisService implements OnModuleDestroy {
+export class RedisService implements OnModuleInit, OnModuleDestroy {
   /**
    * Redis client instance for general commands.
    */
@@ -46,6 +46,47 @@ export class RedisService implements OnModuleDestroy {
         error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Failed to initialize Redis client: ${errorMessage}`);
     }
+  }
+
+  /**
+   * Wait for Redis connections to be ready before proceeding
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      // Wait for all Redis clients to be ready
+      await Promise.all([
+        this.waitForClientReady(this.client),
+        this.waitForClientReady(this.cacheClient),
+        this.waitForClientReady(this.publisher),
+        this.waitForClientReady(this.subscriber),
+      ]);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to establish Redis connections: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Wait for a Redis client to be ready
+   */
+  private async waitForClientReady(client: Redis): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (client.status === 'ready') {
+        resolve();
+        return;
+      }
+
+      client.once('ready', () => resolve());
+      client.once('error', reject);
+
+      // Timeout after 30 seconds
+      setTimeout(() => {
+        client.removeListener('ready', resolve);
+        client.removeListener('error', reject);
+        reject(new Error('Redis connection timeout'));
+      }, 30000);
+    });
   }
 
   /**
