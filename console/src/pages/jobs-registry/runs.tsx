@@ -25,7 +25,7 @@ import {
   Clock,
   Loader2Icon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams<{ id: string }>();
@@ -37,7 +37,18 @@ export default function Runs() {
       },
     });
 
-  console.log(jobHistoryDetail);
+  // Memoize jobs grouped by tool ID for efficient lookups
+  const jobsByToolId = useMemo(() => {
+    if (!jobHistoryDetail?.jobs) return new Map<string, Job[]>();
+    return jobHistoryDetail.jobs.reduce((acc, job) => {
+      const toolId = job.tool.id;
+      if (!acc.has(toolId)) {
+        acc.set(toolId, []);
+      }
+      acc.get(toolId)!.push(job);
+      return acc;
+    }, new Map<string, Job[]>());
+  }, [jobHistoryDetail?.jobs]);
 
   const getTitle = (row: Job) => {
     const value = row?.assetService
@@ -116,49 +127,58 @@ export default function Runs() {
     },
   ];
 
-  const getToolStatus = (toolIndex: number) => {
-    const tools = jobHistoryDetail?.tools || [];
+  const getToolStatus = useMemo(() => {
+    return (toolIndex: number) => {
+      const tools = jobHistoryDetail?.tools || [];
 
-    // Check if any previous tool in the workflow is still running
-    for (let i = 0; i < toolIndex; i++) {
-      const prevTool = tools[i];
-      const prevToolJobs =
-        jobHistoryDetail?.jobs?.filter((job) => job.tool.id === prevTool.id) ||
-        [];
+      // Check if any previous tool in the workflow is still running
+      for (let i = 0; i < toolIndex; i++) {
+        const prevTool = tools[i];
+        const prevToolJobs = jobsByToolId.get(prevTool.id) || [];
 
-      if (prevToolJobs.length > 0) {
-        const hasPrevRunning = prevToolJobs.some(
-          (job) => job.status === JobStatus.in_progress,
-        );
-        if (hasPrevRunning) return 'running';
+        if (prevToolJobs.length > 0) {
+          const hasPrevRunning = prevToolJobs.some(
+            (job) => job.status === JobStatus.in_progress,
+          );
+          if (hasPrevRunning) return 'running';
 
-        const allPrevCompleted = prevToolJobs.every(
-          (job) => job.status === JobStatus.completed,
-        );
-        if (!allPrevCompleted) return 'running';
+          const allPrevCompleted = prevToolJobs.every(
+            (job) => job.status === JobStatus.completed,
+          );
+          if (!allPrevCompleted) return 'running';
+        }
       }
-    }
 
-    // Check current tool jobs
-    const currentTool = tools[toolIndex];
-    const currentToolJobs =
-      jobHistoryDetail?.jobs?.filter((job) => job.tool.id === currentTool.id) ||
-      [];
+      // Check current tool jobs
+      const currentTool = tools[toolIndex];
+      const currentToolJobs = jobsByToolId.get(currentTool.id) || [];
 
-    if (currentToolJobs.length === 0) return null;
+      if (currentToolJobs.length === 0) return null;
 
-    const hasRunning = currentToolJobs.some(
-      (job) => job.status === JobStatus.in_progress,
-    );
-    if (hasRunning) return 'running';
+      const hasRunning = currentToolJobs.some(
+        (job) => job.status === JobStatus.in_progress,
+      );
+      if (hasRunning) return 'running';
 
-    const allCompleted = currentToolJobs.every(
-      (job) => job.status === JobStatus.completed,
-    );
-    if (allCompleted) return 'completed';
+      const allCompleted = currentToolJobs.every(
+        (job) => job.status === JobStatus.completed,
+      );
+      if (allCompleted) return 'completed';
 
-    return 'running';
-  };
+      return 'running';
+    };
+  }, [jobHistoryDetail?.tools, jobsByToolId]);
+
+  // Memoize sorted jobs to avoid sorting on every render
+  const sortedJobs = useMemo(() => {
+    // Use .slice() to create a shallow copy before sorting to avoid mutating the original array
+    return (jobHistoryDetail?.jobs || [])
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+  }, [jobHistoryDetail?.jobs]);
 
   const navigate = useNavigate();
   return (
@@ -203,10 +223,7 @@ export default function Runs() {
       <DataTable
         isShowHeader={false}
         columns={columns}
-        data={(jobHistoryDetail?.jobs || []).sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        )}
+        data={sortedJobs}
         showColumnVisibility={true}
         showPagination={false}
         page={1}
