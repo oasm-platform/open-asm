@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { CodeBlock } from '@/components/common/code-block';
 import Page from '@/components/common/page';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
 import {
   Dialog,
@@ -10,13 +11,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import Image from '@/components/ui/image';
 import JobStatusBadge from '@/components/ui/job-status';
 import type { Job } from '@/services/apis/gen/queries';
 import {
   JobStatus,
+  useJobsRegistryControllerCancelJob,
+  useJobsRegistryControllerDeleteJob,
   useJobsRegistryControllerGetJobHistoryDetail,
 } from '@/services/apis/gen/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
   ArrowRight,
@@ -24,18 +34,23 @@ import {
   CircleCheck,
   Clock,
   Loader2Icon,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 export default function Runs() {
   const { id: jobHistoryId } = useParams<{ id: string }>();
   const [jobError, setJobError] = useState<Job | null>();
+  const queryClient = useQueryClient();
   const { data: jobHistoryDetail } =
     useJobsRegistryControllerGetJobHistoryDetail(jobHistoryId || '', {
       query: {
         refetchInterval: 1000,
       },
     });
+
+  const { mutate: deleteJobMutate } = useJobsRegistryControllerDeleteJob();
+  const { mutate: cancelJobMutate } = useJobsRegistryControllerCancelJob();
 
   // Memoize jobs grouped by tool ID for efficient lookups
   const jobsByToolId = useMemo(() => {
@@ -121,6 +136,88 @@ export default function Runs() {
                 {seconds}s
               </span>
             )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const canCancel =
+          row.original.status === JobStatus.pending ||
+          row.original.status === JobStatus.in_progress;
+
+        return (
+          <div className="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="h-8 w-8 p-0 flex items-center justify-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {canCancel && (
+                  <ConfirmDialog
+                    title="Cancel Job"
+                    description="Are you sure you want to cancel this job?"
+                    onConfirm={() =>
+                      cancelJobMutate(
+                        { id: row.original.id },
+                        {
+                          onSuccess: () => {
+                            queryClient.invalidateQueries({
+                              queryKey: [
+                                'JobsRegistryControllerGetJobHistoryDetail',
+                                jobHistoryId,
+                              ],
+                            });
+                          },
+                        },
+                      )
+                    }
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        Cancel
+                      </DropdownMenuItem>
+                    }
+                  />
+                )}
+                <ConfirmDialog
+                  title="Delete Job"
+                  description="Are you sure you want to delete this job?"
+                  onConfirm={() =>
+                    deleteJobMutate(
+                      { id: row.original.id },
+                      {
+                        onSuccess: () => {
+                          queryClient.invalidateQueries({
+                            queryKey: [
+                              'JobsRegistryControllerGetJobHistoryDetail',
+                              jobHistoryId,
+                            ],
+                          });
+                        },
+                      },
+                    )
+                  }
+                  trigger={
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  }
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
