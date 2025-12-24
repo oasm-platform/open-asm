@@ -14,6 +14,6 @@ export class JobErrorLog extends BaseEntity {
   @ApiProperty()
   @Column({ nullable: true })
   jobId: string;
-  @ManyToOne(() => Job, (job) => job.errorLogs)
+  @ManyToOne(() => Job, (job) => job.errorLogs, { onDelete: 'CASCADE' })
   job: Job;
 }
