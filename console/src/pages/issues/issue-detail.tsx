@@ -1,10 +1,8 @@
 import Page from '@/components/common/page';
 import IssueComments from '@/components/issues/issue-comments';
 import IssueTags from '@/components/issues/issue-tags';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import StatusBadge from '@/components/ui/status-badge';
 import {
   useIssuesControllerGetById,
@@ -12,10 +10,10 @@ import {
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Check, PencilIcon, User, X } from 'lucide-react';
+import { Check, PencilIcon, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
+import { useParams } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 
 dayjs.extend(relativeTime);
@@ -73,7 +71,7 @@ const IssueDetail = () => {
   }
 
   return (
-    <Page className="w-full">
+    <Page className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 mx-auto">
       <div className="mb-6 pb-4 border-b border-border">
         <div className="mb-2">
           {isEditing ? (
@@ -152,32 +150,6 @@ const IssueDetail = () => {
               Labels
             </h3>
             <IssueTags issue={issue} onUpdate={refetch} />
-          </div>
-
-          <Separator />
-
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              Author
-            </h3>
-            <div className="flex items-center gap-2">
-              <Avatar
-                className="h-6 w-6"
-                aria-label={`Author: ${issue.createdBy?.name || 'Unknown'}`}
-              >
-                <AvatarFallback className="text-xs">
-                  {issue.createdBy?.name?.charAt(0).toUpperCase() || (
-                    <User size={14} />
-                  )}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm font-medium">
-                {issue.createdBy?.name || 'Unknown'}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Created {dayjs(issue.createdAt).fromNow()}
-            </p>
           </div>
         </div>
       </div>
