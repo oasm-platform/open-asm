@@ -24,6 +24,8 @@ export class TechnologyForwarderService implements OnModuleInit {
   private readonly CACHE_KEY_PREFIX = 'technology:';
   private readonly CATEGORY_CACHE_KEY = 'categories';
   private readonly CACHE_TTL = 60 * 60 * 24 * 30;
+  private readonly INITIALIZATION_FLAG_KEY =
+    'technology:initialization:completed';
 
   // Constants for file processing
   private readonly FETCH_DELAY_MS = 1000;
@@ -40,16 +42,54 @@ export class TechnologyForwarderService implements OnModuleInit {
   /**
    * Initialize module and fetch all technology data on startup
    * This method is called automatically when the module is initialized
+   * The data fetching runs asynchronously in the background without blocking app startup
    */
+  // eslint-disable-next-line @typescript-eslint/require-await
   async onModuleInit(): Promise<void> {
-    this.logger.log('Starting technology data initialization...');
+    // Check if initialization has already been logged globally
+    const isAlreadyLogged = await this.redisService.cacheClient.get(
+      this.INITIALIZATION_FLAG_KEY,
+    );
 
-    try {
-      await this.fetchAndCacheAllTechnologies();
-      this.logger.log('Technology data initialization completed successfully');
-    } catch (error) {
-      this.logger.error('Error during technology data initialization:', error);
+    if (isAlreadyLogged === this.STATUS_TRUE) {
+      return;
     }
+
+    this.logger.log('Starting technology data initialization in background...');
+
+    // Run data fetching asynchronously without awaiting to avoid blocking app startup
+    this.fetchAndCacheAllTechnologies()
+      .then(async () => {
+        // Double-check flag to prevent race conditions
+        const currentFlag = await this.redisService.cacheClient.get(
+          this.INITIALIZATION_FLAG_KEY,
+        );
+        if (currentFlag !== this.STATUS_TRUE) {
+          await this.redisService.cacheClient.set(
+            this.INITIALIZATION_FLAG_KEY,
+            this.STATUS_TRUE,
+          );
+          this.logger.log(
+            'Technology data initialization completed successfully',
+          );
+        }
+      })
+      .catch(async (error) => {
+        // Double-check flag to prevent race conditions
+        const currentFlag = await this.redisService.cacheClient.get(
+          this.INITIALIZATION_FLAG_KEY,
+        );
+        if (currentFlag !== this.STATUS_TRUE) {
+          await this.redisService.cacheClient.set(
+            this.INITIALIZATION_FLAG_KEY,
+            this.STATUS_TRUE,
+          );
+          this.logger.error(
+            'Error during technology data initialization:',
+            error,
+          );
+        }
+      });
   }
 
   /**
@@ -58,7 +98,13 @@ export class TechnologyForwarderService implements OnModuleInit {
    * Stores individual technologies with key format: technology:${techName}
    */
   private async fetchAndCacheAllTechnologies(): Promise<void> {
-    const stats = { successCount: 0, errorCount: 0, totalTechnologiesCached: 0 };
+    const stats = {
+      successCount: 0,
+      errorCount: 0,
+      totalTechnologiesCached: 0,
+    };
+
+    let isFetchingFromRemote = false;
 
     for (const letter of this.ALPHABET) {
       try {
@@ -66,21 +112,28 @@ export class TechnologyForwarderService implements OnModuleInit {
         stats.successCount += result.isSuccess ? 1 : 0;
         stats.errorCount += result.isError ? 1 : 0;
         stats.totalTechnologiesCached += result.technologiesCached;
-        if (result.isSuccess){
+
+        // Track if we're actually fetching from remote
+        if (result.technologiesCached > 0) {
+          isFetchingFromRemote = true;
+        }
+
+        if (result.isSuccess) {
           continue;
         }
-          if (letter !== 'z') {
-            await this.delay(this.FETCH_DELAY_MS);
-          }
+        if (letter !== 'z') {
+          await this.delay(this.FETCH_DELAY_MS);
+        }
       } catch (error) {
         stats.errorCount++;
-        this.logger.error(`Error processing technology file ${letter}.json:`, error);
+        if (isFetchingFromRemote) {
+          this.logger.error(
+            `Error processing technology file ${letter}.json:`,
+            error,
+          );
+        }
       }
     }
-
-    this.logger.log(
-      `Technology data fetch completed. Files: ${stats.successCount}, Errors: ${stats.errorCount}, Total technologies cached: ${stats.totalTechnologiesCached}`,
-    );
   }
 
   /**
@@ -114,7 +167,9 @@ export class TechnologyForwarderService implements OnModuleInit {
       return { isSuccess: true, isError: false, technologiesCached };
     } catch (error) {
       if (error instanceof FileNotFoundError) {
-        this.logger.debug(`Technology file ${fileName} not found (404), skipping...`);
+        this.logger.debug(
+          `Technology file ${fileName} not found (404), skipping...`,
+        );
         return { isSuccess: true, isError: false, technologiesCached: 0 };
       }
 
@@ -131,7 +186,9 @@ export class TechnologyForwarderService implements OnModuleInit {
     try {
       const cached = await this.redisService.cacheClient.get(statusKey);
       const isProcessed = cached === this.STATUS_TRUE;
-      this.logger.debug(`Status check for ${statusKey}: cached='${cached}', isProcessed=${isProcessed}`);
+      this.logger.debug(
+        `Status check for ${statusKey}: cached='${cached}', isProcessed=${isProcessed}`,
+      );
       return isProcessed;
     } catch (error) {
       this.logger.error(`Error checking status for ${statusKey}:`, error);
@@ -144,7 +201,9 @@ export class TechnologyForwarderService implements OnModuleInit {
    * @param fileName The name of the file to fetch
    * @returns The parsed JSON data
    */
-  private async fetchTechnologyFileData(fileName: string): Promise<Record<string, unknown>> {
+  private async fetchTechnologyFileData(
+    fileName: string,
+  ): Promise<Record<string, unknown>> {
     const url = `${WEBAPP_ANALYZER_SRC_URL}/technologies/${fileName}`;
     this.logger.debug(`Fetching technology data from: ${url}`);
 
@@ -166,7 +225,9 @@ export class TechnologyForwarderService implements OnModuleInit {
    * @param data The parsed technology data
    * @returns Number of technologies cached
    */
-  private async cacheTechnologiesFromData(data: Record<string, unknown>): Promise<number> {
+  private async cacheTechnologiesFromData(
+    data: Record<string, unknown>,
+  ): Promise<number> {
     let cachedCount = 0;
 
     for (const [techName, techData] of Object.entries(data)) {
@@ -174,7 +235,10 @@ export class TechnologyForwarderService implements OnModuleInit {
         const techKey = `${this.CACHE_KEY_PREFIX}${techName}`;
 
         if (!(await this.redisService.cacheClient.get(techKey))) {
-          await this.redisService.cacheClient.set(techKey, JSON.stringify(techData));
+          await this.redisService.cacheClient.set(
+            techKey,
+            JSON.stringify(techData),
+          );
           cachedCount++;
         }
       } catch (techError) {
@@ -191,7 +255,7 @@ export class TechnologyForwarderService implements OnModuleInit {
    * @returns Promise that resolves after the delay
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -301,8 +365,8 @@ export class TechnologyForwarderService implements OnModuleInit {
       const cachedResults = await this.batchGetCachedTechnologies(techNames);
       return await Promise.all(
         techNames.map((techName, index) =>
-          this.enrichSingleTechnology(techName, cachedResults[index])
-        )
+          this.enrichSingleTechnology(techName, cachedResults[index]),
+        ),
       );
     } catch (error) {
       this.logger.error('Error in batch enriching technologies:', error);
@@ -315,7 +379,9 @@ export class TechnologyForwarderService implements OnModuleInit {
    * @param techNames Array of technology names
    * @returns Array of cached data strings or null
    */
-  private async batchGetCachedTechnologies(techNames: string[]): Promise<(string | null)[]> {
+  private async batchGetCachedTechnologies(
+    techNames: string[],
+  ): Promise<(string | null)[]> {
     const luaScript = `
       local prefix = ARGV[1]
       local keys = {}
@@ -325,12 +391,12 @@ export class TechnologyForwarderService implements OnModuleInit {
       return redis.call('MGET', unpack(keys))
     `;
 
-    return await this.redisService.cacheClient.eval(
+    return (await this.redisService.cacheClient.eval(
       luaScript,
       0,
       this.CACHE_KEY_PREFIX,
       ...techNames,
-    ) as (string | null)[];
+    )) as (string | null)[];
   }
 
   /**
@@ -341,7 +407,7 @@ export class TechnologyForwarderService implements OnModuleInit {
    */
   private async enrichSingleTechnology(
     techName: string,
-    cachedData: string | null
+    cachedData: string | null,
   ): Promise<TechnologyDetailDTO> {
     if (!cachedData) {
       return new TechnologyDetailDTO();
@@ -352,7 +418,7 @@ export class TechnologyForwarderService implements OnModuleInit {
       techInfo.name = techName;
 
       const categories = await this.getCategoriesForTechnology(techInfo);
-      const categoryNames = categories?.map(category => category.name) || [];
+      const categoryNames = categories?.map((category) => category.name) || [];
 
       return {
         ...techInfo,
@@ -361,7 +427,10 @@ export class TechnologyForwarderService implements OnModuleInit {
         iconUrl: techInfo.icon ? await this.getIconUrl(techInfo.icon) : '',
       };
     } catch (parseError) {
-      this.logger.error(`Error parsing cached data for ${techName}:`, parseError);
+      this.logger.error(
+        `Error parsing cached data for ${techName}:`,
+        parseError,
+      );
       return new TechnologyDetailDTO();
     }
   }
