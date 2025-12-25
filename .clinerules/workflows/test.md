@@ -36,6 +36,7 @@
 
 - **Mandatory requirements**:
   - Test all public functions / methods
+  - MUST have full documentation comments above every new or modified function
   - Cover **happy paths and unhappy paths**
   - Include edge cases and boundary conditions
   - Follow **AAA pattern** (Arrange – Act – Assert)

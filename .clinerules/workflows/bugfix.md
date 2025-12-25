@@ -49,6 +49,7 @@
   - **Second Rule**: Ensure the fix doesn't break existing functionality
   - **Third Rule**: Add proper validation for edge cases that caused the bug
   - **Fourth Rule**: Update related error messages to be more descriptive if applicable
+  - **Fifth Rule**: MUST have full documentation comments above every new or modified function
 
 - **Testing Rule**: Before implementing the fix, identify what tests should be added to prevent this bug from recurring.
 

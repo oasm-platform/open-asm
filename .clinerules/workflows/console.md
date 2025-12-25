@@ -41,6 +41,7 @@
 
 - The **Component must follow**:
   - Strict TypeScript typing
+  - MUST have full documentation comments above every new or modified function
   - Proper prop validation
   - Clean, readable code structure
   - Follow existing naming conventions

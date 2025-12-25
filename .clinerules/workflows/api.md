@@ -5,17 +5,9 @@
 > Rule: **You MUST execute EVERY step below sequentially. Skipping, merging, or reordering steps is NOT allowed.**
 > Completion is valid **only if all checkpoints are satisfied**.
 
----
+<detailed_sequence_of_steps>
 
-## Global Execution Rules (Mandatory)
-
-- Follow steps **1 → 7 in order**.
-- Each step must be **explicitly completed** before moving to the next.
-- If any step fails (lint, tests, missing docs, etc.) → **go back and fix before proceeding**.
-- Do NOT assume or auto-skip any step.
-- Do NOT produce a final answer until **Step 7 is completed**.
-
----
+# API Development Process - Detailed Sequence of Steps
 
 ## 1. Requirement & API Specification (Checkpoint 1)
 
@@ -23,260 +15,194 @@
 
 You MUST explicitly define:
 
-- **Inputs**
-  - Data types
-  - Validation rules
-  - Constraints
-
-- **Outputs**
-  - Response shape
-  - Return types
-  - Success / error codes
-
-- **Business logic**
-  - Core flow
-  - Error scenarios
-  - External dependencies (DB, internal services, third-party APIs)
+- **Inputs**: Data types, validation rules, constraints.
+- **Outputs**: Response shape, return types, success/error codes.
+- **Business logic**: Core flow, error scenarios, external dependencies (DB, internal services, third-party APIs).
 
 ### B. Existing API Modification
 
 You MUST explicitly document:
 
-- Current behavior
-- Desired changes
-- Breaking changes (if any)
-- Backward compatibility impact
-- Migration strategy for dependent clients
+- Current behavior vs. Desired changes.
+- Breaking changes and backward compatibility impact.
+- Migration strategy for dependent clients.
 
 ### C. API Definition (Mandatory for all APIs)
 
-- HTTP method
-- Endpoint path
-- Request body / query / params
-- Swagger documentation using `@Doc()`
-- Workspace handling:
-  - If `workspaceId` is required → set `getWorkspaceId: true`
-
-- DTOs:
-  - Body DTO
-  - Query DTO
-  - Params DTO
-  - Response DTO
-  - All DTOs must use `class-validator`
-  - DTOs must live in `/dtos` of the module
+- HTTP method, Endpoint path, Request body/query/params.
+- Swagger documentation using `@Doc()`.
+- Workspace handling: If `workspaceId` is required → set `getWorkspaceId: true`.
+- DTOs: Body, Query, Params, Response. Must use `class-validator` and live in `/dtos`.
 
 > ❌ You may NOT proceed to Step 2 until all items in Step 1 are fully specified.
 
----
-
 ## 2. Implementation: Controller → Service (Checkpoint 2)
-
-### REST API Standards Compliance
-
-#### HTTP Methods (CRUD Operations)
-
-- **GET** - Retrieve resources (READ)
-  - Use for fetching data without side effects
-  - Idempotent operations
-  - Examples: `GET /users`, `GET /users/:id`
-
-- **POST** - Create new resources (CREATE)
-  - Use for creating new entities
-  - Request body contains data to create the resource
-  - Examples: `POST /users`, `POST /users/:id/activate`
-
-- **PUT** - Update entire resource (UPDATE)
-  - Use for complete resource replacement
-  - Request body contains complete resource data
-  - Examples: `PUT /users/:id`
-
-- **PATCH** - Partial resource update (UPDATE)
-  - Use for partial updates
-  - Request body contains only fields to update
-  - Examples: `PATCH /users/:id`
-
-- **DELETE** - Remove resources (DELETE)
-  - Use for deleting resources
-  - Examples: `DELETE /users/:id`
-
-#### Endpoint Routing Standards
-
-- Use **plural nouns** for resource collections
-  - ✅ `GET /users`, `GET /products`, `GET /orders`
-  - ❌ `GET /user`, `GET /product`, `GET /order`
-
-- Use **hierarchical structure** for relationships
-  - ✅ `GET /users/:userId/orders`, `GET /users/:userId/orders/:orderId`
-  - ❌ `GET /user-orders/:userId`, `GET /order/:orderId/user/:userId`
-
-- Use **descriptive action endpoints** when CRUD doesn't apply
-  - ✅ `POST /users/:id/activate`, `POST /users/:id/deactivate`
-  - ❌ `POST /activate-user/:id`, `POST /users/activate/:id`
-
-- Maintain **consistent parameter naming**
-  - Use `:resourceId` format (e.g., `:userId`, `:orderId`)
-  - Avoid generic `:id` when multiple resources in path
 
 ### Controller Rules
 
-- MUST exist for new APIs
-- MUST declare **new endpoints BEFORE any `/:id` routes**
-- Handles ONLY:
-  - Routing
-  - DTO validation
-  - Request/response mapping
-
-- NO business logic
+- MUST exist for new APIs.
+- MUST have full documentation comments above every function.
+- MUST declare **new endpoints BEFORE any `/:id` routes**.
+- Handles ONLY: Routing, DTO validation, Request/response mapping.
+- NO business logic.
 
 ### Service Rules
 
-- Contains **all business logic**
-- Strict typing only
-- Use `async/await`
-- English comments **only for non-obvious logic**
+- Contains **all business logic**.
+- MUST have full documentation comments above every function.
+- Strict typing only; use `async/await`.
+- English comments **only for non-obvious logic**.
 
 ### Entity Rules
 
-- If modifying or creating an Entity:
-  - FIRST review all related entities in:
-    - `src/common/entity/*`
-    - Module-specific entities
-
-  - Ensure schema consistency and relationships
+- Review schema consistency and relationships in `src/common/entity/*` and module-specific entities.
 
 ### User Data Exposure Rule
 
-- User info in responses MUST be limited to:
-  - `id`
-  - `name`
-  - `image`
+- User info in responses MUST be limited to: `id`, `name`, `image`.
 
 ### DTO Rules (Strict)
 
-- DTOs are **mandatory** for:
-  - Body
-  - Query
-  - Params
-  - Response
-
-- Prefer extending existing entities
-- Use `@ApiProperty()` for Swagger & codegen fields
-- Accept **minimum required input only**
-- Validate all inputs with `class-validator`
-
-### Success Message Response Rule (POST/PUT/DELETE)
-
-- For APIs that perform create (POST), update (PUT/PATCH), or delete (DELETE) operations and need to return a success message, use `DefaultMessageResponseDto` from `core-api/src/common/dtos/default-message-response.dto.ts`
-- This DTO provides a standardized success message response format with a `message` field
-- Example usage for successful operations: `{ "message": "Success" }`
+- Use `@ApiProperty()` for Swagger & codegen fields.
+- Accept **minimum required input only**.
+- For success messages (POST/PUT/DELETE), use `DefaultMessageResponseDto`.
 
 > ❌ Do NOT proceed to Step 3 until Controller and Service are fully implemented and compliant.
 
----
-
 ## 3. Test-Driven Development: Service Tests (Checkpoint 3)
 
-### New APIs
-
-- Service tests are **MANDATORY**
-- File: `*.service.spec.ts`
-- Tests MUST cover:
-  - Valid input → success
-  - Invalid input / edge cases
-  - Error handling (DB, dependencies)
-
-### Existing API Modifications
-
-- Update or create service tests
-- Ensure:
-  - New behavior is tested
-  - No regression in existing behavior
-  - Backward compatibility (if required)
-
-### Mocking Rules
-
-- Mock **ALL external dependencies**
-- IDs MUST be valid UUID v4+ using:
-
-```ts
-import { randomUUID } from 'crypto';
-```
+- Service tests are **MANDATORY** (`*.service.spec.ts`).
+- Tests MUST cover: Valid input → success, Invalid input / edge cases, Error handling.
+- Mock **ALL external dependencies**.
+- IDs MUST be valid UUID v4+ using `import { randomUUID } from 'crypto';`.
 
 > ❌ Do NOT proceed to Step 4 until all required tests are written.
 
----
-
 ## 4. Linting (Checkpoint 4)
 
-- Run ESLint
-- Result MUST be:
-  - **0 errors**
-  - **0 warnings**
+- Run ESLint.
+- Result MUST be: **0 errors**, **0 warnings**.
 
 > ❌ Any lint issue → fix immediately and re-check.
 
----
-
 ## 5. Test Verification (Checkpoint 5)
 
-- Run ONLY tests related to modified/created files
-
-```bash
-npm run test -- <module-path>/<file-name>.service.spec.ts
-```
-
-Example:
-
-```bash
-cd core-api
-npm run test -- src/modules/users/users.service.spec.ts
-```
-
-- ALL tests MUST pass
-- If tests fail:
-  - Fix implementation
-  - OR update tests first if requirements changed
+- Run ONLY tests related to modified/created files.
+- ALL tests MUST pass.
 
 > ❌ Do NOT proceed to Step 6 unless tests are green.
 
----
-
 ## 6. Console API Generation (Checkpoint 6)
 
-### Required When:
-
-- New API is exposed to frontend
-- DTOs change
-- Endpoint behavior or contract changes
-
-Run:
-
-```bash
-task console:gen-api
-```
-
-- Ensure `/console` client types & methods are updated
-- Generated files MUST be committed with feature code
+- Required when: New API is exposed, DTOs change, or Step 1 contract changes.
+- Run `task console:gen-api` to update `/console` client types.
 
 > ❌ Skipping this step invalidates the implementation.
 
----
-
 ## 7. Completion Summary (Checkpoint 7)
 
-Provide a final summary including:
+Provide a final summary:
 
-- What was added or changed
-- List of modified files
-- Confirmation:
-  - Tests ✅
-  - Lint ✅
-
-- Status: **READY FOR REVIEW**
+- What was added or changed.
+- List of modified files.
+- Confirmation: Tests ✅, Lint ✅.
+- Status: **READY FOR REVIEW**.
 
 > ✅ ONLY after this step is completed is the task considered DONE.
 
----
+</detailed_sequence_of_steps>
+
+<standards_and_conventions>
+
+# REST API & Coding Standards
+
+## HTTP Methods (CRUD Operations)
+
+- **GET**: Retrieve resources (Idempotent).
+- **POST**: Create new resources.
+- **PUT**: Update entire resource (Replacement).
+- **PATCH**: Partial resource update.
+- **DELETE**: Remove resources.
+
+## Endpoint Routing Standards
+
+- Use **plural nouns** (`/users`, not `/user`).
+- Use **hierarchical structure** (`/users/:userId/orders`).
+- Use **descriptive action endpoints** (`/users/:id/activate`).
+- Maintain **consistent parameter naming** (`:userId`, not just `:id`).
+
+## DTO Implementation
+
+- DTOs are **mandatory** for Body, Query, Params, and Response.
+- Validate all inputs with `class-validator`.
+- Success responses for mutations:
+  ```ts
+  { "message": "Success" } // DefaultMessageResponseDto
+  ```
+
+</standards_and_conventions>
+
+<example_api_workflow>
+
+# Example: Adding a Target Service History API
+
+## Step 1: Specification
+
+- **Endpoint**: `GET /target-services/:id/history`
+- **Goal**: Fetch history of metadata changes for a specific target service.
+- **Output**: Array of `TargetServiceHistoryDto`.
+
+## Step 2: Implementation
+
+- Create `TargetServiceHistoryDto` in `dtos/`.
+- Add method to `TargetServicesController` (before generic ID routes).
+- Implement business logic in `TargetServicesService` to query the history table.
+
+## Step 3: Testing
+
+```ts
+// target-services.service.spec.ts
+it('should return history for a valid service id', async () => {
+  const serviceId = randomUUID();
+  mockRepo.find.mockResolvedValue([{ id: randomUUID(), change: 'Updated' }]);
+  const result = await service.getHistory(serviceId);
+  expect(result).toHaveLength(1);
+});
+```
+
+## Step 4-6: Validation
+
+- `npm run lint`
+- `npm run test -- src/modules/targets/target-services.service.spec.ts`
+- `task console:gen-api`
+
+</example_api_workflow>
+
+<common_api_commands>
+
+# Common API Development Commands
+
+## Testing
+
+```bash
+# Run specific module tests
+npm run test -- <path-to-spec-file>
+
+# Example
+npm run test -- src/modules/users/users.service.spec.ts
+```
+
+## Generation & Linting
+
+```bash
+# Generate console API client types
+task console:gen-api
+
+# Check linting
+npm run lint
+```
+
+</common_api_commands>
 
 ## Reference
 
