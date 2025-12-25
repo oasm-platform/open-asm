@@ -107,16 +107,18 @@ export function ChatHistoryManager({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] h-[85vh] flex flex-col p-0 gap-0 overflow-hidden bg-background border-border shadow-lg">
-        <DialogHeader className="p-6 border-b shrink-0 bg-background">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-1">
-              <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
-                <History className="h-5 w-5 text-muted-foreground" />
-                Chat History
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
-                Manage and search your previous conversations.
-              </DialogDescription>
+        <DialogHeader className="p-6 pr-12 border-b shrink-0 bg-background relative">
+          <div className="flex flex-row items-start justify-between gap-4 text-left">
+            <div className="flex items-start gap-3 min-w-0 flex-1">
+              <History className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="flex flex-col gap-1 min-w-0 items-start">
+                <DialogTitle className="text-lg font-semibold truncate leading-none text-left">
+                  Chat History
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground line-clamp-2 text-left">
+                  Manage and search your previous conversations.
+                </DialogDescription>
+              </div>
             </div>
 
             <Button
@@ -126,10 +128,11 @@ export function ChatHistoryManager({
                 onCreateNewSession();
                 onOpenChange(false);
               }}
-              className="gap-2"
+              className="gap-2 shrink-0 h-9"
             >
               <Plus className="h-4 w-4" />
-              New Chat
+              <span className="hidden sm:inline">New Chat</span>
+              <span className="sm:hidden">New</span>
             </Button>
           </div>
         </DialogHeader>

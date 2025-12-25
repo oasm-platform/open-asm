@@ -23,30 +23,36 @@ export function ChatHistoryItem({
   return (
     <div
       className={cn(
-        'group relative flex items-center justify-between gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer',
+        'group relative flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer',
         isActive
           ? 'bg-secondary/50 border-primary/20'
           : 'bg-card border-transparent hover:bg-muted/50 hover:border-border',
       )}
       onClick={onSelect}
     >
-      <div className="flex-1 min-w-0 flex items-center justify-between pr-8">
-        <h4
-          className={cn(
-            'text-sm font-medium truncate',
-            isActive ? 'text-primary' : 'text-foreground',
-          )}
-        >
-          {session.title || 'Untitled Conversation'}
-        </h4>
-
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground ml-4 whitespace-nowrap opacity-70">
-          <span>{format(date, 'MMM d, yyyy • HH:mm')}</span>
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <h4
+            className={cn(
+              'text-sm font-medium truncate flex-1',
+              isActive ? 'text-primary' : 'text-foreground',
+            )}
+          >
+            {session.title || 'Untitled Conversation'}
+          </h4>
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap opacity-70">
+            {format(date, 'MMM d, yyyy')}
+          </span>
         </div>
+        {session.description && (
+          <p className="text-xs text-muted-foreground truncate line-clamp-1">
+            {session.description}
+          </p>
+        )}
       </div>
 
       <div
-        className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         <ConfirmDialog
