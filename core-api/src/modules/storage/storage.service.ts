@@ -174,4 +174,37 @@ export class StorageService {
       );
     }
   }
+  /**
+   * Read and parse a JSON file from storage.
+   * @param filePath The path of the file to retrieve (relative to bucket).
+   * @param bucket The bucket name where the file is stored (default: 'default').
+   * @returns The parsed JSON data.
+   * @throws NotFoundException if the file doesn't exist.
+   */
+  public async readJsonFile<T>(
+    filePath: string,
+    bucket: string = 'default',
+  ): Promise<T> {
+    const cleanPath = filePath.replace(/^[./\s]+/, '');
+    const bucketPath = this.getBucketPath(bucket);
+    const fullPath = join(bucketPath, cleanPath);
+
+    const resolvedPath = resolve(fullPath);
+    const resolvedBucketPath = resolve(bucketPath);
+
+    if (!resolvedPath.startsWith(resolvedBucketPath) || !existsSync(resolvedPath)) {
+      throw new NotFoundException('File not found');
+    }
+
+    try {
+      const content = await fs.promises.readFile(resolvedPath, 'utf8');
+      return JSON.parse(content) as T;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new InternalServerErrorException(
+        `Failed to read or parse JSON file: ${errorMessage}`,
+      );
+    }
+  }
 }
