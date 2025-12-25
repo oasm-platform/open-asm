@@ -1,5 +1,6 @@
-import { JobStatus } from '@/common/enums/enum';
+import { BullMQName, JobStatus } from '@/common/enums/enum';
 import { RedisService } from '@/services/redis/redis.service';
+import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -90,6 +91,10 @@ describe('JobsRegistryService', () => {
         {
           provide: ToolsService,
           useValue: mockToolsService,
+        },
+        {
+          provide: getQueueToken(BullMQName.JOB_RESULT),
+          useValue: { add: jest.fn() },
         },
         JobsRegistryService,
       ],
