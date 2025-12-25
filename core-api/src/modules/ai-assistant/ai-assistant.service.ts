@@ -413,10 +413,13 @@ export class AiAssistantService implements OnModuleInit {
         ),
       );
       return {
-        conversation: response.conversation!,
+        conversation: response?.conversation,
       };
     } catch (error: unknown) {
-      this.logger.error('Failed to update conversation', error);
+      this.logger.error(
+        'Failed to update conversation',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }
@@ -440,11 +443,14 @@ export class AiAssistantService implements OnModuleInit {
         ),
       );
       return {
-        success: response.success || false,
-        message: response.message || '',
+        success: response?.success || false,
+        message: response?.message || '',
       };
     } catch (error: unknown) {
-      this.logger.error('Failed to delete conversation', error);
+      this.logger.error(
+        'Failed to delete conversation',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }
@@ -462,11 +468,14 @@ export class AiAssistantService implements OnModuleInit {
         this.conversationService.deleteConversations({}, metadata),
       );
       return {
-        success: response.success || false,
-        message: response.message || '',
+        success: response?.success || false,
+        message: response?.message || '',
       };
     } catch (error: unknown) {
-      this.logger.error('Failed to delete all conversations', error);
+      this.logger.error(
+        'Failed to delete all conversations',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }

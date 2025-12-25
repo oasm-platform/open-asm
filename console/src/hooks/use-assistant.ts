@@ -34,7 +34,7 @@ export function useAssistant() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [sortBy, setSortBy] = useState('updated_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
   // Fetch conversations
   const {

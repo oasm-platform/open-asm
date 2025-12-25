@@ -62,7 +62,7 @@ export class UpdateConversationResponseDto {
       updatedAt: { type: 'string' },
     },
   })
-  conversation: Conversation;
+  conversation?: Conversation;
 }
 
 /**
