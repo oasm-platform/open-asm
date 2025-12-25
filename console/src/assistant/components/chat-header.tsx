@@ -13,6 +13,15 @@ export function ChatHeader({
   onSelectSession,
   onCreateNewSession,
   onClose,
+  deleteConversation,
+  deleteAllConversations,
+  search,
+  setSearch,
+  page,
+  setPage,
+  limit,
+  totalCount,
+  isLoadingConversations,
 }: ChatHeaderProps) {
   const [isMcpManagerOpen, setIsMcpManagerOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -84,6 +93,15 @@ export function ChatHeader({
         currentSessionId={currentSessionId}
         onSelectSession={(id) => onSelectSession?.(id)}
         onCreateNewSession={() => onCreateNewSession?.()}
+        deleteConversation={deleteConversation}
+        deleteAllConversations={deleteAllConversations}
+        search={search}
+        setSearch={setSearch}
+        page={page}
+        setPage={setPage}
+        limit={limit}
+        totalCount={totalCount}
+        isLoadingConversations={isLoadingConversations}
       />
 
       <McpServerManager

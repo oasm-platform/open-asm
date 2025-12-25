@@ -104,6 +104,10 @@ const IssueTags = ({ issue, onUpdate, isEditable = true }: IssueTagsProps) => {
   }, [issue.tags]);
 
   const handleSave = useCallback(() => {
+    const newTag = inputValue.trim().replace(/,$/, '');
+    if (newTag && !tagList.includes(newTag)) {
+      setTagList((prev) => [...prev, newTag]);
+    }
     updateIssue(
       {
         id: issue.id,
@@ -123,7 +127,7 @@ const IssueTags = ({ issue, onUpdate, isEditable = true }: IssueTagsProps) => {
         },
       },
     );
-  }, [updateIssue, issue.id, tagList, onUpdate]);
+  }, [inputValue, tagList, updateIssue, issue.id, onUpdate]);
 
   // Read-only view
   if (!isEditing) {

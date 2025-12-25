@@ -199,15 +199,19 @@ function McpServerManagerContent({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-        <DialogHeader className="p-6 border-b shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Server className="h-5 w-5" />
-            MCP Servers Manager
-          </DialogTitle>
-          <DialogDescription>
-            Configure servers to extend the assistant's capabilities with
-            external tools and data.
-          </DialogDescription>
+        <DialogHeader className="p-6 border-b shrink-0 bg-background">
+          <div className="flex items-start gap-3">
+            <Server className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="flex flex-col gap-1 items-start">
+              <DialogTitle className="text-lg font-semibold leading-none text-left">
+                MCP Servers Manager
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground text-left">
+                Configure servers to extend the assistant's capabilities with
+                external tools and data.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-0">

@@ -102,6 +102,12 @@ const AddTagDialog = (props: AddTagDialogProps) => {
 
   const handleSave = (updatedTagList?: string[]) => {
     const tagsToSave = updatedTagList || tagList;
+    const newTag = inputValue.trim();
+
+    if (!tagList.includes(newTag) && newTag) {
+      tagsToSave.push(newTag);
+    }
+
     mutate(
       {
         id: props.id,

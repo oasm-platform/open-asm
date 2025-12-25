@@ -126,7 +126,7 @@ export default function DetailSheet({
             </div>
           ) : (
             data && (
-              <ScrollArea className="flex-grow min-h-0 pr-2 sm:pr-4 mt-4 [&>div>div]:!block">
+              <ScrollArea className="grow min-h-0 pr-2 sm:pr-4 mt-4 [&>div>div]:block!">
                 <div className="flex flex-col space-y-5">
                   {/* General Information */}
                   <Section
@@ -242,7 +242,7 @@ export default function DetailSheet({
                               <span className="block mb-1">Affected URL</span>
                               <div className="flex items-start gap-2">
                                 <a
-                                  href={`https://${data.affectedUrl}`}
+                                  href={data.affectedUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-500 hover:text-blue-600 hover:underline transition-colors break-all flex-1 min-w-0"
@@ -706,7 +706,7 @@ export default function DetailSheet({
                                 </Badge>
                               )}
                             </div>
-                            <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                            <ExternalLink className="h-4 w-4 shrink-0" />
                           </Button>
                         </Link>
                       </Section>

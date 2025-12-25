@@ -55,11 +55,11 @@ export function McpServerItem({
       value={name}
       className="border rounded-lg bg-card px-0 group"
     >
-      <div className="flex items-center justify-between px-4 py-2">
-        <AccordionTrigger className="hover:no-underline py-0 flex-1 [&>svg]:hidden">
-          <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-4 py-3 gap-2">
+        <AccordionTrigger className="hover:no-underline py-0 flex-1 min-w-0 [&>svg]:hidden">
+          <div className="flex items-center gap-2.5 min-w-0">
             <span
-              className={`h-2.5 w-2.5 rounded-full ${
+              className={`h-2.5 w-2.5 rounded-full shrink-0 ${
                 config.status === 'active'
                   ? 'bg-green-500'
                   : config.status === 'disabled'
@@ -67,27 +67,29 @@ export function McpServerItem({
                     : 'bg-red-500'
               }`}
             />
-            <span className="font-medium">{name}</span>
-            <Badge
-              variant="secondary"
-              className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground"
-            >
-              project
-            </Badge>
-            {hasPendingChanges && (
+            <span className="font-medium truncate">{name}</span>
+            <div className="flex items-center gap-1.5 shrink-0">
               <Badge
-                variant="default"
-                className="text-[10px] h-5 px-1.5 font-normal bg-orange-500 hover:bg-orange-600"
+                variant="secondary"
+                className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground whitespace-nowrap"
               >
-                Unsaved
+                project
               </Badge>
-            )}
-            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+              {hasPendingChanges && (
+                <Badge
+                  variant="default"
+                  className="text-[10px] h-5 px-1.5 font-normal bg-orange-500 hover:bg-orange-600 whitespace-nowrap"
+                >
+                  Unsaved
+                </Badge>
+              )}
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 shrink-0" />
           </div>
         </AccordionTrigger>
 
         {/* Actions Row */}
-        <div className="flex items-center gap-2 ml-4">
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
           <ConfirmDialog
             title="Delete MCP Server"
             description={`Are you sure you want to delete the MCP server '${name}'?`}

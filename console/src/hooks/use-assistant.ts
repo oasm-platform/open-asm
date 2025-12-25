@@ -29,12 +29,25 @@ export function useAssistant() {
     currentConversationIdRef.current = currentConversationId;
   }, [currentConversationId]);
 
+  // Filter & Pagination state
+  const [search, setSearch] = useState<string | undefined>();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [sortBy, setSortBy] = useState('updated_at');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+
   // Fetch conversations
   const {
     data: conversationsData,
     refetch: refetchConversations,
     isLoading: isLoadingConversations,
-  } = useAiAssistantControllerGetConversations();
+  } = useAiAssistantControllerGetConversations({
+    search,
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+  });
 
   // Fetch messages for current conversation
   // Use a valid UUID format to avoid database errors, but disable query when no real ID
@@ -84,6 +97,8 @@ export function useAssistant() {
       createdAt: conv.createdAt,
       updatedAt: conv.updatedAt,
     })) || [];
+
+  const totalCount = conversationsData?.totalCount || 0;
 
   // Send message with streaming
   const sendMessage = useCallback(
@@ -308,6 +323,19 @@ export function useAssistant() {
     streamingStatus,
     isLoadingConversations,
     isLoadingMessages,
+
+    // Filter & Pagination
+    search,
+    setSearch,
+    page,
+    setPage,
+    limit,
+    setLimit,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    setSortOrder,
+    totalCount,
 
     // Actions
     sendMessage,
