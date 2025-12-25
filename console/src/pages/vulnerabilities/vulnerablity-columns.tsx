@@ -77,10 +77,10 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
           {value ? (
             <div className="flex items-center gap-1">
               <a
-                href={`https://${value}`}
+                href={value}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-500 flex-shrink-0 flex items-center gap-1"
+                className="text-blue-500 shrink-0 flex items-center gap-1"
               >
                 <span className="truncate">{value}</span>
                 <ExternalLink size={14} />
@@ -168,14 +168,13 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
     size: 200,
     cell: ({ row }) => {
       const { tool } = row.original;
-      if (!tool) return (
-        <div className="min-h-[60px] flex items-center justify-center">
-          -
-        </div>
-      );
+      if (!tool)
+        return (
+          <div className="min-h-[60px] flex items-center justify-center">-</div>
+        );
       return (
         <div className="min-h-[60px] flex items-center">
-          <Link to={`/tools/${tool.id}`} className='flex items-center gap-2'>
+          <Link to={`/tools/${tool.id}`} className="flex items-center gap-2">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -184,18 +183,21 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
                       url={tool?.logoUrl}
                       width={24}
                       height={24}
-                      className='rounded'
+                      className="rounded"
                     />
                     <span className="text-sm font-medium">{tool.name}</span>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="w-full max-w-[300px] p-2">
+                <TooltipContent
+                  side="bottom"
+                  className="w-full max-w-[300px] p-2"
+                >
                   <div className="flex items-center gap-2 mb-1">
                     <Image
                       url={tool?.logoUrl}
                       width={40}
                       height={40}
-                      className='rounded'
+                      className="rounded"
                     />
                     <h4 className="font-bold">{tool.name}</h4>
                   </div>
