@@ -62,10 +62,16 @@ export interface Conversation {
 }
 
 export interface GetConversationsRequest {
+  search: string;
+  page: number;
+  limit: number;
+  sortBy: string;
+  sortOrder: string;
 }
 
 export interface GetConversationsResponse {
   conversations: Conversation[];
+  totalCount: number;
 }
 
 export interface UpdateConversationRequest {
@@ -543,11 +549,26 @@ export const Conversation: MessageFns<Conversation> = {
 };
 
 function createBaseGetConversationsRequest(): GetConversationsRequest {
-  return {};
+  return { search: "", page: 0, limit: 0, sortBy: "", sortOrder: "" };
 }
 
 export const GetConversationsRequest: MessageFns<GetConversationsRequest> = {
-  encode(_: GetConversationsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(message: GetConversationsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.search !== "") {
+      writer.uint32(10).string(message.search);
+    }
+    if (message.page !== 0) {
+      writer.uint32(16).int32(message.page);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(24).int32(message.limit);
+    }
+    if (message.sortBy !== "") {
+      writer.uint32(34).string(message.sortBy);
+    }
+    if (message.sortOrder !== "") {
+      writer.uint32(42).string(message.sortOrder);
+    }
     return writer;
   },
 
@@ -558,6 +579,46 @@ export const GetConversationsRequest: MessageFns<GetConversationsRequest> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.search = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.page = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.limit = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.sortBy = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.sortOrder = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -569,13 +630,16 @@ export const GetConversationsRequest: MessageFns<GetConversationsRequest> = {
 };
 
 function createBaseGetConversationsResponse(): GetConversationsResponse {
-  return { conversations: [] };
+  return { conversations: [], totalCount: 0 };
 }
 
 export const GetConversationsResponse: MessageFns<GetConversationsResponse> = {
   encode(message: GetConversationsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.conversations) {
       Conversation.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.totalCount !== 0) {
+      writer.uint32(16).int32(message.totalCount);
     }
     return writer;
   },
@@ -593,6 +657,14 @@ export const GetConversationsResponse: MessageFns<GetConversationsResponse> = {
           }
 
           message.conversations.push(Conversation.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.totalCount = reader.int32();
           continue;
         }
       }

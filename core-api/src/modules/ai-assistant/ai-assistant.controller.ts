@@ -23,6 +23,7 @@ import {
   UpdateConversationDto,
   UpdateConversationResponseDto,
 } from './dto/conversation.dto';
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import {
   GenerateTagsDto,
   GenerateTagsResponseDto,
@@ -195,10 +196,11 @@ export class AiAssistantController {
   })
   @Get('conversations')
   async getConversations(
+    @Query() query: GetManyBaseQueryParams,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Promise<GetConversationsResponseDto> {
-    return this.aiAssistantService.getConversations(workspaceId, userId);
+    return this.aiAssistantService.getConversations(workspaceId, userId, query);
   }
 
   @Doc({

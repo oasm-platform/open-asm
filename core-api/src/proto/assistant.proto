@@ -75,10 +75,16 @@ message Conversation {
 }
 
 message GetConversationsRequest {
+  string search = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  string sort_by = 4;
+  string sort_order = 5;
 }
 
 message GetConversationsResponse {
   repeated Conversation conversations = 1;
+  int32 total_count = 2;
 }
 
 message UpdateConversationRequest {
@@ -248,3 +254,4 @@ message GetMCPServerHealthResponse {
   string status = 2;       // "active", "disabled", or "error"
   string error = 3;        // error message if status is "error"
 }
+

@@ -342,6 +342,8 @@ export type GetConversationsResponseDtoConversationsItem = {
 export type GetConversationsResponseDto = {
   /** List of conversations */
   conversations: GetConversationsResponseDtoConversationsItem[];
+  /** Total count of conversations */
+  totalCount: number;
 };
 
 /**
@@ -1708,6 +1710,14 @@ export type WorkspacesControllerGetWorkspacesParams = {
    * Whether to archive (true) or unarchive (false) the workspace
    */
   isArchived?: boolean;
+};
+
+export type AiAssistantControllerGetConversationsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 export type JobsRegistryControllerGetManyJobsParams = {
@@ -5645,42 +5655,250 @@ export function useAiAssistantControllerGetMcpServerHealth<
  * @summary Get all conversations
  */
 export const aiAssistantControllerGetConversations = (
+  params?: AiAssistantControllerGetConversationsParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<GetConversationsResponseDto>(
-    { url: `/api/ai-assistant/conversations`, method: 'GET', signal },
+    { url: `/api/ai-assistant/conversations`, method: 'GET', params, signal },
     options,
   );
 };
 
-export const getAiAssistantControllerGetConversationsQueryKey = () => {
-  return [`/api/ai-assistant/conversations`] as const;
+export const getAiAssistantControllerGetConversationsInfiniteQueryKey = (
+  params?: AiAssistantControllerGetConversationsParams,
+) => {
+  return [
+    'infinate',
+    `/api/ai-assistant/conversations`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
-export const getAiAssistantControllerGetConversationsQueryOptions = <
-  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+export const getAiAssistantControllerGetConversationsQueryKey = (
+  params?: AiAssistantControllerGetConversationsParams,
+) => {
+  return [
+    `/api/ai-assistant/conversations`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAiAssistantControllerGetConversationsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    AiAssistantControllerGetConversationsParams['page']
+  >,
   TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
+>(
+  params?: AiAssistantControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetConversationsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ??
-    getAiAssistantControllerGetConversationsQueryKey();
+    getAiAssistantControllerGetConversationsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    QueryKey,
+    AiAssistantControllerGetConversationsParams['page']
+  > = ({ signal, pageParam }) =>
+    aiAssistantControllerGetConversations(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    TError,
+    TData,
+    QueryKey,
+    AiAssistantControllerGetConversationsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetConversationsInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
+  >;
+export type AiAssistantControllerGetConversationsInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    AiAssistantControllerGetConversationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AiAssistantControllerGetConversationsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetConversationsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    AiAssistantControllerGetConversationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetConversationsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    AiAssistantControllerGetConversationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetConversationsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all conversations
+ */
+
+export function useAiAssistantControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+    AiAssistantControllerGetConversationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetConversationsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetConversationsInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetConversationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetConversationsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>
   > = ({ signal }) =>
-    aiAssistantControllerGetConversations(requestOptions, signal);
+    aiAssistantControllerGetConversations(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
@@ -5698,6 +5916,7 @@ export function useAiAssistantControllerGetConversations<
   TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
   TError = unknown,
 >(
+  params: undefined | AiAssistantControllerGetConversationsParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -5724,6 +5943,7 @@ export function useAiAssistantControllerGetConversations<
   TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
   TError = unknown,
 >(
+  params?: AiAssistantControllerGetConversationsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -5750,6 +5970,7 @@ export function useAiAssistantControllerGetConversations<
   TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
   TError = unknown,
 >(
+  params?: AiAssistantControllerGetConversationsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -5772,6 +5993,7 @@ export function useAiAssistantControllerGetConversations<
   TData = Awaited<ReturnType<typeof aiAssistantControllerGetConversations>>,
   TError = unknown,
 >(
+  params?: AiAssistantControllerGetConversationsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -5786,8 +6008,10 @@ export function useAiAssistantControllerGetConversations<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions =
-    getAiAssistantControllerGetConversationsQueryOptions(options);
+  const queryOptions = getAiAssistantControllerGetConversationsQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -11913,182 +12137,6 @@ export function useAssetsControllerExportServicesToCSV<
 } {
   const queryOptions =
     getAssetsControllerExportServicesToCSVQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Retrieves detailed information about a specific technology.
- * @summary Get technology information
- */
-export const technologyControllerGetTechnologyInfo = (
-  name: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<TechnologyDetailDTO>(
-    { url: `/api/technology/${name}`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getTechnologyControllerGetTechnologyInfoQueryKey = (
-  name?: string,
-) => {
-  return [`/api/technology/${name}`] as const;
-};
-
-export const getTechnologyControllerGetTechnologyInfoQueryOptions = <
-  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-  TError = unknown,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getTechnologyControllerGetTechnologyInfoQueryKey(name);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
-  > = ({ signal }) =>
-    technologyControllerGetTechnologyInfo(name, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!name,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type TechnologyControllerGetTechnologyInfoQueryResult = NonNullable<
-  Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
->;
-export type TechnologyControllerGetTechnologyInfoQueryError = unknown;
-
-export function useTechnologyControllerGetTechnologyInfo<
-  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-  TError = unknown,
->(
-  name: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-          TError,
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTechnologyControllerGetTechnologyInfo<
-  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-  TError = unknown,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-          TError,
-          Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useTechnologyControllerGetTechnologyInfo<
-  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-  TError = unknown,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get technology information
- */
-
-export function useTechnologyControllerGetTechnologyInfo<
-  TData = Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-  TError = unknown,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof technologyControllerGetTechnologyInfo>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getTechnologyControllerGetTechnologyInfoQueryOptions(
-    name,
-    options,
-  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

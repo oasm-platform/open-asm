@@ -33,6 +33,15 @@ export type ChatHeaderProps = {
   onCreateNewSession?: () => void;
   onClose?: () => void;
   showSidebar?: boolean;
+  deleteConversation?: (id: string) => Promise<void>;
+  deleteAllConversations?: () => Promise<void>;
+  search?: string;
+  setSearch?: (val: string) => void;
+  page?: number;
+  setPage?: (val: number | ((prev: number) => number)) => void;
+  limit?: number;
+  totalCount?: number;
+  isLoadingConversations?: boolean;
 };
 
 export type ChatMessagesProps = {

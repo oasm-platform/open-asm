@@ -44,7 +44,7 @@ export class TechnologyForwarderService implements OnModuleInit {
    * This method is called automatically when the module is initialized
    * The data fetching runs asynchronously in the background without blocking app startup
    */
-  // eslint-disable-next-line @typescript-eslint/require-await
+   
   async onModuleInit(): Promise<void> {
     // Check if initialization has already been logged globally
     const isAlreadyLogged = await this.redisService.cacheClient.get(
