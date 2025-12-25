@@ -4,24 +4,25 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import {
+  BullMQName,
   JobPriority,
   JobStatus,
   ToolCategory,
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
-import { JobDataResultType } from '@/common/types/app.types';
 import { RedisService } from '@/services/redis/redis.service';
 import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { InjectQueue } from '@nestjs/bullmq';
 import {
-  BadGatewayException,
   Injectable,
   Logger,
   NotFoundException,
-  Optional,
+  Optional
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
@@ -62,7 +63,8 @@ export class JobsRegistryService {
     @Optional() private toolsService: ToolsService,
     private storageService: StorageService,
     private redis: RedisService,
-  ) {}
+    @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
+  ) { }
   public async getManyJobs(
     query: GetManyJobsRequestDto,
   ): Promise<GetManyBaseResponseDto<Job>> {
@@ -544,80 +546,36 @@ export class JobsRegistryService {
   public async updateResult(
     workerId: string,
     dto: UpdateResultDto,
-  ): Promise<{ workerId: string; dto: UpdateResultDto }> {
-    const { jobId, data } = dto;
-    const job = await this.findJobForUpdate(workerId, jobId);
-    if (!job) {
-      throw new NotFoundException('Job not found');
-    }
+  ): Promise<{ jobId: string; queueId: string }> {
+    const fileName = `${dto.jobId}-${Date.now()}.json`;
+    const { path: resultRef } = this.storageService.uploadFile(
+      fileName,
+      Buffer.from(JSON.stringify(dto.data)),
+      'job-results',
+    );
 
-    try {
-      const isBuiltInTools = job.tool.type === WorkerType.BUILT_IN;
+    const bullJob = await this.jobResultQueue.add(
+      BullMQName.JOB_RESULT,
+      {
+        workerId,
+        jobId: dto.jobId,
+        resultRef,
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
 
-      let dataForSync: JobDataResultType;
-
-      if (isBuiltInTools) {
-        const step = builtInTools.find((tool) => tool.name === job.tool.name);
-
-        if (!step) {
-          throw new Error(`Worker step not found for worker: ${job.tool.name}`);
-        }
-
-        const builtInStep = builtInTools.find(
-          (tool) => tool.name === job.tool.name,
-        );
-
-        if (!builtInStep) {
-          throw new Error(`Worker step not found for worker: ${job.tool.name}`);
-        }
-
-        if (!data.raw && !builtInStep) {
-          throw new BadGatewayException('Raw data is required');
-        }
-        dataForSync = builtInStep?.parser?.(data.raw);
-      } else {
-        dataForSync = data.payload;
-      }
-
-      if (job.isSaveData) {
-        await this.dataAdapterService.syncData({
-          data: dataForSync,
-          job,
-        });
-      }
-      if (data?.error) {
-        throw new Error();
-      }
-
-      await this.repo.save({
-        ...job,
-        status: JobStatus.COMPLETED,
-        completedAt: new Date(),
-      });
-
-      const jobForPublish = await this.repo.save({
-        ...job,
-        status: JobStatus.COMPLETED,
-        completedAt: new Date(),
-      });
-
-      await this.getNextStepForJob(job);
-
-      if (job.isPublishEvent) {
-        await this.redis.publish(
-          `jobs:${job.id}`,
-          JSON.stringify(jobForPublish),
-        );
-      }
-
-      return { workerId, dto };
-    } catch (e) {
-      await this.handleJobError(dto, job, e);
-      return { workerId, dto };
-    }
+    return { jobId: bullJob.id ?? '', queueId: bullJob.queueName };
   }
 
-  private async handleJobError(dto: UpdateResultDto, job: Job, error: Error) {
+  public async handleJobError(dto: UpdateResultDto, job: Job, error: Error) {
     await this.repo.save({
       ...job,
       status: JobStatus.FAILED,
@@ -727,7 +685,7 @@ export class JobsRegistryService {
    * Updates the result of a job with the given worker ID.
    * @param job
    */
-  private async getNextStepForJob(job: Job) {
+  public async getNextStepForJob(job: Job) {
     const workflow = job.jobHistory.workflow;
     if (!workflow) return;
 
@@ -766,7 +724,7 @@ export class JobsRegistryService {
    * @param jobId
    * @returns
    */
-  private async findJobForUpdate(workerId: string, jobId: string) {
+  public async findJobForUpdate(workerId: string, jobId: string) {
     return this.repo.findOne({
       where: {
         workerId,
