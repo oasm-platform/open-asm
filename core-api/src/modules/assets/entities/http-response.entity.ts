@@ -2,7 +2,7 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 
 class TlsInfo {
@@ -148,6 +148,7 @@ export class HttpResponse extends BaseEntity {
   a: string[];
 
   @ApiProperty()
+  @Index({ fulltext: true }) // For GIN index on array
   @Column({ array: true, type: 'varchar', nullable: true })
   tech: string[];
 
@@ -184,6 +185,7 @@ export class HttpResponse extends BaseEntity {
   chain_status_codes: string[];
 
   @ApiProperty()
+  @Index(['assetServiceId', 'createdAt'])
   @Column({ type: 'varchar', nullable: true })
   assetServiceId: string;
 

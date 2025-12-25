@@ -1,5 +1,5 @@
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 export type AssetContextType = ReturnType<typeof useServerDataTable> & {
@@ -73,13 +73,20 @@ export default function AssetProvider({
 
   const filterHandlers = useCallback(
     (key: string, value: string[]) => {
-      params.delete(key);
-      if (value.length > 0)
-        for (const v of value) params.append(key, v.toString());
-
-      setParams(params, { replace: true });
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('page', '1');
+          next.delete(key);
+          if (value.length > 0) {
+            for (const v of value) next.append(key, v.toString());
+          }
+          return next;
+        },
+        { replace: true },
+      );
     },
-    [params, setParams],
+    [setParams],
   );
 
   const startGenerating = useCallback((assetId: string) => {
@@ -101,44 +108,78 @@ export default function AssetProvider({
     [generatingAssets],
   );
 
-  const queryParams = {
-    targetIds: targetId ? [targetId] : undefined,
-    value: tableParams.filter,
-    limit: tableParams.pageSize,
-    ipAddresses: ipAddresses,
-    ports: ports,
-    techs: techs,
-    hosts: hosts,
-    statusCodes: statusCodes,
-    page: tableParams.page,
-    sortBy: tableParams.sortBy,
-    sortOrder: tableParams.sortOrder,
-  };
+  const queryParams = useMemo(
+    () => ({
+      targetIds: targetId ? [targetId] : undefined,
+      value: tableParams.filter,
+      limit: tableParams.pageSize,
+      ipAddresses: ipAddresses,
+      ports: ports,
+      techs: techs,
+      hosts: hosts,
+      statusCodes: statusCodes,
+      page: tableParams.page,
+      sortBy: tableParams.sortBy,
+      sortOrder: tableParams.sortOrder,
+    }),
+    [
+      targetId,
+      tableParams.filter,
+      tableParams.pageSize,
+      tableParams.page,
+      tableParams.sortBy,
+      tableParams.sortOrder,
+      ipAddresses,
+      ports,
+      techs,
+      hosts,
+      statusCodes,
+    ],
+  );
 
-  const queryFilterParams = {
-    targetIds: targetId ? [targetId] : undefined,
-    limit: 10,
-    page: 1,
-  };
+  const queryFilterParams = useMemo(
+    () => ({
+      targetIds: targetId ? [targetId] : undefined,
+      limit: 10,
+      page: 1,
+    }),
+    [targetId],
+  );
 
-  const queryOptions = {
-    query: {
-      refetchInterval: refetchInterval ?? 30 * 1000,
-      queryKey: [
-        targetId,
-        tableParams.page,
-        tableParams.filter,
-        tableParams.pageSize,
-        tableParams.sortBy,
-        tableParams.sortOrder,
-        ipAddresses,
-        ports,
-        techs,
-        hosts,
-        statusCodes,
-      ],
-    },
-  };
+  const queryOptions = useMemo(
+    () => ({
+      query: {
+        refetchInterval: refetchInterval ?? 30 * 1000,
+        queryKey: [
+          targetId,
+          tableParams.page,
+          tableParams.filter,
+          tableParams.pageSize,
+          tableParams.sortBy,
+          tableParams.sortOrder,
+          ipAddresses,
+          ports,
+          techs,
+          hosts,
+          statusCodes,
+        ],
+      },
+    }),
+    [
+      targetId,
+      tableParams.page,
+      tableParams.filter,
+      tableParams.pageSize,
+      tableParams.sortBy,
+      tableParams.sortOrder,
+      refetchInterval,
+      ipAddresses,
+      ports,
+      techs,
+      hosts,
+      statusCodes,
+    ],
+  );
 
   return (
     <AssetContext.Provider

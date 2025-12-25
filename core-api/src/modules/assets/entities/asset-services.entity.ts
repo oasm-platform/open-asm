@@ -4,24 +4,27 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
   Unique,
 } from 'typeorm';
+import { AssetTag } from './asset-tags.entity';
 import { Asset } from './assets.entity';
 import { HttpResponse } from './http-response.entity';
 import { StatusCodeAssetsView } from './status-code-assets.entity';
-import { AssetTag } from './asset-tags.entity';
 
 @Entity('asset_services')
 @Unique(['assetId', 'port'])
+@Index(['createdAt'])
 export class AssetService extends BaseEntity {
   @ApiProperty()
   @Column()
   value: string;
 
   @ApiProperty()
+  @Index()
   @Column({ type: 'integer' })
   port: number;
 
@@ -57,6 +60,7 @@ export class AssetService extends BaseEntity {
   tags: AssetTag[];
 
   @ApiProperty()
+  @Index({ where: '"isErrorPage" = false' })
   @Column({ default: false })
   isErrorPage?: boolean;
 }
