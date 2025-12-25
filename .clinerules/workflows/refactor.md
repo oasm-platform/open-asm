@@ -96,7 +96,7 @@ Before modifying any production code:
 ### 3.1 Implementation Rules
 
 - Only internal structural changes are allowed
-
+- MUST have full documentation comments above every new or modified function
 - Do **not** change:
   - Public APIs
   - Function signatures

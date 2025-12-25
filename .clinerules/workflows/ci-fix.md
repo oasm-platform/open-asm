@@ -51,6 +51,7 @@
   - **Second Rule**: Ensure the fix works in both local and CI environments
   - **Third Rule**: Optimize for build performance and reliability
   - **Fourth Rule**: Add proper error handling and logging for debugging
+  - **Fifth Rule**: MUST have full documentation comments above every new or modified function
 
 - **Testing Rule**: Test the fix in both local environment and actual CI pipeline if possible.
 - **Security Rule**: Ensure no sensitive information is exposed in pipeline logs or configurations.
