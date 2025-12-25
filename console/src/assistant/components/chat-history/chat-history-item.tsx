@@ -52,7 +52,7 @@ export function ChatHistoryItem({
       </div>
 
       <div
-        className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+        className="flex items-center opacity-40 hover:opacity-100 transition-opacity shrink-0 ml-2"
         onClick={(e) => e.stopPropagation()}
       >
         <ConfirmDialog
@@ -64,7 +64,7 @@ export function ChatHistoryItem({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors"
             >
               <Trash2 className="h-4 w-4" />
             </Button>

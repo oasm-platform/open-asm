@@ -31,6 +31,15 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
     createNewConversation,
     selectConversation,
     updateConversation,
+    deleteConversation,
+    deleteAllConversations,
+    search,
+    setSearch,
+    page,
+    setPage,
+    limit,
+    totalCount,
+    isLoadingConversations,
   } = useAssistant();
 
   // Find current session
@@ -119,6 +128,15 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
               currentSessionId={currentConversationId}
               onSelectSession={handleSelectSession}
               onCreateNewSession={handleNewConversation}
+              deleteConversation={deleteConversation}
+              deleteAllConversations={deleteAllConversations}
+              search={search}
+              setSearch={setSearch}
+              page={page}
+              setPage={setPage}
+              limit={limit}
+              totalCount={totalCount}
+              isLoadingConversations={isLoadingConversations}
             />
             <SheetDescription className="sr-only">Description</SheetDescription>
 

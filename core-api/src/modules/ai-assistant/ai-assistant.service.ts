@@ -34,7 +34,11 @@ import {
   GetMessagesResponseDto,
   DeleteMessageResponseDto,
 } from './dto/message.dto';
-import type { GetMCPServerHealthResponse } from '@/types/assistant';
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import type {
+  GetMCPServerHealthResponse,
+  GetConversationsResponse,
+} from '@/types/assistant';
 
 @Injectable()
 export class AiAssistantService implements OnModuleInit {
@@ -355,17 +359,31 @@ export class AiAssistantService implements OnModuleInit {
   async getConversations(
     workspaceId: string,
     userId: string,
+    query?: GetManyBaseQueryParams,
   ): Promise<GetConversationsResponseDto> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response = await firstValueFrom(
-        this.conversationService.getConversations({}, metadata),
+      const response = await firstValueFrom<GetConversationsResponse>(
+        this.conversationService.getConversations(
+          {
+            search: query?.search || '',
+            page: query?.page || 1,
+            limit: query?.limit || 10,
+            sortBy: query?.sortBy || 'updated_at',
+            sortOrder: query?.sortOrder?.toLowerCase() || 'desc',
+          },
+          metadata,
+        ),
       );
       return {
         conversations: response.conversations || [],
+        totalCount: Number(response.totalCount || 0),
       };
-    } catch (error: unknown) {
-      this.logger.error('Failed to get conversations', error);
+    } catch (error) {
+      this.logger.error(
+        'Failed to get conversations',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }

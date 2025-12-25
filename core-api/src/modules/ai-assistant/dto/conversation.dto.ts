@@ -21,6 +21,12 @@ export class GetConversationsResponseDto {
     },
   })
   conversations: Conversation[];
+
+  @ApiProperty({
+    description: 'Total count of conversations',
+    type: 'number',
+  })
+  totalCount: number;
 }
 
 /**
