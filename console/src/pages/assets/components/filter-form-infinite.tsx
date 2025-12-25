@@ -52,6 +52,7 @@ export default function FilterFormInfinite() {
               for (const facet of facets) {
                 params.delete(facet);
               }
+              params.set('page', '1');
               setParams(params);
             }}
             className="h-8 px-2 lg:px-3"

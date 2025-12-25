@@ -28,7 +28,6 @@ import { UpdateAssetDto } from './dto/update-asset.dto';
 import { AssetService } from './entities/asset-services.entity';
 import { AssetTag } from './entities/asset-tags.entity';
 import { Asset } from './entities/assets.entity';
-import { HttpResponse } from './entities/http-response.entity';
 
 // Type cho raw database response từ TLS query
 interface TlsRawData {
@@ -60,7 +59,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all assets services associated with a specified target.
@@ -86,7 +85,7 @@ export class AssetsService {
       },
       techs: {
         value: techs,
-        whereClause: `"httpResponses"."tech" && :param`,
+        whereClause: `latest_http_response.tech && :param`,
       },
       hosts: {
         value: hosts,
@@ -98,7 +97,7 @@ export class AssetsService {
       },
       ports: {
         value: ports,
-        whereClause: `"assetServices"."port" = ANY(:param)`,
+        whereClause: `asset_service.port = ANY(:param)`,
       },
       statusCodes: {
         value: statusCodes,
@@ -107,18 +106,18 @@ export class AssetsService {
     };
 
     const queryBuilder = this.assetServiceRepo
-      .createQueryBuilder('assetServices')
-      .leftJoin('assetServices.asset', 'asset')
+      .createQueryBuilder('asset_service')
+      .leftJoin('asset_service.asset', 'asset')
       .leftJoin('asset.target', 'targets')
-      .leftJoin(
-        'assetServices.httpResponses',
-        'httpResponses',
-        'httpResponses.createdAt = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
+      .leftJoinAndSelect(
+        'asset_service.httpResponses',
+        'latest_http_response',
+        'latest_http_response.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = asset_service.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoin('asset.ipAssets', 'ipAssets')
-      .leftJoin('assetServices.statusCodeAssets', 'statusCodeAssets')
-      .where('"assetServices"."isErrorPage" = false')
+      .leftJoin('asset_service.statusCodeAssets', 'statusCodeAssets')
+      .where('asset_service."isErrorPage" = false')
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       })
@@ -157,32 +156,16 @@ export class AssetsService {
 
     const offset = (query.page - 1) * query.limit;
 
-    const queryBuilder = this.buildBaseQuery(query, workspaceId).select([
-      'assetServices.value',
-      'assetServices.port',
-      'assetServices.id',
-      'asset.isEnabled',
-      'asset.targetId',
-      'assetServices.createdAt',
-      'ipAssets.ipAddress',
-      'httpResponses.tech',
-      'httpResponses.id',
-      'httpResponses.title',
-      'httpResponses.tls',
-      'httpResponses.chain_status_codes',
-      'httpResponses.status_code',
-      'httpResponses.url',
-      'httpResponses.favicon_url',
-    ]);
+    const queryBuilder = this.buildBaseQuery(query, workspaceId);
 
     if (query.value) {
-      queryBuilder.andWhere('assetServices.value ILIKE :value', {
+      queryBuilder.andWhere('asset_service.value ILIKE :value', {
         value: `%${query.value}%`,
       });
     }
 
     const [list, total] = await queryBuilder
-      .orderBy(`assetServices.${query.sortBy}`, query.sortOrder)
+      .orderBy(`asset_service.${query.sortBy}`, query.sortOrder)
       .skip(offset)
       .take(query.limit)
       .getManyAndCount();
@@ -191,17 +174,17 @@ export class AssetsService {
       const asset = new GetAssetsResponseDto();
       asset.id = item.id;
       asset.value = item.value;
-      asset.targetId = item.asset.targetId;
+      asset.targetId = item.asset?.targetId;
       asset.createdAt = item.createdAt;
-      asset.dnsRecords = item.asset.dnsRecords;
-      asset.isEnabled = item.asset.isEnabled;
+      asset.dnsRecords = item.asset?.dnsRecords;
+      asset.isEnabled = item.asset?.isEnabled;
 
       // asset.tags = item.asset.tags || [];
-      asset.ipAddresses = item.asset.ipAssets
+      asset.ipAddresses = item.asset?.ipAssets
         ? item.asset.ipAssets.map((e) => e.ipAddress)
         : [];
 
-      if (item.httpResponses) {
+      if (item.httpResponses && item.httpResponses.length > 0) {
         asset.httpResponses = item.httpResponses[0];
         if (asset.httpResponses?.tech) {
           const techList = (
@@ -334,35 +317,17 @@ export class AssetsService {
       workspaceId,
     )
       .andWhere('"statusCodeAssets"."statusCode" != 0')
-      .select([
-        'assetServices.value',
-        'assetServices.port',
-        'assetServices.id',
-        'asset.isEnabled',
-        'asset.targetId',
-        'assetServices.createdAt',
-        'ipAssets.ipAddress',
-        'httpResponses.tech',
-        'httpResponses.title',
-        'httpResponses.tls',
-        'httpResponses.chain_status_codes',
-        'httpResponses.status_code',
-        'asset.targetId',
-        'httpResponses.raw_header',
-        'httpResponses.url',
-        'httpResponses.favicon_url',
-      ])
-      .andWhere('assetServices.id = :id', { id });
+      .andWhere('asset_service.id = :id', { id });
 
     const item = await queryBuilder.getOneOrFail();
 
     const asset = new GetAssetsResponseDto();
     asset.id = item.id;
     asset.value = item.value;
-    asset.targetId = item.asset.targetId;
+    asset.targetId = item.asset?.targetId;
     asset.createdAt = item.createdAt;
-    asset.dnsRecords = item.asset.dnsRecords;
-    asset.isEnabled = item.asset.isEnabled;
+    asset.dnsRecords = item.asset?.dnsRecords;
+    asset.isEnabled = item.asset?.isEnabled;
     asset.port = item.port;
 
     // Load tags separately - tags belong to AssetService, not Asset
@@ -377,11 +342,11 @@ export class AssetsService {
       (t) => ({ id: t.id, tag: t.tag }) as Partial<AssetTag>,
     ) as AssetTag[];
 
-    asset.ipAddresses = item.asset.ipAssets
+    asset.ipAddresses = item.asset?.ipAssets
       ? item.asset.ipAssets.map((e) => e.ipAddress)
       : [];
 
-    if (item.httpResponses) {
+    if (item.httpResponses && item.httpResponses.length > 0) {
       asset.httpResponses = item.httpResponses[0];
       if (asset.httpResponses?.tech) {
         const techList = (
@@ -423,7 +388,7 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
         '"ipAssets"."ip"',
-        'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
+        'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
       .andWhere('"ipAssets"."ip" IS NOT NULL')
       .groupBy('"ipAssets"."ip"');
@@ -483,7 +448,7 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
         'asset.value',
-        'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
+        'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
       .andWhere('asset.value IS NOT NULL')
       .groupBy('asset.value');
@@ -538,13 +503,13 @@ export class AssetsService {
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
-        'assetServices.port as port',
-        'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
+        'asset_service.port as port',
+        'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
-      .groupBy('assetServices.port');
+      .groupBy('asset_service.port');
 
     if (query.value) {
-      queryBuilder.andWhere('"assetServices".port::text ILIKE :value', {
+      queryBuilder.andWhere('asset_service.port::text ILIKE :value', {
         value: `%${query.value}%`,
       });
     }
@@ -585,30 +550,20 @@ export class AssetsService {
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetTechnologyAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
-    if (!(query.sortBy in GetIpAssetsDTO)) {
+    if (!(query.sortBy in GetTechnologyAssetsDTO)) {
       query.sortBy = '"assetCount"';
     }
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
-      .innerJoin(
-        (subQuery) =>
-          subQuery
-            .select('"httpResponses"."assetServiceId"', 'assetId')
-            .addSelect('unnest("httpResponses"."tech")', 'technology')
-            .addSelect('"httpResponses"."createdAt"', 'createdAt')
-            .from(HttpResponse, 'httpResponses'),
-        'sq',
-        '"sq"."assetId" = "assetServices"."id" AND "sq"."createdAt" = (SELECT MAX(hr."createdAt") FROM http_responses hr WHERE hr."assetServiceId" = assetServices.id)',
-      )
       .select([
-        '"sq"."technology"',
-        'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
+        'unnest(latest_http_response.tech) as "technology"',
+        'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
-      .andWhere('"sq"."technology" IS NOT NULL')
-      .groupBy('"sq"."technology"');
+      .andWhere('latest_http_response.tech IS NOT NULL')
+      .groupBy('technology');
 
     if (query.value) {
-      queryBuilder.andWhere('"sq"."technology"::text ILIKE :value', {
+      queryBuilder.andHaving('unnest(latest_http_response.tech) ILIKE :value', {
         value: `%${query.value}%`,
       });
     }
@@ -686,7 +641,7 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
         '"statusCodeAssets"."statusCode"',
-        'COUNT(DISTINCT "assetServices"."id") as "assetCount"',
+        'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
       .groupBy('"statusCodeAssets"."statusCode"');
 
@@ -939,10 +894,10 @@ export class AssetsService {
       new GetAssetsQueryDto(),
       workspaceId,
     ).select([
-      'assetServices.value',
-      'assetServices.port',
-      'httpResponses.tech',
-      'httpResponses.tls',
+      'asset_service.value',
+      'asset_service.port',
+      'latest_http_response.tech',
+      'latest_http_response.tls',
     ]);
 
     const services = await queryBuilder.getMany();

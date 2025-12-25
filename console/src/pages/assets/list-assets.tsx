@@ -54,6 +54,7 @@ export function ListAssets() {
   const handleTabChange = (value: string) => {
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('tab', value);
+    newSearchParams.set('page', '1');
     navigate(`?${newSearchParams.toString()}`);
   };
 

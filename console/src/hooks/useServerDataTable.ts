@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 /**
  * Custom hook for server-side data table with pagination, sorting, and filtering
@@ -17,11 +17,11 @@ export function useServerDataTable({
   /**
    * Default field to sort by (default: "createdAt")
    */
-  defaultSortBy = "createdAt",
+  defaultSortBy = 'createdAt',
   /**
    * Default sort order - either ASC (ascending) or DESC (descending) (default: "DESC")
    */
-  defaultSortOrder = "DESC" as "ASC" | "DESC",
+  defaultSortOrder = 'DESC' as 'ASC' | 'DESC',
   /**
    * Whether to update URL search parameters when table state changes (default: true)
    * If true, table parameters will be synced with URL query params
@@ -35,60 +35,52 @@ export function useServerDataTable({
     pageSize: defaultPageSize,
     sortBy: defaultSortBy,
     sortOrder: defaultSortOrder,
-    filter: "",
+    filter: '',
   }));
-
-  // Sync internal params with URL params when isUpdateSearchQueryParam is true
-  useEffect(() => {
-    if (isUpdateSearchQueryParam) {
-      const getNumberParam = (key: string, fallback: number) => {
-        const val = parseInt(urlParams.get(key) || "");
-        return isNaN(val) ? fallback : val;
-      };
-
-      setInternalParams({
-        page: getNumberParam("page", defaultPage),
-        pageSize: getNumberParam("pageSize", defaultPageSize),
-        sortBy: urlParams.get("sortBy") || defaultSortBy,
-        sortOrder: (urlParams.get("sortOrder") as "ASC" | "DESC") || defaultSortOrder,
-        filter: urlParams.get("filter") || "",
-      });
-    }
-  }, [urlParams, defaultPage, defaultPageSize, defaultSortBy, defaultSortOrder, isUpdateSearchQueryParam]);
-
   const getNumberParam = (key: string, fallback: number) => {
-    const val = parseInt(urlParams.get(key) || "");
+    const val = parseInt(urlParams.get(key) || '');
     return isNaN(val) ? fallback : val;
   };
 
-  // Use URL params when isUpdateSearchQueryParam is true, otherwise use internal params
-  const page = isUpdateSearchQueryParam ? getNumberParam("page", defaultPage) : internalParams.page;
-  const pageSize = isUpdateSearchQueryParam ? getNumberParam("pageSize", defaultPageSize) : internalParams.pageSize;
-  const sortBy = isUpdateSearchQueryParam ? (urlParams.get("sortBy") || defaultSortBy) : internalParams.sortBy;
+  const page = isUpdateSearchQueryParam
+    ? getNumberParam('page', defaultPage)
+    : internalParams.page;
+  const pageSize = isUpdateSearchQueryParam
+    ? getNumberParam('pageSize', defaultPageSize)
+    : internalParams.pageSize;
+  const sortBy = isUpdateSearchQueryParam
+    ? urlParams.get('sortBy') || defaultSortBy
+    : internalParams.sortBy;
   const sortOrder = isUpdateSearchQueryParam
-    ? (urlParams.get("sortOrder") as "ASC" | "DESC") || defaultSortOrder
+    ? (urlParams.get('sortOrder') as 'ASC' | 'DESC') || defaultSortOrder
     : internalParams.sortOrder;
-  const filter = isUpdateSearchQueryParam ? (urlParams.get("filter") || "") : internalParams.filter;
+  const filter = isUpdateSearchQueryParam
+    ? urlParams.get('filter') || ''
+    : internalParams.filter;
 
   const setParam = useCallback(
     (key: string, value: string | number | undefined) => {
       if (isUpdateSearchQueryParam) {
-        // Update URL params
-        if (!value) {
-          urlParams.delete(key);
-        } else {
-          urlParams.set(key, value.toString());
-        }
-        setUrlParams(urlParams, { replace: true });
+        setUrlParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            if (!value) {
+              next.delete(key);
+            } else {
+              next.set(key, value.toString());
+            }
+            return next;
+          },
+          { replace: true },
+        );
       } else {
-        // Update internal params only
-        setInternalParams(prev => ({
+        setInternalParams((prev) => ({
           ...prev,
-          [key]: value?.toString() || (key === 'page' ? defaultPage : key === 'pageSize' ? defaultPageSize : key === 'sortOrder' ? defaultSortOrder : "")
+          [key]: value ?? '',
         }));
       }
     },
-    [isUpdateSearchQueryParam, urlParams, setUrlParams, defaultPage, defaultPageSize, defaultSortOrder]
+    [isUpdateSearchQueryParam, setUrlParams],
   );
 
   return {
@@ -100,11 +92,37 @@ export function useServerDataTable({
       filter,
     },
     tableHandlers: {
-      setPage: (v: number) => setParam("page", v),
-      setPageSize: (v: number) => setParam("pageSize", v),
-      setSortBy: (v: string) => setParam("sortBy", v),
-      setSortOrder: (v: "ASC" | "DESC") => setParam("sortOrder", v),
-      setFilter: useCallback((v: string) => setParam("filter", v), [setParam]),
+      setPage: useCallback((v: number) => setParam('page', v), [setParam]),
+      setPageSize: useCallback(
+        (v: number) => setParam('pageSize', v),
+        [setParam],
+      ),
+      setSortBy: useCallback((v: string) => setParam('sortBy', v), [setParam]),
+      setSortOrder: useCallback(
+        (v: 'ASC' | 'DESC') => setParam('sortOrder', v),
+        [setParam],
+      ),
+      setFilter: useCallback(
+        (v: string) => {
+          if (isUpdateSearchQueryParam) {
+            setUrlParams(
+              (prev) => {
+                const next = new URLSearchParams(prev);
+                if (next.get('filter') === v) return prev;
+                next.set('page', '1');
+                next.set('filter', v);
+                return next;
+              },
+              { replace: true },
+            );
+          } else {
+            if (internalParams.filter === v) return;
+            setParam('page', 1);
+            setParam('filter', v);
+          }
+        },
+        [isUpdateSearchQueryParam, setUrlParams, setParam, internalParams.filter],
+      ),
     },
   };
 }
