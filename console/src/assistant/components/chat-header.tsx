@@ -1,10 +1,11 @@
-import { Plus, HistoryIcon, Database, X } from 'lucide-react';
+import { Plus, HistoryIcon, Database, X, BotMessageSquare } from 'lucide-react';
 import { SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useState, useCallback } from 'react';
 import type { ChatHeaderProps } from '../types/types';
 import { McpServerManager } from './mcp-server-manager';
 import { ChatHistoryManager } from './chat-history';
+import { LLMManager } from './llm-manager';
 
 export function ChatHeader({
   title = 'AI Assistant',
@@ -25,6 +26,7 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const [isMcpManagerOpen, setIsMcpManagerOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isLLMManagerOpen, setIsLLMManagerOpen] = useState(false);
 
   const toggleHistory = useCallback(() => {
     setIsHistoryOpen((prev) => !prev);
@@ -34,16 +36,19 @@ export function ChatHeader({
     setIsMcpManagerOpen(true);
   }, []);
 
+  const handleOpenLLMManager = useCallback(() => {
+    setIsLLMManagerOpen(true);
+  }, []);
+
   const handleNewChat = useCallback(() => {
     onCreateNewSession?.();
   }, [onCreateNewSession]);
 
   return (
     <div className="mb-1">
-      <div className="flex items-center justify-between border-b pb-2">
-        <SheetTitle>{title}</SheetTitle>
-
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between border-b pb-2 gap-2">
+        <SheetTitle className="truncate">{title}</SheetTitle>
+        <div className="flex items-center gap-1 flex-shrink-0">
           <Button
             variant="ghost"
             size="icon"
@@ -62,6 +67,16 @@ export function ChatHeader({
             className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors duration-200"
           >
             <Database className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleOpenLLMManager}
+            title="LLM Manager"
+            className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors duration-200"
+          >
+            <BotMessageSquare className="h-4 w-4" />
           </Button>
 
           <Button
@@ -108,6 +123,8 @@ export function ChatHeader({
         open={isMcpManagerOpen}
         onOpenChange={setIsMcpManagerOpen}
       />
+
+      <LLMManager open={isLLMManagerOpen} onOpenChange={setIsLLMManagerOpen} />
     </div>
   );
 }

@@ -35,6 +35,7 @@ import {
   UpdateMcpServersDto,
   UpdateMcpServersResponseDto,
   GetMcpServerHealthResponseDto,
+  GetMcpServersResponseDto,
 } from './dto/mcp-servers.dto';
 import {
   CreateMessageDto,
@@ -42,9 +43,19 @@ import {
   GetMessagesResponseDto,
   UpdateMessageDto,
 } from './dto/message.dto';
-
-// Fix: CreateMessageDto definition in dto/message.dto might need update too, but locally used interface in controller for createMessageStream needs to match service call.
-// The controller constructs a local object of type CreateMessageDto.
+import {
+  UpdateLLMConfigDto,
+  LLMConfigResponseDto,
+  ModelInfoResponseDto,
+} from './dto/llm-config.dto';
+import type {
+  ModelInfo,
+  LLMConfig,
+  GetLLMConfigsResponse,
+  UpdateLLMConfigResponse,
+  DeleteLLMConfigResponse,
+  SetPreferredLLMConfigResponse,
+} from '@/types/assistant';
 
 @ApiTags('AI Assistant')
 @Controller('ai-assistant')
@@ -83,6 +94,9 @@ export class AiAssistantController {
   @Doc({
     summary: 'Get all MCP servers',
     description: 'Retrieves all MCP servers for the current workspace and user',
+    response: {
+      serialization: GetMcpServersResponseDto,
+    },
     request: {
       getWorkspaceId: true,
     },
@@ -307,6 +321,8 @@ export class AiAssistantController {
     @Query('conversationId') conversationId: string | undefined,
     @Query('isCreateConversation') isCreateConversation: string | undefined,
     @Query('agentType') agentType: string | undefined,
+    @Query('model') model: string | undefined,
+    @Query('provider') provider: string | undefined,
     @UserId() userId: string,
     @WorkspaceId() workspaceId: string,
   ): Observable<{ data: string }> {
@@ -315,6 +331,8 @@ export class AiAssistantController {
       conversationId,
       isCreateConversation: isCreateConversation === 'true',
       agentType: agentType ? parseInt(agentType, 10) : undefined,
+      model,
+      provider,
     };
 
     return this.aiAssistantService
@@ -381,5 +399,143 @@ export class AiAssistantController {
       workspaceId,
       userId,
     );
+  }
+
+  @Doc({
+    summary: 'Get available models',
+    description:
+      'Retrieves all available models (internal + configured external)',
+    response: {
+      serialization: ModelInfoResponseDto,
+      isArray: true,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('models')
+  async getAvailableModels(
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<ModelInfoResponseDto[]> {
+    const models: ModelInfo[] =
+      await this.aiAssistantService.getAvailableModels(workspaceId, userId);
+    const result: ModelInfoResponseDto[] = models.map((m: ModelInfo) => ({
+      id: m.id,
+      name: m.name,
+      provider: m.provider,
+      description: m.description,
+      isActive: m.isActive,
+      isRecommended: !!m.isRecommended,
+    }));
+    return result;
+  }
+
+  @Doc({
+    summary: 'Get LLM Configs',
+    description: 'Retrieves LLM configurations/keys (masked)',
+    response: {
+      serialization: LLMConfigResponseDto,
+      isArray: true,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('configs')
+  async getLLMConfigs(
+    @Query() query: GetManyBaseQueryParams,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<LLMConfigResponseDto[]> {
+    const response: GetLLMConfigsResponse =
+      await this.aiAssistantService.getLLMConfigs(workspaceId, userId, query);
+    const configs: LLMConfig[] = response.configs ?? [];
+    const result: LLMConfigResponseDto[] = configs.map((c: LLMConfig) => ({
+      id: c.id,
+      provider: c.provider,
+      apiKey: c.apiKey, // Already masked by assistant service
+      model: c.model,
+      isPreferred: c.isPreferred,
+    }));
+    return result;
+  }
+
+  @Doc({
+    summary: 'Update LLM Config',
+    description: 'Updates or creates LLM configuration for a provider (BYOK)',
+    response: {
+      serialization: LLMConfigResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('configs')
+  async updateLLMConfig(
+    @Body() body: UpdateLLMConfigDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<LLMConfigResponseDto> {
+    const response: UpdateLLMConfigResponse =
+      await this.aiAssistantService.updateLLMConfig(body, workspaceId, userId);
+    const config = response.config;
+    return {
+      id: config?.id || '',
+      provider: config?.provider || '',
+      apiKey: config?.apiKey || '',
+      model: config?.model || '',
+      isPreferred: config?.isPreferred || false,
+    };
+  }
+
+  @Doc({
+    summary: 'Delete LLM Config',
+    description: 'Deletes LLM configuration by ID',
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete('configs/:id')
+  async deleteLLMConfig(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<{ success: boolean }> {
+    const response: DeleteLLMConfigResponse =
+      await this.aiAssistantService.deleteLLMConfig(id, workspaceId, userId);
+    return { success: !!response.success };
+  }
+
+  @Doc({
+    summary: 'Set Preferred LLM Config',
+    description: 'Sets a specific LLM configuration as preferred',
+    response: {
+      serialization: LLMConfigResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Patch('configs/:id/set-preferred')
+  async setPreferredLLMConfig(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<LLMConfigResponseDto> {
+    const response: SetPreferredLLMConfigResponse =
+      await this.aiAssistantService.setPreferredLLMConfig(
+        id,
+        workspaceId,
+        userId,
+      );
+    const config = response.config;
+    return {
+      id: config?.id || '',
+      provider: config?.provider || '',
+      apiKey: config?.apiKey || '',
+      model: config?.model || '',
+      isPreferred: config?.isPreferred || false,
+    };
   }
 }

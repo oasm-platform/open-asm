@@ -1,6 +1,5 @@
 import { useRef, useEffect, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +11,7 @@ import {
 import { Send, Plus, Zap, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentType } from '../types/agent-types';
+import { StreamingStatus } from './streaming-status';
 
 type ChatInputProps = {
   inputMessage: string;
@@ -20,6 +20,10 @@ type ChatInputProps = {
   isSending: boolean;
   selectedAgentType: number;
   onSelectAgentType: (type: number) => void;
+  streamingStatus?: {
+    type?: string;
+    content?: string;
+  };
 };
 
 // Configuration object for Agent Types
@@ -51,6 +55,7 @@ export const ChatInput = memo(function ChatInput({
   isSending,
   selectedAgentType,
   onSelectAgentType,
+  streamingStatus,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -100,15 +105,27 @@ export const ChatInput = memo(function ChatInput({
     AGENT_CONFIG[AgentType.Orchestration];
 
   return (
-    <form onSubmit={handleSubmit} className="relative group">
-      <div className="relative flex items-end gap-2 bg-background p-1.5 rounded-3xl border border-input shadow-sm focus-within:border-ring focus-within:shadow-md transition-all duration-200">
-        <div className="pl-1 pb-1 shrink-0">
+    <div className="flex flex-col gap-1.5 px-2 sm:px-4 pt-2 bg-black">
+      {/* Show streaming status (thinking, tool usage, etc.) */}
+      {streamingStatus && (
+        <div className="animate-in fade-in slide-in-from-bottom-1 duration-300">
+          <StreamingStatus
+            type={streamingStatus.type}
+            content={streamingStatus.content}
+          />
+        </div>
+      )}
+      <form
+        onSubmit={handleSubmit}
+        className="relative flex items-center gap-0.5 bg-background p-1 rounded-3xl border border-input shadow-sm focus-within:border-ring focus-within:shadow-md transition-all duration-200"
+      >
+        <div className="pl-1 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-full text-zinc-500 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="h-7 w-7 rounded-full text-zinc-500 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 title={`Current Mode: ${currentAgent.label}`}
               >
                 {currentAgent.icon}
@@ -118,13 +135,17 @@ export const ChatInput = memo(function ChatInput({
               <DropdownMenuLabel>Assistant Mode</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() =>
-                  onSelectAgentType(
-                    selectedAgentType === AgentType.Analysis
-                      ? AgentType.Orchestration
-                      : AgentType.Analysis,
-                  )
-                }
+                onClick={() => onSelectAgentType(AgentType.Orchestration)}
+                className={cn(
+                  'cursor-pointer',
+                  selectedAgentType === AgentType.Orchestration && 'bg-accent',
+                )}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                <span>Orchestrator</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSelectAgentType(AgentType.Analysis)}
                 className={cn(
                   'cursor-pointer',
                   selectedAgentType === AgentType.Analysis && 'bg-accent',
@@ -134,13 +155,7 @@ export const ChatInput = memo(function ChatInput({
                 <span>Security Analyst</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() =>
-                  onSelectAgentType(
-                    selectedAgentType === AgentType.NucleiGenerator
-                      ? AgentType.Orchestration
-                      : AgentType.NucleiGenerator,
-                  )
-                }
+                onClick={() => onSelectAgentType(AgentType.NucleiGenerator)}
                 className={cn(
                   'cursor-pointer',
                   selectedAgentType === AgentType.NucleiGenerator &&
@@ -154,14 +169,14 @@ export const ChatInput = memo(function ChatInput({
           </DropdownMenu>
         </div>
 
-        <Textarea
+        <textarea
           ref={textareaRef}
           value={inputMessage}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder={`Ask ${currentAgent.label}...`}
           rows={1}
-          className="flex-1 !bg-transparent border-none outline-none shadow-none ring-0 focus-visible:ring-0 px-2 py-3 text-foreground text-base placeholder:text-muted-foreground font-medium resize-none overflow-y-auto min-h-[44px] max-h-[200px] scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600"
+          className="flex-1 !bg-transparent border-none outline-none shadow-none ring-0 focus-visible:ring-0 px-2 py-2 text-foreground text-base placeholder:text-muted-foreground font-medium resize-none overflow-y-auto min-h-[40px] max-h-[200px] scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600"
           disabled={isSending}
         />
 
@@ -169,11 +184,11 @@ export const ChatInput = memo(function ChatInput({
           type="submit"
           disabled={isDisabled}
           size="icon"
-          className="h-10 w-10 mb-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shrink-0"
+          className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shrink-0"
         >
           <Send className="w-4 h-4 ml-0.5" />
         </Button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 });

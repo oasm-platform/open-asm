@@ -5,12 +5,11 @@ import { firstValueFrom } from 'rxjs';
 import {
   AddMcpServersDto,
   AddMcpServersResponseDto,
-  McpServerConfig,
   UpdateMcpServersDto,
   UpdateMcpServersResponseDto,
   DeleteMcpServersResponseDto,
   GetMcpServersResponseDto,
-  McpServerConfigWithStatus,
+  McpConfigJson,
 } from './dto/mcp-servers.dto';
 import {
   DomainClassifyService,
@@ -19,9 +18,9 @@ import {
   MessageService,
   HealthCheckService,
   IssueService,
+  LLMConfigService,
 } from './ai-assistant.interface';
 
-import { Struct } from '@/types';
 import { GenerateTagsDto } from './dto/generate-tags.dto';
 
 import {
@@ -34,10 +33,30 @@ import {
   GetMessagesResponseDto,
   DeleteMessageResponseDto,
 } from './dto/message.dto';
+import { UpdateLLMConfigDto } from './dto/llm-config.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import type {
   GetMCPServerHealthResponse,
   GetConversationsResponse,
+  ModelInfo,
+  GetLLMConfigsResponse,
+  GetMessagesResponse,
+  DeleteMessageResponse,
+  HealthCheckResponse,
+  DomainClassifyResponse,
+  AddMCPServersResponse,
+  UpdateMCPServersResponse,
+  DeleteMCPServersResponse,
+  UpdateConversationResponse,
+  DeleteConversationResponse,
+  DeleteConversationsResponse,
+  ResolveIssueResponse,
+  UpdateLLMConfigResponse,
+  DeleteLLMConfigResponse,
+  SetPreferredLLMConfigRequest,
+  SetPreferredLLMConfigResponse,
+  GetAvailableModelsResponse,
+  GetAvailableModelsRequest,
 } from '@/types/assistant';
 
 @Injectable()
@@ -49,6 +68,7 @@ export class AiAssistantService implements OnModuleInit {
   private messageService: MessageService;
   private healthCheckService: HealthCheckService;
   private issueService: IssueService;
+  private llmConfigService: LLMConfigService;
 
   constructor(
     @Inject('ASSISTANT_PACKAGE') private readonly client: ClientGrpc,
@@ -67,6 +87,8 @@ export class AiAssistantService implements OnModuleInit {
     this.healthCheckService =
       this.client.getService<HealthCheckService>('HealthCheck');
     this.issueService = this.client.getService<IssueService>('IssueService');
+    this.llmConfigService =
+      this.client.getService<LLMConfigService>('LLMConfigService');
   }
 
   private createMetadata(workspaceId?: string, userId?: string): Metadata {
@@ -85,11 +107,11 @@ export class AiAssistantService implements OnModuleInit {
    */
   async healthCheck(): Promise<{ message: string }> {
     try {
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<HealthCheckResponse>(
         this.healthCheckService.healthCheck({}),
       );
 
-      if (response.message === 'OK') {
+      if (response && response.message === 'OK') {
         return {
           message: 'ok',
         };
@@ -115,7 +137,7 @@ export class AiAssistantService implements OnModuleInit {
   ): Promise<string[]> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<DomainClassifyResponse>(
         this.domainClassifyService.domainClassify(
           {
             domain: generateTagsDto.domain,
@@ -142,12 +164,12 @@ export class AiAssistantService implements OnModuleInit {
   ): Promise<GetMcpServersResponseDto> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<{ mcpConfigJson?: string }>(
         this.mcpServerService.getMcpServers({}, metadata),
       );
 
       // Parse JSON string from backend (already enriched with status)
-      if (response.mcpConfigJson) {
+      if (response && response.mcpConfigJson) {
         const parsed = JSON.parse(
           response.mcpConfigJson,
         ) as GetMcpServersResponseDto;
@@ -181,48 +203,36 @@ export class AiAssistantService implements OnModuleInit {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
 
-      // Wrap the entire config object (including mcpServers key)
-      const mcpConfigStruct = Struct.wrap({
+      const mcpConfig: McpConfigJson = {
         mcpServers: addMcpServersDto.mcpServers,
-      });
+      };
 
-      const response = await firstValueFrom(
+      const addMcpResponse = await firstValueFrom<AddMCPServersResponse>(
         this.mcpServerService.addMcpServers(
           {
-            mcpConfig: mcpConfigStruct,
+            mcpConfig,
           },
           metadata,
         ),
       );
 
       // Parse JSON string from backend (already enriched with status)
-      if (response.mcpConfigJson) {
+      if (addMcpResponse && addMcpResponse.mcpConfigJson) {
         const parsed = JSON.parse(
-          response.mcpConfigJson,
+          addMcpResponse.mcpConfigJson,
         ) as AddMcpServersResponseDto;
         return {
           ...parsed,
-          success: response.success || false,
-          error: response.error,
+          success: !!addMcpResponse.success,
+          error: addMcpResponse.error,
         };
       }
 
-      // Fallback to old response format (should not happen with updated backend)
-      const mcpServers: Record<string, McpServerConfig> = {};
-      for (const server of response.servers || []) {
-        if (server.config) {
-          const structLike = server.config as {
-            fields: Record<string, unknown>;
-          };
-          const unwrapped = Struct.unwrap(structLike);
-          Object.assign(mcpServers, unwrapped);
-        }
-      }
-
+      // Fallback
       return {
-        mcpServers: mcpServers as Record<string, McpServerConfigWithStatus>,
-        success: response.success || false,
-        error: response.error,
+        mcpServers: {},
+        success: !!addMcpResponse?.success,
+        error: addMcpResponse?.error,
       };
     } catch (error: unknown) {
       this.logger.error('Failed to add MCP servers', error);
@@ -241,46 +251,33 @@ export class AiAssistantService implements OnModuleInit {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
 
-      // Wrap the entire config object (including mcpServers key)
-      const mcpConfigStruct = Struct.wrap({
+      const mcpConfig: McpConfigJson = {
         mcpServers: updateMcpServersDto.mcpServers,
-      });
+      };
 
-      const response = await firstValueFrom(
+      const updateMcpResponse = await firstValueFrom<UpdateMCPServersResponse>(
         this.mcpServerService.updateMcpServers(
           {
-            mcpConfig: mcpConfigStruct,
+            mcpConfig,
           },
           metadata,
         ),
       );
 
       // Parse JSON string from backend (already enriched with status)
-      if (response.mcpConfigJson) {
+      if (updateMcpResponse && updateMcpResponse.mcpConfigJson) {
         const parsed = JSON.parse(
-          response.mcpConfigJson,
+          updateMcpResponse.mcpConfigJson,
         ) as UpdateMcpServersResponseDto;
         return {
           ...parsed,
-          success: response.success || false,
+          success: !!updateMcpResponse.success,
         };
       }
 
-      // Fallback to old response format (should not happen with updated backend)
-      const mcpServers: Record<string, McpServerConfig> = {};
-      for (const server of response.servers || []) {
-        if (server.config) {
-          const structLike = server.config as {
-            fields: Record<string, unknown>;
-          };
-          const unwrapped = Struct.unwrap(structLike);
-          Object.assign(mcpServers, unwrapped);
-        }
-      }
-
       return {
-        mcpServers: mcpServers as Record<string, McpServerConfigWithStatus>,
-        success: response.success || false,
+        mcpServers: {},
+        success: !!updateMcpResponse?.success,
       };
     } catch (error: unknown) {
       this.logger.error('Failed to update MCP servers', error);
@@ -298,7 +295,7 @@ export class AiAssistantService implements OnModuleInit {
   ): Promise<DeleteMcpServersResponseDto> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<DeleteMCPServersResponse>(
         this.mcpServerService.deleteMcpServers(
           {
             id,
@@ -307,7 +304,7 @@ export class AiAssistantService implements OnModuleInit {
         ),
       );
       return {
-        success: response.success || false,
+        success: !!response.success,
         message: response.message || '',
       };
     } catch (error: unknown) {
@@ -330,7 +327,7 @@ export class AiAssistantService implements OnModuleInit {
   }> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response: GetMCPServerHealthResponse = await firstValueFrom(
+      const response = await firstValueFrom<GetMCPServerHealthResponse>(
         this.mcpServerService.getMcpServerHealth(
           {
             serverName,
@@ -340,7 +337,7 @@ export class AiAssistantService implements OnModuleInit {
       );
 
       return {
-        isActive: response.isActive || false,
+        isActive: !!response.isActive,
         status: (response.status as 'active' | 'disabled' | 'error') || 'error',
         error: response.error || undefined,
       };
@@ -370,7 +367,7 @@ export class AiAssistantService implements OnModuleInit {
             page: query?.page || 1,
             limit: query?.limit || 10,
             sortBy: query?.sortBy || 'updated_at',
-            sortOrder: query?.sortOrder?.toLowerCase() || 'desc',
+            sortOrder: (query?.sortOrder || 'desc').toLowerCase(),
           },
           metadata,
         ),
@@ -379,7 +376,7 @@ export class AiAssistantService implements OnModuleInit {
         conversations: response.conversations || [],
         totalCount: Number(response.totalCount || 0),
       };
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(
         'Failed to get conversations',
         error instanceof Error ? error.stack : String(error),
@@ -402,7 +399,7 @@ export class AiAssistantService implements OnModuleInit {
   ): Promise<UpdateConversationResponseDto> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<UpdateConversationResponse>(
         this.conversationService.updateConversation(
           {
             conversationId,
@@ -434,7 +431,7 @@ export class AiAssistantService implements OnModuleInit {
   ): Promise<DeleteConversationResponseDto> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<DeleteConversationResponse>(
         this.conversationService.deleteConversation(
           {
             conversationId,
@@ -443,7 +440,7 @@ export class AiAssistantService implements OnModuleInit {
         ),
       );
       return {
-        success: response?.success || false,
+        success: !!response?.success,
         message: response?.message || '',
       };
     } catch (error: unknown) {
@@ -464,11 +461,11 @@ export class AiAssistantService implements OnModuleInit {
   ): Promise<DeleteConversationsResponseDto> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<DeleteConversationsResponse>(
         this.conversationService.deleteConversations({}, metadata),
       );
       return {
-        success: response?.success || false,
+        success: !!response?.success,
         message: response?.message || '',
       };
     } catch (error: unknown) {
@@ -490,7 +487,7 @@ export class AiAssistantService implements OnModuleInit {
   ): Promise<GetMessagesResponseDto> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<GetMessagesResponse>(
         this.messageService.getMessages({ conversationId }, metadata),
       );
       return {
@@ -511,6 +508,8 @@ export class AiAssistantService implements OnModuleInit {
       conversationId?: string;
       isCreateConversation?: boolean;
       agentType?: number;
+      model?: string;
+      provider?: string;
     },
     workspaceId: string,
     userId: string,
@@ -522,6 +521,9 @@ export class AiAssistantService implements OnModuleInit {
         conversationId: createMessageDto.conversationId || '',
         isCreateConversation: createMessageDto.isCreateConversation || false,
         agentType: createMessageDto.agentType || 0,
+        model: createMessageDto.model || '',
+        provider: createMessageDto.provider || '',
+        apiKey: '', // API key is handled by the assistant service internally
       },
       metadata,
     );
@@ -563,7 +565,7 @@ export class AiAssistantService implements OnModuleInit {
   ): Promise<DeleteMessageResponseDto> {
     try {
       const metadata = this.createMetadata(workspaceId, userId);
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<DeleteMessageResponse>(
         this.messageService.deleteMessage(
           {
             conversationId,
@@ -573,7 +575,7 @@ export class AiAssistantService implements OnModuleInit {
         ),
       );
       return {
-        success: response.success || false,
+        success: !!response.success,
         message: response.message || '',
       };
     } catch (error: unknown) {
@@ -588,31 +590,140 @@ export class AiAssistantService implements OnModuleInit {
   async resolveIssue(
     question: string,
     issueType: number, // IssueType enum value
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    metadata: Record<string, any>,
+    metadata: Record<string, unknown>,
     workspaceId?: string,
     userId?: string,
   ): Promise<{ message: string }> {
     try {
       const grpcMetadata = this.createMetadata(workspaceId, userId);
 
-      const response = await firstValueFrom(
+      const response = await firstValueFrom<ResolveIssueResponse>(
         this.issueService.resolveIssueServers(
           {
             question,
             issueType,
-            metadata: metadata,
+            metadata,
           },
           grpcMetadata,
         ),
       );
 
       return {
-        message: response.message || '',
+        message: response?.message || '',
       };
     } catch (error: unknown) {
       this.logger.error('Failed to resolve issue with AI assistant', error);
       throw error;
     }
+  }
+
+  /**
+   * Get LLM Configs
+   */
+  async getLLMConfigs(
+    workspaceId: string,
+    userId: string,
+    query?: GetManyBaseQueryParams,
+  ): Promise<GetLLMConfigsResponse> {
+    const metadata = this.createMetadata(workspaceId, userId);
+    const sortBy =
+      query?.sortBy === 'createdAt' || !query?.sortBy
+        ? 'created_at'
+        : query.sortBy;
+    const sortOrder = (query?.sortOrder || 'asc').toLowerCase();
+
+    const result: GetLLMConfigsResponse = await firstValueFrom(
+      this.llmConfigService.getLlmConfigs(
+        {
+          search: query?.search || '',
+          page: query?.page || 1,
+          limit: query?.limit || 10,
+          sortBy,
+          sortOrder,
+        },
+        metadata,
+      ),
+    );
+    return result;
+  }
+
+  /**
+   * Update LLM Config
+   */
+  async updateLLMConfig(
+    dto: UpdateLLMConfigDto,
+    workspaceId: string,
+    userId: string,
+  ): Promise<UpdateLLMConfigResponse> {
+    const metadata = this.createMetadata(workspaceId, userId);
+    const result: UpdateLLMConfigResponse = await firstValueFrom(
+      this.llmConfigService.updateLlmConfig(
+        {
+          provider: dto.provider,
+          apiKey: dto.apiKey,
+          model: dto.model || '',
+          id: dto.id || '',
+        },
+        metadata,
+      ),
+    );
+    return result;
+  }
+
+  /**
+   * Delete LLM Config
+   */
+  async deleteLLMConfig(
+    id: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<DeleteLLMConfigResponse> {
+    const metadata = this.createMetadata(workspaceId, userId);
+    const result: DeleteLLMConfigResponse = await firstValueFrom(
+      this.llmConfigService.deleteLlmConfig(
+        {
+          id,
+        },
+        metadata,
+      ),
+    );
+    return result;
+  }
+
+  /**
+   * Get available models
+   */
+  async getAvailableModels(
+    workspaceId: string,
+    userId: string,
+  ): Promise<ModelInfo[]> {
+    const metadata = this.createMetadata(workspaceId, userId);
+    try {
+      const request: GetAvailableModelsRequest = {};
+      const obs = this.llmConfigService.getAvailableModels(request, metadata);
+      const response: GetAvailableModelsResponse = await firstValueFrom(obs);
+      return response?.models || [];
+    } catch (e: unknown) {
+      this.logger.warn('Failed to fetch models from assistant', e);
+      return [];
+    }
+  }
+
+  /**
+   * Set Preferred LLM Config
+   */
+  async setPreferredLLMConfig(
+    id: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<SetPreferredLLMConfigResponse> {
+    const metadata = this.createMetadata(workspaceId, userId);
+    const request: SetPreferredLLMConfigRequest = {
+      id,
+    };
+    const result: SetPreferredLLMConfigResponse = await firstValueFrom(
+      this.llmConfigService.setPreferredLlmConfig(request, metadata),
+    );
+    return result;
   }
 }

@@ -35,7 +35,7 @@ function applyCommonDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
  * @param options Documentation options
  * @returns Array of method decorators
  */
- 
+
 function applyParamDecorators<T>(options?: IDocOptions<T>): MethodDecorator[] {
   const decorators: MethodDecorator[] = [];
 
@@ -123,6 +123,7 @@ function DocDefault<T>({
   dataSchema,
   description,
   extraModels = [],
+  isArray = false,
   httpStatus = HttpStatus.OK,
   serialization,
 }: Omit<IDocResponseOptions<T>, 'messageExample'>): MethodDecorator {
@@ -136,9 +137,20 @@ function DocDefault<T>({
     Object.assign(schema, dataSchema);
   } else if (serialization) {
     decorators.push(ApiExtraModels(serialization));
-    Object.assign(schema, {
-      $ref: getSchemaPath(serialization),
-    });
+    if (isArray) {
+      Object.assign(schema, {
+        properties: {
+          data: {
+            type: 'array',
+            items: { $ref: getSchemaPath(serialization) },
+          },
+        },
+      });
+    } else {
+      Object.assign(schema, {
+        $ref: getSchemaPath(serialization),
+      });
+    }
   }
 
   // Always include AppResponseSerialization and extra models
