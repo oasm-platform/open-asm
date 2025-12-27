@@ -10,6 +10,7 @@ export interface IDocResponseOptions<T> {
   httpStatus?: HttpStatus;
   messageExample?: string;
   serialization?: ClassConstructor<T>;
+  isArray?: boolean;
 }
 
 export interface IDocOptions<T> {

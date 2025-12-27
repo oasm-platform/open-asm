@@ -8,7 +8,7 @@ import { ChatHeader } from './components/chat-header';
 import { ChatInput } from './components/chat-input';
 import { ChatMessages } from './components/chat-messages';
 import { ConversationTitle } from './components/conversation-title';
-import { StreamingStatus } from './components/streaming-status';
+import { ChatSuggestions } from './components/chat-suggestions';
 import type { AssistantChatProps } from './types/types';
 import { AgentType } from './types/agent-types';
 
@@ -49,16 +49,14 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
     const messageText = typeof text === 'string' ? text : inputMessage;
     if (messageText.trim() === '') return;
 
-    if (typeof text !== 'string') setInputMessage(''); // Clear input if sending typed message (handles Event object from button click)
+    if (typeof text !== 'string') setInputMessage('');
 
     if (onSendMessage) {
       onSendMessage(messageText);
     }
 
     try {
-      // If no conversation is selected, create a new one
       const isNewConversation = !currentConversationId;
-      // Pass the selected agent type (default 0)
       await sendMessage(messageText, isNewConversation, selectedAgentType);
     } catch (error) {
       console.error('❌ Failed to send message:', error);
@@ -72,14 +70,6 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
   const handleSelectSession = (sessionId: string) => {
     selectConversation(sessionId);
   };
-
-  const suggestions = [
-    'What is the current system security status?',
-    'Are there any high-risk vulnerabilities detected?',
-    'How should I configure the WAF for better protection?',
-    'Can you explain the results of the last scan?',
-    'What specific security actions do you recommend now?',
-  ];
 
   return (
     <>
@@ -104,11 +94,11 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
         <SheetContent
           side="right"
           className={cn(
-            'flex flex-col fixed gap-0 bg-background transition-all duration-300 ease-in-out',
+            'flex flex-col fixed gap-0 bg-black transition-all duration-300 ease-in-out',
             // Mobile: Full screen
-            'inset-0 w-full h-full p-4 border-none shadow-none',
+            'inset-0 w-full h-full p-3 border-none shadow-none text-zinc-100',
             // Desktop (sm+): Restore original floating sidebar styles
-            'sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[calc(100%-2rem)] sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl sm:shadow-xl sm:p-5 sm:border-l',
+            'sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[calc(100%-2rem)] sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl sm:shadow-2xl sm:p-5 sm:border-l sm:border-zinc-900',
             '[&>button]:hidden', // Hide default Sheet close button
           )}
         >
@@ -140,8 +130,6 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
             />
             <SheetDescription className="sr-only">Description</SheetDescription>
 
-            {/* Show conversation title with New Chat action */}
-            {/* Show conversation title with New Chat action */}
             <ConversationTitle
               session={currentSession}
               onNewChat={handleNewConversation}
@@ -157,43 +145,9 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
             />
 
             {messages.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
-                <div className="mb-8 text-center space-y-2">
-                  <div className="bg-primary/10 p-3 rounded-full w-fit mx-auto text-primary mb-4">
-                    <MessageCircle className="h-8 w-8" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground">
-                    I am OASM Security Assistant
-                  </h3>
-                  <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
-                    How can I help you secure your infrastructure today?
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 gap-2.5 w-full max-w-sm">
-                  {suggestions.map((s) => (
-                    <Button
-                      key={s}
-                      variant="outline"
-                      className="justify-start h-auto py-3 px-4 text-left whitespace-normal shadow-sm hover:shadow-md hover:border-primary/50 hover:bg-primary/5 transition-all w-full rounded-xl border-dashed border-zinc-300 dark:border-zinc-700"
-                      onClick={() => handleSendMessage(s)}
-                    >
-                      <span className="text-sm">{s}</span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              <ChatSuggestions onSuggestionClick={handleSendMessage} />
             ) : (
               <ChatMessages messages={messages} />
-            )}
-
-            {/* Show streaming status (thinking, tool usage, etc.) - Moved here */}
-            {isStreaming && (
-              <div className="px-4 py-2">
-                <StreamingStatus
-                  type={streamingStatus.type}
-                  content={streamingStatus.content}
-                />
-              </div>
             )}
 
             <ChatInput
@@ -201,6 +155,7 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
               setInputMessage={setInputMessage}
               onSendMessage={handleSendMessage}
               isSending={isStreaming}
+              streamingStatus={isStreaming ? streamingStatus : undefined}
               selectedAgentType={selectedAgentType}
               onSelectAgentType={setSelectedAgentType}
             />

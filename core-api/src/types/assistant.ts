@@ -35,6 +35,79 @@ export interface HealthCheckResponse {
   message: string;
 }
 
+export interface LLMConfig {
+  provider: string;
+  /** Masked when returned in GetLLMConfigs */
+  apiKey: string;
+  /** Optional: default model for this provider */
+  model: string;
+  id: string;
+  /** Only one config can be preferred per user/workspace */
+  isPreferred: boolean;
+}
+
+export interface GetLLMConfigsRequest {
+  search: string;
+  page: number;
+  limit: number;
+  sortBy: string;
+  sortOrder: string;
+}
+
+export interface GetLLMConfigsResponse {
+  configs: LLMConfig[];
+  totalCount: number;
+}
+
+export interface UpdateLLMConfigRequest {
+  provider: string;
+  apiKey: string;
+  model: string;
+  id: string;
+}
+
+export interface UpdateLLMConfigResponse {
+  config: LLMConfig | undefined;
+  success: boolean;
+}
+
+export interface DeleteLLMConfigRequest {
+  id: string;
+}
+
+export interface DeleteLLMConfigResponse {
+  success: boolean;
+}
+
+export interface SetPreferredLLMConfigRequest {
+  id: string;
+}
+
+export interface SetPreferredLLMConfigResponse {
+  config: LLMConfig | undefined;
+  success: boolean;
+}
+
+export interface ModelInfo {
+  id: string;
+  /** Human readable name */
+  name: string;
+  /** "openai", "anthropic", "internal", etc. */
+  provider: string;
+  description: string;
+  /** True if key is valid/present */
+  isActive: boolean;
+  /** Recommended model */
+  isRecommended: boolean;
+}
+
+export interface GetAvailableModelsRequest {
+}
+
+export interface GetAvailableModelsResponse {
+  models: ModelInfo[];
+}
+
 export interface DomainClassifyRequest {
   domain: string;
 }
@@ -129,6 +202,9 @@ export interface CreateMessageRequest {
   conversationId: string;
   isCreateConversation: boolean;
   agentType: AgentType;
+  model: string;
+  provider: string;
+  apiKey: string;
 }
 
 export interface CreateMessageResponse {
@@ -285,6 +361,648 @@ export const HealthCheckResponse: MessageFns<HealthCheckResponse> = {
           }
 
           message.message = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseLLMConfig(): LLMConfig {
+  return { provider: "", apiKey: "", model: "", id: "", isPreferred: false };
+}
+
+export const LLMConfig: MessageFns<LLMConfig> = {
+  encode(message: LLMConfig, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.provider !== "") {
+      writer.uint32(10).string(message.provider);
+    }
+    if (message.apiKey !== "") {
+      writer.uint32(18).string(message.apiKey);
+    }
+    if (message.model !== "") {
+      writer.uint32(26).string(message.model);
+    }
+    if (message.id !== "") {
+      writer.uint32(34).string(message.id);
+    }
+    if (message.isPreferred !== false) {
+      writer.uint32(40).bool(message.isPreferred);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LLMConfig {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLLMConfig();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.provider = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.apiKey = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.model = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isPreferred = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseGetLLMConfigsRequest(): GetLLMConfigsRequest {
+  return { search: "", page: 0, limit: 0, sortBy: "", sortOrder: "" };
+}
+
+export const GetLLMConfigsRequest: MessageFns<GetLLMConfigsRequest> = {
+  encode(message: GetLLMConfigsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.search !== "") {
+      writer.uint32(10).string(message.search);
+    }
+    if (message.page !== 0) {
+      writer.uint32(16).int32(message.page);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(24).int32(message.limit);
+    }
+    if (message.sortBy !== "") {
+      writer.uint32(34).string(message.sortBy);
+    }
+    if (message.sortOrder !== "") {
+      writer.uint32(42).string(message.sortOrder);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetLLMConfigsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetLLMConfigsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.search = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.page = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.limit = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.sortBy = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.sortOrder = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseGetLLMConfigsResponse(): GetLLMConfigsResponse {
+  return { configs: [], totalCount: 0 };
+}
+
+export const GetLLMConfigsResponse: MessageFns<GetLLMConfigsResponse> = {
+  encode(message: GetLLMConfigsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.configs) {
+      LLMConfig.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.totalCount !== 0) {
+      writer.uint32(16).int32(message.totalCount);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetLLMConfigsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetLLMConfigsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.configs.push(LLMConfig.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.totalCount = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseUpdateLLMConfigRequest(): UpdateLLMConfigRequest {
+  return { provider: "", apiKey: "", model: "", id: "" };
+}
+
+export const UpdateLLMConfigRequest: MessageFns<UpdateLLMConfigRequest> = {
+  encode(message: UpdateLLMConfigRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.provider !== "") {
+      writer.uint32(10).string(message.provider);
+    }
+    if (message.apiKey !== "") {
+      writer.uint32(18).string(message.apiKey);
+    }
+    if (message.model !== "") {
+      writer.uint32(26).string(message.model);
+    }
+    if (message.id !== "") {
+      writer.uint32(34).string(message.id);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateLLMConfigRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateLLMConfigRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.provider = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.apiKey = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.model = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseUpdateLLMConfigResponse(): UpdateLLMConfigResponse {
+  return { config: undefined, success: false };
+}
+
+export const UpdateLLMConfigResponse: MessageFns<UpdateLLMConfigResponse> = {
+  encode(message: UpdateLLMConfigResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.config !== undefined) {
+      LLMConfig.encode(message.config, writer.uint32(10).fork()).join();
+    }
+    if (message.success !== false) {
+      writer.uint32(16).bool(message.success);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateLLMConfigResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateLLMConfigResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.config = LLMConfig.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseDeleteLLMConfigRequest(): DeleteLLMConfigRequest {
+  return { id: "" };
+}
+
+export const DeleteLLMConfigRequest: MessageFns<DeleteLLMConfigRequest> = {
+  encode(message: DeleteLLMConfigRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteLLMConfigRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteLLMConfigRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseDeleteLLMConfigResponse(): DeleteLLMConfigResponse {
+  return { success: false };
+}
+
+export const DeleteLLMConfigResponse: MessageFns<DeleteLLMConfigResponse> = {
+  encode(message: DeleteLLMConfigResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteLLMConfigResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteLLMConfigResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseSetPreferredLLMConfigRequest(): SetPreferredLLMConfigRequest {
+  return { id: "" };
+}
+
+export const SetPreferredLLMConfigRequest: MessageFns<SetPreferredLLMConfigRequest> = {
+  encode(message: SetPreferredLLMConfigRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPreferredLLMConfigRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetPreferredLLMConfigRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseSetPreferredLLMConfigResponse(): SetPreferredLLMConfigResponse {
+  return { config: undefined, success: false };
+}
+
+export const SetPreferredLLMConfigResponse: MessageFns<SetPreferredLLMConfigResponse> = {
+  encode(message: SetPreferredLLMConfigResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.config !== undefined) {
+      LLMConfig.encode(message.config, writer.uint32(10).fork()).join();
+    }
+    if (message.success !== false) {
+      writer.uint32(16).bool(message.success);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPreferredLLMConfigResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetPreferredLLMConfigResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.config = LLMConfig.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseModelInfo(): ModelInfo {
+  return { id: "", name: "", provider: "", description: "", isActive: false, isRecommended: false };
+}
+
+export const ModelInfo: MessageFns<ModelInfo> = {
+  encode(message: ModelInfo, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.provider !== "") {
+      writer.uint32(26).string(message.provider);
+    }
+    if (message.description !== "") {
+      writer.uint32(34).string(message.description);
+    }
+    if (message.isActive !== false) {
+      writer.uint32(40).bool(message.isActive);
+    }
+    if (message.isRecommended !== false) {
+      writer.uint32(48).bool(message.isRecommended);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ModelInfo {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.provider = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isActive = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.isRecommended = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseGetAvailableModelsRequest(): GetAvailableModelsRequest {
+  return {};
+}
+
+export const GetAvailableModelsRequest: MessageFns<GetAvailableModelsRequest> = {
+  encode(_: GetAvailableModelsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetAvailableModelsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetAvailableModelsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseGetAvailableModelsResponse(): GetAvailableModelsResponse {
+  return { models: [] };
+}
+
+export const GetAvailableModelsResponse: MessageFns<GetAvailableModelsResponse> = {
+  encode(message: GetAvailableModelsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.models) {
+      ModelInfo.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetAvailableModelsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetAvailableModelsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.models.push(ModelInfo.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -1110,7 +1828,15 @@ export const GetMessagesResponse: MessageFns<GetMessagesResponse> = {
 };
 
 function createBaseCreateMessageRequest(): CreateMessageRequest {
-  return { question: "", conversationId: "", isCreateConversation: false, agentType: 0 };
+  return {
+    question: "",
+    conversationId: "",
+    isCreateConversation: false,
+    agentType: 0,
+    model: "",
+    provider: "",
+    apiKey: "",
+  };
 }
 
 export const CreateMessageRequest: MessageFns<CreateMessageRequest> = {
@@ -1126,6 +1852,15 @@ export const CreateMessageRequest: MessageFns<CreateMessageRequest> = {
     }
     if (message.agentType !== 0) {
       writer.uint32(32).int32(message.agentType);
+    }
+    if (message.model !== "") {
+      writer.uint32(42).string(message.model);
+    }
+    if (message.provider !== "") {
+      writer.uint32(50).string(message.provider);
+    }
+    if (message.apiKey !== "") {
+      writer.uint32(58).string(message.apiKey);
     }
     return writer;
   },
@@ -1167,6 +1902,30 @@ export const CreateMessageRequest: MessageFns<CreateMessageRequest> = {
           }
 
           message.agentType = reader.int32() as any;
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.model = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.provider = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.apiKey = reader.string();
           continue;
         }
       }
@@ -2010,6 +2769,146 @@ export const HealthCheckService = {
 
 export interface HealthCheckServer extends UntypedServiceImplementation {
   healthCheck: handleUnaryCall<HealthCheckRequest, HealthCheckResponse>;
+}
+
+/**
+ * ----------------
+ * LLM Configuration (BYOK)
+ * ----------------
+ */
+
+export interface LLMConfigServiceClient {
+  getLlmConfigs(request: GetLLMConfigsRequest): Observable<GetLLMConfigsResponse>;
+
+  updateLlmConfig(request: UpdateLLMConfigRequest): Observable<UpdateLLMConfigResponse>;
+
+  deleteLlmConfig(request: DeleteLLMConfigRequest): Observable<DeleteLLMConfigResponse>;
+
+  setPreferredLlmConfig(request: SetPreferredLLMConfigRequest): Observable<SetPreferredLLMConfigResponse>;
+
+  getAvailableModels(request: GetAvailableModelsRequest): Observable<GetAvailableModelsResponse>;
+}
+
+/**
+ * ----------------
+ * LLM Configuration (BYOK)
+ * ----------------
+ */
+
+export interface LLMConfigServiceController {
+  getLlmConfigs(
+    request: GetLLMConfigsRequest,
+  ): Promise<GetLLMConfigsResponse> | Observable<GetLLMConfigsResponse> | GetLLMConfigsResponse;
+
+  updateLlmConfig(
+    request: UpdateLLMConfigRequest,
+  ): Promise<UpdateLLMConfigResponse> | Observable<UpdateLLMConfigResponse> | UpdateLLMConfigResponse;
+
+  deleteLlmConfig(
+    request: DeleteLLMConfigRequest,
+  ): Promise<DeleteLLMConfigResponse> | Observable<DeleteLLMConfigResponse> | DeleteLLMConfigResponse;
+
+  setPreferredLlmConfig(
+    request: SetPreferredLLMConfigRequest,
+  ): Promise<SetPreferredLLMConfigResponse> | Observable<SetPreferredLLMConfigResponse> | SetPreferredLLMConfigResponse;
+
+  getAvailableModels(
+    request: GetAvailableModelsRequest,
+  ): Promise<GetAvailableModelsResponse> | Observable<GetAvailableModelsResponse> | GetAvailableModelsResponse;
+}
+
+export function LLMConfigServiceControllerMethods() {
+  return function (constructor: Function) {
+    const grpcMethods: string[] = [
+      "getLlmConfigs",
+      "updateLlmConfig",
+      "deleteLlmConfig",
+      "setPreferredLlmConfig",
+      "getAvailableModels",
+    ];
+    for (const method of grpcMethods) {
+      const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
+      GrpcMethod("LLMConfigService", method)(constructor.prototype[method], method, descriptor);
+    }
+    const grpcStreamMethods: string[] = [];
+    for (const method of grpcStreamMethods) {
+      const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
+      GrpcStreamMethod("LLMConfigService", method)(constructor.prototype[method], method, descriptor);
+    }
+  };
+}
+
+export const LLM_CONFIG_SERVICE_NAME = "LLMConfigService";
+
+/**
+ * ----------------
+ * LLM Configuration (BYOK)
+ * ----------------
+ */
+export type LLMConfigServiceService = typeof LLMConfigServiceService;
+export const LLMConfigServiceService = {
+  getLlmConfigs: {
+    path: "/app.LLMConfigService/GetLLMConfigs",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetLLMConfigsRequest): Buffer => Buffer.from(GetLLMConfigsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetLLMConfigsRequest => GetLLMConfigsRequest.decode(value),
+    responseSerialize: (value: GetLLMConfigsResponse): Buffer =>
+      Buffer.from(GetLLMConfigsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetLLMConfigsResponse => GetLLMConfigsResponse.decode(value),
+  },
+  updateLlmConfig: {
+    path: "/app.LLMConfigService/UpdateLLMConfig",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: UpdateLLMConfigRequest): Buffer =>
+      Buffer.from(UpdateLLMConfigRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpdateLLMConfigRequest => UpdateLLMConfigRequest.decode(value),
+    responseSerialize: (value: UpdateLLMConfigResponse): Buffer =>
+      Buffer.from(UpdateLLMConfigResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): UpdateLLMConfigResponse => UpdateLLMConfigResponse.decode(value),
+  },
+  deleteLlmConfig: {
+    path: "/app.LLMConfigService/DeleteLLMConfig",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: DeleteLLMConfigRequest): Buffer =>
+      Buffer.from(DeleteLLMConfigRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): DeleteLLMConfigRequest => DeleteLLMConfigRequest.decode(value),
+    responseSerialize: (value: DeleteLLMConfigResponse): Buffer =>
+      Buffer.from(DeleteLLMConfigResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): DeleteLLMConfigResponse => DeleteLLMConfigResponse.decode(value),
+  },
+  setPreferredLlmConfig: {
+    path: "/app.LLMConfigService/SetPreferredLLMConfig",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: SetPreferredLLMConfigRequest): Buffer =>
+      Buffer.from(SetPreferredLLMConfigRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetPreferredLLMConfigRequest => SetPreferredLLMConfigRequest.decode(value),
+    responseSerialize: (value: SetPreferredLLMConfigResponse): Buffer =>
+      Buffer.from(SetPreferredLLMConfigResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): SetPreferredLLMConfigResponse => SetPreferredLLMConfigResponse.decode(value),
+  },
+  getAvailableModels: {
+    path: "/app.LLMConfigService/GetAvailableModels",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetAvailableModelsRequest): Buffer =>
+      Buffer.from(GetAvailableModelsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetAvailableModelsRequest => GetAvailableModelsRequest.decode(value),
+    responseSerialize: (value: GetAvailableModelsResponse): Buffer =>
+      Buffer.from(GetAvailableModelsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetAvailableModelsResponse => GetAvailableModelsResponse.decode(value),
+  },
+} as const;
+
+export interface LLMConfigServiceServer extends UntypedServiceImplementation {
+  getLlmConfigs: handleUnaryCall<GetLLMConfigsRequest, GetLLMConfigsResponse>;
+  updateLlmConfig: handleUnaryCall<UpdateLLMConfigRequest, UpdateLLMConfigResponse>;
+  deleteLlmConfig: handleUnaryCall<DeleteLLMConfigRequest, DeleteLLMConfigResponse>;
+  setPreferredLlmConfig: handleUnaryCall<SetPreferredLLMConfigRequest, SetPreferredLLMConfigResponse>;
+  getAvailableModels: handleUnaryCall<GetAvailableModelsRequest, GetAvailableModelsResponse>;
 }
 
 /**

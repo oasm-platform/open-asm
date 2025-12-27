@@ -70,6 +70,22 @@ export class CreateMessageDto {
   })
   @IsOptional()
   agentType?: number;
+
+  @ApiPropertyOptional({
+    description: 'Model name to use',
+    example: 'gpt-4o',
+  })
+  @IsString()
+  @IsOptional()
+  model?: string;
+
+  @ApiPropertyOptional({
+    description: 'Provider name',
+    example: 'openai',
+  })
+  @IsString()
+  @IsOptional()
+  provider?: string;
 }
 
 export class CreateMessageResponseDto {
@@ -102,6 +118,22 @@ export class UpdateMessageDto {
   })
   @IsOptional()
   agentType?: number;
+
+  @ApiPropertyOptional({
+    description: 'Model name to use',
+    example: 'gpt-4o',
+  })
+  @IsString()
+  @IsOptional()
+  model?: string;
+
+  @ApiPropertyOptional({
+    description: 'Provider name',
+    example: 'openai',
+  })
+  @IsString()
+  @IsOptional()
+  provider?: string;
 }
 
 export class UpdateMessageResponseDto {

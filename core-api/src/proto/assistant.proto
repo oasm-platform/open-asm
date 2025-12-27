@@ -18,6 +18,82 @@ message HealthCheckResponse {
 }
 
 // ----------------
+// LLM Configuration (BYOK)
+// ----------------
+service LLMConfigService {
+  rpc GetLLMConfigs(GetLLMConfigsRequest) returns (GetLLMConfigsResponse);
+  rpc UpdateLLMConfig(UpdateLLMConfigRequest) returns (UpdateLLMConfigResponse);
+  rpc DeleteLLMConfig(DeleteLLMConfigRequest) returns (DeleteLLMConfigResponse);
+  rpc SetPreferredLLMConfig(SetPreferredLLMConfigRequest) returns (SetPreferredLLMConfigResponse);
+  rpc GetAvailableModels(GetAvailableModelsRequest) returns (GetAvailableModelsResponse);
+}
+
+message LLMConfig {
+    string provider = 1;
+    string api_key = 2; // Masked when returned in GetLLMConfigs
+    string model = 3;   // Optional: default model for this provider
+    string id = 4;
+    bool is_preferred = 5; // Only one config can be preferred per user/workspace
+}
+
+message GetLLMConfigsRequest {
+  string search = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  string sort_by = 4;
+  string sort_order = 5;
+}
+
+message GetLLMConfigsResponse {
+  repeated LLMConfig configs = 1;
+  int32 total_count = 2;
+}
+
+message UpdateLLMConfigRequest {
+    string provider = 1;
+    string api_key = 2;
+    string model = 3;
+    string id = 4;
+}
+
+message UpdateLLMConfigResponse {
+    LLMConfig config = 1;
+    bool success = 2;
+}
+
+message DeleteLLMConfigRequest {
+    string id = 1;
+}
+
+message DeleteLLMConfigResponse {
+    bool success = 1;
+}
+
+message SetPreferredLLMConfigRequest {
+    string id = 1;
+}
+
+message SetPreferredLLMConfigResponse {
+    LLMConfig config = 1;
+    bool success = 2;
+}
+
+message ModelInfo {
+    string id = 1;
+    string name = 2;      // Human readable name
+    string provider = 3;  // "openai", "anthropic", "internal", etc.
+    string description = 4;
+    bool is_active = 5;   // True if key is valid/present
+    bool is_recommended = 6; // Recommended model
+}
+
+message GetAvailableModelsRequest {}
+
+message GetAvailableModelsResponse {
+    repeated ModelInfo models = 1;
+}
+
+// ----------------
 // Domain Classify
 // ----------------
 service DomainClassify {
@@ -149,6 +225,9 @@ message CreateMessageRequest {
   string conversation_id = 2;
   bool is_create_conversation = 3;
   AgentType agent_type = 4;
+  string model = 5;
+  string provider = 6;
+  string api_key = 7;
 }
 
 enum AgentType {

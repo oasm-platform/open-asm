@@ -14,6 +14,8 @@ export interface CreateMessageDto {
   conversationId?: string;
   isCreateConversation?: boolean;
   agentType?: number;
+  model?: string;
+  provider?: string;
 }
 
 export interface UpdateMessageDto {
@@ -69,6 +71,14 @@ export async function* createMessageStream(
 
   if (dto.agentType !== undefined) {
     params.append('agentType', String(dto.agentType));
+  }
+
+  if (dto.model) {
+    params.append('model', dto.model);
+  }
+
+  if (dto.provider) {
+    params.append('provider', dto.provider);
   }
 
   const url = `/api/ai-assistant/messages/stream?${params.toString()}`;

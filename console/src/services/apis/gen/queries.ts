@@ -237,6 +237,16 @@ export type GenerateTagsDto = {
 };
 
 /**
+ * MCP servers configuration with embedded status
+ */
+export type GetMcpServersResponseDtoMcpServers = { [key: string]: unknown };
+
+export type GetMcpServersResponseDto = {
+  /** MCP servers configuration with embedded status */
+  mcpServers: GetMcpServersResponseDtoMcpServers;
+};
+
+/**
  * MCP servers configuration with status
  */
 export type AddMcpServersResponseDtoMcpServers = { [key: string]: unknown };
@@ -403,6 +413,30 @@ export type DeleteMessageResponseDto = {
   success: boolean;
   /** Response message */
   message: string;
+};
+
+export type ModelInfoResponseDto = {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  isActive: boolean;
+  isRecommended: boolean;
+};
+
+export type LLMConfigResponseDto = {
+  id: string;
+  provider: string;
+  apiKey: string;
+  model: string;
+  isPreferred: boolean;
+};
+
+export type UpdateLLMConfigDto = {
+  id?: string;
+  provider: string;
+  apiKey: string;
+  model?: string;
 };
 
 export type AssetDnsRecords = { [key: string]: unknown };
@@ -1718,6 +1752,23 @@ export type AiAssistantControllerGetConversationsParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type AiAssistantControllerGetAvailableModels200 =
+  AppResponseSerialization & {
+    data?: ModelInfoResponseDto[];
+  };
+
+export type AiAssistantControllerGetLLMConfigsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AiAssistantControllerGetLLMConfigs200 = AppResponseSerialization & {
+  data?: LLMConfigResponseDto[];
 };
 
 export type JobsRegistryControllerGetManyJobsParams = {
@@ -5046,7 +5097,7 @@ export const aiAssistantControllerGetMcpServers = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AppResponseSerialization>(
+  return orvalClient<GetMcpServersResponseDto>(
     { url: `/api/ai-assistant/mcp-servers`, method: 'GET', signal },
     options,
   );
@@ -6557,6 +6608,801 @@ export const useAiAssistantControllerDeleteMessage = <
 > => {
   const mutationOptions =
     getAiAssistantControllerDeleteMessageMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves all available models (internal + configured external)
+ * @summary Get available models
+ */
+export const aiAssistantControllerGetAvailableModels = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AiAssistantControllerGetAvailableModels200>(
+    { url: `/api/ai-assistant/models`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetAvailableModelsQueryKey = () => {
+  return [`/api/ai-assistant/models`] as const;
+};
+
+export const getAiAssistantControllerGetAvailableModelsQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetAvailableModelsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetAvailableModels(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetAvailableModelsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>
+>;
+export type AiAssistantControllerGetAvailableModelsQueryError = unknown;
+
+export function useAiAssistantControllerGetAvailableModels<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetAvailableModels<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetAvailableModels<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get available models
+ */
+
+export function useAiAssistantControllerGetAvailableModels<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetAvailableModels>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetAvailableModelsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves LLM configurations/keys (masked)
+ * @summary Get LLM Configs
+ */
+export const aiAssistantControllerGetLLMConfigs = (
+  params?: AiAssistantControllerGetLLMConfigsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AiAssistantControllerGetLLMConfigs200>(
+    { url: `/api/ai-assistant/configs`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAiAssistantControllerGetLLMConfigsInfiniteQueryKey = (
+  params?: AiAssistantControllerGetLLMConfigsParams,
+) => {
+  return [
+    'infinate',
+    `/api/ai-assistant/configs`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAiAssistantControllerGetLLMConfigsQueryKey = (
+  params?: AiAssistantControllerGetLLMConfigsParams,
+) => {
+  return [`/api/ai-assistant/configs`, ...(params ? [params] : [])] as const;
+};
+
+export const getAiAssistantControllerGetLLMConfigsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+    AiAssistantControllerGetLLMConfigsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetLLMConfigsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetLLMConfigsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetLLMConfigsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+    QueryKey,
+    AiAssistantControllerGetLLMConfigsParams['page']
+  > = ({ signal, pageParam }) =>
+    aiAssistantControllerGetLLMConfigs(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+    TError,
+    TData,
+    QueryKey,
+    AiAssistantControllerGetLLMConfigsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetLLMConfigsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>
+>;
+export type AiAssistantControllerGetLLMConfigsInfiniteQueryError = unknown;
+
+export function useAiAssistantControllerGetLLMConfigsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+    AiAssistantControllerGetLLMConfigsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AiAssistantControllerGetLLMConfigsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetLLMConfigsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetLLMConfigsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+    AiAssistantControllerGetLLMConfigsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetLLMConfigsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetLLMConfigsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetLLMConfigsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+    AiAssistantControllerGetLLMConfigsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetLLMConfigsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetLLMConfigsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get LLM Configs
+ */
+
+export function useAiAssistantControllerGetLLMConfigsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+    AiAssistantControllerGetLLMConfigsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetLLMConfigsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData,
+        QueryKey,
+        AiAssistantControllerGetLLMConfigsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAiAssistantControllerGetLLMConfigsInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAiAssistantControllerGetLLMConfigsQueryOptions = <
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetLLMConfigsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAiAssistantControllerGetLLMConfigsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>
+  > = ({ signal }) =>
+    aiAssistantControllerGetLLMConfigs(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AiAssistantControllerGetLLMConfigsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>
+>;
+export type AiAssistantControllerGetLLMConfigsQueryError = unknown;
+
+export function useAiAssistantControllerGetLLMConfigs<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+  TError = unknown,
+>(
+  params: undefined | AiAssistantControllerGetLLMConfigsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetLLMConfigs<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetLLMConfigsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAiAssistantControllerGetLLMConfigs<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetLLMConfigsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get LLM Configs
+ */
+
+export function useAiAssistantControllerGetLLMConfigs<
+  TData = Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+  TError = unknown,
+>(
+  params?: AiAssistantControllerGetLLMConfigsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof aiAssistantControllerGetLLMConfigs>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAiAssistantControllerGetLLMConfigsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates or creates LLM configuration for a provider (BYOK)
+ * @summary Update LLM Config
+ */
+export const aiAssistantControllerUpdateLLMConfig = (
+  updateLLMConfigDto: UpdateLLMConfigDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<LLMConfigResponseDto>(
+    {
+      url: `/api/ai-assistant/configs`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateLLMConfigDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAiAssistantControllerUpdateLLMConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateLLMConfig>>,
+    TError,
+    { data: UpdateLLMConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateLLMConfig>>,
+  TError,
+  { data: UpdateLLMConfigDto },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerUpdateLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerUpdateLLMConfig>>,
+    { data: UpdateLLMConfigDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiAssistantControllerUpdateLLMConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerUpdateLLMConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateLLMConfig>>
+>;
+export type AiAssistantControllerUpdateLLMConfigMutationBody =
+  UpdateLLMConfigDto;
+export type AiAssistantControllerUpdateLLMConfigMutationError = unknown;
+
+/**
+ * @summary Update LLM Config
+ */
+export const useAiAssistantControllerUpdateLLMConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerUpdateLLMConfig>>,
+      TError,
+      { data: UpdateLLMConfigDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerUpdateLLMConfig>>,
+  TError,
+  { data: UpdateLLMConfigDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerUpdateLLMConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes LLM configuration by ID
+ * @summary Delete LLM Config
+ */
+export const aiAssistantControllerDeleteLLMConfig = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/ai-assistant/configs/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerDeleteLLMConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteLLMConfig>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerDeleteLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerDeleteLLMConfig>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiAssistantControllerDeleteLLMConfig(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerDeleteLLMConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteLLMConfig>>
+>;
+
+export type AiAssistantControllerDeleteLLMConfigMutationError = unknown;
+
+/**
+ * @summary Delete LLM Config
+ */
+export const useAiAssistantControllerDeleteLLMConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerDeleteLLMConfig>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerDeleteLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerDeleteLLMConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Sets a specific LLM configuration as preferred
+ * @summary Set Preferred LLM Config
+ */
+export const aiAssistantControllerSetPreferredLLMConfig = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<LLMConfigResponseDto>(
+    { url: `/api/ai-assistant/configs/${id}/set-preferred`, method: 'PATCH' },
+    options,
+  );
+};
+
+export const getAiAssistantControllerSetPreferredLLMConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiAssistantControllerSetPreferredLLMConfig>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiAssistantControllerSetPreferredLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['aiAssistantControllerSetPreferredLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiAssistantControllerSetPreferredLLMConfig>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiAssistantControllerSetPreferredLLMConfig(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiAssistantControllerSetPreferredLLMConfigMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof aiAssistantControllerSetPreferredLLMConfig>>
+  >;
+
+export type AiAssistantControllerSetPreferredLLMConfigMutationError = unknown;
+
+/**
+ * @summary Set Preferred LLM Config
+ */
+export const useAiAssistantControllerSetPreferredLLMConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof aiAssistantControllerSetPreferredLLMConfig>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof aiAssistantControllerSetPreferredLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAiAssistantControllerSetPreferredLLMConfigMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
