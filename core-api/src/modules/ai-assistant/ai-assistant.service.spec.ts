@@ -91,27 +91,24 @@ describe('AiAssistantService', () => {
           provider: dto.provider,
           apiKey: dto.apiKey,
           model: dto.model,
+          id: '',
         },
         expect.any(Object), // metadata
       );
     });
 
     it('deleteLLMConfig should return success boolean', async () => {
-      const provider = 'openai';
+      const id = 'config-123';
       const mockResponse = { success: true };
 
       (llmConfigServiceMock.deleteLlmConfig as jest.Mock).mockReturnValue(
         of(mockResponse),
       );
 
-      const result = await service.deleteLLMConfig(
-        provider,
-        workspaceId,
-        userId,
-      );
+      const result = await service.deleteLLMConfig(id, workspaceId, userId);
       expect(result).toEqual(mockResponse);
       expect(llmConfigServiceMock.deleteLlmConfig).toHaveBeenCalledWith(
-        { provider },
+        { id },
         expect.any(Object),
       );
     });
