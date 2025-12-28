@@ -235,6 +235,14 @@ export interface GenerateTagsDto {
   domain: string;
 }
 
+export interface GetMcpServersResponseDto {
+  /**
+   * MCP servers configuration with embedded status
+   * @example {"mcpServers":{"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"..."},"disabled":false,"active":true,"status":"active"},"searxng":{"command":"npx","args":["-y","mcp-searxng"],"disabled":false,"active":false,"status":"error","error":"Connection failed"}}}
+   */
+  mcpServers: object;
+}
+
 export interface AddMcpServersResponseDto {
   /** Config ID */
   id?: string;
@@ -312,6 +320,8 @@ export interface GetConversationsResponseDto {
     createdAt?: string;
     updatedAt?: string;
   }[];
+  /** Total count of conversations */
+  totalCount: number;
 }
 
 export interface UpdateConversationResponseDto {
@@ -388,6 +398,31 @@ export interface DeleteMessageResponseDto {
    * @example "Message deleted successfully"
    */
   message: string;
+}
+
+export interface ModelInfoResponseDto {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  isActive: boolean;
+  isRecommended: boolean;
+}
+
+export interface LLMConfigResponseDto {
+  id: string;
+  provider: string;
+  apiKey: string;
+  model: string;
+  isPreferred: boolean;
+  isEditable: boolean;
+}
+
+export interface UpdateLLMConfigDto {
+  id?: string;
+  provider: string;
+  apiKey: string;
+  model?: string;
 }
 
 export interface Asset {
@@ -546,6 +581,7 @@ export interface JobHistoryDetailResponseDto {
   /** @format date-time */
   updatedAt: string;
   tools: Tool[];
+  jobs: Job[];
 }
 
 export interface Notification {
@@ -2592,10 +2628,24 @@ export class Api<
    * @summary Get all conversations
    * @request GET:/api/ai-assistant/conversations
    */
-  aiAssistantControllerGetConversations = (params: RequestParams = {}) =>
+  aiAssistantControllerGetConversations = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations`,
       method: "GET",
+      query: query,
       format: "json",
       ...params,
     });
@@ -2689,6 +2739,121 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
       method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves all available models (internal + configured external)
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetAvailableModels
+   * @summary Get available models
+   * @request GET:/api/ai-assistant/models
+   */
+  aiAssistantControllerGetAvailableModels = (params: RequestParams = {}) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: ModelInfoResponseDto[];
+      },
+      any
+    >({
+      path: `/api/ai-assistant/models`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves LLM configurations/keys (masked)
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerGetLlmConfigs
+   * @summary Get LLM Configs
+   * @request GET:/api/ai-assistant/configs
+   */
+  aiAssistantControllerGetLlmConfigs = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: LLMConfigResponseDto[];
+      },
+      any
+    >({
+      path: `/api/ai-assistant/configs`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates or creates LLM configuration for a provider (BYOK)
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerUpdateLlmConfig
+   * @summary Update LLM Config
+   * @request POST:/api/ai-assistant/configs
+   */
+  aiAssistantControllerUpdateLlmConfig = (
+    data: UpdateLLMConfigDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/configs`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes LLM configuration by ID
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerDeleteLlmConfig
+   * @summary Delete LLM Config
+   * @request DELETE:/api/ai-assistant/configs/{id}
+   */
+  aiAssistantControllerDeleteLlmConfig = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/configs/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Sets a specific LLM configuration as preferred
+   *
+   * @tags AI Assistant
+   * @name AiAssistantControllerSetPreferredLlmConfig
+   * @summary Set Preferred LLM Config
+   * @request PATCH:/api/ai-assistant/configs/{id}/set-preferred
+   */
+  aiAssistantControllerSetPreferredLlmConfig = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/ai-assistant/configs/${id}/set-preferred`,
+      method: "PATCH",
       format: "json",
       ...params,
     });
@@ -2862,6 +3027,22 @@ export class Api<
   jobsRegistryControllerReRunJob = (id: string, params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/${id}/re-run`,
+      method: "POST",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Cancel a job by its ID in the specified workspace
+   *
+   * @tags JobsRegistry
+   * @name JobsRegistryControllerCancelJob
+   * @summary Cancel a job
+   * @request POST:/api/jobs-registry/{id}/cancel
+   */
+  jobsRegistryControllerCancelJob = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/jobs-registry/${id}/cancel`,
       method: "POST",
       format: "json",
       ...params,
@@ -3325,25 +3506,6 @@ export class Api<
   assetsControllerExportServicesToCsv = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/services/export`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves detailed information about a specific technology.
-   *
-   * @tags Technology
-   * @name TechnologyControllerGetTechnologyInfo
-   * @summary Get technology information
-   * @request GET:/api/technology/{name}
-   */
-  technologyControllerGetTechnologyInfo = (
-    name: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/technology/${name}`,
       method: "GET",
       format: "json",
       ...params,

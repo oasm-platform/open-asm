@@ -430,6 +430,7 @@ export type LLMConfigResponseDto = {
   apiKey: string;
   model: string;
   isPreferred: boolean;
+  isEditable: boolean;
 };
 
 export type UpdateLLMConfigDto = {

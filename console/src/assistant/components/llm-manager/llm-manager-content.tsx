@@ -67,6 +67,7 @@ export function LLMManagerContent() {
       model: c.model || '',
       apiKey: c.apiKey,
       isPreferred: !!c.isPreferred,
+      isEditable: c.isEditable,
     })) || [];
 
   const handleSetDefault = (id: string) => {
@@ -124,8 +125,6 @@ export function LLMManagerContent() {
 
   const handleDelete = (id: string) => {
     if (!selectedWorkspace) return;
-
-    if (!confirm(`Are you sure you want to delete this configuration?`)) return;
 
     deleteConfig(
       {

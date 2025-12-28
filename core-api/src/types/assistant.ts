@@ -44,6 +44,8 @@ export interface LLMConfig {
   id: string;
   /** Only one config can be preferred per user/workspace */
   isPreferred: boolean;
+  /** Whether the config can be edited/deleted (false for system defaults) */
+  isEditable: boolean;
 }
 
 export interface GetLLMConfigsRequest {
@@ -374,7 +376,7 @@ export const HealthCheckResponse: MessageFns<HealthCheckResponse> = {
 };
 
 function createBaseLLMConfig(): LLMConfig {
-  return { provider: "", apiKey: "", model: "", id: "", isPreferred: false };
+  return { provider: "", apiKey: "", model: "", id: "", isPreferred: false, isEditable: false };
 }
 
 export const LLMConfig: MessageFns<LLMConfig> = {
@@ -393,6 +395,9 @@ export const LLMConfig: MessageFns<LLMConfig> = {
     }
     if (message.isPreferred !== false) {
       writer.uint32(40).bool(message.isPreferred);
+    }
+    if (message.isEditable !== false) {
+      writer.uint32(48).bool(message.isEditable);
     }
     return writer;
   },
@@ -442,6 +447,14 @@ export const LLMConfig: MessageFns<LLMConfig> = {
           }
 
           message.isPreferred = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.isEditable = reader.bool();
           continue;
         }
       }

@@ -1,5 +1,6 @@
 import { Trash2, Edit2, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -10,6 +11,7 @@ interface LLMConfig {
   model: string;
   apiKey: string;
   isPreferred: boolean;
+  isEditable?: boolean;
 }
 
 interface LLMListProps {
@@ -34,6 +36,8 @@ export function LLMList({
       <div className="grid gap-3">
         {configs.map((config) => {
           const isPreferred = config.isPreferred;
+          const isEditable = config.isEditable !== false; // Default to true if undefined
+
           return (
             <div
               key={config.id}
@@ -84,7 +88,7 @@ export function LLMList({
                     )}
                   />
                 </Button>
-                {config.id !== '00000000-0000-0000-0000-000000000000' && (
+                {isEditable && (
                   <>
                     <Button
                       variant="ghost"
@@ -94,14 +98,20 @@ export function LLMList({
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onDelete(config.id)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <ConfirmDialog
+                      title="Delete Configuration"
+                      description={`Are you sure you want to delete the configuration for ${config.provider}?`}
+                      onConfirm={() => onDelete(config.id)}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
                   </>
                 )}
               </div>
