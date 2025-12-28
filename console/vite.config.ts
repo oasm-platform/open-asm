@@ -15,8 +15,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      host: '0.0.0.0',
+      host: true,
       port: 5173,
+      allowedHosts: true,
       proxy: {
         '/api': {
           target: env.VITE_API_URL,

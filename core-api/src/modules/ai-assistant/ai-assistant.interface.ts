@@ -37,6 +37,16 @@ import type {
   HealthCheckResponse,
   ResolveIssueRequest,
   ResolveIssueResponse,
+  GetLLMConfigsRequest,
+  GetLLMConfigsResponse,
+  UpdateLLMConfigRequest,
+  UpdateLLMConfigResponse,
+  DeleteLLMConfigRequest,
+  DeleteLLMConfigResponse,
+  SetPreferredLLMConfigRequest,
+  SetPreferredLLMConfigResponse,
+  GetAvailableModelsRequest,
+  GetAvailableModelsResponse,
 } from '@/types/assistant';
 
 /**
@@ -137,4 +147,30 @@ export interface IssueService {
     request: ResolveIssueRequest,
     metadata?: unknown,
   ): Observable<ResolveIssueResponse>;
+}
+
+/**
+ * LLM Config Service Client
+ */
+export interface LLMConfigService {
+  getLlmConfigs(
+    request: GetLLMConfigsRequest,
+    metadata?: unknown,
+  ): Observable<GetLLMConfigsResponse>;
+  updateLlmConfig(
+    request: UpdateLLMConfigRequest,
+    metadata?: unknown,
+  ): Observable<UpdateLLMConfigResponse>;
+  deleteLlmConfig(
+    request: DeleteLLMConfigRequest,
+    metadata?: unknown,
+  ): Observable<DeleteLLMConfigResponse>;
+  setPreferredLlmConfig(
+    request: SetPreferredLLMConfigRequest,
+    metadata?: unknown,
+  ): Observable<SetPreferredLLMConfigResponse>;
+  getAvailableModels(
+    request: GetAvailableModelsRequest,
+    metadata?: unknown,
+  ): Observable<GetAvailableModelsResponse>;
 }

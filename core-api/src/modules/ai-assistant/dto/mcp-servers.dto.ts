@@ -47,7 +47,7 @@ export interface McpServerConfigWithStatus {
   tools?: Array<{
     name: string;
     description?: string;
-    inputSchema?: any;
+    inputSchema?: Record<string, unknown>;
   }>;
   resources?: Array<{
     uri: string;

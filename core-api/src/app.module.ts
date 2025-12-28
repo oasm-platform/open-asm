@@ -1,3 +1,4 @@
+// Trigger rebuild to update OpenAPI spec
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -10,7 +11,12 @@ import { CombineModule } from './modules/combine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { ServicesModule } from './services/services.module';
-import { AcceptLanguageResolver, HeaderResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
+import {
+  AcceptLanguageResolver,
+  HeaderResolver,
+  I18nModule,
+  QueryResolver,
+} from 'nestjs-i18n';
 import * as path from 'path';
 
 @Module({
@@ -24,7 +30,7 @@ import * as path from 'path';
     I18nModule.forRoot({
       fallbackLanguage: 'en',
       loaderOptions: {
-        path: path.join(__dirname, '/i18n/'),
+        path: path.join(__dirname, 'i18n'),
         watch: true,
       },
       resolvers: [

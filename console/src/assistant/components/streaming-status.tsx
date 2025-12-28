@@ -127,7 +127,7 @@ export function StreamingStatus({ type, content }: StreamingStatusProps) {
   if (!status) return null;
 
   return (
-    <div className="mb-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="mb-1.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
       {status}
     </div>
   );
