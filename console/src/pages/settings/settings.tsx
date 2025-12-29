@@ -1,7 +1,6 @@
 import Page from '@/components/common/page';
-import { Button } from '@/components/ui/button';
+import CreateMcpPermission from './components/create-mcp-permission';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus } from 'lucide-react';
 import { useEffect, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import CreateWorkspaceDialog from '../workspaces/create-workspace-dialog';
@@ -59,9 +58,7 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
       content: {
         title: 'MCP Permissions',
         description: 'Manage your MCP permissions',
-        action: <Button size={"sm"} variant="outline" onClick={() => navigate('create')}>
-          <Plus size={20} />  Create
-        </Button>,
+        action: <CreateMcpPermission />,
       },
       component: <ListMcpPermissions />,
     },
@@ -98,7 +95,7 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
         description: 'Manage your workspace configs',
       },
       component: <WorkspaceConfigs />,
-    }
+    },
   ];
 
   const currentTab = tab || defaultTab;
@@ -143,4 +140,3 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
 };
 
 export default Settings;
-
