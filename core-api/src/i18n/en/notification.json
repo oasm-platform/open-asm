@@ -1,0 +1,5 @@
+{
+  "notification": {
+    "CREATE_WORKSPACE": "Workspace {workspaceName} created"
+  }
+}

@@ -6,12 +6,12 @@ import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
 
-import { I18nService } from 'nestjs-i18n';
-import { NotificationResponseDto } from './dto/notification.dto';
-import { CreateNotificationDto } from './dto/create-notification.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { getManyResponse } from '@/utils/getManyResponse';
 import { RedisService } from '@/services/redis/redis.service';
+import { getManyResponse } from '@/utils/getManyResponse';
+import { I18nService } from 'nestjs-i18n';
+import { CreateNotificationDto } from './dto/create-notification.dto';
+import { NotificationResponseDto } from './dto/notification.dto';
 
 @Injectable()
 export class NotificationsService {
@@ -56,9 +56,9 @@ export class NotificationsService {
       .getManyAndCount();
 
     const data = notifications.map((n) => {
-      const message = this.i18n.translate<string>(n.notification.content.key, {
+      const message = this.i18n.translate<string>(n.notification.type, {
         lang,
-        args: n.notification.content.metadata || {},
+        args: n.notification.metadata || {},
       }) as string;
 
       return {
