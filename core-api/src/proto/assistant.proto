@@ -34,6 +34,7 @@ message LLMConfig {
     string model = 3;   // Optional: default model for this provider
     string id = 4;
     bool is_preferred = 5; // Only one config can be preferred per user/workspace
+    bool is_editable = 6; // Whether the config can be edited/deleted (false for system defaults)
 }
 
 message GetLLMConfigsRequest {

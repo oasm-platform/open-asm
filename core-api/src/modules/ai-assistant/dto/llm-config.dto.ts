@@ -38,6 +38,9 @@ export class LLMConfigResponseDto {
 
   @ApiProperty()
   isPreferred: boolean;
+
+  @ApiProperty()
+  isEditable: boolean;
 }
 
 export class ModelInfoResponseDto {

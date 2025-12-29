@@ -12,6 +12,7 @@ import {
   Query,
   Sse,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiExcludeEndpoint, ApiTags } from '@nestjs/swagger';
 import { map, Observable } from 'rxjs';
@@ -457,6 +458,7 @@ export class AiAssistantController {
       apiKey: c.apiKey, // Already masked by assistant service
       model: c.model,
       isPreferred: c.isPreferred,
+      isEditable: c.isEditable ?? false,
     }));
     return result;
   }
@@ -480,12 +482,20 @@ export class AiAssistantController {
     const response: UpdateLLMConfigResponse =
       await this.aiAssistantService.updateLLMConfig(body, workspaceId, userId);
     const config = response.config;
+
+    if (!config) {
+      throw new NotFoundException(
+        'Configuration not found or failed to update.',
+      );
+    }
+
     return {
-      id: config?.id || '',
-      provider: config?.provider || '',
-      apiKey: config?.apiKey || '',
-      model: config?.model || '',
-      isPreferred: config?.isPreferred || false,
+      id: config.id,
+      provider: config.provider,
+      apiKey: config.apiKey,
+      model: config.model,
+      isPreferred: config.isPreferred,
+      isEditable: config.isEditable ?? false,
     };
   }
 
@@ -530,12 +540,20 @@ export class AiAssistantController {
         userId,
       );
     const config = response.config;
+
+    if (!config) {
+      throw new NotFoundException(
+        'Configuration not found or failed to update.',
+      );
+    }
+
     return {
-      id: config?.id || '',
-      provider: config?.provider || '',
-      apiKey: config?.apiKey || '',
-      model: config?.model || '',
-      isPreferred: config?.isPreferred || false,
+      id: config.id,
+      provider: config.provider,
+      apiKey: config.apiKey,
+      model: config.model,
+      isPreferred: config.isPreferred,
+      isEditable: config.isEditable ?? false,
     };
   }
 }
