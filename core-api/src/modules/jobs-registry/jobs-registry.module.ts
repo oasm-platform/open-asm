@@ -12,7 +12,6 @@ import {
   AssetsDiscoveryScheduleConsumer,
 } from './processors/scan-schedule.processor';
 
-import { NotificationsModule } from '../notifications/notifications.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobResultProcessor } from './processors/job-result.processor';
@@ -26,7 +25,6 @@ import { JobResultProcessor } from './processors/job-result.processor';
       AssetGroupWorkflow,
       JobErrorLog,
     ]),
-    NotificationsModule,
     WorkspacesModule,
     BullModule.registerQueue({
       name: BullMQName.JOB_RESULT,
@@ -41,4 +39,4 @@ import { JobResultProcessor } from './processors/job-result.processor';
   ],
   exports: [JobsRegistryService],
 })
-export class JobsRegistryModule { }
+export class JobsRegistryModule {}

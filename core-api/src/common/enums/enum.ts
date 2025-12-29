@@ -143,7 +143,7 @@ export enum NotificationScope {
 }
 
 export enum NotificationType {
-  CREATE_WORKSPACE = 'CREATE_WORKSPACE',
+  WORKSPACE_CREATED = 'WORKSPACE_CREATED',
 }
 
 export enum Language {

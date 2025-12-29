@@ -49,24 +49,30 @@ export class NotificationsService {
         'recipient.createdAt',
         'notification.id',
         'notification.type',
-        'notification.content',
+        'notification.metadata',
       ])
       .skip(offset)
       .take(query.limit)
       .getManyAndCount();
-
     const data = notifications.map((n) => {
-      const message = this.i18n.translate<string>(n.notification.type, {
+      const key = `notification.${n.notification.type}`;
+      const message = this.i18n.translate<string>(key, {
         lang,
+        args: n.notification.metadata || {},
+      }) as string;
+      const url = this.i18n.translate<string>(key, {
+        lang: 'routers',
         args: n.notification.metadata || {},
       }) as string;
 
       return {
-        ...n,
+        id: n.notification.id,
+        status: n.status,
+        createdAt: n.createdAt,
         message,
+        url,
       } as NotificationResponseDto;
     });
-
     return getManyResponse({
       query,
       data,

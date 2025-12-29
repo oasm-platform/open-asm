@@ -1,16 +1,9 @@
 import { NotificationStatus } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { Notification } from '../entities/notification.entity';
 
 export class NotificationResponseDto {
   @ApiProperty()
   id: string;
-
-  @ApiProperty()
-  notificationId: string;
-
-  @ApiProperty()
-  userId: string;
 
   @ApiProperty({ enum: NotificationStatus })
   status: NotificationStatus;
@@ -23,7 +16,7 @@ export class NotificationResponseDto {
 
   @ApiProperty()
   message: string;
-  
+
   @ApiProperty()
-  notification: Notification;
+  url: string;
 }

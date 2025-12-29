@@ -1,5 +1,3 @@
 {
-  "notification": {
-    "CREATE_WORKSPACE": "Workspace {workspaceName} created"
-  }
+  "WORKSPACE_CREATED": "Workspace {name} created"
 }
