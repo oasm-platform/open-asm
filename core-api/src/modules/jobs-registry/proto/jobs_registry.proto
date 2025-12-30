@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package jobs_registry;
+
+service JobsRegistryService {
+  rpc alive (AliveRequest) returns (stream AliveResponse);
+  rpc next (Worker) returns (Job);
+  rpc result (JobResult) return (JobResponse);
+}
+
+message AliveRequest {}
+
+message AliveResponse {
+  bool status = 1;
+}
+
+message Worker {
+  string token = 1;
+  string id = 2;
+}
+
+message Job {
+  string id = 1;
+  string asset = 2;
+  optional string command = 3;
+}
+
+message JobResult {
+  string id = 1;
+  DataPayload data = 2;
+}
+
+message DataPayload{
+  bool error = 1;
+  string raw = 2;
+  payload = 3
+}
+
+

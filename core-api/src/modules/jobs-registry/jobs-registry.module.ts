@@ -16,6 +16,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobResultProcessor } from './processors/job-result.processor';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { join } from 'path';
 
 @Global()
 @Module({
@@ -31,6 +33,16 @@ import { JobResultProcessor } from './processors/job-result.processor';
     BullModule.registerQueue({
       name: BullMQName.JOB_RESULT,
     }),
+    ClientsModule.register([
+      {
+        name: 'JOBS_REGISTRY_PACKAGE',
+        transport: Transport.GRPC,
+        options: {
+          package: 'jobs_registry',
+          protoPath: join(__dirname, 'proto/jobs_registry.proto'),
+        },
+      },
+    ]),
   ],
   controllers: [JobsRegistryController],
   providers: [
@@ -41,4 +53,4 @@ import { JobResultProcessor } from './processors/job-result.processor';
   ],
   exports: [JobsRegistryService],
 })
-export class JobsRegistryModule { }
+export class JobsRegistryModule {}
