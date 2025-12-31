@@ -19,7 +19,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  Optional
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
@@ -64,7 +64,7 @@ export class JobsRegistryService {
     private storageService: StorageService,
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
-  ) { }
+  ) {}
   public async getManyJobs(
     query: GetManyJobsRequestDto,
   ): Promise<GetManyBaseResponseDto<Job>> {
@@ -227,10 +227,7 @@ export class JobsRegistryService {
       await jobRepo.save(jobsToInsert);
 
       // Increment pending jobs counter (hybrid Redis + DB)
-      await this.incrementJobHistoryCounter(
-        jobHistory.id,
-        jobsToInsert.length,
-      );
+      await this.incrementJobHistoryCounter(jobHistory.id, jobsToInsert.length);
     }
 
     return jobsToInsert;
@@ -436,7 +433,10 @@ export class JobsRegistryService {
 
       return response;
     } catch (error) {
-      Logger.error('Error in getNextJob', error);
+      Logger.error(
+        'Error in getNextJob',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       await queryRunner.rollbackTransaction();
       return null;
     } finally {
@@ -1033,7 +1033,7 @@ export class JobsRegistryService {
 
     // Increment Redis counter for each job (atomic)
     for (let i = 0; i < count; i++) {
-      await this.redis.incr(redisKey);
+      await this.redis.client.incr(redisKey);
     }
 
     // Increment DB counter async (non-blocking)
@@ -1048,7 +1048,7 @@ export class JobsRegistryService {
         } catch (error) {
           Logger.error(
             `Failed to increment DB counter for JobHistory ${jobHistoryId}`,
-            error,
+            error instanceof Error ? error : new Error(String(error)),
           );
         }
       })();
@@ -1067,7 +1067,7 @@ export class JobsRegistryService {
 
     try {
       // 1. Decrement Redis counter (atomic)
-      const remaining = await this.redis.decr(redisKey);
+      const remaining = await this.redis.client.decr(redisKey);
 
       // 2. Decrement DB counter async
       setImmediate(() => {
@@ -1081,7 +1081,7 @@ export class JobsRegistryService {
           } catch (error) {
             logger.error(
               `Failed to decrement DB counter for JobHistory ${jobHistoryId}`,
-              error,
+              error instanceof Error ? error : new Error(String(error)),
             );
           }
         })();
@@ -1104,7 +1104,7 @@ export class JobsRegistryService {
     } catch (error) {
       logger.error(
         `Error in decrementAndCheckCompletion for JobHistory ${jobHistoryId}`,
-        error,
+        error instanceof Error ? error : new Error(String(error)),
       );
       // Fallback: check completion from DB
       await this.checkAndTriggerCompletionFromDB(jobHistoryId);
@@ -1114,9 +1114,7 @@ export class JobsRegistryService {
   /**
    * Check and trigger completion event (ensures exactly-once execution)
    */
-  private async checkAndTriggerCompletion(
-    jobHistoryId: string,
-  ): Promise<void> {
+  private async checkAndTriggerCompletion(jobHistoryId: string): Promise<void> {
     const logger = new Logger('JobHistoryCompletion');
 
     // Double-check with DB to be sure
@@ -1149,7 +1147,7 @@ export class JobsRegistryService {
       );
       // Cleanup Redis counter even if failed (completed but failed)
       const redisKey = this.getRedisPendingKey(jobHistoryId);
-      await this.redis.del(redisKey);
+      await this.redis.client.del(redisKey);
       return;
     }
 
@@ -1184,7 +1182,7 @@ export class JobsRegistryService {
       if (current?.isCompleted) {
         // Already completed -> ensure key cleanup
         const redisKey = this.getRedisPendingKey(jobHistoryId);
-        await this.redis.del(redisKey);
+        await this.redis.client.del(redisKey);
       }
     }
   }
@@ -1200,12 +1198,12 @@ export class JobsRegistryService {
 
     logger.log(
       `🎉 JobHistory ${jobHistory.id} completed! ` +
-      `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
+        `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
     );
 
     // Cleanup Redis counter
     const redisKey = this.getRedisPendingKey(jobHistory.id);
-    await this.redis.del(redisKey);
+    await this.redis.client.del(redisKey);
 
     // TODO: Add custom logic here (webhook, notification, etc.)
   }
@@ -1213,9 +1211,7 @@ export class JobsRegistryService {
   /**
    * Rebuild Redis counter from database (recovery mechanism)
    */
-  private async rebuildCounterFromDB(
-    jobHistoryId: string,
-  ): Promise<number> {
+  private async rebuildCounterFromDB(jobHistoryId: string): Promise<number> {
     const logger = new Logger('JobHistoryCompletion');
 
     const pendingCount = await this.repo.count({
@@ -1228,10 +1224,10 @@ export class JobsRegistryService {
     const redisKey = this.getRedisPendingKey(jobHistoryId);
 
     if (pendingCount > 0) {
-      await this.redis.set(redisKey, pendingCount);
+      await this.redis.client.set(redisKey, pendingCount);
     } else {
       // If count = 0, delete key to avoid "stuck at 0" state
-      await this.redis.del(redisKey);
+      await this.redis.client.del(redisKey);
     }
 
     logger.log(
@@ -1256,7 +1252,7 @@ export class JobsRegistryService {
       // If already completed, ensure key cleanup
       if (jobHistory?.isCompleted) {
         const redisKey = this.getRedisPendingKey(jobHistoryId);
-        await this.redis.del(redisKey);
+        await this.redis.client.del(redisKey);
       }
       return;
     }
@@ -1286,7 +1282,10 @@ export class JobsRegistryService {
 
     // Get Redis counter
     const redisKey = this.getRedisPendingKey(jobHistoryId);
-    const redisCount = parseInt((await this.redis.get(redisKey)) || '0', 10);
+    const redisCount = parseInt(
+      (await this.redis.client.get(redisKey)) || '0',
+      10,
+    );
 
     // Get actual count from DB
     const actualCount = await this.repo.count({
@@ -1302,12 +1301,13 @@ export class JobsRegistryService {
       select: ['pendingJobsCount'],
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const dbCount = jobHistory?.pendingJobsCount || 0;
 
     if (redisCount !== actualCount) {
       logger.warn(
         `Counter mismatch for JobHistory ${jobHistoryId}: ` +
-        `Redis=${redisCount}, Actual=${actualCount}, DB=${dbCount}`,
+          `Redis=${redisCount}, Actual=${actualCount}, DB=${dbCount}`,
       );
 
       // Auto-fix
