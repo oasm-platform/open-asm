@@ -88,6 +88,11 @@ export class JobResultProcessor extends WorkerHost {
                 completedAt: new Date(),
             });
 
+            // Decrement counter and check completion
+            await this.jobsRegistryService.decrementAndCheckCompletion(
+                job.jobHistory.id,
+            );
+
             await this.jobsRegistryService.getNextStepForJob(completedJob);
 
             if (job.isPublishEvent) {
