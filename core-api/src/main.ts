@@ -18,6 +18,9 @@ import {
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
+import type { MicroserviceOptions } from '@nestjs/microservices';
+import { Transport } from '@nestjs/microservices';
+import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
@@ -89,7 +92,19 @@ async function bootstrap() {
 
   fs.writeFileSync(pathOutputOpenApi, JSON.stringify(documentFactory()));
 
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package: ['workers', 'jobs_registry'],
+      protoPath: [
+        join(__dirname, 'proto/workers.proto'),
+        join(__dirname, 'proto/jobs_registry.proto'),
+      ],
+    },
+  });
+
   // Start server
+  await app.startAllMicroservices();
   const port = process.env.PORT ?? DEFAULT_PORT;
   await app.listen(port);
 

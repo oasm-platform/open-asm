@@ -7,10 +7,10 @@ import "google/protobuf/struct.proto";
 
 // Service Definition
 service JobsRegistryService {
-  rpc Alive (AliveRequest) returns (stream AliveResponse);
   rpc Next (Worker) returns (Job);
   rpc Result (JobResult) returns (JobResponse); 
 }
+
 
 // --- Request/Response Messages ---
 
@@ -20,9 +20,11 @@ message AliveResponse {
   bool status = 1;
 }
 
+message Empty {}
+
+
 message Worker {
-  string token = 1;
-  string id = 2;
+  string id = 1;
 }
 
 message Job {

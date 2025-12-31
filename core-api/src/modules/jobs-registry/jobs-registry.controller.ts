@@ -7,6 +7,7 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { WorkspaceOwnerGuard } from '@/common/guards/workspace-owner.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -19,6 +20,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { GrpcMethod } from '@nestjs/microservices';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
@@ -198,5 +200,23 @@ export class JobsRegistryController {
     @Param() params: IdQueryParamDto,
   ) {
     return this.jobsRegistryService.deleteJob(workspaceId, params.id);
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'Next')
+  async next(worker: {
+    id: string;
+  }): Promise<{ id: string; asset: string; command?: string }> {
+    const job = await this.jobsRegistryService.getNextJob(worker.id);
+
+    if (!job) {
+      return { id: '', asset: '', command: '' };
+    }
+
+    return {
+      id: job.id,
+      asset: job.asset,
+      command: job.command,
+    };
   }
 }
