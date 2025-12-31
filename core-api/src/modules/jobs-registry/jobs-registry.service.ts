@@ -1301,16 +1301,11 @@ export class JobsRegistryService {
       select: ['pendingJobsCount'],
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const dbCount = jobHistory?.pendingJobsCount || 0;
-
     if (redisCount !== actualCount) {
       logger.warn(
         `Counter mismatch for JobHistory ${jobHistoryId}: ` +
-          `Redis=${redisCount}, Actual=${actualCount}, DB=${dbCount}`,
+          `Redis=${redisCount}, Actual=${actualCount}, DB=${jobHistory?.pendingJobsCount}`,
       );
-
-      // Auto-fix
       await this.rebuildCounterFromDB(jobHistoryId);
       return false;
     }
