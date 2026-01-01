@@ -21,6 +21,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
+import { plainToInstance } from 'class-transformer';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
@@ -217,6 +218,35 @@ export class JobsRegistryController {
       id: job.id,
       asset: job.asset,
       command: job.command,
+    };
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('JobsRegistryService', 'Result')
+  async result({
+    workerId,
+    data,
+  }: {
+    workerId: string;
+    data: UpdateResultDto;
+  }): Promise<{ success: boolean; message: string }> {
+    const transformedData = plainToInstance(UpdateResultDto, data, {
+      enableImplicitConversion: true,
+      excludeExtraneousValues: true,
+    });
+    const result = await this.jobsRegistryService.updateResult(
+      workerId,
+      transformedData,
+    );
+    if (!result.jobId)
+      return {
+        success: true,
+        message: '',
+      };
+
+    return {
+      success: false,
+      message: '',
     };
   }
 }

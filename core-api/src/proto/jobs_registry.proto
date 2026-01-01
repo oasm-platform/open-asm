@@ -8,7 +8,7 @@ import "google/protobuf/struct.proto";
 // Service Definition
 service JobsRegistryService {
   rpc Next (Worker) returns (Job);
-  rpc Result (JobResult) returns (JobResponse); 
+  rpc Result (JobResultRequest) returns (JobResponse); 
 }
 
 
@@ -38,14 +38,13 @@ message JobResponse {
   string message = 2;
 }
 
+message JobResultRequest{
+  string worker_id = 1;
+  UpdateResultDto data = 2;
+}
 
 message UpdateResultDto {
   string job_id = 1;
-  DataPayloadResult data = 2;
-}
-
-message JobResult {
-  string id = 1;
   DataPayloadResult data = 2;
 }
 
