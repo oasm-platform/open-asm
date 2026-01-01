@@ -27,7 +27,6 @@ import { randomUUID } from 'crypto';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
-import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-privider/built-in-tools';
@@ -59,7 +58,6 @@ export class JobsRegistryService {
     @InjectRepository(JobErrorLog)
     public readonly jobErrorLogRepo: Repository<JobErrorLog>,
     private dataSource: DataSource,
-    private dataAdapterService: DataAdapterService,
     @Optional() private toolsService: ToolsService,
     private storageService: StorageService,
     private redis: RedisService,
