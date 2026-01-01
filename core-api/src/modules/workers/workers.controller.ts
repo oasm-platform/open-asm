@@ -61,7 +61,7 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'Join')
-  async join$(requests$: {
+  async grpcJoin(requests$: {
     apiKey: string;
   }): Promise<{ workerId: string; workerToken: string }> {
     const worker = await this.workersService.join({ apiKey: requests$.apiKey });
@@ -72,7 +72,7 @@ export class WorkersController {
   }
 
   @GrpcStreamMethod('WorkersService', 'Alive')
-  alive$(
+  grpcAlive$(
     requests$: Observable<{ workerToken: string }>,
   ): Observable<{ alive: boolean }> {
     return requests$.pipe(
