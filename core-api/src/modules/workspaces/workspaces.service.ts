@@ -1,10 +1,16 @@
 import { LIMIT_WORKSPACE_CREATE } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { ApiKeyType } from '@/common/enums/enum';
+import {
+  ApiKeyType,
+  NotificationScope,
+  NotificationType,
+} from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
-import getSwaggerMetadata, { SwaggerPropertyMetadata } from '@/utils/getSwaggerMetadata';
+import getSwaggerMetadata, {
+  SwaggerPropertyMetadata,
+} from '@/utils/getSwaggerMetadata';
 import {
   BadRequestException,
   ForbiddenException,
@@ -13,8 +19,9 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
@@ -37,12 +44,10 @@ export class WorkspacesService implements OnModuleInit {
     @InjectRepository(WorkspaceTarget)
     private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private apiKeyService: ApiKeysService,
-    private dataSource: DataSource
-  ) { }
+    private notificationsService: NotificationsService,
+  ) {}
 
-  async onModuleInit() {
-  }
-
+  async onModuleInit() {}
 
   /**
    * Creates a new workspace, and adds the requesting user as a member.
@@ -78,6 +83,14 @@ export class WorkspacesService implements OnModuleInit {
       user: { id },
     });
 
+    await this.notificationsService.createNotification({
+      recipients: [id],
+      scope: NotificationScope.USER,
+      type: NotificationType.WORKSPACE_CREATED,
+      metadata: {
+        name: newWorkspace.name,
+      },
+    });
     return newWorkspace;
   }
 
@@ -91,8 +104,8 @@ export class WorkspacesService implements OnModuleInit {
   ): Promise<Workspace[]> {
     return this.repo.find({
       where: {
-        id: In(workspaceIds)
-      }
+        id: In(workspaceIds),
+      },
     });
   }
 
@@ -207,10 +220,13 @@ export class WorkspacesService implements OnModuleInit {
 
   /**
    * Retrieves the configuration settings for a specific workspace.
-   * @param workspaceId 
-   * @returns 
+   * @param workspaceId
+   * @returns
    */
-  public async getWorkspaceConfigs(workspaceId: string, userContext: UserContextPayload): Promise<GetWorkspaceConfigsDto> {
+  public async getWorkspaceConfigs(
+    workspaceId: string,
+    userContext: UserContextPayload,
+  ): Promise<GetWorkspaceConfigsDto> {
     const swaggerMetadata = getSwaggerMetadata(Workspace);
 
     const workspace = await this.getWorkspaceByIdAndOwner(
@@ -239,7 +255,9 @@ export class WorkspacesService implements OnModuleInit {
    * @param targetId - The ID of the target to look up.
    * @returns The workspace ID associated with the target, or null if not found.
    */
-  public async getWorkspaceIdByTargetId(targetId: string): Promise<string | null> {
+  public async getWorkspaceIdByTargetId(
+    targetId: string,
+  ): Promise<string | null> {
     const workspaceTarget = await this.workspaceTargetRepository
       .createQueryBuilder('workspaceTarget')
       .innerJoin('workspaceTarget.workspace', 'workspace')
@@ -254,15 +272,16 @@ export class WorkspacesService implements OnModuleInit {
 
   /**
    * Retrieves the configuration settings for a specific workspace.
-   * @param workspaceId 
-   * @returns 
+   * @param workspaceId
+   * @returns
    */
-  public async getWorkspaceConfigValue(workspaceId: string): Promise<Workspace> {
-
+  public async getWorkspaceConfigValue(
+    workspaceId: string,
+  ): Promise<Workspace> {
     const workspace = await this.repo.findOne({
       where: {
         id: workspaceId,
-      }
+      },
     });
 
     if (!workspace) {
@@ -274,12 +293,16 @@ export class WorkspacesService implements OnModuleInit {
 
   /**
    * Updates the configuration settings for a specific workspace.
-   * @param workspaceId 
-   * @param dto 
-   * @param userContext 
-   * @returns 
+   * @param workspaceId
+   * @param dto
+   * @param userContext
+   * @returns
    */
-  async updateWorkspaceConfigs(workspaceId: string, dto: UpdateWorkspaceConfigsDto, userContext: UserContextPayload) {
+  async updateWorkspaceConfigs(
+    workspaceId: string,
+    dto: UpdateWorkspaceConfigsDto,
+    userContext: UserContextPayload,
+  ) {
     await this.getWorkspaceByIdAndOwner(workspaceId, userContext);
     await this.repo.update({ id: workspaceId }, dto);
     return { message: 'Workspace configs updated successfully' };
@@ -420,7 +443,9 @@ export class WorkspacesService implements OnModuleInit {
    * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to an array of workspace members with user details.
    */
-  public async getMembersByWorkspaceId(workspaceId: string): Promise<WorkspaceMembers[]> {
+  public async getMembersByWorkspaceId(
+    workspaceId: string,
+  ): Promise<WorkspaceMembers[]> {
     return this.workspaceMembersRepository.find({
       where: {
         workspace: { id: workspaceId },

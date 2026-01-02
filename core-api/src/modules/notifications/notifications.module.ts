@@ -1,6 +1,6 @@
 import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../auth/entities/user.entity';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
@@ -10,6 +10,7 @@ import { NotificationsConsumer } from './processors/notifications.processor';
 
 import { NotificationsController } from './notifications.controller';
 
+@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([Notification, NotificationRecipient, User]),

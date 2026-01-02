@@ -584,64 +584,6 @@ export interface JobHistoryDetailResponseDto {
   jobs: Job[];
 }
 
-export interface Notification {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-}
-
-export interface NotificationResponseDto {
-  id: string;
-  notificationId: string;
-  userId: string;
-  status: NotificationResponseDtoStatusEnum;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  message: string;
-  notification: Notification;
-}
-
-export interface GetManyNotificationResponseDtoDto {
-  data: NotificationResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
-}
-
-export interface NotificationContentDto {
-  /**
-   * Translation key for the notification content
-   * @example "notifications.welcome"
-   */
-  key: string;
-  /**
-   * Metadata for the notification content (variables for translation)
-   * @example {"name":"John Doe"}
-   */
-  metadata?: object;
-}
-
-export interface CreateNotificationDto {
-  /**
-   * List of user IDs to receive the notification
-   * @example ["user-123","user-456"]
-   */
-  recipients: string[];
-  /**
-   * Type of the notification
-   * @example "USER"
-   */
-  type: CreateNotificationDtoTypeEnum;
-  /** Content of the notification including key and metadata */
-  content: NotificationContentDto;
-}
-
 export interface PickTypeClass {
   id: string;
   name: string;
@@ -1715,6 +1657,43 @@ export interface UpdateIssueCommentDto {
 
 export type Object = object;
 
+export interface NotificationResponseDto {
+  id: string;
+  status: NotificationResponseDtoStatusEnum;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  message: string;
+  url: string;
+}
+
+export interface GetManyNotificationResponseDtoDto {
+  data: NotificationResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface CreateNotificationDto {
+  /** List of user IDs to receive the notification */
+  recipients: string[];
+  /**
+   * Type of the notification
+   * @example "USER"
+   */
+  scope: CreateNotificationDtoScopeEnum;
+  /** Type of the notification */
+  type: CreateNotificationDtoTypeEnum;
+  /**
+   * Metadata for the notification content (variables for translation)
+   * @example {"name":"John Doe"}
+   */
+  metadata?: object;
+}
+
 export interface McpTool {
   name: string;
   type: string;
@@ -1806,22 +1785,6 @@ export enum JobHistoryResponseDtoStatusEnum {
   Cancelled = "cancelled",
 }
 
-export enum NotificationResponseDtoStatusEnum {
-  Sent = "sent",
-  Unread = "unread",
-  Read = "read",
-}
-
-/**
- * Type of the notification
- * @example "USER"
- */
-export enum CreateNotificationDtoTypeEnum {
-  SYSTEM = "SYSTEM",
-  USER = "USER",
-  GROUP = "GROUP",
-}
-
 export enum VulnerabilityStatisticsDtoSeverityEnum {
   Info = "info",
   Low = "low",
@@ -1886,6 +1849,27 @@ export enum IssueCommentTypeEnum {
   Content = "content",
   Open = "open",
   Closed = "closed",
+}
+
+export enum NotificationResponseDtoStatusEnum {
+  Sent = "sent",
+  Unread = "unread",
+  Read = "read",
+}
+
+/**
+ * Type of the notification
+ * @example "USER"
+ */
+export enum CreateNotificationDtoScopeEnum {
+  SYSTEM = "SYSTEM",
+  USER = "USER",
+  GROUP = "GROUP",
+}
+
+/** Type of the notification */
+export enum CreateNotificationDtoTypeEnum {
+  WORKSPACE_CREATED = "WORKSPACE_CREATED",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -3060,140 +3044,6 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/jobs-registry/${id}`,
       method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieve a paginated list of notifications for the current user
-   *
-   * @tags Notifications
-   * @name NotificationsControllerGetNotifications
-   * @summary Get all notifications
-   * @request GET:/api/notifications
-   */
-  notificationsControllerGetNotifications = (
-    query?: {
-      search?: string;
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/notifications`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Create a new notification for a specific user or group of users
-   *
-   * @tags Notifications
-   * @name NotificationsControllerCreateNotification
-   * @summary Create a notification
-   * @request POST:/api/notifications
-   */
-  notificationsControllerCreateNotification = (
-    data: CreateNotificationDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/notifications`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Subscribe to a Server-Sent Events (SSE) stream for real-time notifications
-   *
-   * @tags Notifications
-   * @name NotificationsControllerStream
-   * @summary Subscribe to notifications stream
-   * @request GET:/api/notifications/stream
-   */
-  notificationsControllerStream = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/notifications/stream`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Get the total count of unread notifications for the current user
-   *
-   * @tags Notifications
-   * @name NotificationsControllerGetUnreadCount
-   * @summary Get unread notifications count
-   * @request GET:/api/notifications/unread-count
-   */
-  notificationsControllerGetUnreadCount = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/notifications/unread-count`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Mark all notifications as read for the current user
-   *
-   * @tags Notifications
-   * @name NotificationsControllerMarkAllAsRead
-   * @summary Mark all notifications as read
-   * @request PATCH:/api/notifications/mark-read
-   */
-  notificationsControllerMarkAllAsRead = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/notifications/mark-read`,
-      method: "PATCH",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Mark all notifications as unread for the current user
-   *
-   * @tags Notifications
-   * @name NotificationsControllerMarkAllAsUnread
-   * @summary Mark all notifications as unread
-   * @request PATCH:/api/notifications/mark-unread
-   */
-  notificationsControllerMarkAllAsUnread = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/notifications/mark-unread`,
-      method: "PATCH",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Mark a single notification as read by its ID
-   *
-   * @tags Notifications
-   * @name NotificationsControllerMarkAsRead
-   * @summary Mark a specific notification as read
-   * @request PATCH:/api/notifications/{id}/read
-   */
-  notificationsControllerMarkAsRead = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/notifications/${id}/read`,
-      method: "PATCH",
       format: "json",
       ...params,
     });
@@ -5034,6 +4884,140 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/comments/${id}`,
       method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieve a paginated list of notifications for the current user
+   *
+   * @tags Notifications
+   * @name NotificationsControllerGetNotifications
+   * @summary Get all notifications
+   * @request GET:/api/notifications
+   */
+  notificationsControllerGetNotifications = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/notifications`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Create a new notification for a specific user or group of users
+   *
+   * @tags Notifications
+   * @name NotificationsControllerCreateNotification
+   * @summary Create a notification
+   * @request POST:/api/notifications
+   */
+  notificationsControllerCreateNotification = (
+    data: CreateNotificationDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/notifications`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Subscribe to a Server-Sent Events (SSE) stream for real-time notifications
+   *
+   * @tags Notifications
+   * @name NotificationsControllerStream
+   * @summary Subscribe to notifications stream
+   * @request GET:/api/notifications/stream
+   */
+  notificationsControllerStream = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/notifications/stream`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get the total count of unread notifications for the current user
+   *
+   * @tags Notifications
+   * @name NotificationsControllerGetUnreadCount
+   * @summary Get unread notifications count
+   * @request GET:/api/notifications/unread-count
+   */
+  notificationsControllerGetUnreadCount = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/notifications/unread-count`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Mark all notifications as read for the current user
+   *
+   * @tags Notifications
+   * @name NotificationsControllerMarkAllAsRead
+   * @summary Mark all notifications as read
+   * @request PATCH:/api/notifications/mark-read
+   */
+  notificationsControllerMarkAllAsRead = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/notifications/mark-read`,
+      method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Mark all notifications as unread for the current user
+   *
+   * @tags Notifications
+   * @name NotificationsControllerMarkAllAsUnread
+   * @summary Mark all notifications as unread
+   * @request PATCH:/api/notifications/mark-unread
+   */
+  notificationsControllerMarkAllAsUnread = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/notifications/mark-unread`,
+      method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Mark a single notification as read by its ID
+   *
+   * @tags Notifications
+   * @name NotificationsControllerMarkAsRead
+   * @summary Mark a specific notification as read
+   * @request PATCH:/api/notifications/{id}/read
+   */
+  notificationsControllerMarkAsRead = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/notifications/${id}/read`,
+      method: "PATCH",
       format: "json",
       ...params,
     });

@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
@@ -15,6 +16,7 @@ describe('WorkspacesService', () => {
   let mockWorkspaceMembersRepository: Partial<Repository<WorkspaceMembers>>;
   let mockWorkspaceTargetRepository: Partial<Repository<WorkspaceTarget>>;
   let mockApiKeysService: Partial<ApiKeysService>;
+  let mockNotificationsService: Partial<NotificationsService>;
   let mockDataSource: Partial<DataSource>;
 
   beforeEach(async () => {
@@ -55,6 +57,10 @@ describe('WorkspacesService', () => {
       getCurrentApiKey: jest.fn(),
     } as any;
 
+    mockNotificationsService = {
+      createNotification: jest.fn(),
+    } as any;
+
     mockDataSource = {} as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -75,6 +81,10 @@ describe('WorkspacesService', () => {
         {
           provide: ApiKeysService,
           useValue: mockApiKeysService,
+        },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
         },
         {
           provide: DataSource,
