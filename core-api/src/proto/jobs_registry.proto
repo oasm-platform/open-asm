@@ -50,9 +50,8 @@ message UpdateResultDto {
 
 message DataPayloadResult {
   bool error = 1;
-  string raw = 2;
-  
-  oneof payload {
+  optional string raw = 2;
+  optional oneof payload {
     AssetList assets = 3;
     HttpResponse http_response = 4;
     NumberList numbers = 5;
