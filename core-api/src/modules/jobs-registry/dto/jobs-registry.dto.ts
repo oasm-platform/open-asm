@@ -17,10 +17,10 @@ type RawGrpcResponse = {
   error?: boolean;
   raw?: string;
   assets?: Asset[];
-  http_response?: HttpResponse;
+  httpResponse?: HttpResponse;
   numbers?: number[];
   vulnerabilities?: Vulnerability[];
-  asset_tags?: AssetTag[];
+  assetTags?: AssetTag[];
 };
 
 export class GetNextJobResponseDto extends PickType(Job, [
@@ -51,7 +51,6 @@ export class DataPayloadResult {
 
   @ApiProperty()
   @IsOptional()
-  @IsOptional()
   @Expose()
   raw: string;
 
@@ -59,7 +58,6 @@ export class DataPayloadResult {
   @IsOptional()
   @Expose()
   @Transform(({ obj }: { obj: RawGrpcResponse }) => {
-    // gRPC repeated fields are wrapped in { values: [...] }
     const unwrap = <T>(field: T | { values: T } | undefined): T | undefined => {
       if (!field) return undefined;
       if (typeof field === 'object' && 'values' in field) {
@@ -70,10 +68,10 @@ export class DataPayloadResult {
 
     return (
       unwrap(obj.assets) ??
-      unwrap(obj.http_response) ??
+      unwrap(obj.httpResponse) ??
       unwrap(obj.numbers) ??
       unwrap(obj.vulnerabilities) ??
-      unwrap(obj.asset_tags)
+      unwrap(obj.assetTags)
     );
   })
   payload: JobDataResultType;

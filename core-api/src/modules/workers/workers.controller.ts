@@ -61,10 +61,10 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'Join')
-  async grpcJoin(requests$: {
+  async grpcJoin(requests: {
     apiKey: string;
   }): Promise<{ workerId: string; workerToken: string }> {
-    const worker = await this.workersService.join({ apiKey: requests$.apiKey });
+    const worker = await this.workersService.join({ apiKey: requests.apiKey });
     return {
       workerId: worker.id,
       workerToken: worker.token,

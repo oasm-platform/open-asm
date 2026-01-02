@@ -229,7 +229,7 @@ export class JobsRegistryController {
   }: {
     workerId: string;
     data: UpdateResultDto;
-  }): Promise<{ success: boolean; message: string }> {
+  }): Promise<{ success: boolean }> {
     const transformedData = plainToInstance(UpdateResultDto, data, {
       enableImplicitConversion: true,
       excludeExtraneousValues: true,
@@ -240,13 +240,11 @@ export class JobsRegistryController {
     );
     if (!result.jobId)
       return {
-        success: true,
-        message: '',
+        success: false,
       };
 
     return {
-      success: false,
-      message: '',
+      success: true,
     };
   }
 }

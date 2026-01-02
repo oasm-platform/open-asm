@@ -14,14 +14,6 @@ service JobsRegistryService {
 
 // --- Request/Response Messages ---
 
-message AliveRequest {}
-
-message AliveResponse {
-  bool status = 1;
-}
-
-message Empty {}
-
 
 message Worker {
   string id = 1;
@@ -35,7 +27,6 @@ message Job {
 
 message JobResponse {
   bool success = 1;
-  string message = 2;
 }
 
 message JobResultRequest{
@@ -51,7 +42,7 @@ message UpdateResultDto {
 message DataPayloadResult {
   bool error = 1;
   optional string raw = 2;
-  optional oneof payload {
+  oneof payload {
     AssetList assets = 3;
     HttpResponse http_response = 4;
     NumberList numbers = 5;

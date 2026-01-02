@@ -100,6 +100,7 @@ async function bootstrap() {
         join(__dirname, 'proto/workers.proto'),
         join(__dirname, 'proto/jobs_registry.proto'),
       ],
+      url: '0.0.0.0:5000',
     },
   });
 
