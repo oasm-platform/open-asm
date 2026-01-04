@@ -7,8 +7,31 @@ import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsObject, IsOptional, IsUUID } from 'class-validator';
 import { JobHistory } from '../entities/job-history.entity';
 import { Job } from '../entities/job.entity';
+import { Expose, Transform, Type } from 'class-transformer';
+import { Asset } from '@/modules/assets/entities/assets.entity';
+import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
+import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
+import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 
-export class GetNextJobResponseDto extends PickType(Job, ['id', 'category', 'status', 'priority', 'createdAt', 'updatedAt', 'command']) {
+type RawGrpcResponse = {
+  error?: boolean;
+  raw?: string;
+  assets?: Asset[];
+  httpResponse?: HttpResponse;
+  numbers?: number[];
+  vulnerabilities?: Vulnerability[];
+  assetTags?: AssetTag[];
+};
+
+export class GetNextJobResponseDto extends PickType(Job, [
+  'id',
+  'category',
+  'status',
+  'priority',
+  'createdAt',
+  'updatedAt',
+  'command',
+]) {
   @ApiProperty()
   asset: string;
 }
@@ -23,23 +46,46 @@ export class DataPayloadResult {
   @ApiProperty()
   @IsOptional()
   @IsBoolean()
+  @Expose()
   error: boolean;
 
   @ApiProperty()
   @IsOptional()
-  @IsOptional()
+  @Expose()
   raw: string;
 
   @ApiProperty()
   @IsOptional()
+  @Expose()
+  @Transform(({ obj }: { obj: RawGrpcResponse }) => {
+    const unwrap = <T>(field: T | { values: T } | undefined): T | undefined => {
+      if (!field) return undefined;
+      if (typeof field === 'object' && 'values' in field) {
+        return field.values;
+      }
+      return field as T;
+    };
+
+    return (
+      unwrap(obj.assets) ??
+      unwrap(obj.httpResponse) ??
+      unwrap(obj.numbers) ??
+      unwrap(obj.vulnerabilities) ??
+      unwrap(obj.assetTags)
+    );
+  })
   payload: JobDataResultType;
 }
 export class UpdateResultDto {
   @ApiProperty()
   @IsUUID()
+  @Expose()
   jobId: string;
+
   @ApiProperty()
   @IsObject()
+  @Type(() => DataPayloadResult)
+  @Expose()
   data: DataPayloadResult;
 }
 
@@ -124,7 +170,13 @@ export class CreateJobsDto {
   targetId: string;
 }
 
-export class CreateJobs extends PickType(Job, ['priority', 'isSaveRawResult', 'isSaveData', 'command', 'isPublishEvent'] as const) {
+export class CreateJobs extends PickType(Job, [
+  'priority',
+  'isSaveRawResult',
+  'isSaveData',
+  'command',
+  'isPublishEvent',
+] as const) {
   tool: Tool;
   targetIds?: string[];
   assetIds?: string[];
