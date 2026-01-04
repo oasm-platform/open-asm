@@ -1,0 +1,188 @@
+syntax = "proto3";
+
+package jobs_registry;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// Service Definition
+service JobsRegistryService {
+  rpc Next (Worker) returns (Job);
+  rpc Result (JobResultRequest) returns (JobResponse); 
+}
+
+
+// --- Request/Response Messages ---
+
+
+message Worker {
+  string id = 1;
+}
+
+message Job {
+  string id = 1;
+  string asset = 2;
+  optional string command = 3;
+}
+
+message JobResponse {
+  bool success = 1;
+}
+
+message JobResultRequest{
+  string worker_id = 1;
+  UpdateResultDto data = 2;
+}
+
+message UpdateResultDto {
+  string job_id = 1;
+  DataPayloadResult data = 2;
+}
+
+message DataPayloadResult {
+  bool error = 1;
+  optional string raw = 2;
+  oneof payload {
+    AssetList assets = 3;
+    HttpResponse http_response = 4;
+    NumberList numbers = 5;
+    VulnerabilityList vulnerabilities = 6;
+    AssetTagList asset_tags = 7;
+  }
+}
+
+message AssetList {
+  repeated Asset values = 1;
+}
+
+message NumberList {
+  repeated int32 values = 1;
+}
+
+message VulnerabilityList {
+  repeated Vulnerability values = 1;
+}
+
+message AssetTagList {
+  repeated AssetTag values = 1;
+}
+
+
+message Asset {
+  string id = 1; 
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+
+  string value = 4;
+  string target_id = 5;
+  bool is_primary = 6;
+  google.protobuf.Struct dns_records = 7;
+  bool is_enabled = 8;
+  
+}
+
+message HttpResponse {
+  string id = 1; 
+  google.protobuf.Timestamp created_at = 2;
+  
+  google.protobuf.Timestamp timestamp = 3;
+  google.protobuf.Struct tls = 4; 
+  string port = 5;
+  string url = 6;
+  string input = 7;
+  string title = 8;
+  string scheme = 9;
+  string webserver = 10;
+  string body = 11;
+  string content_type = 12;
+  string method = 13;
+  string host = 14;
+  string path = 15;
+  string favicon = 16;
+  string favicon_md5 = 17;
+  string favicon_url = 18;
+  
+  google.protobuf.Struct header = 19; // jsonb
+  string raw_header = 20;
+  string request = 21;
+  string time = 22;
+  
+  repeated string a = 23;
+  repeated string tech = 24;
+  
+  int32 words = 25;
+  int32 lines = 26;
+  int32 status_code = 27;
+  int32 content_length = 28;
+  bool failed = 29;
+  
+  google.protobuf.Struct knowledgebase = 30; // jsonb
+  
+  repeated string resolvers = 31;
+  repeated string chain_status_codes = 32;
+  
+  string asset_service_id = 33;
+  string job_history_id = 34;
+}
+
+message Vulnerability {
+  string id = 1; 
+  string name = 2;
+  string description = 3;
+  string synopsis = 4;
+  
+  Severity severity = 5; 
+  
+  repeated string tags = 6;
+  repeated string references = 7;
+  repeated string authors = 8;
+  
+  string affected_url = 9;
+  string ip_address = 10;
+  string host = 11;
+  repeated string ports = 12;
+  
+  string cvss_metric = 13;
+  float cvss_score = 14;
+  float epss_score = 15;
+  float vpr_score = 16;
+  
+  repeated string cve_id = 17;
+  repeated string bid_id = 18;
+  repeated string cwe_id = 19;
+  repeated string cea_id = 20;
+  repeated string iava = 21;
+  
+  string cve_url = 22;
+  string cwe_url = 23;
+  string solution = 24;
+  string extractor_name = 25;
+  repeated string extracted_results = 26;
+  
+  google.protobuf.Timestamp publication_date = 27;
+  google.protobuf.Timestamp modification_date = 28;
+  
+  string tool_id = 29; // Relation ID
+  string asset_id = 30; // Relation ID
+  string file_path = 31;
+  string job_history_id = 32;
+  bool is_archived = 33;
+  string fingerprint = 34;
+}
+
+message AssetTag {
+  string id = 1; 
+  string tag = 2;
+  string asset_service_id = 3;
+  string tool_id = 4;
+}
+
+// --- Enums ---
+
+enum Severity {
+  INFO = 0;
+  LOW = 1;
+  MEDIUM = 2;
+  HIGH = 3;
+  CRITICAL = 4;
+}

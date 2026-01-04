@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package workers;
+
+service WorkersService {
+  rpc Join(JoinRequest) returns (JoinResponse);
+  rpc Alive(stream AliveRequest) returns (stream AliveResponse);
+}
+
+message JoinRequest {
+  string api_key = 1;
+}
+
+message JoinResponse {
+  string worker_id = 1;
+  string worker_token = 2;
+}
+
+message AliveRequest {
+  string worker_token = 1;
+}
+
+message AliveResponse {
+  bool alive = 1;
+}
