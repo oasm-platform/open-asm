@@ -16,6 +16,8 @@ export class WorkflowsService implements OnModuleInit {
   constructor(
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
+    @InjectRepository(Workspace)
+    private workspaceRepository: Repository<Workspace>,
   ) { }
 
   private readonly logger = new Logger(WorkflowsService.name);
@@ -50,7 +52,7 @@ export class WorkflowsService implements OnModuleInit {
 
     const files = fs.readdirSync(this.templatesPath);
 
-    const yamlFiles = files.filter((file) => file.endsWith('.yaml'));
+    const yamlFiles = files.filter((file) => file.endsWith('.yaml') || file.endsWith('.yml'));
 
     return yamlFiles;
   }
@@ -83,46 +85,64 @@ export class WorkflowsService implements OnModuleInit {
   async onModuleInit() {
     try {
       const yamlFiles = this.listTemplates();
+      const workspaces = await this.workspaceRepository.find();
 
-      for (const fileName of yamlFiles) {
-        try {
-          const filePath = path.join(this.templatesPath, fileName);
-          const fileContent = fs.readFileSync(filePath, 'utf8');
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          const parsed = yaml.load(fileContent) as Record<string, unknown>;
+      for (const workspace of workspaces) {
+        for (const fileName of yamlFiles) {
+          try {
+            const filePath = path.join(this.templatesPath, fileName);
+            const fileContent = fs.readFileSync(filePath, 'utf8');
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            const parsed = yaml.load(fileContent) as Record<string, unknown>;
 
-          const newContent = this.normalizeOn(parsed);
+            const newContent = this.normalizeOn(parsed);
 
-          // Check current workflow
-          const existing = await this.workflowRepository.findOne({
-            where: { filePath: fileName },
-          });
+            const baseName = fileName.replace(/\.(yaml|yml)$/, '');
+            const normalizedName = baseName
+              .replace(/[-_]/g, ' ')
+              .split(' ')
+              .filter(Boolean)
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+            const workflowName = `[Default] ${normalizedName}`;
 
-          if (!existing) {
-            // Update new template with change
-            await this.workflowRepository.insert({
-              name: fileName,
-              content: newContent,
-              filePath: fileName,
+            // Check current workflow for this workspace
+            const existing = await this.workflowRepository.findOne({
+              where: {
+                filePath: fileName,
+                workspace: { id: workspace.id },
+              },
             });
-            this.logger.log(`Inserted new workflow: ${fileName}`);
-          } else if (
-            JSON.stringify(newContent) !== JSON.stringify(existing.content)
-          ) {
-            await this.workflowRepository.update(
-              { filePath: fileName },
-              { content: newContent },
-            );
-            this.logger.log(`Updated workflow content: ${fileName}`);
-          } else {
-            this.logger.log(`No changes for workflow: ${fileName}`);
-          }
-        } catch (error) {
-          this.logger.error(
-            `Error processing workflow ${fileName}: ${(error as Error).message}`,
 
-            (error as Error).stack,
-          );
+            if (!existing) {
+              // Insert new workflow for this workspace
+              await this.workflowRepository.insert({
+                name: workflowName,
+                content: newContent,
+                filePath: fileName,
+                workspace: { id: workspace.id } as Workspace,
+              });
+              this.logger.log(
+                `Inserted new workflow: ${workflowName} for workspace: ${workspace.id}`,
+              );
+            } else if (
+              JSON.stringify(newContent) !== JSON.stringify(existing.content) ||
+              existing.name !== workflowName
+            ) {
+              await this.workflowRepository.update(
+                { id: existing.id },
+                { content: newContent, name: workflowName },
+              );
+              this.logger.log(
+                `Updated workflow: ${workflowName} for workspace: ${workspace.id}`,
+              );
+            }
+          } catch (error) {
+            this.logger.error(
+              `Error processing workflow ${fileName} for workspace ${workspace.id}: ${(error as Error).message}`,
+              (error as Error).stack,
+            );
+          }
         }
       }
     } catch (error) {
