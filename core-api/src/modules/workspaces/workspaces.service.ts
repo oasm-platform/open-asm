@@ -14,15 +14,18 @@ import getSwaggerMetadata, {
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   OnModuleInit,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
+import { WorkflowsService } from '../workflows/workflows.service';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
 import {
@@ -45,9 +48,11 @@ export class WorkspacesService implements OnModuleInit {
     private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private apiKeyService: ApiKeysService,
     private notificationsService: NotificationsService,
-  ) {}
+    @Inject(forwardRef(() => WorkflowsService))
+    private workflowsService: WorkflowsService,
+  ) { }
 
-  async onModuleInit() {}
+  async onModuleInit() { }
 
   /**
    * Creates a new workspace, and adds the requesting user as a member.
@@ -91,6 +96,9 @@ export class WorkspacesService implements OnModuleInit {
         name: newWorkspace.name,
       },
     });
+
+    await this.workflowsService.createDefaultWorkflows(newWorkspace.id);
+
     return newWorkspace;
   }
 

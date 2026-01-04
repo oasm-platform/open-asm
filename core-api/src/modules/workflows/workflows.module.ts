@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
@@ -9,7 +9,7 @@ import { WorkflowsService } from './workflows.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Workflow, Workspace]),
-    WorkspacesModule,
+    forwardRef(() => WorkspacesModule),
   ],
   controllers: [WorkflowsController],
   providers: [WorkflowsService],
