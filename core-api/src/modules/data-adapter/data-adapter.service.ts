@@ -329,7 +329,7 @@ export class DataAdapterService {
 
       // Map of tool categories to their corresponding sync functions and validation classes
       const syncFunctions: Partial<
-        Record<ToolCategory, SyncFunctionConfig<any>>
+        Record<ToolCategory, SyncFunctionConfig<unknown>>
       > = {
         [ToolCategory.PORTS_SCANNER]: {
           handler: (data: DataAdapterInput<number[]>) =>
@@ -383,7 +383,7 @@ export class DataAdapterService {
       }
 
       // Call the appropriate sync function with proper type assertion
-      const typedData = { job, data } as unknown as DataAdapterInput<any>;
+      const typedData = { job, data } as unknown as DataAdapterInput<unknown>;
       await syncFunction.handler(typedData);
 
       return;

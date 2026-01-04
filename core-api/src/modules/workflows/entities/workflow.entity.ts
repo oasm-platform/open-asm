@@ -75,4 +75,12 @@ export class Workflow extends BaseEntity {
     onDelete: 'CASCADE',
   })
   assetGroupWorkflows?: AssetGroupWorkflow[];
+
+  @ApiProperty()
+  @Column({ default: true })
+  isCanDelete: boolean;
+
+  @ApiProperty()
+  @Column({ default: true })
+  isCanEdit: boolean;
 }

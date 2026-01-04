@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
+import { WorkflowsService } from '../workflows/workflows.service';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
 import { WorkspacesService } from './workspaces.service';
@@ -85,6 +86,12 @@ describe('WorkspacesService', () => {
         {
           provide: NotificationsService,
           useValue: mockNotificationsService,
+        },
+        {
+          provide: WorkflowsService,
+          useValue: {
+            createDefaultWorkflows: jest.fn(),
+          },
         },
         {
           provide: DataSource,

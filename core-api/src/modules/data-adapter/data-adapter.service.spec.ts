@@ -6,8 +6,9 @@ import { Severity, ToolCategory } from '../../common/enums/enum';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import type { Asset } from '../assets/entities/assets.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
+import { IssuesService } from '../issues/issues.service';
 import type { Job } from '../jobs-registry/entities/job.entity';
-import type { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterService } from './data-adapter.service';
 
@@ -32,6 +33,7 @@ describe('DataAdapterService', () => {
         values: jest.fn().mockReturnThis(),
         orIgnore: jest.fn().mockReturnThis(),
         orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
       },
       commitTransaction: jest.fn(),
       rollbackTransaction: jest.fn(),
@@ -68,6 +70,12 @@ describe('DataAdapterService', () => {
         {
           provide: WorkspacesService,
           useValue: mockWorkspacesService,
+        },
+        {
+          provide: IssuesService,
+          useValue: {
+            createIssue: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -508,9 +516,21 @@ describe('DataAdapterService', () => {
           return undefined;
         },
       );
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .execute.mockResolvedValue(undefined);
+
+      // Mock the full query builder chain for vulnerabilities
+      const mockQueryBuilder = {
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({
+          raw: mockVulnerabilities,
+          identifiers: mockVulnerabilities.map(v => ({ id: v.id })),
+        }),
+      };
+
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(mockQueryBuilder);
 
       await service.vulnerabilities({
         data: mockVulnerabilities,
@@ -518,6 +538,12 @@ describe('DataAdapterService', () => {
       });
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockQueryBuilder.insert).toHaveBeenCalled();
+      expect(mockQueryBuilder.into).toHaveBeenCalledWith(Vulnerability);
+      expect(mockQueryBuilder.values).toHaveBeenCalled();
+      expect(mockQueryBuilder.orUpdate).toHaveBeenCalled();
+      expect(mockQueryBuilder.returning).toHaveBeenCalledWith('*');
+      expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
     it('should not insert vulnerabilities if data is empty', async () => {
