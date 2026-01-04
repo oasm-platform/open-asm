@@ -147,9 +147,6 @@ export class WorkflowsService implements OnModuleInit {
               { id: existing.id },
               { content: newContent, name: workflowName },
             );
-            this.logger.log(
-              `Updated workflow: ${workflowName} for workspace: ${workspaceId}`,
-            );
           }
         } catch (error) {
           this.logger.error(

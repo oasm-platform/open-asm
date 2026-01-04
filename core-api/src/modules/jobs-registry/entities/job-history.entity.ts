@@ -37,5 +37,5 @@ export class JobHistory extends BaseEntity {
   @ManyToOne(() => Workflow, (workflow) => workflow.jobHistories, {
     onDelete: 'CASCADE',
   })
-  workflow?: Workflow;
+  workflow: Workflow;
 }

@@ -1,10 +1,15 @@
+import { BOT_ID } from '@/common/constants/app.constants';
 import { JobDataResultType } from '@/common/types/app.types';
 import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { DataSource, InsertResult } from 'typeorm';
-import { Severity, ToolCategory } from '../../common/enums/enum';
+import {
+  IssueSourceType,
+  Severity,
+  ToolCategory,
+} from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
@@ -256,20 +261,20 @@ export class DataAdapterService {
       );
 
       if (vulsForAlert.length > 0) {
-        // await Promise.all(
-        //   vulsForAlert.map((v) =>
-        //     this.issuesService.createIssue(
-        //       {
-        //         title: `[${v.severity}] ${v.name}`,
-        //         description: v.description,
-        //         sourceId: v.id,
-        //         sourceType: IssueSourceType.VULNERABILITY,
-        //       },
-        //       job.jobHistory.workflow?.workspace.id,
-        //       BOT_ID,
-        //     ),
-        //   ),
-        // );
+        await Promise.all(
+          vulsForAlert.map((v) =>
+            this.issuesService.createIssue(
+              {
+                title: `[${v.severity}] ${v.name}`,
+                description: v.description,
+                sourceId: v.id,
+                sourceType: IssueSourceType.VULNERABILITY,
+              },
+              job.jobHistory.workflow?.workspace.id,
+              BOT_ID,
+            ),
+          ),
+        );
       }
     });
   }
