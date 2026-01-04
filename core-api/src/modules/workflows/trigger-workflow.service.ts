@@ -13,7 +13,7 @@ export class TriggerWorkflowService implements OnModuleInit {
     private toolsService: ToolsService,
     private dataSource: DataSource,
     private eventEmitter: EventEmitter2,
-  ) {}
+  ) { }
 
   onModuleInit() {
     // Listen all events with wildcard
@@ -46,6 +46,7 @@ export class TriggerWorkflowService implements OnModuleInit {
               targetIds: [payload.id],
               workflow: workflow,
               priority: tool.priority,
+              workspaceId: workflow.workspace.id,
             });
           }
         })
@@ -66,6 +67,7 @@ export class TriggerWorkflowService implements OnModuleInit {
     return this.dataSource
       .getRepository(Workflow)
       .createQueryBuilder('workflow')
+      .leftJoinAndSelect('workflow.workspace', 'workspace')
       .where("workflow.content -> 'on' -> :target ? :action", {
         target,
         action,

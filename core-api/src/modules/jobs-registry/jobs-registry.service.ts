@@ -62,7 +62,7 @@ export class JobsRegistryService {
     private storageService: StorageService,
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
-  ) {}
+  ) { }
   public async getManyJobs(
     query: GetManyJobsRequestDto,
   ): Promise<GetManyBaseResponseDto<Job>> {
@@ -716,6 +716,7 @@ export class JobsRegistryService {
             workflow: job.jobHistory.workflow,
             jobHistory: job.jobHistory,
             priority: tool.priority,
+            workspaceId: workflow.workspace.id,
           }),
         ),
       );
@@ -740,7 +741,9 @@ export class JobsRegistryService {
           target: true,
         },
         jobHistory: {
-          workflow: true,
+          workflow: {
+            workspace: true,
+          },
         },
         tool: true,
         assetService: true,
@@ -1196,7 +1199,7 @@ export class JobsRegistryService {
 
     logger.log(
       `🎉 JobHistory ${jobHistory.id} completed! ` +
-        `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
+      `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
     );
 
     // Cleanup Redis counter
@@ -1302,7 +1305,7 @@ export class JobsRegistryService {
     if (redisCount !== actualCount) {
       logger.warn(
         `Counter mismatch for JobHistory ${jobHistoryId}: ` +
-          `Redis=${redisCount}, Actual=${actualCount}, DB=${jobHistory?.pendingJobsCount}`,
+        `Redis=${redisCount}, Actual=${actualCount}, DB=${jobHistory?.pendingJobsCount}`,
       );
       await this.rebuildCounterFromDB(jobHistoryId);
       return false;

@@ -43,7 +43,7 @@ export class AssetGroupService {
     private scanScheduleQueue: Queue<AssetGroupWorkflow>,
     private toolsService: ToolsService,
     private jobRegistryService: JobsRegistryService,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all asset groups with optional filtering and pagination
@@ -826,6 +826,7 @@ export class AssetGroupService {
     const assetGroupWorkflow = await this.assetGroupWorkflowRepo
       .createQueryBuilder('assetGroupWorkflow')
       .innerJoinAndSelect('assetGroupWorkflow.workflow', 'workflow')
+      .leftJoinAndSelect('workflow.workspace', 'workspace')
       .innerJoin('assetGroupWorkflow.assetGroup', 'assetGroup')
       .where('assetGroupWorkflow.id = :assetGroupWorkflowId', {
         assetGroupWorkflowId,
@@ -882,6 +883,7 @@ export class AssetGroupService {
       assetIds: assets.map((a) => a.id),
       workflow: workflow,
       priority: tool.priority,
+      workspaceId: workflow.workspace.id,
     });
     return {
       message: `Run scheduler for asset group workflow with ID ${assetGroupWorkflowId}`,
