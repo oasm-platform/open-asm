@@ -27,7 +27,6 @@ import { randomUUID } from 'crypto';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
-import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-privider/built-in-tools';
@@ -59,12 +58,11 @@ export class JobsRegistryService {
     @InjectRepository(JobErrorLog)
     public readonly jobErrorLogRepo: Repository<JobErrorLog>,
     private dataSource: DataSource,
-    private dataAdapterService: DataAdapterService,
     @Optional() private toolsService: ToolsService,
     private storageService: StorageService,
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
-  ) {}
+  ) { }
   public async getManyJobs(
     query: GetManyJobsRequestDto,
   ): Promise<GetManyBaseResponseDto<Job>> {
@@ -718,6 +716,7 @@ export class JobsRegistryService {
             workflow: job.jobHistory.workflow,
             jobHistory: job.jobHistory,
             priority: tool.priority,
+            workspaceId: workflow.workspace.id,
           }),
         ),
       );
@@ -742,7 +741,9 @@ export class JobsRegistryService {
           target: true,
         },
         jobHistory: {
-          workflow: true,
+          workflow: {
+            workspace: true,
+          },
         },
         tool: true,
         assetService: true,
@@ -1198,7 +1199,7 @@ export class JobsRegistryService {
 
     logger.log(
       `🎉 JobHistory ${jobHistory.id} completed! ` +
-        `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
+      `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
     );
 
     // Cleanup Redis counter
@@ -1304,7 +1305,7 @@ export class JobsRegistryService {
     if (redisCount !== actualCount) {
       logger.warn(
         `Counter mismatch for JobHistory ${jobHistoryId}: ` +
-          `Redis=${redisCount}, Actual=${actualCount}, DB=${jobHistory?.pendingJobsCount}`,
+        `Redis=${redisCount}, Actual=${actualCount}, DB=${jobHistory?.pendingJobsCount}`,
       );
       await this.rebuildCounterFromDB(jobHistoryId);
       return false;

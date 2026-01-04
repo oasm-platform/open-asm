@@ -46,7 +46,7 @@ export class WorkflowContent {
 }
 
 @Entity('workflows')
-@Index(['filePath'], { unique: true })
+@Index(['filePath', 'workspace'], { unique: true })
 export class Workflow extends BaseEntity {
   @Column()
   name: string;
@@ -62,7 +62,7 @@ export class Workflow extends BaseEntity {
   @JoinColumn({ name: 'createdBy' })
   createdBy?: User;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.id)
+  @ManyToOne(() => Workspace, (workspace) => workspace.id, { nullable: false })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 
@@ -75,4 +75,12 @@ export class Workflow extends BaseEntity {
     onDelete: 'CASCADE',
   })
   assetGroupWorkflows?: AssetGroupWorkflow[];
+
+  @ApiProperty()
+  @Column({ default: true })
+  isCanDelete: boolean;
+
+  @ApiProperty()
+  @Column({ default: true })
+  isCanEdit: boolean;
 }

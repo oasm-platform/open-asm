@@ -1,0 +1,5 @@
+name: vuls_scan_basic
+
+jobs:
+  - name: Vuls Scan
+    run: nuclei

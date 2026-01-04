@@ -180,7 +180,7 @@ export class CreateJobs extends PickType(Job, [
   tool: Tool;
   targetIds?: string[];
   assetIds?: string[];
-  workspaceId?: string;
+  workspaceId: string;
   workflow?: Workflow;
   jobHistory?: JobHistory;
 }

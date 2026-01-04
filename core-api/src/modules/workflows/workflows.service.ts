@@ -16,6 +16,8 @@ export class WorkflowsService implements OnModuleInit {
   constructor(
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
+    @InjectRepository(Workspace)
+    private workspaceRepository: Repository<Workspace>,
   ) { }
 
   private readonly logger = new Logger(WorkflowsService.name);
@@ -50,7 +52,7 @@ export class WorkflowsService implements OnModuleInit {
 
     const files = fs.readdirSync(this.templatesPath);
 
-    const yamlFiles = files.filter((file) => file.endsWith('.yaml'));
+    const yamlFiles = files.filter((file) => file.endsWith('.yaml') || file.endsWith('.yml'));
 
     return yamlFiles;
   }
@@ -82,6 +84,22 @@ export class WorkflowsService implements OnModuleInit {
 
   async onModuleInit() {
     try {
+      const workspaces = await this.workspaceRepository.find();
+
+      for (const workspace of workspaces) {
+        await this.createDefaultWorkflows(workspace.id);
+      }
+    } catch (error) {
+      this.logger.error('Error initializing workflows:', error);
+    }
+  }
+
+  /**
+   * Create or update default workflows for a specific workspace
+   * @param workspaceId ID of the workspace
+   */
+  public async createDefaultWorkflows(workspaceId: string) {
+    try {
       const yamlFiles = this.listTemplates();
 
       for (const fileName of yamlFiles) {
@@ -93,40 +111,57 @@ export class WorkflowsService implements OnModuleInit {
 
           const newContent = this.normalizeOn(parsed);
 
-          // Check current workflow
+          const baseName = fileName.replace(/\.(yaml|yml)$/, '');
+          const normalizedName = baseName
+            .replace(/[-_]/g, ' ')
+            .split(' ')
+            .filter(Boolean)
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          const workflowName = `[Default] ${normalizedName}`;
+
+          // Check current workflow for this workspace
           const existing = await this.workflowRepository.findOne({
-            where: { filePath: fileName },
+            where: {
+              filePath: fileName,
+              workspace: { id: workspaceId },
+            },
           });
 
           if (!existing) {
-            // Update new template with change
+            // Insert new workflow for this workspace
             await this.workflowRepository.insert({
-              name: fileName,
+              name: workflowName,
               content: newContent,
               filePath: fileName,
+              workspace: { id: workspaceId } as Workspace,
+              isCanDelete: false,
+              isCanEdit: false,
             });
-            this.logger.log(`Inserted new workflow: ${fileName}`);
+            this.logger.log(
+              `Inserted new workflow: ${workflowName} for workspace: ${workspaceId}`,
+            );
           } else if (
-            JSON.stringify(newContent) !== JSON.stringify(existing.content)
+            JSON.stringify(newContent) !== JSON.stringify(existing.content) ||
+            existing.name !== workflowName
           ) {
             await this.workflowRepository.update(
-              { filePath: fileName },
-              { content: newContent },
+              { id: existing.id },
+              { content: newContent, name: workflowName },
             );
-            this.logger.log(`Updated workflow content: ${fileName}`);
-          } else {
-            this.logger.log(`No changes for workflow: ${fileName}`);
           }
         } catch (error) {
           this.logger.error(
-            `Error processing workflow ${fileName}: ${(error as Error).message}`,
-
+            `Error processing workflow ${fileName} for workspace ${workspaceId}: ${(error as Error).message}`,
             (error as Error).stack,
           );
         }
       }
     } catch (error) {
-      this.logger.error('Error initializing workflows:', error);
+      this.logger.error(
+        `Error creating default workflows for workspace ${workspaceId}:`,
+        error,
+      );
     }
   }
 

@@ -10,4 +10,4 @@ import { DataAdapterService } from './data-adapter.service';
   providers: [DataAdapterService],
   exports: [DataAdapterService],
 })
-export class DataAdapterModule { }
+export class DataAdapterModule {}

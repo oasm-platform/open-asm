@@ -1,3 +1,4 @@
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
@@ -9,7 +10,6 @@ import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilitiesService } from './vulnerabilities.service';
-import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
@@ -17,9 +17,17 @@ export class VulnerabilitiesController {
     private readonly vulnerabilitiesService: VulnerabilitiesService,
   ) {}
 
+  @Doc({
+    summary: 'Scan target',
+    description:
+      'Initiates a vulnerability scan for a specified target, identifying potential security risks and vulnerabilities.',
+    request: {
+      getWorkspaceId: true,
+    },
+  })
   @Post('scan')
-  scan(@Body() scanDto: ScanDto) {
-    return this.vulnerabilitiesService.scan(scanDto.targetId);
+  scan(@Body() scanDto: ScanDto, @WorkspaceId() workspaceId: string) {
+    return this.vulnerabilitiesService.scan(scanDto.targetId, workspaceId);
   }
 
   @Doc({
