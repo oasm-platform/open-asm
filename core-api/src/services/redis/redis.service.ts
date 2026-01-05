@@ -244,4 +244,119 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       );
     }
   }
+
+  /**
+   * Atomic increment operation
+   *
+   * @param key - Redis key name
+   * @returns The value after increment
+   */
+  public async incr(key: string): Promise<number> {
+    try {
+      return await this.client.incr(key);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to increment key ${key}: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
+   * Atomic decrement operation
+   *
+   * @param key - Redis key name
+   * @returns The value after decrement
+   */
+  public async decr(key: string): Promise<number> {
+    try {
+      return await this.client.decr(key);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to decrement key ${key}: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
+   * Get value from Redis
+   *
+   * @param key - Redis key name
+   * @returns The value or null if key doesn't exist
+   */
+  public async get(key: string): Promise<string | null> {
+    try {
+      return await this.cacheClient.get(key);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to get key ${key}: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
+   * Set value in Redis
+   *
+   * @param key - Redis key name
+   * @param value - Value to set
+   * @returns OK if successful
+   */
+  public async set(key: string, value: string | number): Promise<string | null> {
+    try {
+      return await this.cacheClient.set(key, value.toString());
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to set key ${key}: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
+   * Set value in Redis with expiry (seconds)
+   *
+   * @param key - Redis key name
+   * @param seconds - Expiry time in seconds
+   * @param value - Value to set
+   * @returns OK if successful
+   */
+  public async setex(
+    key: string,
+    seconds: number,
+    value: string | number,
+  ): Promise<string> {
+    try {
+      return await this.cacheClient.setex(key, seconds, value.toString());
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to setex key ${key}: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
+   * Delete key from Redis
+   *
+   * @param key - Redis key name
+   * @returns Number of keys deleted (0 or 1)
+   */
+  public async del(key: string): Promise<number> {
+    try {
+      return await this.client.del(key);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to delete key ${key}: ${errorMessage}`,
+      );
+    }
+  }
 }

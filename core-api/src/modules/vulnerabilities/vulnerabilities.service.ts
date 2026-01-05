@@ -32,12 +32,13 @@ export class VulnerabilitiesService {
    * @param targetId - The ID of the target to scan.
    * @returns A message indicating the scan has started.
    */
-  public async scan(targetId: string) {
+  public async scan(targetId: string, workspaceId: string) {
     const tools = await this.toolsService.getToolByNames({ names: ['nuclei'] });
     await this.jobRegistryService.createNewJob({
       tool: tools[0],
       targetIds: [targetId],
       priority: tools[0].priority,
+      workspaceId,
     });
     return { message: `Scanning target ${targetId}...` };
   }

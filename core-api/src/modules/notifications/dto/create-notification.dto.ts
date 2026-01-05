@@ -1,22 +1,36 @@
-import { NotificationType } from '@/common/enums/enum';
+import { NotificationScope, NotificationType } from '@/common/enums/enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
   IsObject,
   IsOptional,
   IsString,
-  ValidateNested,
 } from 'class-validator';
 
-export class NotificationContentDto {
+export class CreateNotificationDto {
   @ApiProperty({
-    description: 'Translation key for the notification content',
-    example: 'notifications.welcome',
+    description: 'List of user IDs to receive the notification',
+    type: [String],
   })
-  @IsString()
-  key: string;
+  @IsArray()
+  @IsString({ each: true })
+  recipients: string[];
+
+  @ApiProperty({
+    description: 'Type of the notification',
+    enum: NotificationScope,
+    example: NotificationScope.USER,
+  })
+  @IsEnum(NotificationScope)
+  scope: NotificationScope;
+
+  @ApiProperty({
+    description: 'Type of the notification',
+    enum: NotificationType,
+  })
+  @IsEnum(NotificationType)
+  type: NotificationType;
 
   @ApiPropertyOptional({
     description:
@@ -26,31 +40,4 @@ export class NotificationContentDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, string>;
-}
-
-export class CreateNotificationDto {
-  @ApiProperty({
-    description: 'List of user IDs to receive the notification',
-    type: [String],
-    example: ['user-123', 'user-456'],
-  })
-  @IsArray()
-  @IsString({ each: true })
-  recipients: string[];
-
-  @ApiProperty({
-    description: 'Type of the notification',
-    enum: NotificationType,
-    example: NotificationType.USER,
-  })
-  @IsEnum(NotificationType)
-  type: NotificationType;
-
-  @ApiProperty({
-    description: 'Content of the notification including key and metadata',
-    type: NotificationContentDto,
-  })
-  @ValidateNested()
-  @Type(() => NotificationContentDto)
-  content: NotificationContentDto;
 }

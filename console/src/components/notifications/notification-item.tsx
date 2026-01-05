@@ -1,22 +1,12 @@
+import { cn } from '@/lib/utils';
 import {
   getNotificationsControllerGetNotificationsInfiniteQueryKey,
   getNotificationsControllerGetUnreadCountQueryKey,
-  type Notification,
   type NotificationResponseDto,
   NotificationResponseDtoStatus,
   useNotificationsControllerMarkAsRead,
 } from '@/services/apis/gen/queries';
-import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
-
-// Extended notification type that includes content with metadata
-interface NotificationWithContent extends Notification {
-  content?: {
-    metadata?: {
-      link?: string;
-    };
-  };
-}
 import { CheckCheck, Info } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
@@ -57,14 +47,9 @@ export const NotificationItem = memo(function NotificationItem({
     onClick?.();
   }, [isUnread, notification.id, markAsRead, onClick]);
 
-  // Determine link based on notification metadata
-  const linkTo =
-    (notification.notification as NotificationWithContent)?.content?.metadata
-      ?.link || '/';
-
   return (
     <Link
-      to={linkTo}
+      to={notification.url}
       onClick={handleClick}
       className={cn(
         'flex items-start gap-4 p-4 transition-colors hover:bg-muted/50',

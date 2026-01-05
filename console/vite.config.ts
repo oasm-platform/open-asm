@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
       },
     },
+    logLevel: 'silent',
     server: {
       host: true,
       port: 5173,
@@ -22,6 +23,7 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: env.VITE_API_URL,
           changeOrigin: true,
+          logLevel: 'silent',
         },
       },
     },

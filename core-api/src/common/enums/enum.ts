@@ -136,10 +136,14 @@ export enum NotificationStatus {
   READ = 'read',
 }
 
-export enum NotificationType {
+export enum NotificationScope {
   SYSTEM = 'SYSTEM',
   USER = 'USER',
   GROUP = 'GROUP',
+}
+
+export enum NotificationType {
+  WORKSPACE_CREATED = 'WORKSPACE_CREATED',
 }
 
 export enum Language {

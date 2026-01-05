@@ -1,15 +1,21 @@
+import { BOT_ID } from '@/common/constants/app.constants';
 import { JobDataResultType } from '@/common/types/app.types';
 import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { DataSource, InsertResult } from 'typeorm';
-import { ToolCategory } from '../../common/enums/enum';
+import {
+  IssueSourceType,
+  Severity,
+  ToolCategory,
+} from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
+import { IssuesService } from '../issues/issues.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterInput } from './data-adapter.interface';
@@ -18,6 +24,7 @@ export class DataAdapterService {
   constructor(
     private readonly dataSource: DataSource,
     private workspaceService: WorkspacesService,
+    private issuesService: IssuesService,
   ) {}
 
   public async validateData<T extends object>(
@@ -206,35 +213,68 @@ export class DataAdapterService {
     job,
   }: DataAdapterInput<Vulnerability[]>): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
-      // Insert new vulnerabilities if data length > 0, do not delete old records
-      if (data.length > 0) {
-        await manager
-          .createQueryBuilder()
-          .insert()
-          .into(Vulnerability)
-          .values(
-            data.map((vuln) => {
-              const stringHash = `${vuln.name}-${job.asset.id}-${job.tool.id}`;
-              const fingerprint = crypto
-                .createHash('md5')
-                .update(stringHash)
-                .digest('hex');
-              return {
-                ...vuln,
-                fingerprint,
-                assetId: job.asset.id,
-                toolId: job.tool.id,
-                asset: { id: job.asset.id },
-                jobHistory: { id: job.jobHistory.id },
-                tool: { id: job.tool.id },
-              };
-            }),
-          )
-          .orUpdate({
-            conflict_target: ['fingerprint'],
-            overwrite: ['updatedAt', 'severity'],
-          })
-          .execute();
+      if (data.length === 0) {
+        return;
+      }
+
+      const values = data.map((vuln) => {
+        const stringHash = `${vuln.name}-${job.asset.id}-${job.tool.id}`;
+        const fingerprint = crypto
+          .createHash('md5')
+          .update(stringHash)
+          .digest('hex');
+        return {
+          ...vuln,
+          fingerprint,
+          assetId: job.asset.id,
+          toolId: job.tool.id,
+          asset: { id: job.asset.id },
+          jobHistory: { id: job.jobHistory.id },
+          tool: { id: job.tool.id },
+        };
+      });
+
+      const result = await manager
+        .createQueryBuilder()
+        .insert()
+        .into(Vulnerability)
+        .values(values)
+        .orUpdate({
+          conflict_target: ['fingerprint'],
+          overwrite: ['updatedAt', 'severity'],
+        })
+        .returning('*')
+        .execute();
+
+      const insertedVulnerabilities = result.raw as Vulnerability[];
+
+      const uniqueVulnerabilities = Array.from(
+        new Map(
+          insertedVulnerabilities.map((vuln) => [vuln.fingerprint, vuln]),
+        ).values(),
+      );
+
+      const vulsForAlert = uniqueVulnerabilities.filter(
+        (vuln) =>
+          vuln.severity &&
+          [Severity.HIGH, Severity.CRITICAL].includes(vuln.severity),
+      );
+
+      if (vulsForAlert.length > 0) {
+        await Promise.all(
+          vulsForAlert.map((v) =>
+            this.issuesService.createIssue(
+              {
+                title: `[${v.severity}] ${v.name}`,
+                description: v.description,
+                sourceId: v.id,
+                sourceType: IssueSourceType.VULNERABILITY,
+              },
+              job.jobHistory.workflow?.workspace.id,
+              BOT_ID,
+            ),
+          ),
+        );
       }
     });
   }
@@ -289,7 +329,7 @@ export class DataAdapterService {
 
       // Map of tool categories to their corresponding sync functions and validation classes
       const syncFunctions: Partial<
-        Record<ToolCategory, SyncFunctionConfig<any>>
+        Record<ToolCategory, SyncFunctionConfig<unknown>>
       > = {
         [ToolCategory.PORTS_SCANNER]: {
           handler: (data: DataAdapterInput<number[]>) =>
@@ -343,7 +383,7 @@ export class DataAdapterService {
       }
 
       // Call the appropriate sync function with proper type assertion
-      const typedData = { job, data } as unknown as DataAdapterInput<any>;
+      const typedData = { job, data } as unknown as DataAdapterInput<unknown>;
       await syncFunction.handler(typedData);
 
       return;

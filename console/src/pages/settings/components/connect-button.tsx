@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 interface ConnectMcpButtonProps {
   permission: McpPermission;
 }
+
 const ConnectMcpButton = (props: ConnectMcpButtonProps) => {
   const [open, setOpen] = useState(false);
   const { permission } = props;
@@ -65,7 +66,7 @@ const ConnectMcpButton = (props: ConnectMcpButtonProps) => {
         </DialogHeader>
         <div className="py-2">
           <div className="mb-4">
-            <pre className="p-3 rounded-md text-xs overflow-x-auto border bg-background">
+            <pre className="p-3 rounded-md text-xs border bg-background whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto">
               {jsonContent}
             </pre>
           </div>

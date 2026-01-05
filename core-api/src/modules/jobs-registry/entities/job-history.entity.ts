@@ -3,7 +3,7 @@ import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import { Port } from '@/modules/assets/entities/ports.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
-import { Entity, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
 import { Job } from './job.entity';
 
 @Entity('job_histories')
@@ -28,8 +28,14 @@ export class JobHistory extends BaseEntity {
   })
   httpResponses?: HttpResponse[];
 
+  @Column({ default: 0 })
+  pendingJobsCount: number;
+
+  @Column({ default: false })
+  isCompleted: boolean;
+
   @ManyToOne(() => Workflow, (workflow) => workflow.jobHistories, {
     onDelete: 'CASCADE',
   })
-  workflow?: Workflow;
+  workflow: Workflow;
 }

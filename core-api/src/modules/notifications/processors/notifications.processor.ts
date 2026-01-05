@@ -1,13 +1,13 @@
 import { BullMQName, NotificationStatus } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
+import { RedisService } from '@/services/redis/redis.service';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job } from 'bullmq';
 import { In, Repository } from 'typeorm';
+import { CreateNotificationDto } from '../dto/create-notification.dto';
 import { NotificationRecipient } from '../entities/notification-recipient.entity';
 import { Notification } from '../entities/notification.entity';
-import { CreateNotificationDto } from '../dto/create-notification.dto';
-import { RedisService } from '@/services/redis/redis.service';
 
 @Processor(BullMQName.NOTIFICATION)
 export class NotificationsConsumer extends WorkerHost {
@@ -24,10 +24,11 @@ export class NotificationsConsumer extends WorkerHost {
   }
 
   async process(job: Job<CreateNotificationDto>): Promise<void> {
-    const { recipients, type, content } = job.data;
+    const { recipients, scope, metadata, type } = job.data;
     const notification = await this.notificationRepo.save({
+      scope,
       type,
-      content,
+      metadata,
     });
 
     const users = await this.userRepo.findBy({
@@ -51,8 +52,8 @@ export class NotificationsConsumer extends WorkerHost {
           `notification:${user.id}`,
           JSON.stringify({
             notificationId: notification.id,
-            type,
-            content,
+            scope,
+            metadata,
           }),
         );
       }
