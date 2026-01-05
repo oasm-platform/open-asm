@@ -1,7 +1,11 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Severity } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -109,6 +113,7 @@ export class VulnerabilitiesService {
       .leftJoin('workspace_targets.workspace', 'workspaces')
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
+      .leftJoinAndSelect('vulnerabilities.vulnerabilityDismissal', 'dismissal')
       .where('workspaces.id = :workspaceId', { workspaceId })
       .andWhere('vulnerabilities.id = :id', { id });
 
@@ -229,6 +234,17 @@ export class VulnerabilitiesService {
     if (!vulnerability) {
       throw new NotFoundException(`Vulnerability ${id} not found`);
     }
+
+    const isDismissed = await this.dismissRepo.findOne({
+      where: {
+        vulnerabilityId: id,
+      },
+    });
+
+    if (isDismissed) {
+      throw new BadRequestException(`Vulnerability ${id} is already dismissed`);
+    }
+
     const result = this.dismissRepo.create({
       vulnerabilityId: id,
       userId: user.id,
