@@ -167,3 +167,9 @@ export enum IssueCommentType {
   OPEN = 'open',
   CLOSED = 'closed',
 }
+
+export enum DismissReason {
+  FALSE_POSITIVE = 'false_positive',
+  USED_IN_TEST = 'used_in_test',
+  WONT_FIX = 'wont_fix',
+}

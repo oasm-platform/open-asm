@@ -1,7 +1,7 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Severity } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -12,12 +12,15 @@ import {
 } from './dto/get-vulnerability-statistics.dto';
 import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
+import { User } from '../auth/entities/user.entity';
+import { VulnerabilityDismissal } from './entities/vulnerability-dismissald.entity';
 
 @Injectable()
 export class VulnerabilitiesService {
   constructor(
     @InjectRepository(Vulnerability)
     private vulnerabilitiesRepository: Repository<Vulnerability>,
+    private dismissRepo: Repository<VulnerabilityDismissal>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
   ) {}
@@ -205,5 +208,30 @@ export class VulnerabilitiesService {
       select: severityCase,
       orderBy: 'severity_order',
     };
+  }
+
+  async dismissVulnerability(
+    id: string,
+    user: User,
+    dismiss: VulnerabilityDismissal,
+  ) {
+    const vulnerability = await this.vulnerabilitiesRepository.findOne({
+      where: { id },
+    });
+    if (!vulnerability) {
+      throw new NotFoundException(`Vulnerability ${id} not found`);
+    }
+    const result = this.dismissRepo.create({
+      vulnerabilityId: id,
+      userId: user.id,
+      reason: dismiss.reason,
+      comment: dismiss.comment,
+    });
+    await this.dismissRepo.save(result);
+    return result;
+  }
+
+  async reopenVulnerability(id: string) {
+    return await this.dismissRepo.delete({ vulnerabilityId: id });
   }
 }

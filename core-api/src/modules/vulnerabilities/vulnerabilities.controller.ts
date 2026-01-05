@@ -10,6 +10,9 @@ import { ScanDto } from './dto/scan.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilitiesService } from './vulnerabilities.service';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { UserContext } from '@/common/decorators/app.decorator';
+import { User } from '../auth/entities/user.entity';
+import { VulnerabilityDismissal } from './entities/vulnerability-dismissald.entity';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
@@ -67,5 +70,35 @@ export class VulnerabilitiesController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.vulnerabilitiesService.getVulnerability(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Dismiss vulnerability',
+    description:
+      'Dismisses a specific security vulnerability identified within the system, removing it from active tracking and analysis.',
+    response: {
+      serialization: VulnerabilityDismissal,
+    },
+  })
+  @Post(':id/dismiss')
+  dismissVulnerability(
+    @Param('id') id: string,
+    @UserContext() user: User,
+    @Body() dismiss: VulnerabilityDismissal,
+  ) {
+    return this.vulnerabilitiesService.dismissVulnerability(id, user, dismiss);
+  }
+
+  @Doc({
+    summary: 'Reopen vulnerability',
+    description:
+      'Reopens a specific security vulnerability identified within the system, restoring it to active tracking and analysis.',
+    response: {
+      serialization: VulnerabilityDismissal,
+    },
+  })
+  @Post(':id/reopen')
+  reopenVulnerability(@Param('id') id: string) {
+    return this.vulnerabilitiesService.reopenVulnerability(id);
   }
 }

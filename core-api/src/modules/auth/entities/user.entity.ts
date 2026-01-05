@@ -10,6 +10,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { Account } from './account.entity';
 import { Session } from './session.entity';
+import { VulnerabilityDismissal } from '@/modules/vulnerabilities/entities/vulnerability-dismissald.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -68,4 +69,10 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Workflow, (workflow) => workflow.createdBy)
   createdWorkflows: Workflow[];
+
+  @OneToMany(
+    () => VulnerabilityDismissal,
+    (vulnerabilityDismissal) => vulnerabilityDismissal.user,
+  )
+  vulnerabilityDismissals: VulnerabilityDismissal[];
 }
