@@ -111,6 +111,7 @@ console/src/App.css
 - Check tools integration: `core-api/src/modules/tools/`
 - Examine data adapters: `core-api/src/modules/data-adapter/`
 - Follow API structure: `core-api/src/common/dtos/`
+- Review API workflow guidelines: `.clinerules/workflows/api.md`
 
 **Key files**:
 
@@ -119,6 +120,7 @@ core-api/src/mcp/
 core-api/src/modules/tools/
 core-api/src/modules/data-adapter/
 core-api/src/common/dtos/
+.clinerules/workflows/api.md
 ```
 
 ### 6. Documentation Agent
@@ -129,6 +131,7 @@ core-api/src/common/dtos/
 - Check API documentation: `core-api/src/common/doc/`
 - Follow ESLint comments rules
 - Maintain JSDoc for public APIs
+- Review API workflow for documentation standards
 
 **Key files**:
 
@@ -136,6 +139,7 @@ core-api/src/common/dtos/
 README.md
 DEVELOPER_GUIDE.md
 core-api/src/common/doc/
+.clinerules/workflows/api.md
 ```
 
 ### 7. Testing Agent
@@ -146,6 +150,7 @@ core-api/src/common/doc/
 - Follow testing ESLint rules
 - Focus on business logic coverage (80%+)
 - Maintain separate test configurations
+- Include API contract testing and performance testing per global rules
 
 **Key files**:
 
@@ -178,3 +183,5 @@ docker-compose up
 - Follow ESLint and Prettier configurations
 - Maintain consistent code style
 - Document public APIs and complex logic
+- Integrate with automated validation and testing pipelines
+- Consider performance implications and security best practices
