@@ -13,13 +13,14 @@ import {
 import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { User } from '../auth/entities/user.entity';
-import { VulnerabilityDismissal } from './entities/vulnerability-dismissald.entity';
+import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 
 @Injectable()
 export class VulnerabilitiesService {
   constructor(
     @InjectRepository(Vulnerability)
     private vulnerabilitiesRepository: Repository<Vulnerability>,
+    @InjectRepository(VulnerabilityDismissal)
     private dismissRepo: Repository<VulnerabilityDismissal>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
@@ -213,11 +214,17 @@ export class VulnerabilitiesService {
 
   async dismissVulnerability(
     id: string,
+    workspaceId: string,
     user: User,
     dismiss: VulnerabilityDismissal,
   ) {
     const vulnerability = await this.vulnerabilitiesRepository.findOne({
-      where: { id },
+      where: {
+        id,
+        asset: {
+          target: { workspaceTargets: { workspace: { id: workspaceId } } },
+        },
+      },
     });
     if (!vulnerability) {
       throw new NotFoundException(`Vulnerability ${id} not found`);
@@ -232,7 +239,26 @@ export class VulnerabilitiesService {
     return result;
   }
 
-  async reopenVulnerability(id: string) {
+  async reopenVulnerability(id: string, workspaceId: string) {
+    const vulnerability = await this.dismissRepo.findOne({
+      where: {
+        vulnerabilityId: id,
+        vulnerability: {
+          asset: {
+            target: {
+              workspaceTargets: {
+                workspace: {
+                  id: workspaceId,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!vulnerability) {
+      throw new NotFoundException(`Vulnerability ${id} not found`);
+    }
     return await this.dismissRepo.delete({ vulnerabilityId: id });
   }
 }

@@ -1,7 +1,15 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   GetVulnerabilitiesStatisticsResponseDto,
@@ -13,7 +21,7 @@ import { VulnerabilitiesService } from './vulnerabilities.service';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { UserContext } from '@/common/decorators/app.decorator';
 import { User } from '../auth/entities/user.entity';
-import { VulnerabilityDismissal } from './entities/vulnerability-dismissald.entity';
+import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
@@ -88,26 +96,39 @@ export class VulnerabilitiesController {
     response: {
       serialization: VulnerabilityDismissal,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Post(':id/dismiss')
   dismissVulnerability(
     @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
     @UserContext() user: User,
     @Body() dismiss: VulnerabilityDismissal,
   ) {
-    return this.vulnerabilitiesService.dismissVulnerability(id, user, dismiss);
+    return this.vulnerabilitiesService.dismissVulnerability(
+      id,
+      workspaceId,
+      user,
+      dismiss,
+    );
   }
 
   @Doc({
     summary: 'Reopen vulnerability',
     description:
       'Reopens a specific security vulnerability identified within the system, restoring it to active tracking and analysis.',
-    response: {
-      serialization: VulnerabilityDismissal,
+    request: {
+      getWorkspaceId: true,
     },
   })
   @Post(':id/reopen')
-  reopenVulnerability(@Param('id') id: string) {
-    return this.vulnerabilitiesService.reopenVulnerability(id);
+  @HttpCode(204)
+  reopenVulnerability(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.vulnerabilitiesService.reopenVulnerability(id, workspaceId);
   }
 }
