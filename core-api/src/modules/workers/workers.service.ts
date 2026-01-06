@@ -2,9 +2,10 @@ import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
   ApiKeyType,
+  JobPriority,
   JobStatus,
   WorkerScope,
-  WorkerType,
+  WorkerType
 } from '@/common/enums/enum';
 import { generateToken } from '@/utils/genToken';
 import { getManyResponse } from '@/utils/getManyResponse';
@@ -23,6 +24,7 @@ import { randomUUID } from 'crypto';
 import { LessThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
+import { OutboxJob } from '../jobs-registry/entities/outbox-job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
@@ -47,13 +49,16 @@ export class WorkersService {
     @InjectRepository(WorkspaceTool)
     public readonly workspaceToolRepo: Repository<WorkspaceTool>,
 
+    @InjectRepository(OutboxJob)
+    public readonly outboxJobRepo: Repository<OutboxJob>,
+
     @Inject(forwardRef(() => JobsRegistryService))
     private jobsRegistryService: JobsRegistryService,
 
     private apiKeyService: ApiKeysService,
 
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * Handles a worker's "alive" signal, which is sent
@@ -102,23 +107,39 @@ export class WorkersService {
       }
     }
 
-    // Update both in_progress jobs with missing workers and failed jobs
-    await this.repo.manager.query(`
-      UPDATE jobs j
-      SET status = CASE 
-          WHEN j.status = '${JobStatus.IN_PROGRESS}' AND j."workerId"::uuid NOT IN (
-            SELECT id FROM workers
-          ) THEN '${JobStatus.PENDING}'
-          WHEN j.status = '${JobStatus.FAILED}' AND j."retryCount" < 4 THEN '${JobStatus.PENDING}'
-          ELSE j.status
-        END,
-        "workerId" = NULL
-      WHERE j.status = '${JobStatus.IN_PROGRESS}'
-        AND j."workerId"::uuid NOT IN (
-          SELECT id FROM workers
-        )
-        OR j.status = '${JobStatus.FAILED}'
-    `);
+    // Use a transaction for cleanup to ensure consistency
+    await this.repo.manager.transaction(async (manager) => {
+      // 1. Identify jobs that need to be recovered (dead worker OR failed retryable)
+      // We check for jobs that are IN_PROGRESS but worker is missing, 
+      // OR FAILED but retryCount < 4
+      const jobsToRecover: { id: string; priority: JobPriority }[] = await manager.query(`
+        SELECT id, priority FROM jobs
+        WHERE (status = '${JobStatus.IN_PROGRESS}' AND "workerId"::uuid NOT IN (SELECT id FROM workers))
+           OR (status = '${JobStatus.FAILED}' AND "retryCount" < 4)
+      `);
+
+      if (jobsToRecover.length > 0) {
+        // 2. Update status to PENDING and clear workerId
+        await manager.query(`
+          UPDATE jobs j
+          SET status = '${JobStatus.PENDING}',
+              "workerId" = NULL
+          WHERE (status = '${JobStatus.IN_PROGRESS}' AND "workerId"::uuid NOT IN (SELECT id FROM workers))
+             OR (status = '${JobStatus.FAILED}' AND "retryCount" < 4)
+        `);
+
+        // 3. Re-insert into outbox_jobs for finding by sync service
+        const outboxRepo = manager.getRepository(OutboxJob);
+        const outboxEntries = jobsToRecover.map((job: { id: string; priority: JobPriority }) => ({
+          jobId: job.id,
+          priority: job.priority,
+        }));
+
+        // Use insert and ignore conflicts just in case (though we deleted from outbox earlier)
+        // or just simple save. existing outbox entries shouldn't exist for these if they were running.
+        await outboxRepo.save(outboxEntries);
+      }
+    });
   }
 
   /**

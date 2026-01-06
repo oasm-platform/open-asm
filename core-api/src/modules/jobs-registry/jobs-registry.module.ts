@@ -14,6 +14,7 @@ import {
 
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { JobErrorLog } from './entities/job-error-log.entity';
+import { OutboxJob } from './entities/outbox-job.entity';
 import { JobResultProcessor } from './processors/job-result.processor';
 
 @Global()
@@ -24,6 +25,7 @@ import { JobResultProcessor } from './processors/job-result.processor';
       JobHistory,
       AssetGroupWorkflow,
       JobErrorLog,
+      OutboxJob,
     ]),
     WorkspacesModule,
     BullModule.registerQueue({
@@ -39,4 +41,4 @@ import { JobResultProcessor } from './processors/job-result.processor';
   ],
   exports: [JobsRegistryService],
 })
-export class JobsRegistryModule {}
+export class JobsRegistryModule { }
