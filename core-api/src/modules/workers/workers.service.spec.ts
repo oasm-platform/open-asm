@@ -5,6 +5,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
+import { OutboxJob } from '../jobs-registry/entities/outbox-job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { WorkerInstance } from './entities/worker.entity';
@@ -15,6 +16,7 @@ describe('WorkersService', () => {
   let mockWorkerInstanceRepository: Partial<Repository<WorkerInstance>>;
   let mockAssetRepository: Partial<Repository<any>>;
   let mockWorkspaceToolRepository: Partial<Repository<any>>;
+  let mockOutboxJobRepository: Partial<Repository<OutboxJob>>;
   let mockJobsRegistryService: Partial<JobsRegistryService>;
   let mockApiKeysService: Partial<ApiKeysService>;
   let mockConfigService: Partial<ConfigService>;
@@ -38,6 +40,14 @@ describe('WorkersService', () => {
       getManyAndCount: jest.fn(),
       getRawMany: jest.fn(),
       getRawOne: jest.fn(),
+      manager: {
+        transaction: jest.fn((callback) => callback({
+          getRepository: jest.fn(() => ({
+            save: jest.fn(),
+          })),
+          query: jest.fn(),
+        })),
+      },
     } as any;
 
     mockAssetRepository = {
@@ -46,6 +56,18 @@ describe('WorkersService', () => {
 
     mockWorkspaceToolRepository = {
       findOne: jest.fn(),
+    } as any;
+
+    mockOutboxJobRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      save: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn(),
     } as any;
 
     mockJobsRegistryService = {
@@ -83,6 +105,10 @@ describe('WorkersService', () => {
         {
           provide: getRepositoryToken(WorkspaceTool),
           useValue: mockWorkspaceToolRepository,
+        },
+        {
+          provide: getRepositoryToken(OutboxJob),
+          useValue: mockOutboxJobRepository,
         },
         {
           provide: JobsRegistryService,

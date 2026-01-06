@@ -12,6 +12,7 @@ import { ToolsService } from '../tools/tools.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
+import { OutboxJob } from './entities/outbox-job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
 
 describe('JobsRegistryService', () => {
@@ -57,6 +58,18 @@ describe('JobsRegistryService', () => {
     getInstalledTools: jest.fn(),
   };
 
+  const mockOutboxJobRepository = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    execute: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -71,6 +84,10 @@ describe('JobsRegistryService', () => {
         {
           provide: getRepositoryToken(JobErrorLog),
           useValue: mockJobErrorLogRepository,
+        },
+        {
+          provide: getRepositoryToken(OutboxJob),
+          useValue: mockOutboxJobRepository,
         },
         {
           provide: DataSource,
