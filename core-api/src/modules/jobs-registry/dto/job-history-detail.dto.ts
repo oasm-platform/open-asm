@@ -76,4 +76,7 @@ export class JobHistoryDetailResponseDto {
 
   @ApiProperty({ type: () => [Job] })
   jobs: Job[];
+
+  @ApiProperty()
+  workflowName?: string;
 }

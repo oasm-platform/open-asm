@@ -204,6 +204,108 @@ export interface ArchiveWorkspaceDto {
   isArchived: boolean;
 }
 
+export type String = object;
+
+export interface GetManyStringDto {
+  data: string[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface GetManyWorkflowsResponseDto {
+  /** The unique identifier of the workflow */
+  id: string;
+  /** The name of the workflow */
+  name: string;
+  /** The file path of the workflow */
+  filePath: string;
+  /** The workflow content */
+  content: object;
+  /**
+   * When the workflow was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the workflow was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The user who created this workflow */
+  createdBy?: object;
+  /** The workspace this workflow belongs to */
+  workspace?: object;
+}
+
+export interface GetManyGetManyWorkflowsResponseDtoDto {
+  data: GetManyWorkflowsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface On {
+  target: string[];
+  schedule: OnScheduleEnum;
+}
+
+export interface WorkflowJob {
+  name: string;
+  run: string;
+}
+
+export interface WorkflowContent {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+}
+
+export interface Workflow {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  content: WorkflowContent;
+  isCanDelete: boolean;
+  isCanEdit: boolean;
+}
+
+export interface CreateWorkflowDto {
+  /**
+   * Name of the workflow
+   * @example "Group Workflow"
+   */
+  name: string;
+  /** Content of the workflow in JSON format */
+  content: WorkflowContent;
+  /**
+   * File path for the workflow
+   * @example "workflows/vulnerability-scan.yaml"
+   */
+  filePath?: string;
+}
+
+export interface UpdateWorkflowDto {
+  /**
+   * Name of the workflow
+   * @example "Group Workflow"
+   */
+  name?: string;
+  /** Content of the workflow in JSON format */
+  content?: WorkflowContent;
+  /**
+   * File path for the workflow
+   * @example "workflows/vulnerability-scan.yaml"
+   */
+  filePath?: string;
+}
+
 export interface CreateFirstAdminDto {
   email: string;
   password: string;
@@ -582,6 +684,7 @@ export interface JobHistoryDetailResponseDto {
   updatedAt: string;
   tools: Tool[];
   jobs: Job[];
+  workflowName: string;
 }
 
 export interface PickTypeClass {
@@ -1228,106 +1331,6 @@ export interface GetManyToolDto {
   pageCount: number;
 }
 
-export type String = object;
-
-export interface GetManyStringDto {
-  data: string[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
-}
-
-export interface GetManyWorkflowsResponseDto {
-  /** The unique identifier of the workflow */
-  id: string;
-  /** The name of the workflow */
-  name: string;
-  /** The file path of the workflow */
-  filePath: string;
-  /** The workflow content */
-  content: object;
-  /**
-   * When the workflow was created
-   * @format date-time
-   */
-  createdAt: string;
-  /**
-   * When the workflow was last updated
-   * @format date-time
-   */
-  updatedAt: string;
-  /** The user who created this workflow */
-  createdBy?: object;
-  /** The workspace this workflow belongs to */
-  workspace?: object;
-}
-
-export interface GetManyGetManyWorkflowsResponseDtoDto {
-  data: GetManyWorkflowsResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
-}
-
-export interface On {
-  target: string[];
-  schedule: OnScheduleEnum;
-}
-
-export interface WorkflowJob {
-  name: string;
-  run: string;
-}
-
-export interface WorkflowContent {
-  on: On;
-  jobs: WorkflowJob[];
-  name: string;
-}
-
-export interface Workflow {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  content: WorkflowContent;
-}
-
-export interface CreateWorkflowDto {
-  /**
-   * Name of the workflow
-   * @example "Group Workflow"
-   */
-  name: string;
-  /** Content of the workflow in JSON format */
-  content: WorkflowContent;
-  /**
-   * File path for the workflow
-   * @example "workflows/vulnerability-scan.yaml"
-   */
-  filePath?: string;
-}
-
-export interface UpdateWorkflowDto {
-  /**
-   * Name of the workflow
-   * @example "Group Workflow"
-   */
-  name?: string;
-  /** Content of the workflow in JSON format */
-  content?: WorkflowContent;
-  /**
-   * File path for the workflow
-   * @example "workflows/vulnerability-scan.yaml"
-   */
-  filePath?: string;
-}
-
 export interface ToolProvider {
   id: string;
   /** @format date-time */
@@ -1761,6 +1764,15 @@ export enum UpdateTargetDtoScanScheduleEnum {
   Value001 = "0 0 1 * *",
 }
 
+export enum OnScheduleEnum {
+  Disabled = "disabled",
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
 /** Server status: active, disabled, or error */
 export enum GetMcpServerHealthResponseDtoStatusEnum {
   Active = "active",
@@ -1800,15 +1812,6 @@ export enum CreateToolDtoCategoryEnum {
   Vulnerabilities = "vulnerabilities",
   Classifier = "classifier",
   Assistant = "assistant",
-}
-
-export enum OnScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
 }
 
 export enum AssetGroupWorkflowScheduleEnum {
@@ -2432,6 +2435,135 @@ export class Api<
       method: "PATCH",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of all available workflow templates in YAML format.
+   *
+   * @tags Workflows
+   * @name WorkflowsControllerListTemplates
+   * @summary Get all workflow templates
+   * @request GET:/api/workflows/templates
+   */
+  workflowsControllerListTemplates = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/templates`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
+   *
+   * @tags Workflows
+   * @name WorkflowsControllerGetManyWorkflows
+   * @summary Get many workflows
+   * @request GET:/api/workflows
+   */
+  workflowsControllerGetManyWorkflows = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      /** Filter by workflow name */
+      name?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Creates a new workflow with the provided data.
+   *
+   * @tags Workflows
+   * @name WorkflowsControllerCreateWorkflow
+   * @summary Create workflow
+   * @request POST:/api/workflows
+   */
+  workflowsControllerCreateWorkflow = (
+    data: CreateWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a specific workflow by its ID within the specified workspace.
+   *
+   * @tags Workflows
+   * @name WorkflowsControllerGetWorkspaceWorkflow
+   * @summary Get workflow by ID
+   * @request GET:/api/workflows/{id}
+   */
+  workflowsControllerGetWorkspaceWorkflow = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates an existing workflow with the provided data.
+   *
+   * @tags Workflows
+   * @name WorkflowsControllerUpdateWorkflow
+   * @summary Update workflow
+   * @request PATCH:/api/workflows/{id}
+   */
+  workflowsControllerUpdateWorkflow = (
+    id: string,
+    data: UpdateWorkflowDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a workflow by its ID.
+   *
+   * @tags Workflows
+   * @name WorkflowsControllerDeleteWorkflow
+   * @summary Delete workflow
+   * @request DELETE:/api/workflows/{id}
+   */
+  workflowsControllerDeleteWorkflow = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/workflows/${id}`,
+      method: "DELETE",
       format: "json",
       ...params,
     });
@@ -3637,18 +3769,20 @@ export class Api<
     });
 
   /**
-   * No description
+   * @description Initiates a vulnerability scan for a specified target, identifying potential security risks and vulnerabilities.
    *
    * @tags Vulnerabilities
    * @name VulnerabilitiesControllerScan
+   * @summary Scan target
    * @request POST:/api/vulnerabilities/scan
    */
   vulnerabilitiesControllerScan = (data: ScanDto, params: RequestParams = {}) =>
-    this.request<any, any>({
+    this.request<AppResponseSerialization, any>({
       path: `/api/vulnerabilities/scan`,
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
       ...params,
     });
 
@@ -3927,135 +4061,6 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/tools/${id}/api-key/rotate`,
       method: "POST",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves a list of all available workflow templates in YAML format.
-   *
-   * @tags Workflows
-   * @name WorkflowsControllerListTemplates
-   * @summary Get all workflow templates
-   * @request GET:/api/workflows/templates
-   */
-  workflowsControllerListTemplates = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/workflows/templates`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
-   *
-   * @tags Workflows
-   * @name WorkflowsControllerGetManyWorkflows
-   * @summary Get many workflows
-   * @request GET:/api/workflows
-   */
-  workflowsControllerGetManyWorkflows = (
-    query?: {
-      search?: string;
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-      /** Filter by workflow name */
-      name?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/workflows`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Creates a new workflow with the provided data.
-   *
-   * @tags Workflows
-   * @name WorkflowsControllerCreateWorkflow
-   * @summary Create workflow
-   * @request POST:/api/workflows
-   */
-  workflowsControllerCreateWorkflow = (
-    data: CreateWorkflowDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/workflows`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves a specific workflow by its ID within the specified workspace.
-   *
-   * @tags Workflows
-   * @name WorkflowsControllerGetWorkspaceWorkflow
-   * @summary Get workflow by ID
-   * @request GET:/api/workflows/{id}
-   */
-  workflowsControllerGetWorkspaceWorkflow = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/workflows/${id}`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Updates an existing workflow with the provided data.
-   *
-   * @tags Workflows
-   * @name WorkflowsControllerUpdateWorkflow
-   * @summary Update workflow
-   * @request PATCH:/api/workflows/{id}
-   */
-  workflowsControllerUpdateWorkflow = (
-    id: string,
-    data: UpdateWorkflowDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/workflows/${id}`,
-      method: "PATCH",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes a workflow by its ID.
-   *
-   * @tags Workflows
-   * @name WorkflowsControllerDeleteWorkflow
-   * @summary Delete workflow
-   * @request DELETE:/api/workflows/{id}
-   */
-  workflowsControllerDeleteWorkflow = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/workflows/${id}`,
-      method: "DELETE",
       format: "json",
       ...params,
     });

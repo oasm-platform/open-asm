@@ -279,7 +279,7 @@ export default function Runs() {
 
   const navigate = useNavigate();
   return (
-    <Page isShowButtonGoBack title="Jobs registry - runs">
+    <Page isShowButtonGoBack title={jobHistoryDetail?.workflowName}>
       {/* Tools Section */}
       {jobHistoryDetail?.tools && jobHistoryDetail.tools.length > 0 && (
         <div className="mb-6 p-4 border rounded-lg bg-card">
