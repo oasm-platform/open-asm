@@ -214,6 +214,115 @@ export type ArchiveWorkspaceDto = {
   isArchived: boolean;
 };
 
+export type String = { [key: string]: unknown };
+
+export type GetManyStringDto = {
+  data: string[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+/**
+ * The workflow content
+ */
+export type GetManyWorkflowsResponseDtoContent = { [key: string]: unknown };
+
+/**
+ * The user who created this workflow
+ */
+export type GetManyWorkflowsResponseDtoCreatedBy = { [key: string]: unknown };
+
+/**
+ * The workspace this workflow belongs to
+ */
+export type GetManyWorkflowsResponseDtoWorkspace = { [key: string]: unknown };
+
+export type GetManyWorkflowsResponseDto = {
+  /** The unique identifier of the workflow */
+  id: string;
+  /** The name of the workflow */
+  name: string;
+  /** The file path of the workflow */
+  filePath: string;
+  /** The workflow content */
+  content: GetManyWorkflowsResponseDtoContent;
+  /** When the workflow was created */
+  createdAt: string;
+  /** When the workflow was last updated */
+  updatedAt: string;
+  /** The user who created this workflow */
+  createdBy?: GetManyWorkflowsResponseDtoCreatedBy;
+  /** The workspace this workflow belongs to */
+  workspace?: GetManyWorkflowsResponseDtoWorkspace;
+};
+
+export type GetManyGetManyWorkflowsResponseDtoDto = {
+  data: GetManyWorkflowsResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type OnSchedule = (typeof OnSchedule)[keyof typeof OnSchedule];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const OnSchedule = {
+  disabled: 'disabled',
+  '0_0_*_*_*': '0 0 * * *',
+  '0_0_*/3_*_*': '0 0 */3 * *',
+  '0_0_*_*_0': '0 0 * * 0',
+  '0_0_*/14_*_*': '0 0 */14 * *',
+  '0_0_1_*_*': '0 0 1 * *',
+} as const;
+
+export type On = {
+  target: string[];
+  schedule: OnSchedule;
+};
+
+export type WorkflowJob = {
+  name: string;
+  run: string;
+};
+
+export type WorkflowContent = {
+  on: On;
+  jobs: WorkflowJob[];
+  name: string;
+};
+
+export type Workflow = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  content: WorkflowContent;
+  isCanDelete: boolean;
+  isCanEdit: boolean;
+};
+
+export type CreateWorkflowDto = {
+  /** Name of the workflow */
+  name: string;
+  /** Content of the workflow in JSON format */
+  content: WorkflowContent;
+  /** File path for the workflow */
+  filePath?: string;
+};
+
+export type UpdateWorkflowDto = {
+  /** Name of the workflow */
+  name?: string;
+  /** Content of the workflow in JSON format */
+  content?: WorkflowContent;
+  /** File path for the workflow */
+  filePath?: string;
+};
+
 export type CreateFirstAdminDto = {
   email: string;
   password: string;
@@ -606,6 +715,7 @@ export type JobHistoryDetailResponseDto = {
   updatedAt: string;
   tools: Tool[];
   jobs: Job[];
+  workflowName: string;
 };
 
 export type PickTypeClass = {
@@ -1162,113 +1272,6 @@ export type GetManyToolDto = {
   pageCount: number;
 };
 
-export type String = { [key: string]: unknown };
-
-export type GetManyStringDto = {
-  data: string[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
-};
-
-/**
- * The workflow content
- */
-export type GetManyWorkflowsResponseDtoContent = { [key: string]: unknown };
-
-/**
- * The user who created this workflow
- */
-export type GetManyWorkflowsResponseDtoCreatedBy = { [key: string]: unknown };
-
-/**
- * The workspace this workflow belongs to
- */
-export type GetManyWorkflowsResponseDtoWorkspace = { [key: string]: unknown };
-
-export type GetManyWorkflowsResponseDto = {
-  /** The unique identifier of the workflow */
-  id: string;
-  /** The name of the workflow */
-  name: string;
-  /** The file path of the workflow */
-  filePath: string;
-  /** The workflow content */
-  content: GetManyWorkflowsResponseDtoContent;
-  /** When the workflow was created */
-  createdAt: string;
-  /** When the workflow was last updated */
-  updatedAt: string;
-  /** The user who created this workflow */
-  createdBy?: GetManyWorkflowsResponseDtoCreatedBy;
-  /** The workspace this workflow belongs to */
-  workspace?: GetManyWorkflowsResponseDtoWorkspace;
-};
-
-export type GetManyGetManyWorkflowsResponseDtoDto = {
-  data: GetManyWorkflowsResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
-};
-
-export type OnSchedule = (typeof OnSchedule)[keyof typeof OnSchedule];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const OnSchedule = {
-  disabled: 'disabled',
-  '0_0_*_*_*': '0 0 * * *',
-  '0_0_*/3_*_*': '0 0 */3 * *',
-  '0_0_*_*_0': '0 0 * * 0',
-  '0_0_*/14_*_*': '0 0 */14 * *',
-  '0_0_1_*_*': '0 0 1 * *',
-} as const;
-
-export type On = {
-  target: string[];
-  schedule: OnSchedule;
-};
-
-export type WorkflowJob = {
-  name: string;
-  run: string;
-};
-
-export type WorkflowContent = {
-  on: On;
-  jobs: WorkflowJob[];
-  name: string;
-};
-
-export type Workflow = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  content: WorkflowContent;
-};
-
-export type CreateWorkflowDto = {
-  /** Name of the workflow */
-  name: string;
-  /** Content of the workflow in JSON format */
-  content: WorkflowContent;
-  /** File path for the workflow */
-  filePath?: string;
-};
-
-export type UpdateWorkflowDto = {
-  /** Name of the workflow */
-  name?: string;
-  /** Content of the workflow in JSON format */
-  content?: WorkflowContent;
-  /** File path for the workflow */
-  filePath?: string;
-};
-
 export type ToolProvider = {
   id: string;
   createdAt: string;
@@ -1745,6 +1748,18 @@ export type WorkspacesControllerGetWorkspacesParams = {
   isArchived?: boolean;
 };
 
+export type WorkflowsControllerGetManyWorkflowsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * Filter by workflow name
+   */
+  name?: string;
+};
+
 export type AiAssistantControllerGetConversationsParams = {
   search?: string;
   page?: number;
@@ -1980,18 +1995,6 @@ export const ToolsControllerGetInstalledToolsCategory = {
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
-
-export type WorkflowsControllerGetManyWorkflowsParams = {
-  search?: string;
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: string;
-  /**
-   * Filter by workflow name
-   */
-  name?: string;
-};
 
 export type ProvidersControllerGetManyProvidersParams = {
   search?: string;
@@ -4591,6 +4594,973 @@ export const useWorkspacesControllerMakeArchived = <
 > => {
   const mutationOptions =
     getWorkspacesControllerMakeArchivedMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves a list of all available workflow templates in YAML format.
+ * @summary Get all workflow templates
+ */
+export const workflowsControllerListTemplates = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyStringDto>(
+    { url: `/api/workflows/templates`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkflowsControllerListTemplatesQueryKey = () => {
+  return [`/api/workflows/templates`] as const;
+};
+
+export const getWorkflowsControllerListTemplatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getWorkflowsControllerListTemplatesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+  > = ({ signal }) => workflowsControllerListTemplates(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerListTemplatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+>;
+export type WorkflowsControllerListTemplatesQueryError = unknown;
+
+export function useWorkflowsControllerListTemplates<
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerListTemplates<
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerListTemplates<
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all workflow templates
+ */
+
+export function useWorkflowsControllerListTemplates<
+  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkflowsControllerListTemplatesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
+ * @summary Get many workflows
+ */
+export const workflowsControllerGetManyWorkflows = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyGetManyWorkflowsResponseDtoDto>(
+    { url: `/api/workflows`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+) => {
+  return ['infinate', `/api/workflows`, ...(params ? [params] : [])] as const;
+};
+
+export const getWorkflowsControllerGetManyWorkflowsQueryKey = (
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+) => {
+  return [`/api/workflows`, ...(params ? [params] : [])] as const;
+};
+
+export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    WorkflowsControllerGetManyWorkflowsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData,
+        QueryKey,
+        WorkflowsControllerGetManyWorkflowsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    QueryKey,
+    WorkflowsControllerGetManyWorkflowsParams['page']
+  > = ({ signal, pageParam }) =>
+    workflowsControllerGetManyWorkflows(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    TError,
+    TData,
+    QueryKey,
+    WorkflowsControllerGetManyWorkflowsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetManyWorkflowsInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>>;
+export type WorkflowsControllerGetManyWorkflowsInfiniteQueryError = unknown;
+
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    WorkflowsControllerGetManyWorkflowsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData,
+        QueryKey,
+        WorkflowsControllerGetManyWorkflowsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    WorkflowsControllerGetManyWorkflowsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData,
+        QueryKey,
+        WorkflowsControllerGetManyWorkflowsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    WorkflowsControllerGetManyWorkflowsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData,
+        QueryKey,
+        WorkflowsControllerGetManyWorkflowsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many workflows
+ */
+
+export function useWorkflowsControllerGetManyWorkflowsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    WorkflowsControllerGetManyWorkflowsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData,
+        QueryKey,
+        WorkflowsControllerGetManyWorkflowsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions(params, options);
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getWorkflowsControllerGetManyWorkflowsQueryOptions = <
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetManyWorkflowsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+  > = ({ signal }) =>
+    workflowsControllerGetManyWorkflows(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetManyWorkflowsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+>;
+export type WorkflowsControllerGetManyWorkflowsQueryError = unknown;
+
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many workflows
+ */
+
+export function useWorkflowsControllerGetManyWorkflows<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+  TError = unknown,
+>(
+  params?: WorkflowsControllerGetManyWorkflowsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkflowsControllerGetManyWorkflowsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Creates a new workflow with the provided data.
+ * @summary Create workflow
+ */
+export const workflowsControllerCreateWorkflow = (
+  createWorkflowDto: CreateWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Workflow>(
+    {
+      url: `/api/workflows`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createWorkflowDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getWorkflowsControllerCreateWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+    TError,
+    { data: CreateWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+  TError,
+  { data: CreateWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerCreateWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+    { data: CreateWorkflowDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return workflowsControllerCreateWorkflow(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkflowsControllerCreateWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>
+>;
+export type WorkflowsControllerCreateWorkflowMutationBody = CreateWorkflowDto;
+export type WorkflowsControllerCreateWorkflowMutationError = unknown;
+
+/**
+ * @summary Create workflow
+ */
+export const useWorkflowsControllerCreateWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+      TError,
+      { data: CreateWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
+  TError,
+  { data: CreateWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkflowsControllerCreateWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves a specific workflow by its ID within the specified workspace.
+ * @summary Get workflow by ID
+ */
+export const workflowsControllerGetWorkspaceWorkflow = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Workflow>(
+    { url: `/api/workflows/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getWorkflowsControllerGetWorkspaceWorkflowQueryKey = (
+  id?: string,
+) => {
+  return [`/api/workflows/${id}`] as const;
+};
+
+export const getWorkflowsControllerGetWorkspaceWorkflowQueryOptions = <
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getWorkflowsControllerGetWorkspaceWorkflowQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+  > = ({ signal }) =>
+    workflowsControllerGetWorkspaceWorkflow(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type WorkflowsControllerGetWorkspaceWorkflowQueryResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+>;
+export type WorkflowsControllerGetWorkspaceWorkflowQueryError = unknown;
+
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+          TError,
+          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workflow by ID
+ */
+
+export function useWorkflowsControllerGetWorkspaceWorkflow<
+  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getWorkflowsControllerGetWorkspaceWorkflowQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates an existing workflow with the provided data.
+ * @summary Update workflow
+ */
+export const workflowsControllerUpdateWorkflow = (
+  id: string,
+  updateWorkflowDto: UpdateWorkflowDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<Workflow>(
+    {
+      url: `/api/workflows/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateWorkflowDto,
+    },
+    options,
+  );
+};
+
+export const getWorkflowsControllerUpdateWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+    TError,
+    { id: string; data: UpdateWorkflowDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+  TError,
+  { id: string; data: UpdateWorkflowDto },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerUpdateWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+    { id: string; data: UpdateWorkflowDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return workflowsControllerUpdateWorkflow(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkflowsControllerUpdateWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>
+>;
+export type WorkflowsControllerUpdateWorkflowMutationBody = UpdateWorkflowDto;
+export type WorkflowsControllerUpdateWorkflowMutationError = unknown;
+
+/**
+ * @summary Update workflow
+ */
+export const useWorkflowsControllerUpdateWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+      TError,
+      { id: string; data: UpdateWorkflowDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
+  TError,
+  { id: string; data: UpdateWorkflowDto },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkflowsControllerUpdateWorkflowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes a workflow by its ID.
+ * @summary Delete workflow
+ */
+export const workflowsControllerDeleteWorkflow = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/workflows/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getWorkflowsControllerDeleteWorkflowMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workflowsControllerDeleteWorkflow'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workflowsControllerDeleteWorkflow(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkflowsControllerDeleteWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>
+>;
+
+export type WorkflowsControllerDeleteWorkflowMutationError = unknown;
+
+/**
+ * @summary Delete workflow
+ */
+export const useWorkflowsControllerDeleteWorkflow = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getWorkflowsControllerDeleteWorkflowMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
@@ -14429,12 +15399,16 @@ export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
   return query;
 }
 
+/**
+ * Initiates a vulnerability scan for a specified target, identifying potential security risks and vulnerabilities.
+ * @summary Scan target
+ */
 export const vulnerabilitiesControllerScan = (
   scanDto: ScanDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<void>(
+  return orvalClient<AppResponseSerialization>(
     {
       url: `/api/vulnerabilities/scan`,
       method: 'POST',
@@ -14490,6 +15464,9 @@ export type VulnerabilitiesControllerScanMutationResult = NonNullable<
 export type VulnerabilitiesControllerScanMutationBody = ScanDto;
 export type VulnerabilitiesControllerScanMutationError = unknown;
 
+/**
+ * @summary Scan target
+ */
 export const useVulnerabilitiesControllerScan = <
   TError = unknown,
   TContext = unknown,
@@ -16837,973 +17814,6 @@ export const useToolsControllerRotateToolApiKey = <
 > => {
   const mutationOptions =
     getToolsControllerRotateToolApiKeyMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Retrieves a list of all available workflow templates in YAML format.
- * @summary Get all workflow templates
- */
-export const workflowsControllerListTemplates = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyStringDto>(
-    { url: `/api/workflows/templates`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getWorkflowsControllerListTemplatesQueryKey = () => {
-  return [`/api/workflows/templates`] as const;
-};
-
-export const getWorkflowsControllerListTemplatesQueryOptions = <
-  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getWorkflowsControllerListTemplatesQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workflowsControllerListTemplates>>
-  > = ({ signal }) => workflowsControllerListTemplates(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type WorkflowsControllerListTemplatesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof workflowsControllerListTemplates>>
->;
-export type WorkflowsControllerListTemplatesQueryError = unknown;
-
-export function useWorkflowsControllerListTemplates<
-  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerListTemplates<
-  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerListTemplates>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerListTemplates<
-  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get all workflow templates
- */
-
-export function useWorkflowsControllerListTemplates<
-  TData = Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerListTemplates>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkflowsControllerListTemplatesQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Retrieves a paginated list of workflows within the specified workspace. Supports filtering by name.
- * @summary Get many workflows
- */
-export const workflowsControllerGetManyWorkflows = (
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyGetManyWorkflowsResponseDtoDto>(
-    { url: `/api/workflows`, method: 'GET', params, signal },
-    options,
-  );
-};
-
-export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey = (
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-) => {
-  return ['infinate', `/api/workflows`, ...(params ? [params] : [])] as const;
-};
-
-export const getWorkflowsControllerGetManyWorkflowsQueryKey = (
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-) => {
-  return [`/api/workflows`, ...(params ? [params] : [])] as const;
-};
-
-export const getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-    WorkflowsControllerGetManyWorkflowsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData,
-        QueryKey,
-        WorkflowsControllerGetManyWorkflowsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkflowsControllerGetManyWorkflowsInfiniteQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-    QueryKey,
-    WorkflowsControllerGetManyWorkflowsParams['page']
-  > = ({ signal, pageParam }) =>
-    workflowsControllerGetManyWorkflows(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-    TError,
-    TData,
-    QueryKey,
-    WorkflowsControllerGetManyWorkflowsParams['page']
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type WorkflowsControllerGetManyWorkflowsInfiniteQueryResult =
-  NonNullable<Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>>;
-export type WorkflowsControllerGetManyWorkflowsInfiniteQueryError = unknown;
-
-export function useWorkflowsControllerGetManyWorkflowsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-    WorkflowsControllerGetManyWorkflowsParams['page']
-  >,
-  TError = unknown,
->(
-  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData,
-        QueryKey,
-        WorkflowsControllerGetManyWorkflowsParams['page']
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerGetManyWorkflowsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-    WorkflowsControllerGetManyWorkflowsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData,
-        QueryKey,
-        WorkflowsControllerGetManyWorkflowsParams['page']
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerGetManyWorkflowsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-    WorkflowsControllerGetManyWorkflowsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData,
-        QueryKey,
-        WorkflowsControllerGetManyWorkflowsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get many workflows
- */
-
-export function useWorkflowsControllerGetManyWorkflowsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-    WorkflowsControllerGetManyWorkflowsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData,
-        QueryKey,
-        WorkflowsControllerGetManyWorkflowsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getWorkflowsControllerGetManyWorkflowsInfiniteQueryOptions(params, options);
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getWorkflowsControllerGetManyWorkflowsQueryOptions = <
-  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-  TError = unknown,
->(
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkflowsControllerGetManyWorkflowsQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
-  > = ({ signal }) =>
-    workflowsControllerGetManyWorkflows(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type WorkflowsControllerGetManyWorkflowsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
->;
-export type WorkflowsControllerGetManyWorkflowsQueryError = unknown;
-
-export function useWorkflowsControllerGetManyWorkflows<
-  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-  TError = unknown,
->(
-  params: undefined | WorkflowsControllerGetManyWorkflowsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerGetManyWorkflows<
-  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-  TError = unknown,
->(
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerGetManyWorkflows<
-  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-  TError = unknown,
->(
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get many workflows
- */
-
-export function useWorkflowsControllerGetManyWorkflows<
-  TData = Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-  TError = unknown,
->(
-  params?: WorkflowsControllerGetManyWorkflowsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetManyWorkflows>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkflowsControllerGetManyWorkflowsQueryOptions(
-    params,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Creates a new workflow with the provided data.
- * @summary Create workflow
- */
-export const workflowsControllerCreateWorkflow = (
-  createWorkflowDto: CreateWorkflowDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<Workflow>(
-    {
-      url: `/api/workflows`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createWorkflowDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getWorkflowsControllerCreateWorkflowMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-    TError,
-    { data: CreateWorkflowDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-  TError,
-  { data: CreateWorkflowDto },
-  TContext
-> => {
-  const mutationKey = ['workflowsControllerCreateWorkflow'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-    { data: CreateWorkflowDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return workflowsControllerCreateWorkflow(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type WorkflowsControllerCreateWorkflowMutationResult = NonNullable<
-  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>
->;
-export type WorkflowsControllerCreateWorkflowMutationBody = CreateWorkflowDto;
-export type WorkflowsControllerCreateWorkflowMutationError = unknown;
-
-/**
- * @summary Create workflow
- */
-export const useWorkflowsControllerCreateWorkflow = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-      TError,
-      { data: CreateWorkflowDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof workflowsControllerCreateWorkflow>>,
-  TError,
-  { data: CreateWorkflowDto },
-  TContext
-> => {
-  const mutationOptions =
-    getWorkflowsControllerCreateWorkflowMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Retrieves a specific workflow by its ID within the specified workspace.
- * @summary Get workflow by ID
- */
-export const workflowsControllerGetWorkspaceWorkflow = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<Workflow>(
-    { url: `/api/workflows/${id}`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getWorkflowsControllerGetWorkspaceWorkflowQueryKey = (
-  id?: string,
-) => {
-  return [`/api/workflows/${id}`] as const;
-};
-
-export const getWorkflowsControllerGetWorkspaceWorkflowQueryOptions = <
-  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getWorkflowsControllerGetWorkspaceWorkflowQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
-  > = ({ signal }) =>
-    workflowsControllerGetWorkspaceWorkflow(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!id,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type WorkflowsControllerGetWorkspaceWorkflowQueryResult = NonNullable<
-  Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
->;
-export type WorkflowsControllerGetWorkspaceWorkflowQueryError = unknown;
-
-export function useWorkflowsControllerGetWorkspaceWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerGetWorkspaceWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-          TError,
-          Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useWorkflowsControllerGetWorkspaceWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get workflow by ID
- */
-
-export function useWorkflowsControllerGetWorkspaceWorkflow<
-  TData = Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof workflowsControllerGetWorkspaceWorkflow>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getWorkflowsControllerGetWorkspaceWorkflowQueryOptions(
-    id,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Updates an existing workflow with the provided data.
- * @summary Update workflow
- */
-export const workflowsControllerUpdateWorkflow = (
-  id: string,
-  updateWorkflowDto: UpdateWorkflowDto,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<Workflow>(
-    {
-      url: `/api/workflows/${id}`,
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      data: updateWorkflowDto,
-    },
-    options,
-  );
-};
-
-export const getWorkflowsControllerUpdateWorkflowMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-    TError,
-    { id: string; data: UpdateWorkflowDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-  TError,
-  { id: string; data: UpdateWorkflowDto },
-  TContext
-> => {
-  const mutationKey = ['workflowsControllerUpdateWorkflow'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-    { id: string; data: UpdateWorkflowDto }
-  > = (props) => {
-    const { id, data } = props ?? {};
-
-    return workflowsControllerUpdateWorkflow(id, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type WorkflowsControllerUpdateWorkflowMutationResult = NonNullable<
-  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>
->;
-export type WorkflowsControllerUpdateWorkflowMutationBody = UpdateWorkflowDto;
-export type WorkflowsControllerUpdateWorkflowMutationError = unknown;
-
-/**
- * @summary Update workflow
- */
-export const useWorkflowsControllerUpdateWorkflow = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-      TError,
-      { id: string; data: UpdateWorkflowDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof workflowsControllerUpdateWorkflow>>,
-  TError,
-  { id: string; data: UpdateWorkflowDto },
-  TContext
-> => {
-  const mutationOptions =
-    getWorkflowsControllerUpdateWorkflowMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Deletes a workflow by its ID.
- * @summary Delete workflow
- */
-export const workflowsControllerDeleteWorkflow = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    { url: `/api/workflows/${id}`, method: 'DELETE' },
-    options,
-  );
-};
-
-export const getWorkflowsControllerDeleteWorkflowMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-    TError,
-    { id: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['workflowsControllerDeleteWorkflow'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
-
-    return workflowsControllerDeleteWorkflow(id, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type WorkflowsControllerDeleteWorkflowMutationResult = NonNullable<
-  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>
->;
-
-export type WorkflowsControllerDeleteWorkflowMutationError = unknown;
-
-/**
- * @summary Delete workflow
- */
-export const useWorkflowsControllerDeleteWorkflow = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-      TError,
-      { id: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof workflowsControllerDeleteWorkflow>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationOptions =
-    getWorkflowsControllerDeleteWorkflowMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
