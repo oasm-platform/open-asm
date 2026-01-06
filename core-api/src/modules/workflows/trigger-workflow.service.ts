@@ -4,21 +4,23 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { ToolsService } from '../tools/tools.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { Workflow } from './entities/workflow.entity';
 
 @Injectable()
 export class TriggerWorkflowService implements OnModuleInit {
   constructor(
     private jobRegistryService: JobsRegistryService,
+    private workspaceService: WorkspacesService,
     private toolsService: ToolsService,
     private dataSource: DataSource,
     private eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   onModuleInit() {
     // Listen all events with wildcard
     this.eventEmitter.onAny((event: string, payload: Target) => {
-      this.getWorkflowByEvent(event)
+      this.getWorkflowByEvent(event, payload)
         .then(async (workflow: Workflow | null) => {
           if (workflow) {
             // Get the first job's tool name
@@ -62,8 +64,11 @@ export class TriggerWorkflowService implements OnModuleInit {
    * @param event Event name
    * @returns Workflow object
    */
-  private async getWorkflowByEvent(event: string) {
+  private async getWorkflowByEvent(event: string, payload: Target) {
     const [target, action] = event.split('.');
+    const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(
+      payload.id,
+    );
     return this.dataSource
       .getRepository(Workflow)
       .createQueryBuilder('workflow')
@@ -72,6 +77,7 @@ export class TriggerWorkflowService implements OnModuleInit {
         target,
         action,
       })
+      .andWhere('workspace.id = :workspaceId', { workspaceId })
       .getOne();
   }
 }

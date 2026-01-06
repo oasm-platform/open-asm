@@ -130,7 +130,10 @@ export class TargetsService implements OnModuleInit {
       await this.workspacesService.getWorkspaceConfigValue(workspaceId);
 
     if (workspaceConfigs.isAssetsDiscovery) {
-      this.eventEmitter.emit('target.create', target);
+      this.eventEmitter.emit('target.create', {
+        target,
+        workspace,
+      });
     }
 
     // trigger update schedule to schedule registry
