@@ -9,6 +9,7 @@ import {
 import { ArrowDownNarrowWide, ArrowUpNarrowWide } from 'lucide-react';
 import * as React from 'react';
 
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -65,6 +66,13 @@ interface DataTableProps<TData, TValue> {
   tableState?: {
     rowSelection?: Record<string, boolean>;
   };
+  rowSelection?: Record<string, boolean>;
+  onRowSelectionChange?: (rowSelection: Record<string, boolean>) => void;
+  /** Render custom header when rows are selected (GitHub-style) */
+  selectionHeader?: (
+    selectedCount: number,
+    table: ReturnType<typeof useReactTable<TData>>,
+  ) => React.ReactNode;
 }
 
 export function DataTable<TData, TValue>({
@@ -92,10 +100,36 @@ export function DataTable<TData, TValue>({
   isShowHeader = true,
   isShowBorder = true,
   tableState,
+  rowSelection: externalRowSelection,
+  onRowSelectionChange,
+  selectionHeader,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
+  const [internalRowSelection, setInternalRowSelection] = React.useState<
+    Record<string, boolean>
+  >({});
+
+  // Use external rowSelection if provided, otherwise use internal state
+  const rowSelection = externalRowSelection ?? internalRowSelection;
+  const setRowSelection = React.useCallback(
+    (
+      updaterOrValue:
+        | Record<string, boolean>
+        | ((prev: Record<string, boolean>) => Record<string, boolean>),
+    ) => {
+      const newValue =
+        typeof updaterOrValue === 'function'
+          ? updaterOrValue(rowSelection)
+          : updaterOrValue;
+      if (onRowSelectionChange) {
+        onRowSelectionChange(newValue);
+      } else {
+        setInternalRowSelection(newValue);
+      }
+    },
+    [rowSelection, onRowSelectionChange],
+  );
 
   const [searchValue, setSearchValue] = React.useState(filterValue);
   const debouncedSearchValue = useDebounce(searchValue, 500);
@@ -103,13 +137,6 @@ export function DataTable<TData, TValue>({
   React.useEffect(() => {
     onFilterChange?.(debouncedSearchValue);
   }, [debouncedSearchValue, onFilterChange]);
-
-  // Sync external tableState.rowSelection with internal rowSelection state
-  React.useEffect(() => {
-    if (tableState?.rowSelection) {
-      setRowSelection(tableState.rowSelection);
-    }
-  }, [tableState?.rowSelection]);
 
   const table = useReactTable({
     data,
@@ -170,20 +197,17 @@ export function DataTable<TData, TValue>({
             <div key={i}>{c}</div>
           ))}
         </div>
-        <div className="w-full md:w-1/2">
+        <div className="flex items-center gap-4 w-full md:w-auto">
           {filterColumnKey && (
-            <div className="flex items-center gap-4 py-1">
-              <Input
-                placeholder={filterPlaceholder}
-                className="w-full md:max-w-sm"
-                value={searchValue}
-                onChange={(e) => {
-                  setSearchValue(e.target.value);
-                }}
-              />
-            </div>
+            <Input
+              placeholder={filterPlaceholder}
+              className="w-full md:max-w-sm"
+              value={searchValue}
+              onChange={(e) => {
+                setSearchValue(e.target.value);
+              }}
+            />
           )}
-
           {filterComponents}
         </div>
       </div>
@@ -193,33 +217,67 @@ export function DataTable<TData, TValue>({
         <Table>
           {isShowHeader && (
             <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-b!">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead
-                      key={header.id}
-                      onClick={() =>
-                        header.column.getCanSort() &&
-                        handleSort(header.column.id)
-                      }
-                      className={`whitespace-nowrap ${header.column.getCanSort() ? 'cursor-pointer' : ''}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                        {sortBy === header.column.id &&
-                          (sortOrder === 'ASC' ? (
-                            <ArrowUpNarrowWide size={16} />
-                          ) : (
-                            <ArrowDownNarrowWide size={16} />
-                          ))}
-                      </div>
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
+              {(() => {
+                const selectedCount =
+                  Object.values(rowSelection).filter(Boolean).length;
+                const hasSelection = selectedCount > 0 && selectionHeader;
+
+                if (hasSelection) {
+                  // GitHub-style: Show selection header instead of normal header
+                  return (
+                    <TableRow className="border-b! bg-muted/30">
+                      <TableHead
+                        colSpan={table.getAllLeafColumns().length}
+                        className="h-10"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={
+                              table.getIsAllPageRowsSelected() ||
+                              (table.getIsSomePageRowsSelected() &&
+                                'indeterminate')
+                            }
+                            onCheckedChange={(value) =>
+                              table.toggleAllPageRowsSelected(!!value)
+                            }
+                            aria-label="Select all"
+                          />
+                          {selectionHeader(selectedCount, table)}
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  );
+                }
+
+                // Normal header
+                return table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="border-b!">
+                    {headerGroup.headers.map((header) => (
+                      <TableHead
+                        key={header.id}
+                        onClick={() =>
+                          header.column.getCanSort() &&
+                          handleSort(header.column.id)
+                        }
+                        className={`whitespace-nowrap h-10 ${header.column.getCanSort() ? 'cursor-pointer' : ''}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                          {sortBy === header.column.id &&
+                            (sortOrder === 'ASC' ? (
+                              <ArrowUpNarrowWide size={16} />
+                            ) : (
+                              <ArrowDownNarrowWide size={16} />
+                            ))}
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ));
+              })()}
             </TableHeader>
           )}
           <TableBody>

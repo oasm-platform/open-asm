@@ -40,7 +40,10 @@ const DISMISS_REASONS = [
 type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
 
 interface DismissAlertDialogProps {
-  vulnerabilityId: string;
+  /** Single vulnerability ID for single dismiss */
+  vulnerabilityId?: string;
+  /** Multiple vulnerability IDs for bulk dismiss */
+  vulnerabilityIds?: string[];
   vulnerabilityName?: string;
   trigger: ReactNode;
   onDismissSuccess?: () => void;
@@ -48,6 +51,7 @@ interface DismissAlertDialogProps {
 
 export function DismissAlertDialog({
   vulnerabilityId,
+  vulnerabilityIds,
   vulnerabilityName,
   trigger,
   onDismissSuccess,
@@ -55,8 +59,14 @@ export function DismissAlertDialog({
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<DismissReason | ''>('');
   const [comment, setComment] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const dismissMutation = useVulnerabilitiesControllerDismissVulnerability();
+
+  // Get all IDs to dismiss
+  const idsToDissmiss =
+    vulnerabilityIds ?? (vulnerabilityId ? [vulnerabilityId] : []);
+  const isBulkDismiss = idsToDissmiss.length > 1;
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
@@ -67,42 +77,55 @@ export function DismissAlertDialog({
   };
 
   const handleDismiss = async () => {
-    if (!reason) return;
+    if (!reason || idsToDissmiss.length === 0) return;
 
-    const dismissalData: VulnerabilityDismissal = {
-      vulnerabilityId,
-      userId: '',
-      reason,
-      comment: comment.trim(),
-    };
+    setIsProcessing(true);
 
-    dismissMutation.mutate(
-      { id: vulnerabilityId, data: dismissalData },
-      {
-        onSuccess: () => {
-          toast.success('Alert dismissed', {
-            description: vulnerabilityName
-              ? `"${vulnerabilityName}" has been dismissed.`
-              : 'The vulnerability has been dismissed.',
-          });
-          setOpen(false);
-          setReason('');
-          setComment('');
-          onDismissSuccess?.();
-        },
-        onError: (error) => {
-          toast.error('Failed to dismiss alert', {
-            description:
-              error instanceof Error
-                ? error.message
-                : 'An unexpected error occurred.',
-          });
-        },
-      },
-    );
+    try {
+      // Dismiss all selected vulnerabilities sequentially
+      for (const id of idsToDissmiss) {
+        const dismissalData: VulnerabilityDismissal = {
+          vulnerabilityId: id,
+          userId: '',
+          reason,
+          comment: comment.trim(),
+        };
+
+        await new Promise<void>((resolve, reject) => {
+          dismissMutation.mutate(
+            { id, data: dismissalData },
+            {
+              onSuccess: () => resolve(),
+              onError: (error) => reject(error),
+            },
+          );
+        });
+      }
+
+      toast.success(isBulkDismiss ? 'Alerts dismissed' : 'Alert dismissed', {
+        description: isBulkDismiss
+          ? `${idsToDissmiss.length} vulnerabilities have been dismissed.`
+          : vulnerabilityName
+            ? `"${vulnerabilityName}" has been dismissed.`
+            : 'The vulnerability has been dismissed.',
+      });
+      setOpen(false);
+      setReason('');
+      setComment('');
+      onDismissSuccess?.();
+    } catch (error) {
+      toast.error('Failed to dismiss alert(s)', {
+        description:
+          error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred.',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const isSubmitDisabled = !reason || dismissMutation.isPending;
+  const isSubmitDisabled = !reason || isProcessing;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

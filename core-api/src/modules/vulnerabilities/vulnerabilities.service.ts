@@ -68,6 +68,7 @@ export class VulnerabilitiesService {
       .leftJoin('workspace_targets.workspace', 'workspaces')
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
+      .leftJoinAndSelect('vulnerabilities.vulnerabilityDismissal', 'dismissal')
       .where('workspaces.id = :workspaceId', { workspaceId })
       .skip((page - 1) * limit)
       .take(limit);
