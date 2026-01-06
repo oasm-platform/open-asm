@@ -14,7 +14,10 @@ import {
   GetVulnerabilitiesStatisticsQueryDto,
   VulnerabilityStatisticsDto,
 } from './dto/get-vulnerability-statistics.dto';
-import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
+import {
+  GetVulnerabilitiesQueryDto,
+  VulnerabilityStatus,
+} from './dto/get-vulnerability.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { User } from '../auth/entities/user.entity';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
@@ -56,7 +59,7 @@ export class VulnerabilitiesService {
    * @returns A promise that resolves to a paginated list of vulnerabilities, including total count and pagination information.
    */
   async getVulnerabilities(query: GetVulnerabilitiesQueryDto) {
-    const { limit, page, sortOrder, targetIds, workspaceId, q } = query;
+    const { limit, page, sortOrder, targetIds, workspaceId, q, status } = query;
 
     const { sortBy } = query;
 
@@ -91,6 +94,13 @@ export class VulnerabilitiesService {
         q: `%${q}%`,
         qArray: `%${q}%`,
       });
+    }
+
+    // Filter by status
+    if (status === VulnerabilityStatus.OPEN) {
+      queryBuilder.andWhere('dismissal.vulnerabilityId IS NULL');
+    } else if (status === VulnerabilityStatus.DISMISSED) {
+      queryBuilder.andWhere('dismissal.vulnerabilityId IS NOT NULL');
     }
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
@@ -144,16 +154,10 @@ export class VulnerabilitiesService {
       .leftJoin('targets.workspaceTargets', 'workspace_targets')
       .leftJoin('workspace_targets.workspace', 'workspaces')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
+      .leftJoin('vulnerabilities.vulnerabilityDismissal', 'dismissal')
       .where('workspaces.id = :workspaceId', { workspaceId })
-      // .andWhere(
-      //   `(
-      //     SELECT MAX(jh."createdAt")
-      //     FROM job_histories jh
-      //     INNER JOIN vulnerabilities v2 ON v2."jobHistoryId" = jh.id
-      //     INNER JOIN assets a2 ON v2."assetId" = a2.id
-      //     WHERE a2."targetId" = targets.id
-      //   ) = "jobHistory"."createdAt"`,
-      // )
+      // Only show open vulnerabilities (not dismissed)
+      .andWhere('dismissal.vulnerabilityId IS NULL')
       .groupBy('vulnerabilities.severity');
 
     if (targetIds) {

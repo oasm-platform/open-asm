@@ -1949,7 +1949,21 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
   workspaceId: string;
   targetIds?: string[];
   q?: string;
+  /**
+   * Filter by vulnerability status: open, dismissed, or all
+   */
+  status?: VulnerabilitiesControllerGetVulnerabilitiesStatus;
 };
+
+export type VulnerabilitiesControllerGetVulnerabilitiesStatus =
+  (typeof VulnerabilitiesControllerGetVulnerabilitiesStatus)[keyof typeof VulnerabilitiesControllerGetVulnerabilitiesStatus];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const VulnerabilitiesControllerGetVulnerabilitiesStatus = {
+  open: 'open',
+  dismissed: 'dismissed',
+  all: 'all',
+} as const;
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
   workspaceId: string;

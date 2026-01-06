@@ -1886,6 +1886,16 @@ export enum CreateNotificationDtoTypeEnum {
   WORKSPACE_CREATED = "WORKSPACE_CREATED",
 }
 
+/**
+ * Filter by vulnerability status: open, dismissed, or all
+ * @default "open"
+ */
+export enum VulnerabilitiesControllerGetVulnerabilitiesParamsStatusEnum {
+  Open = "open",
+  Dismissed = "dismissed",
+  All = "all",
+}
+
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
   BuiltIn = "built_in",
   Provider = "provider",
@@ -3819,6 +3829,11 @@ export class Api<
       workspaceId: string;
       targetIds?: string[];
       q?: string;
+      /**
+       * Filter by vulnerability status: open, dismissed, or all
+       * @default "open"
+       */
+      status?: VulnerabilitiesControllerGetVulnerabilitiesParamsStatusEnum;
     },
     params: RequestParams = {},
   ) =>
