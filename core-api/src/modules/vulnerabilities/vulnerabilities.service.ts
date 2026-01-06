@@ -114,6 +114,7 @@ export class VulnerabilitiesService {
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
       .leftJoinAndSelect('vulnerabilities.vulnerabilityDismissal', 'dismissal')
+      .leftJoinAndSelect('dismissal.user', 'user')
       .where('workspaces.id = :workspaceId', { workspaceId })
       .andWhere('vulnerabilities.id = :id', { id });
 

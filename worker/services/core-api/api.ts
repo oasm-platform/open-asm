@@ -1233,6 +1233,13 @@ export interface ScanDto {
   targetId: string;
 }
 
+export interface VulnerabilityDismissal {
+  vulnerabilityId: string;
+  userId: string;
+  reason: string;
+  comment: string;
+}
+
 export interface Vulnerability {
   id: string;
   /** @format date-time */
@@ -1269,6 +1276,7 @@ export interface Vulnerability {
   /** @format date-time */
   modificationDate: string;
   tool: Tool;
+  vulnerabilityDismissal: VulnerabilityDismissal;
 }
 
 export interface GetManyVulnerabilityDto {
@@ -1287,13 +1295,6 @@ export interface VulnerabilityStatisticsDto {
 
 export interface GetVulnerabilitiesStatisticsResponseDto {
   data: VulnerabilityStatisticsDto[];
-}
-
-export interface VulnerabilityDismissal {
-  vulnerabilityId: string;
-  userId: string;
-  reason: string;
-  comment: string;
 }
 
 export interface CreateToolDto {
