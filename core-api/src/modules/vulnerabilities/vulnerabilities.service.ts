@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { ToolsService } from '../tools/tools.service';
 import {
@@ -219,48 +219,61 @@ export class VulnerabilitiesService {
     };
   }
 
-  async dismissVulnerability(
-    id: string,
+  async bulkDismissVulnerabilities(
+    ids: string[],
     workspaceId: string,
     user: User,
-    dismiss: VulnerabilityDismissal,
+    dismiss: { reason: VulnerabilityDismissal['reason']; comment?: string },
   ) {
-    const vulnerability = await this.vulnerabilitiesRepository.findOne({
+    // Validate all vulnerabilities exist and belong to the workspace
+    const vulnerabilities = await this.vulnerabilitiesRepository.find({
       where: {
-        id,
+        id: In(ids),
         asset: {
           target: { workspaceTargets: { workspace: { id: workspaceId } } },
         },
       },
     });
-    if (!vulnerability) {
-      throw new NotFoundException(`Vulnerability ${id} not found`);
+
+    const foundIds = vulnerabilities.map((v) => v.id);
+    const notFoundIds = ids.filter((id) => !foundIds.includes(id));
+    if (notFoundIds.length > 0) {
+      throw new NotFoundException(
+        `Vulnerabilities not found: ${notFoundIds.join(', ')}`,
+      );
     }
 
-    const isDismissed = await this.dismissRepo.findOne({
+    // Check which are already dismissed
+    const alreadyDismissed = await this.dismissRepo.find({
       where: {
-        vulnerabilityId: id,
+        vulnerabilityId: In(ids),
       },
     });
 
-    if (isDismissed) {
-      throw new BadRequestException(`Vulnerability ${id} is already dismissed`);
+    if (alreadyDismissed.length > 0) {
+      throw new BadRequestException(
+        `Vulnerabilities already dismissed: ${alreadyDismissed.map((d) => d.vulnerabilityId).join(', ')}`,
+      );
     }
 
-    const result = this.dismissRepo.create({
-      vulnerabilityId: id,
-      userId: user.id,
-      reason: dismiss.reason,
-      comment: dismiss.comment,
-    });
-    await this.dismissRepo.save(result);
-    return result;
+    // Create dismissal records for all
+    const dismissals = ids.map((id) =>
+      this.dismissRepo.create({
+        vulnerabilityId: id,
+        userId: user.id,
+        reason: dismiss.reason,
+        comment: dismiss.comment ?? '',
+      }),
+    );
+
+    await this.dismissRepo.save(dismissals);
+    return dismissals;
   }
 
-  async reopenVulnerability(id: string, workspaceId: string) {
-    const vulnerability = await this.dismissRepo.findOne({
+  async bulkReopenVulnerabilities(ids: string[], workspaceId: string) {
+    const dismissals = await this.dismissRepo.find({
       where: {
-        vulnerabilityId: id,
+        vulnerabilityId: In(ids),
         vulnerability: {
           asset: {
             target: {
@@ -274,9 +287,15 @@ export class VulnerabilitiesService {
         },
       },
     });
-    if (!vulnerability) {
-      throw new NotFoundException(`Vulnerability ${id} not found`);
+
+    const foundIds = dismissals.map((d) => d.vulnerabilityId);
+    const notFoundIds = ids.filter((id) => !foundIds.includes(id));
+    if (notFoundIds.length > 0) {
+      throw new NotFoundException(
+        `Dismissed vulnerabilities not found: ${notFoundIds.join(', ')}`,
+      );
     }
-    return await this.dismissRepo.delete({ vulnerabilityId: id });
+
+    await this.dismissRepo.delete({ vulnerabilityId: In(ids) });
   }
 }

@@ -21,6 +21,10 @@ import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { UserContext } from '@/common/decorators/app.decorator';
 import { User } from '../auth/entities/user.entity';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
+import {
+  BulkDismissVulnerabilitiesDto,
+  BulkReopenVulnerabilitiesDto,
+} from './dto/bulk-vulnerability.dto';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
@@ -89,45 +93,48 @@ export class VulnerabilitiesController {
   }
 
   @Doc({
-    summary: 'Dismiss vulnerability',
+    summary: 'Bulk dismiss vulnerabilities',
     description:
-      'Dismisses a specific security vulnerability identified within the system, removing it from active tracking and analysis.',
+      'Dismisses multiple security vulnerabilities identified within the system, removing them from active tracking and analysis.',
     response: {
       serialization: VulnerabilityDismissal,
+      isArray: true,
     },
     request: {
       getWorkspaceId: true,
     },
   })
-  @Post(':id/dismiss')
-  dismissVulnerability(
-    @Param('id') id: string,
+  @Post('dismiss')
+  bulkDismissVulnerabilities(
     @WorkspaceId() workspaceId: string,
     @UserContext() user: User,
-    @Body() dismiss: VulnerabilityDismissal,
+    @Body() dto: BulkDismissVulnerabilitiesDto,
   ) {
-    return this.vulnerabilitiesService.dismissVulnerability(
-      id,
+    return this.vulnerabilitiesService.bulkDismissVulnerabilities(
+      dto.ids,
       workspaceId,
       user,
-      dismiss,
+      dto,
     );
   }
 
   @Doc({
-    summary: 'Reopen vulnerability',
+    summary: 'Bulk reopen vulnerabilities',
     description:
-      'Reopens a specific security vulnerability identified within the system, restoring it to active tracking and analysis.',
+      'Reopens multiple security vulnerabilities identified within the system, restoring them to active tracking and analysis.',
     request: {
       getWorkspaceId: true,
     },
   })
-  @Post(':id/reopen')
+  @Post('reopen')
   @HttpCode(204)
-  reopenVulnerability(
-    @Param('id') id: string,
+  bulkReopenVulnerabilities(
     @WorkspaceId() workspaceId: string,
+    @Body() dto: BulkReopenVulnerabilitiesDto,
   ) {
-    return this.vulnerabilitiesService.reopenVulnerability(id, workspaceId);
+    return this.vulnerabilitiesService.bulkReopenVulnerabilities(
+      dto.ids,
+      workspaceId,
+    );
   }
 }

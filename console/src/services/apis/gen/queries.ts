@@ -1226,6 +1226,10 @@ export type GetVulnerabilitiesStatisticsResponseDto = {
   data: VulnerabilityStatisticsDto[];
 };
 
+export type BulkDismissVulnerabilitiesDto = { [key: string]: unknown };
+
+export type BulkReopenVulnerabilitiesDto = { [key: string]: unknown };
+
 export type CreateToolDtoCategory =
   (typeof CreateToolDtoCategory)[keyof typeof CreateToolDtoCategory];
 
@@ -1951,6 +1955,11 @@ export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
   workspaceId: string;
   targetIds?: string[];
 };
+
+export type VulnerabilitiesControllerBulkDismissVulnerabilities200 =
+  AppResponseSerialization & {
+    data?: VulnerabilityDismissal[];
+  };
 
 export type ToolsControllerGetManyToolsParams = {
   search?: string;
@@ -16336,192 +16345,225 @@ export function useVulnerabilitiesControllerGetVulnerabilityById<
 }
 
 /**
- * Dismisses a specific security vulnerability identified within the system, removing it from active tracking and analysis.
- * @summary Dismiss vulnerability
+ * Dismisses multiple security vulnerabilities identified within the system, removing them from active tracking and analysis.
+ * @summary Bulk dismiss vulnerabilities
  */
-export const vulnerabilitiesControllerDismissVulnerability = (
-  id: string,
-  vulnerabilityDismissal: VulnerabilityDismissal,
+export const vulnerabilitiesControllerBulkDismissVulnerabilities = (
+  bulkDismissVulnerabilitiesDto: BulkDismissVulnerabilitiesDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<VulnerabilityDismissal>(
+  return orvalClient<VulnerabilitiesControllerBulkDismissVulnerabilities200>(
     {
-      url: `/api/vulnerabilities/${id}/dismiss`,
+      url: `/api/vulnerabilities/dismiss`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      data: vulnerabilityDismissal,
+      data: bulkDismissVulnerabilitiesDto,
       signal,
     },
     options,
   );
 };
 
-export const getVulnerabilitiesControllerDismissVulnerabilityMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerDismissVulnerability>>,
+export const getVulnerabilitiesControllerBulkDismissVulnerabilitiesMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+      >,
+      TError,
+      { data: BulkDismissVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+    >,
     TError,
-    { id: string; data: VulnerabilityDismissal },
+    { data: BulkDismissVulnerabilitiesDto },
     TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof vulnerabilitiesControllerDismissVulnerability>>,
-  TError,
-  { id: string; data: VulnerabilityDismissal },
-  TContext
-> => {
-  const mutationKey = ['vulnerabilitiesControllerDismissVulnerability'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
+  > => {
+    const mutationKey = ['vulnerabilitiesControllerBulkDismissVulnerabilities'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerDismissVulnerability>>,
-    { id: string; data: VulnerabilityDismissal }
-  > = (props) => {
-    const { id, data } = props ?? {};
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+      >,
+      { data: BulkDismissVulnerabilitiesDto }
+    > = (props) => {
+      const { data } = props ?? {};
 
-    return vulnerabilitiesControllerDismissVulnerability(
-      id,
-      data,
-      requestOptions,
-    );
+      return vulnerabilitiesControllerBulkDismissVulnerabilities(
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
   };
 
-  return { mutationFn, ...mutationOptions };
-};
-
-export type VulnerabilitiesControllerDismissVulnerabilityMutationResult =
+export type VulnerabilitiesControllerBulkDismissVulnerabilitiesMutationResult =
   NonNullable<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerDismissVulnerability>>
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+    >
   >;
-export type VulnerabilitiesControllerDismissVulnerabilityMutationBody =
-  VulnerabilityDismissal;
-export type VulnerabilitiesControllerDismissVulnerabilityMutationError =
+export type VulnerabilitiesControllerBulkDismissVulnerabilitiesMutationBody =
+  BulkDismissVulnerabilitiesDto;
+export type VulnerabilitiesControllerBulkDismissVulnerabilitiesMutationError =
   unknown;
 
 /**
- * @summary Dismiss vulnerability
+ * @summary Bulk dismiss vulnerabilities
  */
-export const useVulnerabilitiesControllerDismissVulnerability = <
+export const useVulnerabilitiesControllerBulkDismissVulnerabilities = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof vulnerabilitiesControllerDismissVulnerability>>,
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+      >,
       TError,
-      { id: string; data: VulnerabilityDismissal },
+      { data: BulkDismissVulnerabilitiesDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof vulnerabilitiesControllerDismissVulnerability>>,
+  Awaited<
+    ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+  >,
   TError,
-  { id: string; data: VulnerabilityDismissal },
+  { data: BulkDismissVulnerabilitiesDto },
   TContext
 > => {
   const mutationOptions =
-    getVulnerabilitiesControllerDismissVulnerabilityMutationOptions(options);
+    getVulnerabilitiesControllerBulkDismissVulnerabilitiesMutationOptions(
+      options,
+    );
 
   return useMutation(mutationOptions, queryClient);
 };
 
 /**
- * Reopens a specific security vulnerability identified within the system, restoring it to active tracking and analysis.
- * @summary Reopen vulnerability
+ * Reopens multiple security vulnerabilities identified within the system, restoring them to active tracking and analysis.
+ * @summary Bulk reopen vulnerabilities
  */
-export const vulnerabilitiesControllerReopenVulnerability = (
-  id: string,
+export const vulnerabilitiesControllerBulkReopenVulnerabilities = (
+  bulkReopenVulnerabilitiesDto: BulkReopenVulnerabilitiesDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<AppResponseSerialization>(
-    { url: `/api/vulnerabilities/${id}/reopen`, method: 'POST', signal },
+    {
+      url: `/api/vulnerabilities/reopen`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: bulkReopenVulnerabilitiesDto,
+      signal,
+    },
     options,
   );
 };
 
-export const getVulnerabilitiesControllerReopenVulnerabilityMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerReopenVulnerability>>,
+export const getVulnerabilitiesControllerBulkReopenVulnerabilitiesMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+      >,
+      TError,
+      { data: BulkReopenVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+    >,
     TError,
-    { id: string },
+    { data: BulkReopenVulnerabilitiesDto },
     TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof vulnerabilitiesControllerReopenVulnerability>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['vulnerabilitiesControllerReopenVulnerability'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
+  > => {
+    const mutationKey = ['vulnerabilitiesControllerBulkReopenVulnerabilities'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerReopenVulnerability>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+      >,
+      { data: BulkReopenVulnerabilitiesDto }
+    > = (props) => {
+      const { data } = props ?? {};
 
-    return vulnerabilitiesControllerReopenVulnerability(id, requestOptions);
+      return vulnerabilitiesControllerBulkReopenVulnerabilities(
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
   };
 
-  return { mutationFn, ...mutationOptions };
-};
-
-export type VulnerabilitiesControllerReopenVulnerabilityMutationResult =
+export type VulnerabilitiesControllerBulkReopenVulnerabilitiesMutationResult =
   NonNullable<
-    Awaited<ReturnType<typeof vulnerabilitiesControllerReopenVulnerability>>
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+    >
   >;
-
-export type VulnerabilitiesControllerReopenVulnerabilityMutationError = unknown;
+export type VulnerabilitiesControllerBulkReopenVulnerabilitiesMutationBody =
+  BulkReopenVulnerabilitiesDto;
+export type VulnerabilitiesControllerBulkReopenVulnerabilitiesMutationError =
+  unknown;
 
 /**
- * @summary Reopen vulnerability
+ * @summary Bulk reopen vulnerabilities
  */
-export const useVulnerabilitiesControllerReopenVulnerability = <
+export const useVulnerabilitiesControllerBulkReopenVulnerabilities = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof vulnerabilitiesControllerReopenVulnerability>>,
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+      >,
       TError,
-      { id: string },
+      { data: BulkReopenVulnerabilitiesDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof vulnerabilitiesControllerReopenVulnerability>>,
+  Awaited<
+    ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+  >,
   TError,
-  { id: string },
+  { data: BulkReopenVulnerabilitiesDto },
   TContext
 > => {
   const mutationOptions =
-    getVulnerabilitiesControllerReopenVulnerabilityMutationOptions(options);
+    getVulnerabilitiesControllerBulkReopenVulnerabilitiesMutationOptions(
+      options,
+    );
 
   return useMutation(mutationOptions, queryClient);
 };

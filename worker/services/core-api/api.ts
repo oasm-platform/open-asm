@@ -1297,6 +1297,10 @@ export interface GetVulnerabilitiesStatisticsResponseDto {
   data: VulnerabilityStatisticsDto[];
 }
 
+export type BulkDismissVulnerabilitiesDto = object;
+
+export type BulkReopenVulnerabilitiesDto = object;
+
 export interface CreateToolDto {
   name: string;
   description: string;
@@ -3869,20 +3873,24 @@ export class Api<
     });
 
   /**
-   * @description Dismisses a specific security vulnerability identified within the system, removing it from active tracking and analysis.
+   * @description Dismisses multiple security vulnerabilities identified within the system, removing them from active tracking and analysis.
    *
    * @tags Vulnerabilities
-   * @name VulnerabilitiesControllerDismissVulnerability
-   * @summary Dismiss vulnerability
-   * @request POST:/api/vulnerabilities/{id}/dismiss
+   * @name VulnerabilitiesControllerBulkDismissVulnerabilities
+   * @summary Bulk dismiss vulnerabilities
+   * @request POST:/api/vulnerabilities/dismiss
    */
-  vulnerabilitiesControllerDismissVulnerability = (
-    id: string,
-    data: VulnerabilityDismissal,
+  vulnerabilitiesControllerBulkDismissVulnerabilities = (
+    data: BulkDismissVulnerabilitiesDto,
     params: RequestParams = {},
   ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/vulnerabilities/${id}/dismiss`,
+    this.request<
+      AppResponseSerialization & {
+        data?: VulnerabilityDismissal[];
+      },
+      any
+    >({
+      path: `/api/vulnerabilities/dismiss`,
       method: "POST",
       body: data,
       type: ContentType.Json,
@@ -3891,20 +3899,22 @@ export class Api<
     });
 
   /**
-   * @description Reopens a specific security vulnerability identified within the system, restoring it to active tracking and analysis.
+   * @description Reopens multiple security vulnerabilities identified within the system, restoring them to active tracking and analysis.
    *
    * @tags Vulnerabilities
-   * @name VulnerabilitiesControllerReopenVulnerability
-   * @summary Reopen vulnerability
-   * @request POST:/api/vulnerabilities/{id}/reopen
+   * @name VulnerabilitiesControllerBulkReopenVulnerabilities
+   * @summary Bulk reopen vulnerabilities
+   * @request POST:/api/vulnerabilities/reopen
    */
-  vulnerabilitiesControllerReopenVulnerability = (
-    id: string,
+  vulnerabilitiesControllerBulkReopenVulnerabilities = (
+    data: BulkReopenVulnerabilitiesDto,
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/vulnerabilities/${id}/reopen`,
+      path: `/api/vulnerabilities/reopen`,
       method: "POST",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });
