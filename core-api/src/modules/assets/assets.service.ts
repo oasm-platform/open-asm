@@ -59,7 +59,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all assets services associated with a specified target.
