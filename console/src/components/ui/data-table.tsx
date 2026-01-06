@@ -189,9 +189,7 @@ export function DataTable<TData, TValue>({
   const showSkeleton = isLoading && data.length === 0;
   return (
     <div className="w-full">
-      {/* Filter and column visibility controls */}
-      {/* Filter and column visibility controls */}
-      <div className="flex flex-col gap-2 md:flex-row-reverse md:justify-between md:items-center">
+      <div className="flex flex-col gap-2 md:flex-row-reverse md:justify-between md:items-center mb-2">
         <div className="flex gap-2 w-full justify-end md:w-auto">
           {toolbarComponents.map((c, i) => (
             <div key={i}>{c}</div>

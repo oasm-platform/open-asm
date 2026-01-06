@@ -11,14 +11,12 @@ import {
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  useVulnerabilitiesControllerDismissVulnerability,
-  type VulnerabilityDismissal,
-} from '@/services/apis/gen/queries';
+import { useVulnerabilitiesControllerBulkDismissVulnerabilities } from '@/services/apis/gen/queries';
 import { Loader2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+/** Available reasons for dismissing a vulnerability */
 const DISMISS_REASONS = [
   {
     value: 'false_positive',
@@ -44,11 +42,18 @@ interface DismissAlertDialogProps {
   vulnerabilityId?: string;
   /** Multiple vulnerability IDs for bulk dismiss */
   vulnerabilityIds?: string[];
+  /** Display name for the vulnerability(s) being dismissed */
   vulnerabilityName?: string;
+  /** Trigger element that opens the dialog */
   trigger: ReactNode;
+  /** Callback invoked after successful dismissal */
   onDismissSuccess?: () => void;
 }
 
+/**
+ * Renders a dialog for dismissing vulnerabilities with reason selection and optional comment.
+ * Supports both single and bulk dismissal using the bulk dismiss API.
+ */
 export function DismissAlertDialog({
   vulnerabilityId,
   vulnerabilityIds,
@@ -59,14 +64,14 @@ export function DismissAlertDialog({
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<DismissReason | ''>('');
   const [comment, setComment] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
 
-  const dismissMutation = useVulnerabilitiesControllerDismissVulnerability();
+  const bulkDismissMutation =
+    useVulnerabilitiesControllerBulkDismissVulnerabilities();
 
   // Get all IDs to dismiss
-  const idsToDissmiss =
+  const idsToDismiss =
     vulnerabilityIds ?? (vulnerabilityId ? [vulnerabilityId] : []);
-  const isBulkDismiss = idsToDissmiss.length > 1;
+  const isBulkDismiss = idsToDismiss.length > 1;
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
@@ -76,56 +81,51 @@ export function DismissAlertDialog({
     }
   };
 
+  /**
+   * Handles the dismiss action by calling the bulk dismiss API.
+   * Shows success/error toast based on the result.
+   */
   const handleDismiss = async () => {
-    if (!reason || idsToDissmiss.length === 0) return;
+    if (!reason || idsToDismiss.length === 0) return;
 
-    setIsProcessing(true);
-
-    try {
-      // Dismiss all selected vulnerabilities sequentially
-      for (const id of idsToDissmiss) {
-        const dismissalData: VulnerabilityDismissal = {
-          vulnerabilityId: id,
-          userId: '',
+    bulkDismissMutation.mutate(
+      {
+        data: {
+          ids: idsToDismiss,
           reason,
-          comment: comment.trim(),
-        };
-
-        await new Promise<void>((resolve, reject) => {
-          dismissMutation.mutate(
-            { id, data: dismissalData },
+          comment: comment.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            isBulkDismiss ? 'Alerts dismissed' : 'Alert dismissed',
             {
-              onSuccess: () => resolve(),
-              onError: (error) => reject(error),
+              description: isBulkDismiss
+                ? `${idsToDismiss.length} vulnerabilities have been dismissed.`
+                : vulnerabilityName
+                  ? `"${vulnerabilityName}" has been dismissed.`
+                  : 'The vulnerability has been dismissed.',
             },
           );
-        });
-      }
-
-      toast.success(isBulkDismiss ? 'Alerts dismissed' : 'Alert dismissed', {
-        description: isBulkDismiss
-          ? `${idsToDissmiss.length} vulnerabilities have been dismissed.`
-          : vulnerabilityName
-            ? `"${vulnerabilityName}" has been dismissed.`
-            : 'The vulnerability has been dismissed.',
-      });
-      setOpen(false);
-      setReason('');
-      setComment('');
-      onDismissSuccess?.();
-    } catch (error) {
-      toast.error('Failed to dismiss alert(s)', {
-        description:
-          error instanceof Error
-            ? error.message
-            : 'An unexpected error occurred.',
-      });
-    } finally {
-      setIsProcessing(false);
-    }
+          setOpen(false);
+          setReason('');
+          setComment('');
+          onDismissSuccess?.();
+        },
+        onError: (error) => {
+          toast.error('Failed to dismiss alert(s)', {
+            description:
+              error instanceof Error
+                ? error.message
+                : 'An unexpected error occurred.',
+          });
+        },
+      },
+    );
   };
 
-  const isSubmitDisabled = !reason || isProcessing;
+  const isSubmitDisabled = !reason || bulkDismissMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -185,12 +185,12 @@ export function DismissAlertDialog({
           <Button
             variant="outline"
             onClick={() => setOpen(false)}
-            disabled={dismissMutation.isPending}
+            disabled={bulkDismissMutation.isPending}
           >
             Cancel
           </Button>
           <Button onClick={handleDismiss} disabled={isSubmitDisabled}>
-            {dismissMutation.isPending && (
+            {bulkDismissMutation.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
             Dismiss
