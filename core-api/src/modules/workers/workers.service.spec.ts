@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { ConfigService } from '@nestjs/config';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -41,12 +42,15 @@ describe('WorkersService', () => {
       getRawMany: jest.fn(),
       getRawOne: jest.fn(),
       manager: {
-        transaction: jest.fn((callback) => callback({
-          getRepository: jest.fn(() => ({
-            save: jest.fn(),
-          })),
-          query: jest.fn(),
-        })),
+        transaction: jest.fn((callback) => {
+          const mockManager = {
+            getRepository: jest.fn(() => ({
+              save: jest.fn(),
+            })),
+            query: jest.fn(),
+          };
+          return callback(mockManager);
+        }),
       },
     } as any;
 
