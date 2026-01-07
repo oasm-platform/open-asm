@@ -266,7 +266,7 @@ export class VulnerabilitiesService {
         vulnerabilityId: id,
         userId: user.id,
         reason: dismiss.reason,
-        comment: dismiss.comment ?? '',
+        comment: dismiss.comment,
       }),
     );
 
@@ -277,7 +277,7 @@ export class VulnerabilitiesService {
   async bulkReopenVulnerabilities(ids: string[], workspaceId: string) {
     const dismissals = await this.dismissRepo.find({
       where: {
-        vulnerabilityId: In(ids),
+        id: In(ids),
         vulnerability: {
           asset: {
             target: {
@@ -292,7 +292,7 @@ export class VulnerabilitiesService {
       },
     });
 
-    const foundIds = dismissals.map((d) => d.vulnerabilityId);
+    const foundIds = dismissals.map((d) => d.id);
     const notFoundIds = ids.filter((id) => !foundIds.includes(id));
     if (notFoundIds.length > 0) {
       throw new NotFoundException(
@@ -300,6 +300,6 @@ export class VulnerabilitiesService {
       );
     }
 
-    await this.dismissRepo.delete({ vulnerabilityId: In(ids) });
+    await this.dismissRepo.delete({ id: In(ids) });
   }
 }

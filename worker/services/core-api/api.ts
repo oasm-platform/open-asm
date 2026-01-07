@@ -1233,11 +1233,14 @@ export interface ScanDto {
   targetId: string;
 }
 
-export interface VulnerabilityDismissal {
-  vulnerabilityId: string;
-  userId: string;
-  reason: string;
-  comment: string;
+export interface User {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  role: UserRoleEnum;
 }
 
 export interface Vulnerability {
@@ -1279,6 +1282,20 @@ export interface Vulnerability {
   vulnerabilityDismissal: VulnerabilityDismissal;
 }
 
+export interface VulnerabilityDismissal {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  vulnerabilityId: string;
+  userId: string;
+  reason: string;
+  comment: string;
+  user: User;
+  vulnerability: Vulnerability;
+}
+
 export interface GetManyVulnerabilityDto {
   data: Vulnerability[];
   total: number;
@@ -1297,9 +1314,15 @@ export interface GetVulnerabilitiesStatisticsResponseDto {
   data: VulnerabilityStatisticsDto[];
 }
 
-export type BulkDismissVulnerabilitiesDto = object;
+export interface BulkDismissVulnerabilitiesDto {
+  ids: string[];
+  reason: string;
+  comment: string | null;
+}
 
-export type BulkReopenVulnerabilitiesDto = object;
+export interface BulkReopenVulnerabilitiesDto {
+  ids: string[];
+}
 
 export interface CreateToolDto {
   name: string;
@@ -1578,16 +1601,6 @@ export interface UpdateAssetGroupWorkflowDto {
   schedule: UpdateAssetGroupWorkflowDtoScheduleEnum;
 }
 
-export interface User {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  name: string;
-  role: UserRoleEnum;
-}
-
 export interface Issue {
   id: string;
   /** @format date-time */
@@ -1808,6 +1821,12 @@ export enum JobHistoryResponseDtoStatusEnum {
   Cancelled = "cancelled",
 }
 
+export enum UserRoleEnum {
+  Admin = "admin",
+  User = "user",
+  Bot = "bot",
+}
+
 export enum VulnerabilityStatisticsDtoSeverityEnum {
   Info = "info",
   Low = "low",
@@ -1841,12 +1860,6 @@ export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
   Value001 = "0 0 1 * *",
-}
-
-export enum UserRoleEnum {
-  Admin = "admin",
-  User = "user",
-  Bot = "bot",
 }
 
 export enum CreateIssueDtoSourceTypeEnum {

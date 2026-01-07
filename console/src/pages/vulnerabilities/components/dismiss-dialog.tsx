@@ -38,10 +38,8 @@ const DISMISS_REASONS = [
 type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
 
 interface DismissAlertDialogProps {
-  /** Single vulnerability ID for single dismiss */
-  vulnerabilityId?: string;
   /** Multiple vulnerability IDs for bulk dismiss */
-  vulnerabilityIds?: string[];
+  vulnerabilityIds: string[];
   /** Display name for the vulnerability(s) being dismissed */
   vulnerabilityName?: string;
   /** Trigger element that opens the dialog */
@@ -55,7 +53,6 @@ interface DismissAlertDialogProps {
  * Supports both single and bulk dismissal using the bulk dismiss API.
  */
 export function DismissAlertDialog({
-  vulnerabilityId,
   vulnerabilityIds,
   vulnerabilityName,
   trigger,
@@ -68,10 +65,7 @@ export function DismissAlertDialog({
   const bulkDismissMutation =
     useVulnerabilitiesControllerBulkDismissVulnerabilities();
 
-  // Get all IDs to dismiss
-  const idsToDismiss =
-    vulnerabilityIds ?? (vulnerabilityId ? [vulnerabilityId] : []);
-  const isBulkDismiss = idsToDismiss.length > 1;
+  const isBulkDismiss = vulnerabilityIds.length > 1;
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
@@ -86,14 +80,14 @@ export function DismissAlertDialog({
    * Shows success/error toast based on the result.
    */
   const handleDismiss = async () => {
-    if (!reason || idsToDismiss.length === 0) return;
+    if (!reason || vulnerabilityIds.length === 0) return;
 
     bulkDismissMutation.mutate(
       {
         data: {
-          ids: idsToDismiss,
+          ids: vulnerabilityIds,
           reason,
-          comment: comment.trim() || undefined,
+          comment: comment.trim(),
         },
       },
       {
@@ -102,7 +96,7 @@ export function DismissAlertDialog({
             isBulkDismiss ? 'Alerts dismissed' : 'Alert dismissed',
             {
               description: isBulkDismiss
-                ? `${idsToDismiss.length} vulnerabilities have been dismissed.`
+                ? `${vulnerabilityIds.length} vulnerabilities have been dismissed.`
                 : vulnerabilityName
                   ? `"${vulnerabilityName}" has been dismissed.`
                   : 'The vulnerability has been dismissed.',

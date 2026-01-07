@@ -1,14 +1,6 @@
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   GetVulnerabilitiesStatisticsResponseDto,
@@ -127,7 +119,6 @@ export class VulnerabilitiesController {
     },
   })
   @Post('reopen')
-  @HttpCode(204)
   bulkReopenVulnerabilities(
     @WorkspaceId() workspaceId: string,
     @Body() dto: BulkReopenVulnerabilitiesDto,

@@ -1154,11 +1154,21 @@ export type ScanDto = {
   targetId: string;
 };
 
-export type VulnerabilityDismissal = {
-  vulnerabilityId: string;
-  userId: string;
-  reason: string;
-  comment: string;
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UserRole = {
+  admin: 'admin',
+  user: 'user',
+  bot: 'bot',
+} as const;
+
+export type User = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  role: UserRole;
 };
 
 export type Vulnerability = {
@@ -1196,6 +1206,18 @@ export type Vulnerability = {
   vulnerabilityDismissal: VulnerabilityDismissal;
 };
 
+export type VulnerabilityDismissal = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  vulnerabilityId: string;
+  userId: string;
+  reason: string;
+  comment: string;
+  user: User;
+  vulnerability: Vulnerability;
+};
+
 export type GetManyVulnerabilityDto = {
   data: Vulnerability[];
   total: number;
@@ -1226,9 +1248,16 @@ export type GetVulnerabilitiesStatisticsResponseDto = {
   data: VulnerabilityStatisticsDto[];
 };
 
-export type BulkDismissVulnerabilitiesDto = { [key: string]: unknown };
+export type BulkDismissVulnerabilitiesDto = {
+  ids: string[];
+  reason: string;
+  /** @nullable */
+  comment: string | null;
+};
 
-export type BulkReopenVulnerabilitiesDto = { [key: string]: unknown };
+export type BulkReopenVulnerabilitiesDto = {
+  ids: string[];
+};
 
 export type CreateToolDtoCategory =
   (typeof CreateToolDtoCategory)[keyof typeof CreateToolDtoCategory];
@@ -1513,23 +1542,6 @@ export const UpdateAssetGroupWorkflowDtoSchedule = {
 
 export type UpdateAssetGroupWorkflowDto = {
   schedule: UpdateAssetGroupWorkflowDtoSchedule;
-};
-
-export type UserRole = (typeof UserRole)[keyof typeof UserRole];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const UserRole = {
-  admin: 'admin',
-  user: 'user',
-  bot: 'bot',
-} as const;
-
-export type User = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  name: string;
-  role: UserRole;
 };
 
 export type Issue = {
