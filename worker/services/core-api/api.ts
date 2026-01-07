@@ -684,6 +684,7 @@ export interface JobHistoryDetailResponseDto {
   updatedAt: string;
   tools: Tool[];
   jobs: Job[];
+  workflowName: string;
 }
 
 export interface PickTypeClass {

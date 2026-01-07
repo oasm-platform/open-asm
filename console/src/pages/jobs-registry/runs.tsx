@@ -112,14 +112,34 @@ export default function Runs() {
       accessorKey: 'createdAt',
       cell: ({ row }) => {
         const updatedAt = dayjs(row.original.updatedAt);
+        const pickJobAt = dayjs(row.original.pickJobAt);
         const completedAt = dayjs(row.original.completedAt);
 
-        // Total seconds between createdAt and completedAt
-        const totalSeconds = completedAt.diff(updatedAt, 'second');
+        // Calculate duration only if all dates are valid and job is completed
+        const isValidDates =
+          pickJobAt.isValid() &&
+          completedAt.isValid() &&
+          row.original.status === JobStatus.completed;
 
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
+        let durationDisplay = null;
+
+        if (isValidDates) {
+          const totalSeconds = completedAt.diff(pickJobAt, 'second');
+
+          // Only display if duration is positive
+          if (totalSeconds >= 0) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            const parts = [];
+            if (hours > 0) parts.push(`${hours}h`);
+            if (minutes > 0) parts.push(`${minutes}m`);
+            parts.push(`${seconds}s`);
+
+            durationDisplay = parts.join(' ');
+          }
+        }
 
         return (
           <div className="text-sm text-muted-foreground flex flex-col gap-2">
@@ -128,12 +148,10 @@ export default function Runs() {
               {updatedAt.format('YYYY-MM-DD HH:mm:ss')}
             </span>
 
-            {row.original.status !== JobStatus.in_progress && (
+            {durationDisplay && (
               <span className="flex gap-2 items-center">
                 <Clock size={20} />
-                {hours > 0 && `${hours}h `}
-                {minutes > 0 && `${minutes}m `}
-                {seconds}s
+                {durationDisplay}
               </span>
             )}
           </div>
@@ -228,7 +246,7 @@ export default function Runs() {
     return (toolIndex: number) => {
       const tools = jobHistoryDetail?.tools || [];
 
-      // Check if any previous tool in the workflow is still running
+      // Check if any previous tool in the workflow is still running or waiting
       for (let i = 0; i < toolIndex; i++) {
         const prevTool = tools[i];
         const prevToolJobs = jobsByToolId.get(prevTool.id) || [];
@@ -237,20 +255,22 @@ export default function Runs() {
           const hasPrevRunning = prevToolJobs.some(
             (job) => job.status === JobStatus.in_progress,
           );
-          if (hasPrevRunning) return 'running';
+          if (hasPrevRunning) return 'pending'; // Changed from 'running' to 'pending'
 
           const allPrevCompleted = prevToolJobs.every(
             (job) => job.status === JobStatus.completed,
           );
-          if (!allPrevCompleted) return 'running';
+          if (!allPrevCompleted) return 'pending'; // Changed from 'running' to 'pending'
         }
+        // If previous tool has no jobs or is completed, continue to check current tool
       }
 
       // Check current tool jobs
       const currentTool = tools[toolIndex];
       const currentToolJobs = jobsByToolId.get(currentTool.id) || [];
 
-      if (currentToolJobs.length === 0) return null;
+      // If current tool has no jobs yet, it's pending
+      if (currentToolJobs.length === 0) return 'pending';
 
       const hasRunning = currentToolJobs.some(
         (job) => job.status === JobStatus.in_progress,
@@ -262,6 +282,12 @@ export default function Runs() {
       );
       if (allCompleted) return 'completed';
 
+      const allPending = currentToolJobs.every(
+        (job) => job.status === JobStatus.pending,
+      );
+      if (allPending) return 'pending';
+
+      // Mixed statuses - some pending, some running, some completed
       return 'running';
     };
   }, [jobHistoryDetail?.tools, jobsByToolId]);
@@ -279,7 +305,7 @@ export default function Runs() {
 
   const navigate = useNavigate();
   return (
-    <Page isShowButtonGoBack title="Jobs registry - runs">
+    <Page isShowButtonGoBack title={jobHistoryDetail?.workflowName}>
       {/* Tools Section */}
       {jobHistoryDetail?.tools && jobHistoryDetail.tools.length > 0 && (
         <div className="mb-6 p-4 border rounded-lg bg-card">
@@ -301,10 +327,13 @@ export default function Runs() {
                     />
                     <span className="font-medium">{tool.name}</span>
                     {status === 'running' && (
-                      <Loader2Icon className="animate-spin h-4 w-4" />
+                      <Loader2Icon className="animate-spin" />
                     )}
                     {status === 'completed' && (
                       <CircleCheck className="text-green-500" />
+                    )}
+                    {status === 'pending' && (
+                      <Clock className="text-yellow-500" />
                     )}
                   </Link>
                   {index < jobHistoryDetail.tools.length - 1 && (
