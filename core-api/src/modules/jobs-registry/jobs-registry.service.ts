@@ -47,6 +47,7 @@ import {
 } from './dto/jobs-registry.dto';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
+import { JobOutbox, JobOutboxStatus } from './entities/job-outbox.entity';
 import { Job } from './entities/job.entity';
 
 @Injectable()
@@ -57,6 +58,8 @@ export class JobsRegistryService {
     public readonly jobHistoryRepo: Repository<JobHistory>,
     @InjectRepository(JobErrorLog)
     public readonly jobErrorLogRepo: Repository<JobErrorLog>,
+    @InjectRepository(JobOutbox)
+    public readonly jobOutboxRepo: Repository<JobOutbox>,
     private dataSource: DataSource,
     @Optional() private toolsService: ToolsService,
     private storageService: StorageService,
@@ -129,106 +132,151 @@ export class JobsRegistryService {
     } else if (!priority) {
       priority = tool.priority || JobPriority.BACKGROUND;
     }
-    // Step 1: create job history
-    let jobHistory: JobHistory;
 
-    if (existingJobHistory) {
-      jobHistory = existingJobHistory;
-    } else {
-      jobHistory = this.jobHistoryRepo.create({
-        workflow,
-      });
-      await this.jobHistoryRepo.save(jobHistory);
-    }
+    // Create query runner for transaction
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    const jobRepo = this.dataSource.getRepository(Job);
-    const jobsToInsert: Job[] = [];
+    try {
+      // Step 1: create job history
+      let jobHistory: JobHistory;
 
-    // Step 2: find appropriate data source based on tool category
-    if (tool.category === ToolCategory.HTTP_PROBE) {
-      // For HTTP_PROBE, use asset services
-      const assetServices = await this.findAssetServicesForJob(
-        targetIds,
-        assetIds,
-        workspaceId,
-      );
-
-      // Step 3: iterate tools and create jobs
-      const defaultCommand = builtInTools.find(
-        (t) => t.name === tool.name,
-      )?.command;
-
-      // Create jobs for each asset service
-      for (const assetService of assetServices) {
-        const job = jobRepo.create({
-          id: randomUUID(),
-          asset: assetService.asset, // Use the associated asset from asset service
-          assetService, // Store the asset service reference
-          jobName: tool.name,
-          status: JobStatus.PENDING,
-          category: tool.category,
-          tool,
-          priority: priority ?? 4,
-          jobHistory,
-          command: bindingCommand(defaultCommand ?? '', {
-            // Use the default command template for HTTP_PROBE
-            value: assetService.value,
-            port: assetService.port.toString(),
-          }),
-          isSaveRawResult: isSaveRawResult ?? false,
-          isPublishEvent,
-        } as DeepPartial<Job>);
-
-        jobsToInsert.push(job);
+      if (existingJobHistory) {
+        jobHistory = existingJobHistory;
+      } else {
+        jobHistory = queryRunner.manager.create(JobHistory, {
+          workflow,
+        });
+        await queryRunner.manager.save(jobHistory);
       }
-    } else {
-      // Cannot query assets for PORTS_SCANNER with assetIds
-      if (tool.category === ToolCategory.PORTS_SCANNER) assetIds = [];
 
-      // For all other categories, use regular assets
-      const assets = await this.findAssetsForJob(
-        targetIds,
-        assetIds,
-        workspaceId,
-      );
+      const jobsToInsert: Job[] = [];
 
-      const filteredAssets = this.filterAssetsByCategory(assets, tool.category);
+      // Step 2: find appropriate data source based on tool category
+      if (tool.category === ToolCategory.HTTP_PROBE) {
+        // For HTTP_PROBE, use asset services
+        const assetServices = await this.findAssetServicesForJob(
+          targetIds,
+          assetIds,
+          workspaceId,
+        );
 
-      // Step 3: iterate tools and create jobs
-      const defaultCommand = builtInTools.find(
-        (t) => t.name === tool.name,
-      )?.command;
+        // Step 3: iterate tools and create jobs
+        const defaultCommand = builtInTools.find(
+          (t) => t.name === tool.name,
+        )?.command;
 
-      for (const asset of filteredAssets) {
-        const job = jobRepo.create({
-          id: randomUUID(),
-          asset,
-          jobName: tool.name,
-          status: JobStatus.PENDING,
-          category: tool.category,
-          tool,
-          priority: priority ?? 4,
-          jobHistory,
-          command: bindingCommand(defaultCommand ?? '', {
-            value: asset.value,
-          }),
-          isSaveRawResult: isSaveRawResult ?? false,
-          isPublishEvent,
-        } as DeepPartial<Job>);
+        // Create jobs for each asset service
+        for (const assetService of assetServices) {
+          const job = queryRunner.manager.create(Job, {
+            id: randomUUID(),
+            asset: assetService.asset, // Use the associated asset from asset service
+            assetService, // Store the asset service reference
+            jobName: tool.name,
+            status: JobStatus.PENDING,
+            category: tool.category,
+            tool,
+            priority: priority ?? 4,
+            jobHistory,
+            command: bindingCommand(defaultCommand ?? '', {
+              // Use the default command template for HTTP_PROBE
+              value: assetService.value,
+              port: assetService.port.toString(),
+            }),
+            isSaveRawResult: isSaveRawResult ?? false,
+            isPublishEvent,
+          } as DeepPartial<Job>);
 
-        jobsToInsert.push(job);
+          jobsToInsert.push(job);
+        }
+      } else {
+        // Cannot query assets for PORTS_SCANNER with assetIds
+        if (tool.category === ToolCategory.PORTS_SCANNER) assetIds = [];
+
+        // For all other categories, use regular assets
+        const assets = await this.findAssetsForJob(
+          targetIds,
+          assetIds,
+          workspaceId,
+        );
+
+        const filteredAssets = this.filterAssetsByCategory(assets, tool.category);
+
+        // Step 3: iterate tools and create jobs
+        const defaultCommand = builtInTools.find(
+          (t) => t.name === tool.name,
+        )?.command;
+
+        for (const asset of filteredAssets) {
+          const job = queryRunner.manager.create(Job, {
+            id: randomUUID(),
+            asset,
+            jobName: tool.name,
+            status: JobStatus.PENDING,
+            category: tool.category,
+            tool,
+            priority: priority ?? 4,
+            jobHistory,
+            command: bindingCommand(defaultCommand ?? '', {
+              value: asset.value,
+            }),
+            isSaveRawResult: isSaveRawResult ?? false,
+            isPublishEvent,
+          } as DeepPartial<Job>);
+
+          jobsToInsert.push(job);
+        }
       }
+
+      // Step 4: save all jobs and outbox records in transaction
+      if (jobsToInsert.length > 0) {
+        // Save all jobs
+        await queryRunner.manager.save(Job, jobsToInsert);
+
+        // Create job outbox records for each job
+        const outboxRecords = jobsToInsert.map((job) => {
+          // Payload follows GetNextJobResponseDto structure
+          const payload = {
+            id: job.id,
+            category: job.category,
+            status: job.status,
+            priority: job.priority,
+            createdAt: job.createdAt,
+            updatedAt: job.updatedAt,
+            command: job.command,
+            asset: job.asset ? job.asset.value : null,
+          };
+
+          return queryRunner.manager.create(JobOutbox, {
+            payload,
+            status: JobOutboxStatus.PENDING,
+            jobId: job.id,
+          });
+        });
+
+        // Save all outbox records
+        await queryRunner.manager.save(JobOutbox, outboxRecords);
+
+        // Commit transaction
+        await queryRunner.commitTransaction();
+
+        // Increment pending jobs counter (hybrid Redis + DB) - outside transaction
+        await this.incrementJobHistoryCounter(jobHistory.id, jobsToInsert.length);
+      } else {
+        // No jobs to insert, rollback transaction
+        await queryRunner.rollbackTransaction();
+      }
+
+      return jobsToInsert;
+    } catch (error) {
+      // Rollback transaction on error
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      // Release query runner
+      await queryRunner.release();
     }
-
-    // Step 4: save all jobs
-    if (jobsToInsert.length > 0) {
-      await jobRepo.save(jobsToInsert);
-
-      // Increment pending jobs counter (hybrid Redis + DB)
-      await this.incrementJobHistoryCounter(jobHistory.id, jobsToInsert.length);
-    }
-
-    return jobsToInsert;
   }
 
   /**

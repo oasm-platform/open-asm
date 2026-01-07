@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflows.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
+import { JobOutbox } from './entities/job-outbox.entity';
 import { JobsRegistryController } from './jobs-registry.controller';
 import { JobsRegistryService } from './jobs-registry.service';
 import {
@@ -24,6 +25,7 @@ import { JobResultProcessor } from './processors/job-result.processor';
       JobHistory,
       AssetGroupWorkflow,
       JobErrorLog,
+      JobOutbox,
     ]),
     WorkspacesModule,
     BullModule.registerQueue({
