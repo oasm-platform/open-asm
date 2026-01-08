@@ -1,10 +1,12 @@
 import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflows.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
+import { JobOutbox } from './entities/job-outbox.entity';
 import { JobsRegistryController } from './jobs-registry.controller';
 import { JobsRegistryService } from './jobs-registry.service';
 import {
@@ -19,11 +21,13 @@ import { JobResultProcessor } from './processors/job-result.processor';
 @Global()
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     TypeOrmModule.forFeature([
       Job,
       JobHistory,
       AssetGroupWorkflow,
       JobErrorLog,
+      JobOutbox,
     ]),
     WorkspacesModule,
     BullModule.registerQueue({
