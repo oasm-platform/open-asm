@@ -1,4 +1,5 @@
 import { BullMQName, JobStatus } from '@/common/enums/enum';
+import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
@@ -11,6 +12,7 @@ import { StorageService } from '../storage/storage.service';
 import { ToolsService } from '../tools/tools.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
+import { JobOutbox } from './entities/job-outbox.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
 
@@ -34,6 +36,18 @@ describe('JobsRegistryService', () => {
 
   const mockJobErrorLogRepository = {
     createQueryBuilder: jest.fn(),
+  };
+
+  const mockJobOutboxRepository = {
+    createQueryBuilder: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn(),
+  };
+
+  const mockRedisLockService = {
+    withLock: jest.fn(),
   };
 
   const mockDataSource = {
@@ -73,8 +87,16 @@ describe('JobsRegistryService', () => {
           useValue: mockJobErrorLogRepository,
         },
         {
+          provide: getRepositoryToken(JobOutbox),
+          useValue: mockJobOutboxRepository,
+        },
+        {
           provide: DataSource,
           useValue: mockDataSource,
+        },
+        {
+          provide: RedisLockService,
+          useValue: mockRedisLockService,
         },
         {
           provide: DataAdapterService,

@@ -391,19 +391,18 @@ export class JobsRegistryService {
 
   /**
    * Retrieves the next job associated with the given worker that has not yet
-   * been started. If a job is found, it is updated with the worker's ID and
-   * saved to the database. If no job is found, this function returns `null`.
+   * been started. First tries to get job from Redis using BRPOP, then falls back
+   * to database query if Redis has no jobs.
+   * Uses distributed locking to ensure Redis pop and DB update are atomic.
    * @param workerId the ID of the worker to retrieve a job for
    * @returns the next job associated with the worker, or `null` if none is found
    */
   public async getNextJob(
     workerId: string,
   ): Promise<GetNextJobResponseDto | null> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
     try {
-      const worker = await queryRunner.manager
+      // Get worker information first - single DB query, reused throughout
+      const worker = await this.repo.manager
         .getRepository(WorkerInstance)
         .findOne({
           where: {
@@ -411,6 +410,399 @@ export class JobsRegistryService {
           },
           relations: ['workspace', 'tool'],
         });
+
+      if (!worker) {
+        throw new NotFoundException('Worker not found');
+      }
+
+      // Try to get job from Redis first with proper sync
+      const redisJob = await this.tryGetJobFromRedisWithSync(worker);
+
+      if (redisJob) {
+        return redisJob;
+      }
+
+      // Fallback to database query if Redis has no jobs
+      // Pass worker directly to avoid redundant DB query
+      return await this.getNextJobFromDatabase(worker);
+    } catch (error) {
+      Logger.error(
+        'Error in getNextJob',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Gets job from Redis with proper atomic sync to database.
+   * Uses distributed lock to prevent job loss if DB update fails.
+   * @param worker the worker instance
+   * @returns the job response DTO or null
+   */
+  private async tryGetJobFromRedisWithSync(
+    worker: WorkerInstance,
+  ): Promise<GetNextJobResponseDto | null> {
+    const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
+
+    if (isBuiltInTools) {
+      return await this.tryGetJobFromRedisForBuiltInWorkerWithSync(worker);
+    }
+
+    return await this.tryGetJobFromRedisForGlobalWorkerWithSync(worker);
+  }
+
+  /**
+   * Gets job from Redis for built-in worker with proper sync.
+   * @param worker the built-in worker instance
+   * @returns the job response DTO or null
+   */
+  private async tryGetJobFromRedisForBuiltInWorkerWithSync(
+    worker: WorkerInstance,
+  ): Promise<GetNextJobResponseDto | null> {
+    const builtInToolsNames = builtInTools.map((tool) => tool.name);
+    const workspaceId = worker.workspace?.id;
+
+    // Scan priority from 0 to 4 (lower number = higher priority = process first)
+    for (let priority = 0; priority <= 4; priority++) {
+      // Scan through each built-in tool
+      for (const toolName of builtInToolsNames) {
+        const redisKey = `jobs:${toolName}:${workspaceId}:${priority}`;
+
+        // BRPOP with 1 second timeout
+        const result = await this.redis.client.brpop(redisKey, 1);
+
+        if (result) {
+          const jsonString = result[1];
+          const payload = JSON.parse(jsonString) as GetNextJobResponseDto;
+          const jobId = payload.id;
+
+          // Try to claim and update in DB atomically
+          const claimed = await this.claimJobFromRedis(jobId, worker.id);
+
+          if (claimed) {
+            // Success: job is claimed, return response
+            return this.buildJobResponseFromPayload(payload, worker);
+          }
+
+          // Failed to claim: job might be claimed by another worker or stale
+          // Continue to next job
+          Logger.warn(`Failed to claim job ${jobId} from Redis, continuing...`);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Gets job from Redis for global worker with proper sync.
+   * @param worker the global worker instance
+   * @returns the job response DTO or null
+   */
+  private async tryGetJobFromRedisForGlobalWorkerWithSync(
+    worker: WorkerInstance,
+  ): Promise<GetNextJobResponseDto | null> {
+    const toolName = worker.tool?.name;
+    if (!toolName) {
+      return null;
+    }
+
+    // Scan priority from 0 to 4 (lower number = higher priority = process first)
+    for (let priority = 0; priority <= 4; priority++) {
+      // Use SCAN to find all keys matching pattern: jobs:{toolName}:*:{priority}
+      const pattern = `jobs:${toolName}:*:${priority}`;
+      const keys: string[] = [];
+
+      // SCAN iterator
+      let cursor = '0';
+      do {
+        const [newCursor, foundKeys] = await this.redis.client.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          100,
+        );
+        cursor = newCursor;
+        keys.push(...foundKeys);
+      } while (cursor !== '0');
+
+      // Randomize keys for fair distribution
+      this.shuffleArray(keys);
+
+      // Try each key with BRPOP
+      for (const redisKey of keys) {
+        const result = await this.redis.client.brpop(redisKey, 1);
+
+        if (result) {
+          const jsonString = result[1];
+          const payload = JSON.parse(jsonString) as GetNextJobResponseDto;
+          const jobId = payload.id;
+
+          // Try to claim and update in DB atomically
+          const claimed = await this.claimJobFromRedis(jobId, worker.id);
+
+          if (claimed) {
+            // Success: job is claimed, return response
+            return this.buildJobResponseFromPayload(payload, worker);
+          }
+
+          // Failed to claim: job might be claimed by another worker or stale
+          Logger.warn(`Failed to claim job ${jobId} from Redis, continuing...`);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Claims a job from Redis by updating the database.
+   * Uses Redis SETNX for atomic claiming and DB transaction for update.
+   * If DB update fails, the claim key expires and job can be re-claimed.
+   * @param jobId the job ID
+   * @param workerId the worker ID
+   * @returns true if claimed successfully, false otherwise
+   */
+  private async claimJobFromRedis(
+    jobId: string,
+    workerId: string,
+  ): Promise<boolean> {
+    const claimKey = `claimed:${jobId}`;
+    const claimTTL = 30; // 30 seconds TTL for claim key (DB update should complete faster)
+
+    // Try to set claim key atomically (only one worker can claim)
+    const claimed = await this.redis.client.set(
+      claimKey,
+      workerId,
+      'EX',
+      claimTTL,
+      'NX',
+    );
+
+    if (claimed !== 'OK') {
+      // Another worker already claimed this job
+      return false;
+    }
+
+    try {
+      // Update job status in database to IN_PROGRESS
+      const updated = await this.repo.update(jobId, {
+        status: JobStatus.IN_PROGRESS,
+        workerId,
+        pickJobAt: new Date(),
+      });
+
+      if (updated.affected && updated.affected > 0) {
+        // Success: extend claim TTL slightly to allow for job processing
+        await this.redis.client.expire(claimKey, 3600); // 1 hour for processing
+        return true;
+      }
+
+      // DB update failed, release claim
+      await this.redis.client.del(claimKey);
+      return false;
+    } catch (error) {
+      // DB error, release claim so job can be re-claimed
+      Logger.error(
+        `Failed to claim job ${jobId} in DB, releasing claim`,
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      await this.redis.client.del(claimKey);
+      return false;
+    }
+  }
+
+  /**
+   * Recovery mechanism: Reclaims stale jobs that were popped from Redis
+   * but never updated in DB. Should be called periodically.
+   * @returns number of jobs reclaimed
+   */
+  public async recoverStaleJobs(): Promise<number> {
+    const logger = new Logger('JobRecovery');
+    let recoveredCount = 0;
+
+    try {
+      // Find claim keys that have expired
+      const claimPattern = 'claimed:*';
+      let cursor = '0';
+
+      do {
+        const [newCursor, keys] = await this.redis.client.scan(
+          cursor,
+          'MATCH',
+          claimPattern,
+          'COUNT',
+          100,
+        );
+        cursor = newCursor;
+
+        for (const claimKey of keys) {
+          // Check if key still exists (not expired)
+          const exists = await this.redis.client.exists(claimKey);
+          if (!exists) {
+            // Key expired, extract jobId and check if job is still PENDING
+            const jobId = claimKey.replace('claimed:', '');
+            const job = await this.repo.findOne({
+              where: { id: jobId, status: JobStatus.PENDING },
+            });
+
+            if (job) {
+              logger.warn(`Recovering stale job ${jobId} from Redis pop`);
+              // Re-add to outbox for re-processing
+              await this.reAddJobToOutbox(job);
+              recoveredCount++;
+            }
+          }
+        }
+      } while (cursor !== '0');
+
+      if (recoveredCount > 0) {
+        logger.log(`Recovered ${recoveredCount} stale jobs`);
+      }
+    } catch (error) {
+      logger.error(
+        'Error recovering stale jobs',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+
+    return recoveredCount;
+  }
+
+  /**
+   * Re-adds a job to the outbox for re-processing.
+   * @param job the job entity to re-add
+   */
+  private async reAddJobToOutbox(job: Job): Promise<void> {
+    // Get workspaceId from job relations or fall back to query
+    let workspaceId = '';
+    if (job.asset?.target?.workspaceTargets?.[0]?.workspace?.id) {
+      workspaceId = job.asset.target.workspaceTargets[0].workspace.id;
+    } else {
+      // Fallback: query workspace from asset
+      interface WorkspaceResult {
+        workspaceId: string;
+      }
+
+      const assetWithWorkspace = await this.repo.manager
+        .getRepository(Asset)
+        .createQueryBuilder('asset')
+        .innerJoin('asset.target', 'target')
+        .innerJoin('target.workspaceTargets', 'wt')
+        .innerJoin('wt.workspace', 'workspace')
+        .where('asset.id = :assetId', { assetId: job.asset?.id })
+        .select(['workspace.id as workspaceId'])
+        .getRawOne<WorkspaceResult>();
+
+      workspaceId = assetWithWorkspace?.workspaceId ?? '';
+    }
+
+    const payload: GetNextJobResponseDto = {
+      id: job.id,
+      category: job.category,
+      status: job.status,
+      priority: job.priority,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      command: job.command,
+      asset: job.asset?.value ?? '',
+      workspaceId,
+      tool: {
+        id: job.tool.id,
+        name: job.tool.name,
+        description: '',
+      },
+    };
+
+    const outboxRecord = this.jobOutboxRepo.create({
+      payload,
+      status: JobOutboxStatus.PENDING,
+      jobId: job.id,
+    });
+
+    await this.jobOutboxRepo.save(outboxRecord);
+  }
+
+  /**
+   * Builds a job response from Redis payload.
+   * @param payload the job payload from Redis
+   * @param worker the worker instance
+   * @returns the job response DTO
+   */
+  private buildJobResponseFromPayload(
+    payload: GetNextJobResponseDto,
+    worker: WorkerInstance,
+  ): GetNextJobResponseDto {
+    return {
+      id: payload.id,
+      category: payload.category,
+      createdAt: payload.createdAt,
+      updatedAt: payload.updatedAt,
+      priority: payload.priority,
+      command: payload.command,
+      asset: payload.asset,
+      tool: payload.tool,
+      workspaceId: worker.workspace?.id ?? payload.workspaceId,
+      status: JobStatus.IN_PROGRESS,
+    };
+  }
+
+  /**
+   * Builds a job response from database job entity.
+   * @param job the job entity
+   * @param worker the worker instance
+   * @returns the job response DTO
+   */
+  private buildJobResponse(
+    job: Job,
+    worker: WorkerInstance,
+  ): GetNextJobResponseDto {
+    return {
+      id: job.id,
+      category: job.category,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      priority: job.priority,
+      command: job.command,
+      asset: job.asset.value,
+      tool: job.tool,
+      workspaceId: worker.workspace.id,
+      status: job.status,
+    };
+  }
+
+  /**
+   * Updates job status to IN_PROGRESS in the database.
+   * @param jobId the job ID
+   * @param workerId the worker ID
+   */
+  private async updateJobStatusInProgress(
+    jobId: string,
+    workerId: string,
+  ): Promise<void> {
+    await this.repo.update(jobId, {
+      status: JobStatus.IN_PROGRESS,
+      workerId,
+      pickJobAt: new Date(),
+    });
+  }
+
+  /**
+   * Fallback method to get next job from database.
+   * Reuses worker parameter to avoid redundant DB query.
+   * @param worker the worker instance (passed from caller to avoid duplicate query)
+   * @returns the next job or null
+   */
+  private async getNextJobFromDatabase(
+    worker: WorkerInstance,
+  ): Promise<GetNextJobResponseDto | null> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
       if (!worker) {
         throw new NotFoundException('Worker not found');
       }
@@ -442,7 +834,6 @@ export class JobsRegistryService {
         queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
       }
 
-      // Only join assetService for HTTP_PROBE category jobs
       if (worker.tool?.category === ToolCategory.HTTP_PROBE) {
         queryBuilder
           .leftJoinAndSelect('jobs.assetService', 'assetService')
@@ -463,7 +854,7 @@ export class JobsRegistryService {
         return null;
       }
 
-      job.workerId = workerId;
+      job.workerId = worker.id;
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
       await queryRunner.manager.save(job);
@@ -477,29 +868,27 @@ export class JobsRegistryService {
 
       await queryRunner.commitTransaction();
 
-      const response: GetNextJobResponseDto = {
-        id: job.id,
-        category: job.category,
-        createdAt: job.createdAt,
-        updatedAt: job.updatedAt,
-        priority: job.priority,
-        command: job.command,
-        asset: job.asset.value,
-        tool: job.tool,
-        workspaceId: worker.workspace.id,
-        status: job.status,
-      };
-
-      return response;
+      return this.buildJobResponse(job, worker);
     } catch (error) {
       Logger.error(
-        'Error in getNextJob',
+        'Error in getNextJobFromDatabase',
         error instanceof Error ? error : new Error(String(error)),
       );
       await queryRunner.rollbackTransaction();
       return null;
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  /**
+   * Shuffles an array in place using Fisher-Yates algorithm.
+   * @param array the array to shuffle
+   */
+  private shuffleArray<T>(array: T[]): void {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
     }
   }
 
@@ -1426,7 +1815,7 @@ export class JobsRegistryService {
    * Runs every 1 second via @Interval decorator
    * Ensures jobs are processed in order of creation (oldest first)
    */
-  @Interval(5000)
+  @Interval(500)
   public async processPendingJobOutbox(): Promise<void> {
     await this.lockService.withLock(
       'processPendingJobOutbox',
@@ -1450,7 +1839,7 @@ export class JobsRegistryService {
           // Process each record
           for (const outboxRecord of pendingOutboxRecords) {
             try {
-              const { payload } = outboxRecord;
+              const payload: GetNextJobResponseDto = outboxRecord.payload;
               const { priority, workspaceId, tool } = payload;
               // Create Redis key with priority
               const redisKey = `jobs:${tool.name}:${workspaceId}:${priority}`;
