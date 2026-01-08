@@ -50,7 +50,7 @@ export default function TechnologyAssetsTab() {
           collapsibleElement={(row) => (
             <AssetTable
               filter={{
-                techs: [row.technology.name],
+                techs: [`${row.technology.name}:${row.technology.version}`],
                 targetIds: targetId ? [targetId] : undefined,
               }}
             />
