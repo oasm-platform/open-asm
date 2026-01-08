@@ -1,4 +1,3 @@
-import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
@@ -10,6 +9,14 @@ import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilitiesService } from './vulnerabilities.service';
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { UserContext } from '@/common/decorators/app.decorator';
+import { User } from '../auth/entities/user.entity';
+import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
+import {
+  BulkDismissVulnerabilitiesDto,
+  BulkReopenVulnerabilitiesDto,
+} from './dto/bulk-vulnerability.dto';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
@@ -75,5 +82,50 @@ export class VulnerabilitiesController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.vulnerabilitiesService.getVulnerability(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Bulk dismiss vulnerabilities',
+    description:
+      'Dismisses multiple security vulnerabilities identified within the system, removing them from active tracking and analysis.',
+    response: {
+      serialization: VulnerabilityDismissal,
+      isArray: true,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('dismiss')
+  bulkDismissVulnerabilities(
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: User,
+    @Body() dto: BulkDismissVulnerabilitiesDto,
+  ) {
+    return this.vulnerabilitiesService.bulkDismissVulnerabilities(
+      dto.ids,
+      workspaceId,
+      user,
+      dto,
+    );
+  }
+
+  @Doc({
+    summary: 'Bulk reopen vulnerabilities',
+    description:
+      'Reopens multiple security vulnerabilities identified within the system, restoring them to active tracking and analysis.',
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('reopen')
+  bulkReopenVulnerabilities(
+    @WorkspaceId() workspaceId: string,
+    @Body() dto: BulkReopenVulnerabilitiesDto,
+  ) {
+    return this.vulnerabilitiesService.bulkReopenVulnerabilities(
+      dto.ids,
+      workspaceId,
+    );
   }
 }

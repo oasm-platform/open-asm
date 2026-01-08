@@ -1,23 +1,34 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Severity } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { ToolsService } from '../tools/tools.service';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   VulnerabilityStatisticsDto,
 } from './dto/get-vulnerability-statistics.dto';
-import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
+import {
+  GetVulnerabilitiesQueryDto,
+  VulnerabilityStatus,
+} from './dto/get-vulnerability.dto';
 import { Vulnerability } from './entities/vulnerability.entity';
+import { User } from '../auth/entities/user.entity';
+import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 
 @Injectable()
 export class VulnerabilitiesService {
   constructor(
     @InjectRepository(Vulnerability)
     private vulnerabilitiesRepository: Repository<Vulnerability>,
+    @InjectRepository(VulnerabilityDismissal)
+    private dismissRepo: Repository<VulnerabilityDismissal>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
   ) {}
@@ -48,7 +59,7 @@ export class VulnerabilitiesService {
    * @returns A promise that resolves to a paginated list of vulnerabilities, including total count and pagination information.
    */
   async getVulnerabilities(query: GetVulnerabilitiesQueryDto) {
-    const { limit, page, sortOrder, targetIds, workspaceId, q } = query;
+    const { limit, page, sortOrder, targetIds, workspaceId, q, status } = query;
 
     const { sortBy } = query;
 
@@ -60,6 +71,7 @@ export class VulnerabilitiesService {
       .leftJoin('workspace_targets.workspace', 'workspaces')
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
+      .leftJoinAndSelect('vulnerabilities.vulnerabilityDismissal', 'dismissal')
       .where('workspaces.id = :workspaceId', { workspaceId })
       .skip((page - 1) * limit)
       .take(limit);
@@ -84,6 +96,13 @@ export class VulnerabilitiesService {
       });
     }
 
+    // Filter by status
+    if (status === VulnerabilityStatus.OPEN) {
+      queryBuilder.andWhere('dismissal.vulnerabilityId IS NULL');
+    } else if (status === VulnerabilityStatus.DISMISSED) {
+      queryBuilder.andWhere('dismissal.vulnerabilityId IS NOT NULL');
+    }
+
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
 
     return getManyResponse({ query, data: vulnerabilities, total });
@@ -105,6 +124,8 @@ export class VulnerabilitiesService {
       .leftJoin('workspace_targets.workspace', 'workspaces')
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
+      .leftJoinAndSelect('vulnerabilities.vulnerabilityDismissal', 'dismissal')
+      .leftJoinAndSelect('dismissal.user', 'user')
       .where('workspaces.id = :workspaceId', { workspaceId })
       .andWhere('vulnerabilities.id = :id', { id });
 
@@ -133,16 +154,10 @@ export class VulnerabilitiesService {
       .leftJoin('targets.workspaceTargets', 'workspace_targets')
       .leftJoin('workspace_targets.workspace', 'workspaces')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
+      .leftJoin('vulnerabilities.vulnerabilityDismissal', 'dismissal')
       .where('workspaces.id = :workspaceId', { workspaceId })
-      // .andWhere(
-      //   `(
-      //     SELECT MAX(jh."createdAt")
-      //     FROM job_histories jh
-      //     INNER JOIN vulnerabilities v2 ON v2."jobHistoryId" = jh.id
-      //     INNER JOIN assets a2 ON v2."assetId" = a2.id
-      //     WHERE a2."targetId" = targets.id
-      //   ) = "jobHistory"."createdAt"`,
-      // )
+      // Only show open vulnerabilities (not dismissed)
+      .andWhere('dismissal.vulnerabilityId IS NULL')
       .groupBy('vulnerabilities.severity');
 
     if (targetIds) {
@@ -206,5 +221,85 @@ export class VulnerabilitiesService {
       select: severityCase,
       orderBy: 'severity_order',
     };
+  }
+
+  async bulkDismissVulnerabilities(
+    ids: string[],
+    workspaceId: string,
+    user: User,
+    dismiss: { reason: VulnerabilityDismissal['reason']; comment?: string },
+  ) {
+    // Validate all vulnerabilities exist and belong to the workspace
+    const vulnerabilities = await this.vulnerabilitiesRepository.find({
+      where: {
+        id: In(ids),
+        asset: {
+          target: { workspaceTargets: { workspace: { id: workspaceId } } },
+        },
+      },
+    });
+
+    const foundIds = vulnerabilities.map((v) => v.id);
+    const notFoundIds = ids.filter((id) => !foundIds.includes(id));
+    if (notFoundIds.length > 0) {
+      throw new NotFoundException(
+        `Vulnerabilities not found: ${notFoundIds.join(', ')}`,
+      );
+    }
+
+    // Check which are already dismissed
+    const alreadyDismissed = await this.dismissRepo.find({
+      where: {
+        vulnerabilityId: In(ids),
+      },
+    });
+
+    if (alreadyDismissed.length > 0) {
+      throw new BadRequestException(
+        `Vulnerabilities already dismissed: ${alreadyDismissed.map((d) => d.vulnerabilityId).join(', ')}`,
+      );
+    }
+
+    // Create dismissal records for all
+    const dismissals = ids.map((id) =>
+      this.dismissRepo.create({
+        vulnerabilityId: id,
+        userId: user.id,
+        reason: dismiss.reason,
+        comment: dismiss.comment,
+      }),
+    );
+
+    await this.dismissRepo.save(dismissals);
+    return dismissals;
+  }
+
+  async bulkReopenVulnerabilities(ids: string[], workspaceId: string) {
+    const dismissals = await this.dismissRepo.find({
+      where: {
+        id: In(ids),
+        vulnerability: {
+          asset: {
+            target: {
+              workspaceTargets: {
+                workspace: {
+                  id: workspaceId,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const foundIds = dismissals.map((d) => d.id);
+    const notFoundIds = ids.filter((id) => !foundIds.includes(id));
+    if (notFoundIds.length > 0) {
+      throw new NotFoundException(
+        `Dismissed vulnerabilities not found: ${notFoundIds.join(', ')}`,
+      );
+    }
+
+    await this.dismissRepo.delete({ id: In(ids) });
   }
 }

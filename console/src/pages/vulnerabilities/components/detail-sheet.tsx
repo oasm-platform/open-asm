@@ -10,11 +10,18 @@ import {
   SheetDescription,
   SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useVulnerabilitiesControllerGetVulnerabilityById } from '@/services/apis/gen/queries';
 import { AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle,
+  BellOff,
   Check,
   Code,
   Copy,
@@ -140,9 +147,26 @@ export default function DetailSheet({
                     color="text-rose-600 dark:text-rose-400"
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6">
-                      <div className="md:col-span-2">
+                      <div className="md:col-span-2 flex items-center gap-2">
                         <span className="block mb-1">Name</span>
                         <span className="font-medium">{data.name}</span>
+                        {data.vulnerabilityDismissal && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant="secondary"
+                                  className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 p-1"
+                                >
+                                  <BellOff size={14} />
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">
+                                <span>Dismissed</span>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                       {/* <div>
 												<span className="block mb-1">ID</span>
