@@ -1,19 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { BaseEntity } from '@/common/entities/base.entity';
+import { JobOutboxStatus } from '@/common/enums/enum';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { GetNextJobResponseDto } from '../dto/jobs-registry.dto';
 import { Job } from './job.entity';
 
-export enum JobOutboxStatus {
-  PENDING = 'pending',
-  SENT = 'sent',
-  ERROR = 'error',
-}
-
 @Entity('jobs_outbox')
-export class JobOutbox {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class JobOutbox extends BaseEntity {
   @Column({ type: 'json' })
-  payload: any;
+  payload: GetNextJobResponseDto;
 
   @Column({
     type: 'enum',
@@ -28,10 +22,4 @@ export class JobOutbox {
 
   @Column()
   jobId: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 }

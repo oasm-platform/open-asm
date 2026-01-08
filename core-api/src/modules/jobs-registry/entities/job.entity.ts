@@ -52,6 +52,8 @@ export class Job extends BaseEntity {
   @Column({ nullable: true })
   workerId?: string;
 
+  @Column({ nullable: true })
+  toolId: string;
   /**
    * The tool used for this job.
    */

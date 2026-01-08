@@ -171,3 +171,15 @@ export enum IssueCommentType {
   OPEN = 'open',
   CLOSED = 'closed',
 }
+
+/**
+ * Enum representing JobOutbox statuses
+ */
+export enum JobOutboxStatus {
+  /** Job is pending to be processed */
+  PENDING = 'pending',
+  /** Job has been sent/processed */
+  SENT = 'sent',
+  /** Job processing failed */
+  ERROR = 'error',
+}

@@ -5,12 +5,14 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import {
   BullMQName,
+  JobOutboxStatus,
   JobPriority,
   JobStatus,
   ToolCategory,
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
+import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import { RedisService } from '@/services/redis/redis.service';
 import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
@@ -21,6 +23,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
@@ -47,7 +50,7 @@ import {
 } from './dto/jobs-registry.dto';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
-import { JobOutbox, JobOutboxStatus } from './entities/job-outbox.entity';
+import { JobOutbox } from './entities/job-outbox.entity';
 import { Job } from './entities/job.entity';
 
 @Injectable()
@@ -65,7 +68,9 @@ export class JobsRegistryService {
     private storageService: StorageService,
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
+    private lockService: RedisLockService,
   ) {}
+
   public async getManyJobs(
     query: GetManyJobsRequestDto,
   ): Promise<GetManyBaseResponseDto<Job>> {
@@ -93,12 +98,6 @@ export class JobsRegistryService {
     return getManyResponse<Job>({ query, data, total });
   }
 
-  /**
-   * Creates jobs for given tools and targets, linked to a jobHistory.
-   * @param tools list of tools to run
-   * @param targets list of targets to scan
-   * @param workflow optional workflow to link
-   */
   /**
    * Creates jobs for given tools and targets, linked to a jobHistory.
    * @param tools list of tools to run
@@ -201,7 +200,10 @@ export class JobsRegistryService {
           workspaceId,
         );
 
-        const filteredAssets = this.filterAssetsByCategory(assets, tool.category);
+        const filteredAssets = this.filterAssetsByCategory(
+          assets,
+          tool.category,
+        );
 
         // Step 3: iterate tools and create jobs
         const defaultCommand = builtInTools.find(
@@ -237,19 +239,20 @@ export class JobsRegistryService {
         // Create job outbox records for each job
         const outboxRecords = jobsToInsert.map((job) => {
           // Payload follows GetNextJobResponseDto structure
-          const payload = {
-            id: job.id,
-            category: job.category,
-            status: job.status,
-            priority: job.priority,
-            createdAt: job.createdAt,
-            updatedAt: job.updatedAt,
-            command: job.command,
-            asset: job.asset ? job.asset.value : null,
-          };
 
           return queryRunner.manager.create(JobOutbox, {
-            payload,
+            payload: {
+              id: job.id,
+              category: job.category,
+              status: job.status,
+              priority: job.priority,
+              createdAt: job.createdAt,
+              updatedAt: job.updatedAt,
+              command: job.command,
+              asset: job.asset?.value ?? '',
+              workspaceId: workspaceId,
+              toolId: job.tool.id,
+            },
             status: JobOutboxStatus.PENDING,
             jobId: job.id,
           });
@@ -262,7 +265,10 @@ export class JobsRegistryService {
         await queryRunner.commitTransaction();
 
         // Increment pending jobs counter (hybrid Redis + DB) - outside transaction
-        await this.incrementJobHistoryCounter(jobHistory.id, jobsToInsert.length);
+        await this.incrementJobHistoryCounter(
+          jobHistory.id,
+          jobsToInsert.length,
+        );
       } else {
         // No jobs to insert, rollback transaction
         await queryRunner.rollbackTransaction();
@@ -475,6 +481,11 @@ export class JobsRegistryService {
         priority: job.priority,
         command: job.command,
         asset: job.asset.value,
+        workspaceId: '',
+        tool: {
+          id: job.tool.id,
+          name: job.tool.name,
+        } as Tool,
       };
 
       return response;
@@ -1361,5 +1372,69 @@ export class JobsRegistryService {
     }
 
     return true;
+  }
+
+  /**
+   * Process pending job outbox records and push them to Redis lists
+   * Runs every 1 second via @Interval decorator
+   * Ensures jobs are processed in order of creation (oldest first)
+   */
+  @Interval(5000)
+  public async processPendingJobOutbox(): Promise<void> {
+    await this.lockService.withLock(
+      'processPendingJobOutbox',
+      5000,
+      async () => {
+        try {
+          // Get all pending job outbox records, ordered by createdAt (oldest first)
+          const pendingOutboxRecords = await this.jobOutboxRepo.find({
+            where: {
+              status: JobOutboxStatus.PENDING,
+            },
+            order: {
+              createdAt: 'ASC', // Oldest first to ensure FIFO
+            },
+          });
+
+          if (pendingOutboxRecords.length === 0) {
+            return; // No pending records, exit early
+          }
+
+          // Process each record
+          for (const outboxRecord of pendingOutboxRecords) {
+            try {
+              const { payload } = outboxRecord;
+              const { priority, workspaceId, tool } = payload;
+
+              // Create Redis key with priority
+              const redisKey = `jobs:${tool.name}:${workspaceId}:${priority}`;
+
+              // Push to Redis list using RPUSH to maintain FIFO order
+              // Since we process oldest first and use RPUSH, newer jobs go to the end
+              await this.redis.client.rpush(redisKey, JSON.stringify(payload));
+
+              // Update status to SENT
+              outboxRecord.status = JobOutboxStatus.SENT;
+              await this.jobOutboxRepo.save(outboxRecord);
+            } catch (error) {
+              // Mark as ERROR and log
+              outboxRecord.status = JobOutboxStatus.ERROR;
+              await this.jobOutboxRepo.save(outboxRecord);
+
+              Logger.error(
+                `Failed to process outbox record ${outboxRecord.id}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }
+          }
+        } catch (error) {
+          Logger.error(
+            'Error in processPendingJobOutbox:',
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        }
+      },
+    );
   }
 }
