@@ -1235,6 +1235,16 @@ export interface ScanDto {
   targetId: string;
 }
 
+export interface User {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  role: UserRoleEnum;
+}
+
 export interface Vulnerability {
   id: string;
   /** @format date-time */
@@ -1271,6 +1281,21 @@ export interface Vulnerability {
   /** @format date-time */
   modificationDate: string;
   tool: Tool;
+  vulnerabilityDismissal: VulnerabilityDismissal;
+}
+
+export interface VulnerabilityDismissal {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  vulnerabilityId: string;
+  userId: string;
+  reason: string;
+  comment: string;
+  user: User;
+  vulnerability: Vulnerability;
 }
 
 export interface GetManyVulnerabilityDto {
@@ -1289,6 +1314,16 @@ export interface VulnerabilityStatisticsDto {
 
 export interface GetVulnerabilitiesStatisticsResponseDto {
   data: VulnerabilityStatisticsDto[];
+}
+
+export interface BulkDismissVulnerabilitiesDto {
+  ids: string[];
+  reason: string;
+  comment: string | null;
+}
+
+export interface BulkReopenVulnerabilitiesDto {
+  ids: string[];
 }
 
 export interface CreateToolDto {
@@ -1568,16 +1603,6 @@ export interface UpdateAssetGroupWorkflowDto {
   schedule: UpdateAssetGroupWorkflowDtoScheduleEnum;
 }
 
-export interface User {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  name: string;
-  role: UserRoleEnum;
-}
-
 export interface Issue {
   id: string;
   /** @format date-time */
@@ -1798,6 +1823,12 @@ export enum JobHistoryResponseDtoStatusEnum {
   Cancelled = "cancelled",
 }
 
+export enum UserRoleEnum {
+  Admin = "admin",
+  User = "user",
+  Bot = "bot",
+}
+
 export enum VulnerabilityStatisticsDtoSeverityEnum {
   Info = "info",
   Low = "low",
@@ -1831,12 +1862,6 @@ export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
   Value001 = "0 0 1 * *",
-}
-
-export enum UserRoleEnum {
-  Admin = "admin",
-  User = "user",
-  Bot = "bot",
 }
 
 export enum CreateIssueDtoSourceTypeEnum {
@@ -1874,6 +1899,16 @@ export enum CreateNotificationDtoScopeEnum {
 /** Type of the notification */
 export enum CreateNotificationDtoTypeEnum {
   WORKSPACE_CREATED = "WORKSPACE_CREATED",
+}
+
+/**
+ * Filter by vulnerability status: open, dismissed, or all
+ * @default "open"
+ */
+export enum VulnerabilitiesControllerGetVulnerabilitiesParamsStatusEnum {
+  Open = "open",
+  Dismissed = "dismissed",
+  All = "all",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -3809,6 +3844,11 @@ export class Api<
       workspaceId: string;
       targetIds?: string[];
       q?: string;
+      /**
+       * Filter by vulnerability status: open, dismissed, or all
+       * @default "open"
+       */
+      status?: VulnerabilitiesControllerGetVulnerabilitiesParamsStatusEnum;
     },
     params: RequestParams = {},
   ) =>
@@ -3858,6 +3898,53 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/vulnerabilities/${id}`,
       method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Dismisses multiple security vulnerabilities identified within the system, removing them from active tracking and analysis.
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerBulkDismissVulnerabilities
+   * @summary Bulk dismiss vulnerabilities
+   * @request POST:/api/vulnerabilities/dismiss
+   */
+  vulnerabilitiesControllerBulkDismissVulnerabilities = (
+    data: BulkDismissVulnerabilitiesDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: VulnerabilityDismissal[];
+      },
+      any
+    >({
+      path: `/api/vulnerabilities/dismiss`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Reopens multiple security vulnerabilities identified within the system, restoring them to active tracking and analysis.
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerBulkReopenVulnerabilities
+   * @summary Bulk reopen vulnerabilities
+   * @request POST:/api/vulnerabilities/reopen
+   */
+  vulnerabilitiesControllerBulkReopenVulnerabilities = (
+    data: BulkReopenVulnerabilitiesDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities/reopen`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });

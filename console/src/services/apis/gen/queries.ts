@@ -715,7 +715,6 @@ export type JobHistoryDetailResponseDto = {
   updatedAt: string;
   tools: Tool[];
   jobs: Job[];
-  workflowName: string;
 };
 
 export type PickTypeClass = {
@@ -1156,6 +1155,23 @@ export type ScanDto = {
   targetId: string;
 };
 
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UserRole = {
+  admin: 'admin',
+  user: 'user',
+  bot: 'bot',
+} as const;
+
+export type User = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  role: UserRole;
+};
+
 export type Vulnerability = {
   id: string;
   createdAt: string;
@@ -1188,6 +1204,19 @@ export type Vulnerability = {
   publicationDate: string;
   modificationDate: string;
   tool: Tool;
+  vulnerabilityDismissal: VulnerabilityDismissal;
+};
+
+export type VulnerabilityDismissal = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  vulnerabilityId: string;
+  userId: string;
+  reason: string;
+  comment: string;
+  user: User;
+  vulnerability: Vulnerability;
 };
 
 export type GetManyVulnerabilityDto = {
@@ -1218,6 +1247,17 @@ export type VulnerabilityStatisticsDto = {
 
 export type GetVulnerabilitiesStatisticsResponseDto = {
   data: VulnerabilityStatisticsDto[];
+};
+
+export type BulkDismissVulnerabilitiesDto = {
+  ids: string[];
+  reason: string;
+  /** @nullable */
+  comment: string | null;
+};
+
+export type BulkReopenVulnerabilitiesDto = {
+  ids: string[];
 };
 
 export type CreateToolDtoCategory =
@@ -1503,23 +1543,6 @@ export const UpdateAssetGroupWorkflowDtoSchedule = {
 
 export type UpdateAssetGroupWorkflowDto = {
   schedule: UpdateAssetGroupWorkflowDtoSchedule;
-};
-
-export type UserRole = (typeof UserRole)[keyof typeof UserRole];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const UserRole = {
-  admin: 'admin',
-  user: 'user',
-  bot: 'bot',
-} as const;
-
-export type User = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  name: string;
-  role: UserRole;
 };
 
 export type Issue = {
@@ -1939,12 +1962,31 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
   workspaceId: string;
   targetIds?: string[];
   q?: string;
+  /**
+   * Filter by vulnerability status: open, dismissed, or all
+   */
+  status?: VulnerabilitiesControllerGetVulnerabilitiesStatus;
 };
+
+export type VulnerabilitiesControllerGetVulnerabilitiesStatus =
+  (typeof VulnerabilitiesControllerGetVulnerabilitiesStatus)[keyof typeof VulnerabilitiesControllerGetVulnerabilitiesStatus];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const VulnerabilitiesControllerGetVulnerabilitiesStatus = {
+  open: 'open',
+  dismissed: 'dismissed',
+  all: 'all',
+} as const;
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
   workspaceId: string;
   targetIds?: string[];
 };
+
+export type VulnerabilitiesControllerBulkDismissVulnerabilities200 =
+  AppResponseSerialization & {
+    data?: VulnerabilityDismissal[];
+  };
 
 export type ToolsControllerGetManyToolsParams = {
   search?: string;
@@ -16328,6 +16370,230 @@ export function useVulnerabilitiesControllerGetVulnerabilityById<
 
   return query;
 }
+
+/**
+ * Dismisses multiple security vulnerabilities identified within the system, removing them from active tracking and analysis.
+ * @summary Bulk dismiss vulnerabilities
+ */
+export const vulnerabilitiesControllerBulkDismissVulnerabilities = (
+  bulkDismissVulnerabilitiesDto: BulkDismissVulnerabilitiesDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<VulnerabilitiesControllerBulkDismissVulnerabilities200>(
+    {
+      url: `/api/vulnerabilities/dismiss`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: bulkDismissVulnerabilitiesDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerBulkDismissVulnerabilitiesMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+      >,
+      TError,
+      { data: BulkDismissVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+    >,
+    TError,
+    { data: BulkDismissVulnerabilitiesDto },
+    TContext
+  > => {
+    const mutationKey = ['vulnerabilitiesControllerBulkDismissVulnerabilities'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+      >,
+      { data: BulkDismissVulnerabilitiesDto }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return vulnerabilitiesControllerBulkDismissVulnerabilities(
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type VulnerabilitiesControllerBulkDismissVulnerabilitiesMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+    >
+  >;
+export type VulnerabilitiesControllerBulkDismissVulnerabilitiesMutationBody =
+  BulkDismissVulnerabilitiesDto;
+export type VulnerabilitiesControllerBulkDismissVulnerabilitiesMutationError =
+  unknown;
+
+/**
+ * @summary Bulk dismiss vulnerabilities
+ */
+export const useVulnerabilitiesControllerBulkDismissVulnerabilities = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+      >,
+      TError,
+      { data: BulkDismissVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<
+    ReturnType<typeof vulnerabilitiesControllerBulkDismissVulnerabilities>
+  >,
+  TError,
+  { data: BulkDismissVulnerabilitiesDto },
+  TContext
+> => {
+  const mutationOptions =
+    getVulnerabilitiesControllerBulkDismissVulnerabilitiesMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Reopens multiple security vulnerabilities identified within the system, restoring them to active tracking and analysis.
+ * @summary Bulk reopen vulnerabilities
+ */
+export const vulnerabilitiesControllerBulkReopenVulnerabilities = (
+  bulkReopenVulnerabilitiesDto: BulkReopenVulnerabilitiesDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/vulnerabilities/reopen`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: bulkReopenVulnerabilitiesDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerBulkReopenVulnerabilitiesMutationOptions =
+  <TError = unknown, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+      >,
+      TError,
+      { data: BulkReopenVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+    >,
+    TError,
+    { data: BulkReopenVulnerabilitiesDto },
+    TContext
+  > => {
+    const mutationKey = ['vulnerabilitiesControllerBulkReopenVulnerabilities'];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+      >,
+      { data: BulkReopenVulnerabilitiesDto }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return vulnerabilitiesControllerBulkReopenVulnerabilities(
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type VulnerabilitiesControllerBulkReopenVulnerabilitiesMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+    >
+  >;
+export type VulnerabilitiesControllerBulkReopenVulnerabilitiesMutationBody =
+  BulkReopenVulnerabilitiesDto;
+export type VulnerabilitiesControllerBulkReopenVulnerabilitiesMutationError =
+  unknown;
+
+/**
+ * @summary Bulk reopen vulnerabilities
+ */
+export const useVulnerabilitiesControllerBulkReopenVulnerabilities = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+      >,
+      TError,
+      { data: BulkReopenVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<
+    ReturnType<typeof vulnerabilitiesControllerBulkReopenVulnerabilities>
+  >,
+  TError,
+  { data: BulkReopenVulnerabilitiesDto },
+  TContext
+> => {
+  const mutationOptions =
+    getVulnerabilitiesControllerBulkReopenVulnerabilitiesMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * Registers a new security assessment tool in the system with specified configuration and capabilities.
