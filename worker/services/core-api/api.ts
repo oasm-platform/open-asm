@@ -841,6 +841,7 @@ export interface GetManyGetPortAssetsDTODto {
 export interface TechnologyDetailDTO {
   name: string;
   cats?: string[];
+  version?: string;
   description?: string;
   html?: string[];
   icon?: string;

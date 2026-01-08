@@ -19,6 +19,9 @@ export class TechnologyDetailDTO {
   cats?: number[];
 
   @ApiProperty({ required: false })
+  version?: string;
+
+  @ApiProperty({ required: false })
   description?: string;
 
   @ApiProperty({ required: false })

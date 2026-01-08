@@ -1,6 +1,6 @@
 import { type GetTechnologyAssetsDTO } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Box, Boxes } from 'lucide-react';
+import { Boxes } from 'lucide-react';
 import BadgeList from './badge-list';
 
 export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
@@ -13,6 +13,7 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
       const data = row.original;
       const iconUrl = data.technology?.iconUrl as string;
       const categories = (data.technology?.categoryNames as string[]) || [];
+      const version = data.technology?.version as string;
 
       return (
         <div className="flex items-center gap-3 py-2 ">
@@ -40,9 +41,11 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
             )}
           </div>
           <div className="flex flex-col gap-1">
-            <div>{data.technology?.name as string}</div>
+            <div>
+              {data.technology?.name as string} {version}
+            </div>
             <div className="flex items-center gap-1">
-              <BadgeList list={categories} Icon={Box} maxDisplay={4} />
+              <BadgeList list={categories} maxDisplay={4} />
             </div>
           </div>
         </div>

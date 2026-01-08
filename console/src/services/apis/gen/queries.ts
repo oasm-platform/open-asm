@@ -880,6 +880,7 @@ export type TechnologyDetailDTODns = { [key: string]: unknown };
 export type TechnologyDetailDTO = {
   name: string;
   cats?: string[];
+  version?: string;
   description?: string;
   html?: string[];
   icon?: string;
