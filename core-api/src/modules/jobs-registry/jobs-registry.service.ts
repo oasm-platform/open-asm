@@ -252,6 +252,10 @@ export class JobsRegistryService {
               asset: job.asset?.value ?? '',
               workspaceId: workspaceId,
               toolId: job.tool.id,
+              tool: {
+                id: job.tool.id,
+                name: job.tool.name,
+              },
             },
             status: JobOutboxStatus.PENDING,
             jobId: job.id,
@@ -481,11 +485,9 @@ export class JobsRegistryService {
         priority: job.priority,
         command: job.command,
         asset: job.asset.value,
-        workspaceId: '',
-        tool: {
-          id: job.tool.id,
-          name: job.tool.name,
-        } as Tool,
+        tool: job.tool,
+        workspaceId: worker.workspace.id,
+        status: job.status,
       };
 
       return response;
@@ -999,9 +1001,13 @@ export class JobsRegistryService {
     jobId: string,
   ): Promise<{ message: string }> {
     const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    let transactionStarted = false;
+
     try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      transactionStarted = true;
+
       // Verify job exists and belongs to workspace
       const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
 
@@ -1016,7 +1022,18 @@ export class JobsRegistryService {
 
       return { message: 'Job re-run successfully' };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (transactionStarted) {
+        try {
+          await queryRunner.rollbackTransaction();
+        } catch (rollbackError) {
+          Logger.error(
+            'Error during transaction rollback in reRunJob',
+            rollbackError instanceof Error
+              ? rollbackError
+              : new Error(String(rollbackError)),
+          );
+        }
+      }
       throw error;
     } finally {
       await queryRunner.release();
@@ -1028,9 +1045,13 @@ export class JobsRegistryService {
     jobId: string,
   ): Promise<DefaultMessageResponseDto> {
     const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    let transactionStarted = false;
+
     try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      transactionStarted = true;
+
       // Verify job exists and belongs to workspace
       const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
 
@@ -1043,7 +1064,18 @@ export class JobsRegistryService {
 
       return { message: 'Job cancelled successfully' };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (transactionStarted) {
+        try {
+          await queryRunner.rollbackTransaction();
+        } catch (rollbackError) {
+          Logger.error(
+            'Error during transaction rollback in cancelJob',
+            rollbackError instanceof Error
+              ? rollbackError
+              : new Error(String(rollbackError)),
+          );
+        }
+      }
       throw error;
     } finally {
       await queryRunner.release();
@@ -1055,9 +1087,13 @@ export class JobsRegistryService {
     jobId: string,
   ): Promise<DefaultMessageResponseDto> {
     const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    let transactionStarted = false;
+
     try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      transactionStarted = true;
+
       // Verify job exists and belongs to workspace
       const job = await this.verifyJobBelongsToWorkspace(jobId, workspaceId);
 
@@ -1068,7 +1104,18 @@ export class JobsRegistryService {
 
       return { message: 'Job deleted successfully' };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (transactionStarted) {
+        try {
+          await queryRunner.rollbackTransaction();
+        } catch (rollbackError) {
+          Logger.error(
+            'Error during transaction rollback in deleteJob',
+            rollbackError instanceof Error
+              ? rollbackError
+              : new Error(String(rollbackError)),
+          );
+        }
+      }
       throw error;
     } finally {
       await queryRunner.release();
@@ -1405,7 +1452,6 @@ export class JobsRegistryService {
             try {
               const { payload } = outboxRecord;
               const { priority, workspaceId, tool } = payload;
-
               // Create Redis key with priority
               const redisKey = `jobs:${tool.name}:${workspaceId}:${priority}`;
 
