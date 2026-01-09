@@ -44,7 +44,7 @@ export class TechnologyForwarderService implements OnModuleInit {
    * This method is called automatically when the module is initialized
    * The data fetching runs asynchronously in the background without blocking app startup
    */
-   
+
   async onModuleInit(): Promise<void> {
     // Check if initialization has already been logged globally
     const isAlreadyLogged = await this.redisService.cacheClient.get(
@@ -360,7 +360,6 @@ export class TechnologyForwarderService implements OnModuleInit {
     if (techNames.length === 0) {
       return [];
     }
-
     try {
       const cachedResults = await this.batchGetCachedTechnologies(techNames);
       return await Promise.all(
@@ -409,6 +408,7 @@ export class TechnologyForwarderService implements OnModuleInit {
     techName: string,
     cachedData: string | null,
   ): Promise<TechnologyDetailDTO> {
+    techName = techName.split(':')[0];
     if (!cachedData) {
       return new TechnologyDetailDTO();
     }

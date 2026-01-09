@@ -59,7 +59,7 @@ export class AssetsService {
     private workspaceService: WorkspacesService,
 
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all assets services associated with a specified target.
@@ -581,34 +581,35 @@ export class AssetsService {
       .offset(offset)
       .getRawMany();
 
+    // Extract just the technology names (without version) for enrichment
+    const techNames = list.map(
+      (item: { technology: string; assetCount: number }) =>
+        item.technology.split(':')[0],
+    );
+
     const enrichedTechs =
-      await this.technologyForwarderService.enrichTechnologies(
-        list.map(
-          (item: { technology: string; assetCount: number }) => item.technology,
-        ),
-      );
+      await this.technologyForwarderService.enrichTechnologies(techNames);
 
     const data = list.map(
       (item: { technology: string; assetCount: number }) => {
+        const [name, version] = item.technology.split(':');
         const obj = new GetTechnologyAssetsDTO();
         obj.assetCount = item.assetCount;
 
-        const enrichedTech = enrichedTechs.find(
-          (tech) => tech?.name === item.technology,
-        );
-
+        const enrichedTech = enrichedTechs.find((tech) => tech?.name === name);
         if (enrichedTech && enrichedTech.name) {
-          obj.technology = enrichedTech;
+          obj.technology = { ...enrichedTech, version };
         } else {
           // Create a minimal technology object with just the name when enrichment fails
           obj.technology = {
-            name: item.technology,
+            name: name,
             description: '',
             icon: '',
             website: '',
             iconUrl: '',
             categoryNames: [],
             categories: [],
+            version,
           } as TechnologyDetailDTO;
         }
 

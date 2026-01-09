@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import Image from '@/components/ui/image';
 import SeverityBadge from '@/components/ui/severity-badge';
 import {
@@ -9,10 +10,42 @@ import {
 } from '@/components/ui/tooltip';
 import type { Vulnerability } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ExternalLink, Info } from 'lucide-react';
+import { BellOff, CircleCheck, ExternalLink, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
+  {
+    id: 'select',
+    header: ({ table }) => (
+      <div className="flex items-center justify-center">
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && 'indeterminate')
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div
+        className="flex items-center justify-center min-h-[60px]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      </div>
+    ),
+    size: 50,
+    enableSorting: false,
+    enableHiding: false,
+  },
+
   {
     accessorKey: 'severity',
     header: 'Severity',
@@ -211,5 +244,60 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
         </div>
       );
     },
+  },
+  {
+    id: 'status',
+    header: 'Status',
+    size: 100,
+    cell: ({ row }) => {
+      const dismissal = row.original.vulnerabilityDismissal;
+      const isDismissed = !!dismissal;
+
+      return (
+        <div className="min-h-[60px] flex items-center">
+          {isDismissed ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="secondary"
+                    className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1"
+                  >
+                    <BellOff size={12} />
+                    Dismissed
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <div className="text-xs">
+                    <span className="font-medium">Reason:</span>{' '}
+                    {dismissal.reason === 'false_positive'
+                      ? 'False positive'
+                      : dismissal.reason === 'used_in_test'
+                        ? 'Used in tests'
+                        : "Won't fix"}
+                    {dismissal.comment && (
+                      <>
+                        <br />
+                        <span className="font-medium">Comment:</span>{' '}
+                        {dismissal.comment}
+                      </>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <Badge
+              variant="secondary"
+              className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1"
+            >
+              <CircleCheck size={12} />
+              Open
+            </Badge>
+          )}
+        </div>
+      );
+    },
+    enableSorting: false,
   },
 ];
