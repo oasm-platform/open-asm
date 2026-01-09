@@ -555,15 +555,20 @@ export class AssetsService {
     }
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
+      .leftJoin(
+        '(SELECT 1)',
+        'dummy',
+        'TRUE CROSS JOIN LATERAL unnest("latest_http_response"."tech") AS unnested_tech',
+      )
       .select([
-        'unnest(latest_http_response.tech) as "technology"',
+        'unnested_tech as "technology"',
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
       .andWhere('latest_http_response.tech IS NOT NULL')
-      .groupBy('technology');
+      .groupBy('unnested_tech');
 
     if (query.value) {
-      queryBuilder.andHaving('unnest(latest_http_response.tech) ILIKE :value', {
+      queryBuilder.andWhere('unnested_tech ILIKE :value', {
         value: `%${query.value}%`,
       });
     }
