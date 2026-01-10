@@ -15,8 +15,6 @@ import {
   OneToMany,
 } from 'typeorm';
 
-
-
 export class On {
   @ApiProperty()
   target?: string[];
@@ -62,7 +60,7 @@ export class Workflow extends BaseEntity {
   @JoinColumn({ name: 'createdBy' })
   createdBy?: User;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.id, { nullable: false })
+  @ManyToOne(() => Workspace, (workspace) => workspace.id, { nullable: true })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 
