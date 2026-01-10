@@ -115,7 +115,16 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
                 rel="noopener noreferrer"
                 className="text-blue-500 shrink-0 flex items-center gap-1"
               >
-                <span className="truncate">{value}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="truncate max-w-[200px] w-full">
+                      {value}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{value}</p>
+                  </TooltipContent>
+                </Tooltip>
                 <ExternalLink size={14} />
               </a>
             </div>
