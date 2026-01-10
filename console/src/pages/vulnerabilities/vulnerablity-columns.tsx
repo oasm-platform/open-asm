@@ -117,9 +117,7 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
               >
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="truncate max-w-[200px] w-full">
-                      {value}
-                    </span>
+                    <span className="truncate max-w-[200px]">{value}</span>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{value}</p>
