@@ -203,14 +203,13 @@ service MessageService {
 
 message Message {
   string message_id = 1;
-  string question = 2;
-  // type = ["message_start","delta","message_end","thinking","tool_start",
-  // "tool_output","tool_end","state","error","done","system","event"]
-  string type = 3;
-  string content = 4;  // JSON string containing message-specific data
-  string conversation_id = 5;
-  string created_at = 6;
-  string updated_at = 7;
+  string conversation_id = 2;
+  string content = 3;
+  string type = 4;  // simplified: "text", "thinking", "error", etc.
+  string created_at = 5;
+  string updated_at = 6;
+  string role = 7;
+  string question = 8;
 }
 
 message GetMessagesRequest {
@@ -232,14 +231,18 @@ message CreateMessageRequest {
 }
 
 enum AgentType {
-  AGENT_TYPE_ORCHESTRATION = 0;
-  AGENT_TYPE_NUCLEI_GENERATOR = 1;
-  AGENT_TYPE_ANALYSIS = 2;
+  ORCHESTRATION = 0;
+  NUCLEI_GENERATOR = 1;
+  ANALYSIS = 2;
 }
 
 message CreateMessageResponse {
-  Message message = 1;
-  Conversation conversation = 2;
+  string message_id = 1;
+  string conversation_id = 2;
+  string content = 3;
+  string type = 4;
+  Conversation conversation = 5;
+  string created_at = 6;
 }
 
 message UpdateMessageRequest {
@@ -250,7 +253,10 @@ message UpdateMessageRequest {
 }
 
 message UpdateMessageResponse {
-  Message message = 1;
+  string message_id = 1;
+  string conversation_id = 2;
+  string content = 3;
+  string type = 4;
 }
 
 message DeleteMessageRequest {

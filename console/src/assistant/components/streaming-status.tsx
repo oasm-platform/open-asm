@@ -1,4 +1,4 @@
-import { Loader2, Wrench, CheckCircle2, Brain } from 'lucide-react';
+import { Wrench, CheckCircle2, Loader } from 'lucide-react';
 
 interface StreamingStatusProps {
   type?: string;
@@ -22,15 +22,8 @@ export function StreamingStatus({ type, content }: StreamingStatusProps) {
     switch (type) {
       case 'thinking':
         return (
-          <div className="flex items-center gap-3 text-sm text-zinc-300 bg-zinc-950 border border-white/10 px-4 py-2.5 rounded-full shadow-sm backdrop-blur-sm animate-pulse">
-            <div className="relative">
-              <Brain className="h-4 w-4 text-zinc-400" />
-              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
-              </span>
-            </div>
-            <span className="font-medium">Thinking...</span>
+          <div className="flex items-center gap-2 text-sm text-zinc-400">
+            <Loader className="h-4 w-4 animate-spin text-indigo-400" />
           </div>
         );
 
@@ -52,17 +45,17 @@ export function StreamingStatus({ type, content }: StreamingStatusProps) {
             : '';
 
         return (
-          <div className="flex flex-col gap-1.5 text-sm text-zinc-300 bg-zinc-950 border border-white/10 px-4 py-3 rounded-2xl shadow-sm backdrop-blur-sm">
+          <div className="flex flex-col gap-1.5 text-sm text-muted-foreground bg-muted/30 border border-border px-4 py-3 rounded-2xl shadow-sm backdrop-blur-sm">
             <div className="flex items-center gap-2">
-              <div className="p-1 bg-zinc-900 rounded-md border border-white/5">
+              <div className="p-1 bg-background rounded-md border border-border">
                 <Wrench className="h-4 w-4 animate-spin-slow text-amber-500" />
               </div>
-              <span className="font-semibold text-zinc-200">
+              <span className="font-semibold text-foreground">
                 Using tool: {toolName}
               </span>
             </div>
             {paramStr && (
-              <div className="ml-8 text-xs font-mono text-zinc-500 bg-zinc-900/50 px-2 py-1 rounded border border-white/5 overflow-hidden text-ellipsis whitespace-nowrap">
+              <div className="ml-8 text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded border border-border overflow-hidden text-ellipsis whitespace-nowrap">
                 {paramStr}
               </div>
             )}
@@ -72,8 +65,8 @@ export function StreamingStatus({ type, content }: StreamingStatusProps) {
 
       case 'tool_output':
         return (
-          <div className="flex items-center gap-2 text-sm text-zinc-300 bg-zinc-950 border border-white/10 px-4 py-2.5 rounded-full shadow-sm backdrop-blur-sm">
-            <div className="p-0.5 bg-zinc-900 rounded-full">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 border border-border px-4 py-2.5 rounded-full shadow-sm backdrop-blur-sm">
+            <div className="p-0.5 bg-background rounded-full">
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             </div>
             <span className="font-medium">Tool completed</span>
@@ -82,7 +75,7 @@ export function StreamingStatus({ type, content }: StreamingStatusProps) {
 
       case 'tool_end':
         return (
-          <div className="flex items-center gap-2 text-sm text-zinc-400 bg-zinc-950 border border-white/10 px-4 py-2.5 rounded-full shadow-sm backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 border border-border px-4 py-2.5 rounded-full shadow-sm backdrop-blur-sm">
             <CheckCircle2 className="h-4 w-4" />
             <span>Tool finished</span>
           </div>
@@ -96,8 +89,8 @@ export function StreamingStatus({ type, content }: StreamingStatusProps) {
               ? parsedContent.message
               : 'Processing...';
         return (
-          <div className="flex items-center gap-2 text-sm text-zinc-300 bg-zinc-950 border border-white/10 px-4 py-2.5 rounded-full shadow-sm backdrop-blur-sm">
-            <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 border border-border px-4 py-2.5 rounded-full shadow-sm backdrop-blur-sm">
+            <Loader className="h-4 w-4 animate-spin text-indigo-500" />
             <span className="font-medium">{stateText}</span>
           </div>
         );
@@ -108,8 +101,8 @@ export function StreamingStatus({ type, content }: StreamingStatusProps) {
 
       case 'message_start':
         return (
-          <div className="flex items-center gap-2 text-sm text-zinc-400 bg-zinc-950 border border-white/10 px-4 py-2.5 rounded-full">
-            <Loader2 className="h-4 w-4 animate-spin" />
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 border border-border px-4 py-2.5 rounded-full">
+            <Loader className="h-4 w-4 animate-spin" />
             <span>Thinking...</span>
           </div>
         );
