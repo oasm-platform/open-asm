@@ -25,10 +25,10 @@ export const ChatSuggestions = memo(function ChatSuggestions({
         <div className="bg-primary/10 p-3 rounded-full w-fit mx-auto text-primary mb-4">
           <MessageCircle className="h-8 w-8" />
         </div>
-        <h3 className="text-lg font-semibold text-zinc-100">
+        <h3 className="text-lg font-semibold text-foreground">
           I am OASM Security Assistant
         </h3>
-        <p className="text-sm text-zinc-500 max-w-[280px] mx-auto">
+        <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
           How can I help you today?
         </p>
       </div>
@@ -37,7 +37,7 @@ export const ChatSuggestions = memo(function ChatSuggestions({
           <Button
             key={s}
             variant="outline"
-            className="justify-start font-normal h-auto py-3 px-4 bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-all text-left whitespace-normal break-words"
+            className="justify-start font-normal h-auto py-3 px-4 bg-muted/30 border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-all text-left whitespace-normal break-words"
             onClick={() => onSuggestionClick(s)}
           >
             <span className="text-sm">{s}</span>

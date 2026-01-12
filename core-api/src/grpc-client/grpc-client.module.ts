@@ -16,7 +16,7 @@ import { join } from 'path';
           options: {
             package: 'app',
             protoPath: join(__dirname, '../proto/assistant.proto'),
-            url: configService.get('AI_ASSISTANT_GRPC_URL', 'localhost:8000'),
+            url: configService.get('AI_ASSISTANT_URL', 'localhost:8000'),
             loader: {
               keepCase: false,
               longs: String,

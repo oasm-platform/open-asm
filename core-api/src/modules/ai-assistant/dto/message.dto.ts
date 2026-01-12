@@ -89,14 +89,22 @@ export class CreateMessageDto {
 }
 
 export class CreateMessageResponseDto {
-  @ApiPropertyOptional({
-    description: 'Created message',
-  })
-  message?: Message;
+  @ApiPropertyOptional()
+  messageId?: string;
 
-  @ApiPropertyOptional({
-    description: 'Conversation (if new conversation was created)',
-  })
+  @ApiPropertyOptional()
+  conversationId?: string;
+
+  @ApiPropertyOptional()
+  content?: string;
+
+  @ApiPropertyOptional()
+  type?: string;
+
+  @ApiPropertyOptional()
+  createdAt?: string;
+
+  @ApiPropertyOptional()
   conversation?: Conversation;
 }
 
@@ -121,10 +129,17 @@ export class UpdateMessageDto {
 }
 
 export class UpdateMessageResponseDto {
-  @ApiProperty({
-    description: 'Updated message',
-  })
-  message: Message;
+  @ApiPropertyOptional()
+  messageId?: string;
+
+  @ApiPropertyOptional()
+  conversationId?: string;
+
+  @ApiPropertyOptional()
+  content?: string;
+
+  @ApiPropertyOptional()
+  type?: string;
 }
 
 /**

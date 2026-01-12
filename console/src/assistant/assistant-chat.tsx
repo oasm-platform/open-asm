@@ -94,11 +94,11 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
         <SheetContent
           side="right"
           className={cn(
-            'flex flex-col fixed gap-0 bg-black transition-all duration-300 ease-in-out',
+            'flex flex-col fixed gap-0 bg-background transition-all duration-300 ease-in-out',
             // Mobile: Full screen
-            'inset-0 w-full h-full p-3 border-none shadow-none text-zinc-100',
+            'inset-0 w-full h-full p-3 !border-none shadow-none text-foreground',
             // Desktop (sm+): Restore original floating sidebar styles
-            'sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[calc(100%-2rem)] sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl sm:shadow-2xl sm:p-5 sm:border-l sm:border-zinc-900',
+            'sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[calc(100%-2rem)] sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl sm:shadow-2xl sm:p-5 !border-none',
             '[&>button]:hidden', // Hide default Sheet close button
           )}
         >
@@ -147,7 +147,11 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
             {messages.length === 0 ? (
               <ChatSuggestions onSuggestionClick={handleSendMessage} />
             ) : (
-              <ChatMessages messages={messages} />
+              <ChatMessages
+                messages={messages}
+                isStreaming={isStreaming}
+                streamingStatus={streamingStatus}
+              />
             )}
 
             <ChatInput
@@ -155,7 +159,6 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
               setInputMessage={setInputMessage}
               onSendMessage={handleSendMessage}
               isSending={isStreaming}
-              streamingStatus={isStreaming ? streamingStatus : undefined}
               selectedAgentType={selectedAgentType}
               onSelectAgentType={setSelectedAgentType}
             />
