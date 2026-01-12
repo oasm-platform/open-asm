@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
 import { AuthService } from './../auth/auth.service';
-import { BOT_ID, BOT_EMAIL } from '@/common/constants/app.constants';
+import { BOT_ID, BOT_EMAIL, BOT_NAME } from '@/common/constants/app.constants';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -24,7 +24,7 @@ export class UsersService implements OnModuleInit {
       // Create bot user if not exists
       const bot = this.usersRepository.create({
         id: BOT_ID,
-        name: 'Cai',
+        name: BOT_NAME,
         email: BOT_EMAIL,
         role: Role.BOT,
         emailVerified: true,

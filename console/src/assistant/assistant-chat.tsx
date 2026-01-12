@@ -26,6 +26,7 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
     messages,
     currentConversationId,
     isStreaming,
+    streamingStatus,
     sendMessage,
     createNewConversation,
     selectConversation,
@@ -146,7 +147,11 @@ export function AssistantChat({ onSendMessage }: AssistantChatProps) {
             {messages.length === 0 ? (
               <ChatSuggestions onSuggestionClick={handleSendMessage} />
             ) : (
-              <ChatMessages messages={messages} isStreaming={isStreaming} />
+              <ChatMessages
+                messages={messages}
+                isStreaming={isStreaming}
+                streamingStatus={streamingStatus}
+              />
             )}
 
             <ChatInput

@@ -35,11 +35,13 @@ const MessageBubble = memo(function MessageBubble({
 
 interface ChatMessagesExtendedProps extends ChatMessagesProps {
   isStreaming?: boolean;
+  streamingStatus?: { type?: string; content?: string };
 }
 
 export const ChatMessages = memo(function ChatMessages({
   messages,
   isStreaming,
+  streamingStatus,
 }: ChatMessagesExtendedProps) {
   const uniqueMessages = useMemo(() => {
     return messages.filter((msg, index) => {
@@ -98,9 +100,11 @@ export const ChatMessages = memo(function ChatMessages({
       })}
       {isStreaming && (
         <div className="flex justify-start px-1 -mt-2">
-          <div className="flex items-center gap-2 text-zinc-400 text-xs italic">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs italic">
             <Loader className="h-3 w-3 animate-spin" />
-            <span>Assistant is thinking...</span>
+            <span>
+              {streamingStatus?.content || 'Assistant is thinking...'}
+            </span>
           </div>
         </div>
       )}
