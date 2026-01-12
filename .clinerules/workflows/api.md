@@ -1,3 +1,7 @@
+---
+description: "Workflow for API development and modification with strict checks from design to deployment"
+---
+
 ## 🔧 API Development & Modification Workflow (AI-Enforced)
 
 > Role: **Senior Backend Engineer (AI Agent)**
