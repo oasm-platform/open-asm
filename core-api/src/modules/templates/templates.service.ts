@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, ILike, Repository } from 'typeorm';
-import { Job } from '../jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolsService } from '../tools/tools.service';
@@ -17,7 +16,6 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
 import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
 import { RenameTemplateDTO } from './dto/renameTemplate.dto';
-import { RunTemplateDto } from './dto/run-template.dto';
 import { Template } from './entities/templates.entity';
 
 @Injectable()
@@ -283,28 +281,28 @@ export class TemplatesService {
    * @returns Promise<Job> The created job object for the scan
    * @throws NotFoundException if the Nuclei tool is not available
    */
-  public async runTemplate(
-    dto: RunTemplateDto,
-    workspaceId: string,
-  ): Promise<Job> {
-    const { assetId } = dto;
-    const [nuclei] = await this.toolService.getToolByNames({
-      names: ['nuclei'],
-    });
+  // public async runTemplate(
+  //   dto: RunTemplateDto,
+  //   workspaceId: string,
+  // ): Promise<Job> {
+  //   const { assetId } = dto;
+  //   const [nuclei] = await this.toolService.getToolByNames({
+  //     names: ['nuclei'],
+  //   });
 
-    if (!nuclei) {
-      throw new NotFoundException('Nuclei tool is not available');
-    }
+  //   if (!nuclei) {
+  //     throw new NotFoundException('Nuclei tool is not available');
+  //   }
 
-    const job = await this.jobService.createNewJob({
-      tool: nuclei,
-      assetIds: [assetId],
-      workspaceId,
-      priority: 0,
-      isSaveRawResult: true,
-      isSaveData: false,
-    });
+  //   const job = await this.jobService.createNewJob({
+  //     tool: nuclei,
+  //     assetIds: [assetId],
+  //     workspaceId,
+  //     priority: 0,
+  //     isSaveRawResult: true,
+  //     isSaveData: false,
+  //   });
 
-    return job[0];
-  }
+  //   return job[0];
+  // }
 }

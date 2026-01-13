@@ -21,7 +21,6 @@ import { CreateToolDto } from './dto/create-tool.dto';
 import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { InstallToolDto } from './dto/install-tool.dto';
-import { RunToolDto } from './dto/run-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -472,24 +471,5 @@ export class ToolsService implements OnModuleInit {
     });
 
     return !!workspaceTool;
-  }
-
-  /**
-   * Run a tool.
-   * @param {string} id - The ID of the tool.
-   * @param {RunToolDto} dto - The tool run data.
-   * @returns {Promise<RunToolResponseDto>} The tool run response.
-   */
-  async runTool(id: string, dto: RunToolDto, workspaceId: string) {
-    const { targetIds } = dto;
-    const tool = await this.getToolById(id, workspaceId);
-
-    await this.jobRegistryService.createNewJob({
-      tool,
-      targetIds: targetIds || [],
-      assetIds: dto.assetIds || [],
-      workspaceId,
-    });
-    return;
   }
 }
