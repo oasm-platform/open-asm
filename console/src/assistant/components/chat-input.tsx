@@ -11,7 +11,6 @@ import {
 import { Send, Plus, Zap, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentType } from '../types/agent-types';
-import { StreamingStatus } from './streaming-status';
 
 type ChatInputProps = {
   inputMessage: string;
@@ -20,10 +19,6 @@ type ChatInputProps = {
   isSending: boolean;
   selectedAgentType: number;
   onSelectAgentType: (type: number) => void;
-  streamingStatus?: {
-    type?: string;
-    content?: string;
-  };
 };
 
 // Configuration object for Agent Types
@@ -55,7 +50,6 @@ export const ChatInput = memo(function ChatInput({
   isSending,
   selectedAgentType,
   onSelectAgentType,
-  streamingStatus,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -105,16 +99,7 @@ export const ChatInput = memo(function ChatInput({
     AGENT_CONFIG[AgentType.Orchestration];
 
   return (
-    <div className="flex flex-col gap-1.5 px-2 sm:px-4 pt-2 bg-black">
-      {/* Show streaming status (thinking, tool usage, etc.) */}
-      {streamingStatus && (
-        <div className="animate-in fade-in slide-in-from-bottom-1 duration-300">
-          <StreamingStatus
-            type={streamingStatus.type}
-            content={streamingStatus.content}
-          />
-        </div>
-      )}
+    <div className="flex flex-col gap-1.5 px-2 sm:px-4 pt-2 bg-background">
       <form
         onSubmit={handleSubmit}
         className="relative flex items-center gap-0.5 bg-background p-1 rounded-3xl border border-input shadow-sm focus-within:border-ring focus-within:shadow-md transition-all duration-200"

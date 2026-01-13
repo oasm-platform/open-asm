@@ -3,10 +3,7 @@
  * These endpoints are not included in the generated queries.ts because they use @Sse decorator
  */
 
-import type {
-  GetMessagesResponseDtoMessagesItem,
-  GetConversationsResponseDtoConversationsItem,
-} from './gen/queries';
+import type { GetConversationsResponseDtoConversationsItem } from './gen/queries';
 import { getGlobalWorkspaceId } from '@/utils/workspaceState';
 
 export interface CreateMessageDto {
@@ -22,27 +19,22 @@ export interface UpdateMessageDto {
   question: string;
 }
 
-// SSE Event data types
-export interface MessageEventData extends GetMessagesResponseDtoMessagesItem {
-  // Additional fields that might come from streaming
-  content?: string;
-}
-
-export interface ConversationEventData extends GetConversationsResponseDtoConversationsItem {
-  conversationId: string;
-}
-
 export interface ErrorEventData {
   message: string;
   code?: string;
   details?: unknown;
 }
 
-export type MessageStreamEventData =
-  | MessageEventData
-  | ConversationEventData
-  | ErrorEventData
-  | Record<string, unknown>;
+// SSE Event data types
+export interface MessageStreamEventData {
+  messageId?: string;
+  conversationId?: string;
+  content?: string;
+  type?: string;
+  createdAt?: string;
+  conversation?: GetConversationsResponseDtoConversationsItem;
+  error?: ErrorEventData;
+}
 
 export interface MessageStreamEvent {
   type: 'message' | 'conversation' | 'error' | 'done';
@@ -139,19 +131,12 @@ export async function* createMessageStream(
               const rawData = JSON.parse(jsonData);
 
               // Transform raw backend data to typed events
-              // Raw data format seen in logs: { "message": {...}, "conversation": {...} }
+              // Raw data format is now flat: { "content": "...", "type": "...", "conversation": {...} }
 
-              if (rawData.conversation) {
-                yield {
-                  type: 'conversation',
-                  data: rawData.conversation,
-                } as MessageStreamEvent;
-              }
-
-              if (rawData.message) {
+              if (rawData.content || rawData.type) {
                 yield {
                   type: 'message',
-                  data: rawData.message,
+                  data: rawData,
                 } as MessageStreamEvent;
               }
 
@@ -177,7 +162,10 @@ export async function* createMessageStream(
         const jsonData = buffer.slice(6).trim();
         if (jsonData) {
           const data = JSON.parse(jsonData);
-          yield data as MessageStreamEvent;
+          yield {
+            type: 'message',
+            data,
+          } as MessageStreamEvent;
         }
       } catch (e) {
         console.error('Error parsing final SSE buffer:', e);
@@ -245,16 +233,10 @@ export async function* updateMessageStream(
             if (jsonData) {
               const rawData = JSON.parse(jsonData);
 
-              if (rawData.conversation) {
-                yield {
-                  type: 'conversation',
-                  data: rawData.conversation,
-                } as MessageStreamEvent;
-              }
-              if (rawData.message) {
+              if (rawData.content || rawData.type) {
                 yield {
                   type: 'message',
-                  data: rawData.message,
+                  data: rawData,
                 } as MessageStreamEvent;
               }
               if (rawData.error) {
@@ -276,7 +258,10 @@ export async function* updateMessageStream(
         const jsonData = buffer.slice(6).trim();
         if (jsonData) {
           const data = JSON.parse(jsonData);
-          yield data as MessageStreamEvent;
+          yield {
+            type: 'message',
+            data,
+          } as MessageStreamEvent;
         }
       } catch (e) {
         console.error('Error parsing final buffer:', e);

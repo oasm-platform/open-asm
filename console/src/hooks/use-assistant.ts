@@ -6,7 +6,10 @@ import {
   useAiAssistantControllerUpdateConversation,
   useAiAssistantControllerDeleteConversations,
 } from '@/services/apis/gen/queries';
-import { createMessageStream } from '@/services/apis/ai-assistant-sse';
+import {
+  createMessageStream,
+  type MessageStreamEventData,
+} from '@/services/apis/ai-assistant-sse';
 import type { Message, ChatSession } from '@/assistant/types/types';
 
 export function useAssistant() {
@@ -69,9 +72,18 @@ export function useAssistant() {
   // Update messages when data changes
   useEffect(() => {
     if (messagesData?.messages && !internalIsStreaming) {
+      // Safety guard: if messagesData is empty but we already have messages in state
+      // (likely temp messages from a recently finished stream), don't clear them
+      // unless they are really old or we're certain there should be no messages.
+      if (messagesData.messages.length === 0 && messages.length > 0) {
+        console.debug(
+          '⚠️ messagesData is empty, preserved state messages to avoid UI flicker',
+        );
+        return;
+      }
       setMessages(messagesData.messages);
     }
-  }, [messagesData, internalIsStreaming]);
+  }, [messagesData, internalIsStreaming, messages.length]);
 
   // Delete conversation mutation
   const { mutateAsync: deleteConversationMutation } =
@@ -154,85 +166,45 @@ export function useAssistant() {
           model,
           provider,
         })) {
-          // Reverted blocking logic ("Stop Jumping") as per user request.
-          // Stream will continue to update global state and force navigation.
-
-          // Update streaming status for UI
-          const eventType =
-            'type' in event.data && typeof event.data.type === 'string'
-              ? event.data.type
-              : event.type;
-
-          const eventContent =
-            'content' in event.data && typeof event.data.content === 'string'
-              ? event.data.content
-              : '';
+          // ... rest of the loop remains the same ...
+          const flatData = event.data as MessageStreamEventData;
+          const eventType = flatData.type || event.type;
+          const eventContent = flatData.content || '';
 
           setStreamingStatus({ type: eventType, content: eventContent });
 
           if (
-            event.type === 'conversation' &&
-            'conversationId' in event.data &&
-            typeof event.data.conversationId === 'string'
+            flatData.conversationId &&
+            flatData.conversationId !== currentConversationIdRef.current
           ) {
-            setCurrentConversationId(event.data.conversationId);
-            // Update streaming ID to follow the conversation
-            setStreamingConversationId(event.data.conversationId);
-          } else if (event.type === 'message' && event.data) {
-            // Extract content - might be JSON string from backend
-            let deltaText = '';
-            if (
-              'content' in event.data &&
-              typeof event.data.content === 'string'
-            ) {
-              try {
-                // Backend sends content as JSON string like: {"text": "...", "agent": "..."}
-                const contentObj = JSON.parse(event.data.content);
-                if (contentObj.text) {
-                  deltaText = contentObj.text;
-                }
-              } catch {
-                // If not JSON, use as-is
-                deltaText = event.data.content;
-              }
-            }
+            setCurrentConversationId(flatData.conversationId);
+            setStreamingConversationId(flatData.conversationId);
+          }
 
-            // Accumulate content
-            if (deltaText) {
+          if (event.type === 'message' && flatData) {
+            const deltaText = flatData.content || '';
+            if (flatData.type === 'text' && deltaText) {
               streamedContent += deltaText;
             }
 
-            // Update the assistant message with accumulated content in REALTIME
             setMessages((prev) => {
               const lastIndex = prev.length - 1;
               if (lastIndex >= 0 && prev[lastIndex].type === 'assistant') {
                 const updated = [...prev];
                 updated[lastIndex] = {
-                  messageId:
-                    'messageId' in event.data &&
-                    typeof event.data.messageId === 'string'
-                      ? event.data.messageId
-                      : placeholderId,
-                  // Don't set question here to avoid duplication in UI
-                  // logic in chat-messages.tsx will render separate user message
+                  messageId: flatData.messageId || placeholderId,
                   question: '',
-                  type: 'assistant',
-                  content: streamedContent, // Show accumulated content
+                  type: 'assistant' as const,
+                  content:
+                    flatData.type === 'text'
+                      ? streamedContent
+                      : flatData.type === 'thinking'
+                        ? flatData.content || prev[lastIndex].content
+                        : prev[lastIndex].content,
                   conversationId:
-                    'conversationId' in event.data &&
-                    typeof event.data.conversationId === 'string'
-                      ? event.data.conversationId
-                      : currentConversationId || '',
-                  createdAt:
-                    'createdAt' in event.data &&
-                    typeof event.data.createdAt === 'string'
-                      ? event.data.createdAt
-                      : new Date().toISOString(),
-                  updatedAt:
-                    'updatedAt' in event.data &&
-                    typeof event.data.updatedAt === 'string'
-                      ? event.data.updatedAt
-                      : new Date().toISOString(),
+                    flatData.conversationId || currentConversationId || '',
+                  createdAt: flatData.createdAt || new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
                 };
                 return updated;
               }
@@ -240,33 +212,47 @@ export function useAssistant() {
             });
           } else if (event.type === 'error') {
             const errorMessage =
-              'message' in event.data && typeof event.data.message === 'string'
-                ? event.data.message
-                : 'Stream error';
-            console.error('❌ Stream error:', event.data);
-            throw new Error(errorMessage);
+              flatData.error?.message ||
+              (typeof flatData === 'string' ? flatData : 'Stream error');
+            console.error('❌ Stream error:', flatData);
+
+            // Instead of throwing, update the assistant message with the error
+            setMessages((prev) => {
+              const lastIndex = prev.length - 1;
+              if (lastIndex >= 0) {
+                const updated = [...prev];
+                updated[lastIndex] = {
+                  ...updated[lastIndex],
+                  type: 'error' as const,
+                  content: errorMessage,
+                };
+                return updated;
+              }
+              return prev;
+            });
+            break; // Stop streaming but keep messages
           }
         }
 
-        // Clear streaming status
         setStreamingStatus({});
-        // Refetch to get the final state (Only if we are still close?)
-        // Refetching is safe, triggers useEffect update.
         await refetchMessages();
         await refetchConversations();
       } catch (error) {
         console.error('Error sending message:', error);
-        // Clear streaming status on error
         setStreamingStatus({});
-        // Remove placeholder messages on error
-        setMessages((prev) =>
-          prev.filter(
+        // Only remove if it's REALLY an initialization error (e.g. fetch failed)
+        // If we already have content, don't clear it.
+        setMessages((prev) => {
+          const hasAssistantContent = prev.some(
+            (m) => m.type === 'assistant' && m.content,
+          );
+          if (hasAssistantContent) return prev;
+          return prev.filter(
             (msg) =>
               !msg.messageId?.startsWith('temp-') &&
               msg.messageId !== placeholderId,
-          ),
-        );
-        throw error;
+          );
+        });
       } finally {
         setInternalIsStreaming(false);
         setStreamingConversationId(undefined);
