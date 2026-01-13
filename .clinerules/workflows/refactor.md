@@ -1,3 +1,7 @@
+---
+description: "Safe code refactoring workflow focused on behavior preservation, strict testing, and code quality improvement"
+---
+
 ## ♻️ Refactoring Development Workflow (AI IDE – Optimized)
 
 > **Role**: Senior Software Engineer performing code refactoring.

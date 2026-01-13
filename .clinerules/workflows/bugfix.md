@@ -1,3 +1,7 @@
+---
+description: "Strict bug fix workflow from root cause analysis to deployment and regression testing"
+---
+
 ## 🐛 Bug Fix Development Workflow (AI IDE)
 
 > Role: You are a **senior software engineer** working on fixing bugs in this codebase.

@@ -1,3 +1,7 @@
+---
+description: "Strict testing workflow focused on 80%+ coverage, TDD, and unit/integration/E2E test types"
+---
+
 ## 🧪 Testing Development Workflow (Strict & Optimized)
 
 > Role: **Senior Test Engineer**
