@@ -1,17 +1,17 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { JobStatus, ToolCategory } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
+import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
+import { Asset } from '@/modules/assets/entities/assets.entity';
+import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
+import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { ApiProperty, PickType } from '@nestjs/swagger';
+import { Expose, Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsObject, IsOptional, IsUUID } from 'class-validator';
 import { JobHistory } from '../entities/job-history.entity';
 import { Job } from '../entities/job.entity';
-import { Expose, Transform, Type } from 'class-transformer';
-import { Asset } from '@/modules/assets/entities/assets.entity';
-import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
-import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
-import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 
 type RawGrpcResponse = {
   error?: boolean;
@@ -181,6 +181,6 @@ export class CreateJobs extends PickType(Job, [
   targetIds?: string[];
   assetIds?: string[];
   workspaceId: string;
-  workflow?: Workflow;
+  workflow: Workflow;
   jobHistory?: JobHistory;
 }

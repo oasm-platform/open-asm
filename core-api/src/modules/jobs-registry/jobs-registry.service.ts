@@ -37,7 +37,6 @@ import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
   CreateJobs,
-  CreateJobsDto,
   GetManyJobsQueryParams,
   GetNextJobResponseDto,
   JobTimelineItem,
@@ -515,32 +514,6 @@ export class JobsRegistryService {
 
     return getManyResponse({ query, data, total });
   }
-
-  /**
-   * Creates jobs for a target.
-   * @param dto the data transfer object containing the target ID and tool IDs
-   * @param workspaceId the workspace ID
-   * @returns an object with a success message
-   */
-  public async createJobsForTarget(
-    dto: CreateJobsDto,
-    workspaceId: string,
-  ): Promise<DefaultMessageResponseDto> {
-    const tools = await this.toolsService.toolsRepository.find({
-      where: { id: In(dto.toolIds) },
-    });
-
-    await Promise.all(
-      tools.map((tool) =>
-        this.createNewJob({ tool, targetIds: [dto.targetId], workspaceId }),
-      ),
-    );
-
-    return {
-      message: 'Jobs created successfully',
-    };
-  }
-
   /**
    * Updates the result of a job with the given worker ID.
    * @param workerId the ID of the worker that ran the job
