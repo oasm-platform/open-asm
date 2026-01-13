@@ -1,5 +1,5 @@
 ---
-description: 'A global workflow to reflect on a task and propose improvements to active .clinerules based on user feedback and multi‑step work.'
+description: "Self-improvement workflow to reflect on tasks and propose improvements to active rules based on user feedback"
 author: 'Cline Team'
 version: '1.0'
 tags: ['reflection', 'rules', 'workflow', 'process-improvement']

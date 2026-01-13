@@ -1,3 +1,7 @@
+---
+description: "Console UI component development workflow focused on TypeScript, React hooks, and accessibility"
+---
+
 ## 🎨 Console UI Component Development Workflow (AI IDE)
 
 > Role: You are a **senior frontend engineer** working on this codebase.
@@ -28,7 +32,7 @@
 - Plan **children components** (if needed)
   - Sub-components in same directory
   - Shared utility functions
-- Custom hooks for complex logic
+  - Custom hooks for complex logic
 
 ---
 

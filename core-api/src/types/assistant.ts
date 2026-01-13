@@ -22,9 +22,9 @@ export enum IssueType {
 }
 
 export enum AgentType {
-  AGENT_TYPE_ORCHESTRATION = 0,
-  AGENT_TYPE_NUCLEI_GENERATOR = 1,
-  AGENT_TYPE_ANALYSIS = 2,
+  ORCHESTRATION = 0,
+  NUCLEI_GENERATOR = 1,
+  ANALYSIS = 2,
   UNRECOGNIZED = -1,
 }
 
@@ -178,17 +178,14 @@ export interface DeleteConversationsResponse {
 
 export interface Message {
   messageId: string;
-  question: string;
-  /**
-   * type = ["message_start","delta","message_end","thinking","tool_start",
-   * "tool_output","tool_end","state","error","done","system","event"]
-   */
-  type: string;
-  /** JSON string containing message-specific data */
-  content: string;
   conversationId: string;
+  content: string;
+  /** simplified: "text", "thinking", "error", etc. */
+  type: string;
   createdAt: string;
   updatedAt: string;
+  role: string;
+  question: string;
 }
 
 export interface GetMessagesRequest {
@@ -210,8 +207,12 @@ export interface CreateMessageRequest {
 }
 
 export interface CreateMessageResponse {
-  message: Message | undefined;
+  messageId: string;
+  conversationId: string;
+  content: string;
+  type: string;
   conversation: Conversation | undefined;
+  createdAt: string;
 }
 
 export interface UpdateMessageRequest {
@@ -222,7 +223,10 @@ export interface UpdateMessageRequest {
 }
 
 export interface UpdateMessageResponse {
-  message: Message | undefined;
+  messageId: string;
+  conversationId: string;
+  content: string;
+  type: string;
 }
 
 export interface DeleteMessageRequest {
@@ -1664,7 +1668,16 @@ export const DeleteConversationsResponse: MessageFns<DeleteConversationsResponse
 };
 
 function createBaseMessage(): Message {
-  return { messageId: "", question: "", type: "", content: "", conversationId: "", createdAt: "", updatedAt: "" };
+  return {
+    messageId: "",
+    conversationId: "",
+    content: "",
+    type: "",
+    createdAt: "",
+    updatedAt: "",
+    role: "",
+    question: "",
+  };
 }
 
 export const Message: MessageFns<Message> = {
@@ -1672,23 +1685,26 @@ export const Message: MessageFns<Message> = {
     if (message.messageId !== "") {
       writer.uint32(10).string(message.messageId);
     }
-    if (message.question !== "") {
-      writer.uint32(18).string(message.question);
-    }
-    if (message.type !== "") {
-      writer.uint32(26).string(message.type);
+    if (message.conversationId !== "") {
+      writer.uint32(18).string(message.conversationId);
     }
     if (message.content !== "") {
-      writer.uint32(34).string(message.content);
+      writer.uint32(26).string(message.content);
     }
-    if (message.conversationId !== "") {
-      writer.uint32(42).string(message.conversationId);
+    if (message.type !== "") {
+      writer.uint32(34).string(message.type);
     }
     if (message.createdAt !== "") {
-      writer.uint32(50).string(message.createdAt);
+      writer.uint32(42).string(message.createdAt);
     }
     if (message.updatedAt !== "") {
-      writer.uint32(58).string(message.updatedAt);
+      writer.uint32(50).string(message.updatedAt);
+    }
+    if (message.role !== "") {
+      writer.uint32(58).string(message.role);
+    }
+    if (message.question !== "") {
+      writer.uint32(66).string(message.question);
     }
     return writer;
   },
@@ -1713,7 +1729,7 @@ export const Message: MessageFns<Message> = {
             break;
           }
 
-          message.question = reader.string();
+          message.conversationId = reader.string();
           continue;
         }
         case 3: {
@@ -1721,7 +1737,7 @@ export const Message: MessageFns<Message> = {
             break;
           }
 
-          message.type = reader.string();
+          message.content = reader.string();
           continue;
         }
         case 4: {
@@ -1729,7 +1745,7 @@ export const Message: MessageFns<Message> = {
             break;
           }
 
-          message.content = reader.string();
+          message.type = reader.string();
           continue;
         }
         case 5: {
@@ -1737,7 +1753,7 @@ export const Message: MessageFns<Message> = {
             break;
           }
 
-          message.conversationId = reader.string();
+          message.createdAt = reader.string();
           continue;
         }
         case 6: {
@@ -1745,7 +1761,7 @@ export const Message: MessageFns<Message> = {
             break;
           }
 
-          message.createdAt = reader.string();
+          message.updatedAt = reader.string();
           continue;
         }
         case 7: {
@@ -1753,7 +1769,15 @@ export const Message: MessageFns<Message> = {
             break;
           }
 
-          message.updatedAt = reader.string();
+          message.role = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.question = reader.string();
           continue;
         }
       }
@@ -1952,16 +1976,28 @@ export const CreateMessageRequest: MessageFns<CreateMessageRequest> = {
 };
 
 function createBaseCreateMessageResponse(): CreateMessageResponse {
-  return { message: undefined, conversation: undefined };
+  return { messageId: "", conversationId: "", content: "", type: "", conversation: undefined, createdAt: "" };
 }
 
 export const CreateMessageResponse: MessageFns<CreateMessageResponse> = {
   encode(message: CreateMessageResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.message !== undefined) {
-      Message.encode(message.message, writer.uint32(10).fork()).join();
+    if (message.messageId !== "") {
+      writer.uint32(10).string(message.messageId);
+    }
+    if (message.conversationId !== "") {
+      writer.uint32(18).string(message.conversationId);
+    }
+    if (message.content !== "") {
+      writer.uint32(26).string(message.content);
+    }
+    if (message.type !== "") {
+      writer.uint32(34).string(message.type);
     }
     if (message.conversation !== undefined) {
-      Conversation.encode(message.conversation, writer.uint32(18).fork()).join();
+      Conversation.encode(message.conversation, writer.uint32(42).fork()).join();
+    }
+    if (message.createdAt !== "") {
+      writer.uint32(50).string(message.createdAt);
     }
     return writer;
   },
@@ -1978,7 +2014,7 @@ export const CreateMessageResponse: MessageFns<CreateMessageResponse> = {
             break;
           }
 
-          message.message = Message.decode(reader, reader.uint32());
+          message.messageId = reader.string();
           continue;
         }
         case 2: {
@@ -1986,7 +2022,39 @@ export const CreateMessageResponse: MessageFns<CreateMessageResponse> = {
             break;
           }
 
+          message.conversationId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.content = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.type = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
           message.conversation = Conversation.decode(reader, reader.uint32());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.createdAt = reader.string();
           continue;
         }
       }
@@ -2070,13 +2138,22 @@ export const UpdateMessageRequest: MessageFns<UpdateMessageRequest> = {
 };
 
 function createBaseUpdateMessageResponse(): UpdateMessageResponse {
-  return { message: undefined };
+  return { messageId: "", conversationId: "", content: "", type: "" };
 }
 
 export const UpdateMessageResponse: MessageFns<UpdateMessageResponse> = {
   encode(message: UpdateMessageResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.message !== undefined) {
-      Message.encode(message.message, writer.uint32(10).fork()).join();
+    if (message.messageId !== "") {
+      writer.uint32(10).string(message.messageId);
+    }
+    if (message.conversationId !== "") {
+      writer.uint32(18).string(message.conversationId);
+    }
+    if (message.content !== "") {
+      writer.uint32(26).string(message.content);
+    }
+    if (message.type !== "") {
+      writer.uint32(34).string(message.type);
     }
     return writer;
   },
@@ -2093,7 +2170,31 @@ export const UpdateMessageResponse: MessageFns<UpdateMessageResponse> = {
             break;
           }
 
-          message.message = Message.decode(reader, reader.uint32());
+          message.messageId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.conversationId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.content = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.type = reader.string();
           continue;
         }
       }

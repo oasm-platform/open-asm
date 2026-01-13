@@ -1,3 +1,7 @@
+---
+description: "Detailed PR review workflow from information gathering to analysis and approval/changes decision"
+---
+
 You have access to the `gh` terminal command. I already authenticated it for you. Please review it to use the PR that I asked you to review. You're already in the `open-asm` repo.
 
 <detailed_sequence_of_steps>

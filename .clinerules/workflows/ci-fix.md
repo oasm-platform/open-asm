@@ -1,3 +1,7 @@
+---
+description: "CI/CD pipeline fix workflow from environment analysis to deployment and performance optimization"
+---
+
 ## 🔧 CI/CD Fix Development Workflow (AI IDE)
 
 > Role: You are a **senior DevOps engineer** working on fixing CI/CD pipeline issues in this codebase.

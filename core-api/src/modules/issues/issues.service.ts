@@ -1,4 +1,3 @@
-import { BOT_USER_DATA } from '@/common/constants/app.constants';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
@@ -7,6 +6,7 @@ import {
   IssueCommentType,
   IssueSourceType,
   IssueStatus,
+  Role,
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
@@ -31,6 +31,7 @@ import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
 import { IssueSourceHandler } from './interfaces/source-handler.interface';
+import { BOT_EMAIL, BOT_ID, BOT_NAME } from '@/common/constants/app.constants';
 
 @Injectable()
 export class IssuesService {
@@ -480,7 +481,11 @@ export class IssuesService {
         content: response.message,
         issue: { id: issueId },
         createdBy: {
-          ...BOT_USER_DATA,
+          id: BOT_ID,
+          name: BOT_NAME,
+          email: BOT_EMAIL,
+          role: Role.BOT,
+          emailVerified: true,
         } as User,
         isCanDelete: false,
         isCanEdit: false,
