@@ -42,7 +42,7 @@ export class TargetsService implements OnModuleInit {
    * @param id - The ID of the target to retrieve.
    * @returns A promise that resolves to the target entity if found, otherwise null.
    */
-  public async getTargetById(id: string): Promise<Target> {
+  public async getTargetById(id: string, workspaceId: string): Promise<Target> {
     const result = (await this.repo
       .createQueryBuilder('targets')
       .leftJoin('targets.workspaceTargets', 'workspaceTarget')
@@ -51,6 +51,7 @@ export class TargetsService implements OnModuleInit {
       .leftJoin('targets.assets', 'asset')
       .leftJoin('asset.jobs', 'job')
       .where('targets.id = :id', { id })
+      .andWhere('workspace.id = :workspaceId', { workspaceId })
       .select([
         'targets.id as id',
         'targets.value as value',
@@ -96,30 +97,61 @@ export class TargetsService implements OnModuleInit {
   ): Promise<Target> {
     const { workspaceId, value } = dto;
     // Check if the workspace exists and the user is the owner
-    const workspace = await this.workspacesService.getWorkspaceByIdAndOwner(
+    await this.workspacesService.getWorkspaceByIdAndOwner(
       workspaceId,
       userContext,
     );
-    // Upsert target
-    await this.repo.upsert({ value }, ['value']);
 
-    // Find target
-    const target = await this.repo.findOne({
-      where: { value },
-      relations: ['workspaceTargets'],
-    });
+    // Use transaction to ensure atomicity of target and workspace_target creation
+    const target = await this.repo.manager.transaction(
+      async (transactionalEntityManager) => {
+        // Check if target already exists in this workspace
+        const existingWorkspaceTarget = await transactionalEntityManager
+          .getRepository(WorkspaceTarget)
+          .findOne({
+            where: {
+              workspace: { id: workspaceId },
+              target: { value },
+            },
+          });
 
-    // Check if target exists in workspace
-    if (!target) {
-      throw new NotFoundException('Target not found after creation');
-    }
-    // Upsert workspace target
-    await this.workspaceTargetRepository.upsert({ workspace, target }, [
-      'workspace',
-      'target',
-    ]);
+        if (existingWorkspaceTarget) {
+          throw new NotFoundException(
+            'Target already exists in this workspace',
+          );
+        }
 
-    // Create primary asset
+        // Create a new target record (don't reuse from other workspaces)
+        const insertResult = await transactionalEntityManager
+          .createQueryBuilder()
+          .insert()
+          .into(Target)
+          .values({ value })
+          .execute();
+
+        // Get the newly created target ID
+        const targetId = insertResult.identifiers[0].id as string;
+        const target = await transactionalEntityManager
+          .getRepository(Target)
+          .findOne({
+            where: { id: targetId },
+          });
+
+        if (!target) {
+          throw new NotFoundException('Target not found after creation');
+        }
+
+        // Create workspace target association
+        await transactionalEntityManager.getRepository(WorkspaceTarget).save({
+          workspace: { id: workspaceId },
+          target: { id: target.id },
+        });
+
+        return target;
+      },
+    );
+
+    // Create primary asset after transaction completes
     await this.assetService.createPrimaryAsset({
       target,
       value,

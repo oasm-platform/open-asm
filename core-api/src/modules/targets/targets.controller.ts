@@ -131,10 +131,13 @@ export class TargetsController {
     response: {
       serialization: Target,
     },
+    request:{
+      getWorkspaceId: true
+    }
   })
   @Get(':id')
-  getTargetById(@Param() { id }: IdQueryParamDto) {
-    return this.targetsService.getTargetById(id);
+  getTargetById(@Param() { id }: IdQueryParamDto, @WorkspaceId() workspaceId: string) {
+    return this.targetsService.getTargetById(id, workspaceId);
   }
 
   @Doc({
