@@ -265,7 +265,7 @@ export class DataAdapterService {
           vulsForAlert.map((v) =>
             this.issuesService.createIssue(
               {
-                title: `[${v.severity}] ${v.name}`,
+                title: `[${v.severity.charAt(0).toUpperCase() + v.severity.slice(1).toLowerCase()}] ${v.name}`,
                 description: v.description,
                 sourceId: v.id,
                 sourceType: IssueSourceType.VULNERABILITY,
