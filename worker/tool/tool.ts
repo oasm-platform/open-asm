@@ -1,7 +1,8 @@
 import logger from "node-color-log";
-import coreApi from "../services/core-api";
-import type { Job } from '../services/core-api/api';
+import type { Job } from "../services/core-api/api";
 import runCommand from "./runCommand";
+
+import { GrpcService } from "../services/grpc.service";
 
 export class Tool {
   private queue: Job[] = [];
@@ -16,9 +17,11 @@ export class Tool {
   private readonly pullInterval = Number(process.env.PULL_INTERVAL) || 1000; // Configurable pull interval
   private isShuttingDown = false;
 
+  constructor(private grpcService: GrpcService) {}
+
   public async run() {
     await this.connectToCore();
-    this.alive();
+    this.startAliveStream();
 
     // Track previous status for change detection
     let prevStatus = this.getStatus();
@@ -77,64 +80,82 @@ export class Tool {
     process.on("SIGINT", gracefulShutdown);
   }
 
-  private async alive() {
-    const aliveInterval = setInterval(async () => {
-      if (this.isShuttingDown) {
-        clearInterval(aliveInterval);
-        return;
-      }
+  private startAliveStream() {
+    if (this.isShuttingDown || !Tool.token) return;
 
-      try {
-        await coreApi.workersControllerAlive({
-          token: Tool.token!,
-        });
-        if (this.isAliveError) {
-          logger.success(
-            `RECONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`
-          );
-          this.isAliveError = false;
+    const stream = this.grpcService.alive();
+    let pingInterval: NodeJS.Timeout;
+
+    const startPinging = () => {
+      pingInterval = setInterval(() => {
+        if (this.isShuttingDown) {
+          stream.end();
+          clearInterval(pingInterval);
+          return;
         }
-      } catch (error: any) {
-        if (error?.response?.status === 401) {
-          logger.warn("Token unauthorized. Reconnecting...");
-          await this.connectToCore();
-        } else {
-          this.isAliveError = true;
-          logger.error("Alive check failed:", error.message);
+        try {
+          stream.write({ worker_token: Tool.token });
+        } catch (e) {
+          logger.error("Failed to write to alive stream");
         }
+      }, 5000);
+    };
+
+    stream.on("data", (data: any) => {
+      if (this.isAliveError) {
+        logger.success(
+          `RECONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`
+        );
+        this.isAliveError = false;
       }
-    }, 5000);
+    });
+
+    stream.on("error", (err: any) => {
+      this.isAliveError = true;
+      logger.error("Alive stream error:", err.message);
+      clearInterval(pingInterval);
+      setTimeout(() => this.startAliveStream(), 5000);
+    });
+
+    stream.on("end", () => {
+      logger.warn("Alive stream ended.");
+      clearInterval(pingInterval);
+      if (!this.isShuttingDown) {
+        setTimeout(() => this.startAliveStream(), 5000);
+      }
+    });
+
+    startPinging();
   }
 
   /**
-   * Validates and connects worker via SSE, waits until workerId is set.
+   * Validates and connects worker via gRPC, waits until workerId is set.
    */
   private async connectToCore() {
     let attempt = 0;
 
     while (true) {
       try {
-        const worker: any = await coreApi.workersControllerJoin({
-          apiKey: process.env.API_KEY! || process.env.OASM_CLOUD_APIKEY!,
-        });
-        Tool.workerId = worker.id;
-        Tool.token = worker.token;
+        const response = await this.grpcService.join(
+          process.env.API_KEY! || process.env.OASM_CLOUD_APIKEY!
+        );
+
+        Tool.workerId = response.worker_id;
+        Tool.token = response.worker_token;
         logger.success(
           `CONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`
         );
 
-        // Wait until Tool.workerId is set (by SSE handler)
-        await this.waitUntil(() => !!Tool.workerId, 1000);
-        return; // success, exit the method
+        return; // success
       } catch (e: any) {
-        // If we get a 401 error, don't retry - just throw an API key invalid error
-        if (e?.response?.status === 401) {
-          logger.error("API key is invalid. Cannot connect to core.");
-        }
+        // If we get an error, check if it's auth related (though gRPC errors are different)
+        // gRPC status 16 is UNAUTHENTICATED usually, but we need to check how it's mapped.
+        // For now, generic retry.
 
         attempt++;
         logger.error(
-          `Cannot connect to core ${process.env.API} (attempt ${attempt}):`
+          `Cannot connect to core (attempt ${attempt}):`,
+          e.message || e
         );
         await this.sleep(1000 * attempt); // exponential backoff delay
       }
@@ -182,14 +203,8 @@ export class Tool {
 
   private async pullSingleJob(): Promise<Job | null> {
     try {
-      const job = (await coreApi.jobsRegistryControllerGetNextJob(
-        Tool.workerId!, {
-        headers: {
-          'worker-token': Tool.token
-        }
-      }
-      )) as Job;
-      return job || null;
+      const job = await this.grpcService.next(Tool.workerId!, Tool.token!);
+      return job && job.id ? job : null;
     } catch (error) {
       return null;
     }
@@ -245,38 +260,44 @@ export class Tool {
     try {
       const data = await this.commandExecution(job.command);
 
-      await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
-        jobId: job.id,
-        data: {
-          raw: data,
-          error: false,
-          payload: {}
+      await this.grpcService.result(
+        Tool.workerId!,
+        {
+          job_id: job.id,
+          data: {
+            raw: data,
+            error: false,
+            payload: {},
+          },
         },
-      });
+        Tool.token!
+      );
 
       const executionTime = Date.now() - startTime;
       logger
         .color("green")
         .log(
-          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split("-")[0]} - Time: ${executionTime}ms`
+          `[DONE] - JobId: ${job.command} - WorkerId: ${
+            Tool.workerId?.split("-")[0]
+          } - Time: ${executionTime}ms`
         );
     } catch (e) {
       logger.error(`Failed to handle job ${job.id}:`, e);
 
       // Optionally report failure to core
       try {
-        await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
-          jobId: job.id,
-          data: {
-            raw: `Error: ${e instanceof Error ? e.message : "Unknown error"}`,
-            error: true,
-            payload: {}
+        await this.grpcService.result(
+          Tool.workerId!,
+          {
+            job_id: job.id,
+            data: {
+              raw: `Error: ${e instanceof Error ? e.message : "Unknown error"}`,
+              error: true,
+              payload: {},
+            },
           },
-        }, {
-          headers: {
-            'worker-token': Tool.token
-          }
-        });
+          Tool.token!
+        );
       } catch (reportError) {
         logger.error(
           `Failed to report job failure for ${job.id}:`,
@@ -286,9 +307,7 @@ export class Tool {
     }
   }
 
-  private async commandExecution(
-    command: string
-  ): Promise<string> {
+  private async commandExecution(command: string): Promise<string> {
     logger.color("blue").log(`[RUNNING]: ${command}`);
 
     try {
