@@ -8,8 +8,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { User } from '../auth/entities/user.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { ToolsService } from '../tools/tools.service';
+import { WorkflowsService } from '../workflows/workflows.service';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   VulnerabilityStatisticsDto,
@@ -18,9 +20,8 @@ import {
   GetVulnerabilitiesQueryDto,
   VulnerabilityStatus,
 } from './dto/get-vulnerability.dto';
-import { Vulnerability } from './entities/vulnerability.entity';
-import { User } from '../auth/entities/user.entity';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
+import { Vulnerability } from './entities/vulnerability.entity';
 
 @Injectable()
 export class VulnerabilitiesService {
@@ -31,6 +32,7 @@ export class VulnerabilitiesService {
     private dismissRepo: Repository<VulnerabilityDismissal>,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
+    private workflowService: WorkflowsService,
   ) {}
 
   /**
@@ -42,8 +44,24 @@ export class VulnerabilitiesService {
    */
   public async scan(targetId: string, workspaceId: string) {
     const tools = await this.toolsService.getToolByNames({ names: ['nuclei'] });
+    const workflow = await this.workflowService.workflowRepository.findOne({
+      where: {
+        workspace: {
+          id: workspaceId,
+        },
+        filePath: 'vuls-scan-basic.yaml',
+      },
+    });
+
+    if (!workflow) {
+      throw new NotFoundException(
+        'Vulnerability scanning workflow not found in the workspace.',
+      );
+    }
+
     await this.jobRegistryService.createNewJob({
       tool: tools[0],
+      workflow,
       targetIds: [targetId],
       priority: tools[0].priority,
       workspaceId,

@@ -516,6 +516,7 @@ export interface LLMConfigResponseDto {
   provider: string;
   apiKey: string;
   model: string;
+  apiUrl: string;
   isPreferred: boolean;
   isEditable: boolean;
 }
@@ -525,6 +526,7 @@ export interface UpdateLLMConfigDto {
   provider: string;
   apiKey: string;
   model?: string;
+  apiUrl?: string;
 }
 
 export interface Asset {
@@ -649,11 +651,6 @@ export interface DataPayloadResult {
 export interface UpdateResultDto {
   jobId: string;
   data: DataPayloadResult;
-}
-
-export interface CreateJobsDto {
-  toolIds: string[];
-  targetId: string;
 }
 
 export interface JobHistoryResponseDto {
@@ -1480,11 +1477,6 @@ export interface GetManyTemplateDto {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-}
-
-export interface RunTemplateDto {
-  templateId: string;
-  assetId: string;
 }
 
 export interface AssetGroup {
@@ -3042,27 +3034,6 @@ export class Api<
     });
 
   /**
-   * No description
-   *
-   * @tags JobsRegistry
-   * @name JobsRegistryControllerCreateJobsForTarget
-   * @summary Creates a new job associated with the given asset and worker name.
-   * @request POST:/api/jobs-registry
-   */
-  jobsRegistryControllerCreateJobsForTarget = (
-    data: CreateJobsDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/jobs-registry`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
    * @description Retrieves a timeline of jobs grouped by tool name and target.
    *
    * @tags JobsRegistry
@@ -4392,27 +4363,6 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/templates/${templateId}`,
       method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Run a template and create a job
-   *
-   * @tags Templates
-   * @name TemplatesControllerRunTemplate
-   * @summary Run a template
-   * @request POST:/api/templates/run
-   */
-  templatesControllerRunTemplate = (
-    data: RunTemplateDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/templates/run`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
       format: "json",
       ...params,
     });

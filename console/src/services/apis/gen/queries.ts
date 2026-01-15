@@ -538,6 +538,7 @@ export type LLMConfigResponseDto = {
   provider: string;
   apiKey: string;
   model: string;
+  apiUrl: string;
   isPreferred: boolean;
   isEditable: boolean;
 };
@@ -547,6 +548,7 @@ export type UpdateLLMConfigDto = {
   provider: string;
   apiKey: string;
   model?: string;
+  apiUrl?: string;
 };
 
 export type AssetDnsRecords = { [key: string]: unknown };
@@ -672,11 +674,6 @@ export type DataPayloadResult = {
 export type UpdateResultDto = {
   jobId: string;
   data: DataPayloadResult;
-};
-
-export type CreateJobsDto = {
-  toolIds: string[];
-  targetId: string;
 };
 
 export type JobHistoryResponseDtoStatus =
@@ -1423,11 +1420,6 @@ export type GetManyTemplateDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-};
-
-export type RunTemplateDto = {
-  templateId: string;
-  assetId: string;
 };
 
 export type AssetGroup = {
@@ -8787,101 +8779,6 @@ export function useJobsRegistryControllerGetManyJobs<
 
   return query;
 }
-
-/**
- * @summary Creates a new job associated with the given asset and worker name.
- */
-export const jobsRegistryControllerCreateJobsForTarget = (
-  createJobsDto: CreateJobsDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/jobs-registry`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createJobsDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getJobsRegistryControllerCreateJobsForTargetMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-    TError,
-    { data: CreateJobsDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-  TError,
-  { data: CreateJobsDto },
-  TContext
-> => {
-  const mutationKey = ['jobsRegistryControllerCreateJobsForTarget'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-    { data: CreateJobsDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return jobsRegistryControllerCreateJobsForTarget(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type JobsRegistryControllerCreateJobsForTargetMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>
-  >;
-export type JobsRegistryControllerCreateJobsForTargetMutationBody =
-  CreateJobsDto;
-export type JobsRegistryControllerCreateJobsForTargetMutationError = unknown;
-
-/**
- * @summary Creates a new job associated with the given asset and worker name.
- */
-export const useJobsRegistryControllerCreateJobsForTarget = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-      TError,
-      { data: CreateJobsDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-  TError,
-  { data: CreateJobsDto },
-  TContext
-> => {
-  const mutationOptions =
-    getJobsRegistryControllerCreateJobsForTargetMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
 
 /**
  * Retrieves a timeline of jobs grouped by tool name and target.
@@ -19796,100 +19693,6 @@ export const useTemplatesControllerDeleteTemplate = <
 > => {
   const mutationOptions =
     getTemplatesControllerDeleteTemplateMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Run a template and create a job
- * @summary Run a template
- */
-export const templatesControllerRunTemplate = (
-  runTemplateDto: RunTemplateDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<Job>(
-    {
-      url: `/api/templates/run`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: runTemplateDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getTemplatesControllerRunTemplateMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-    TError,
-    { data: RunTemplateDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-  TError,
-  { data: RunTemplateDto },
-  TContext
-> => {
-  const mutationKey = ['templatesControllerRunTemplate'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-    { data: RunTemplateDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return templatesControllerRunTemplate(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type TemplatesControllerRunTemplateMutationResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerRunTemplate>>
->;
-export type TemplatesControllerRunTemplateMutationBody = RunTemplateDto;
-export type TemplatesControllerRunTemplateMutationError = unknown;
-
-/**
- * @summary Run a template
- */
-export const useTemplatesControllerRunTemplate = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-      TError,
-      { data: RunTemplateDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-  TError,
-  { data: RunTemplateDto },
-  TContext
-> => {
-  const mutationOptions =
-    getTemplatesControllerRunTemplateMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

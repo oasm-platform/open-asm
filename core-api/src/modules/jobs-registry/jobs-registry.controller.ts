@@ -26,7 +26,6 @@ import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import {
-  CreateJobsDto,
   GetNextJobResponseDto,
   JobTimelineResponseDto,
   UpdateResultDto,
@@ -89,22 +88,6 @@ export class JobsRegistryController {
     @Body() dto: UpdateResultDto,
   ) {
     return this.jobsRegistryService.updateResult(workerId, dto);
-  }
-
-  @UseGuards(WorkspaceOwnerGuard)
-  @Doc({
-    summary:
-      'Creates a new job associated with the given asset and worker name.',
-    request: {
-      getWorkspaceId: true,
-    },
-  })
-  @Post()
-  createJobsForTarget(
-    @Body() dto: CreateJobsDto,
-    @WorkspaceId() workspaceId: string,
-  ) {
-    return this.jobsRegistryService.createJobsForTarget(dto, workspaceId);
   }
 
   @Doc({

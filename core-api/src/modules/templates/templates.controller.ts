@@ -13,11 +13,9 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { Job } from '../jobs-registry/entities/job.entity';
 import { CreateTemplateDTO } from './dto/createTemplate.dto';
 import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
 import { RenameTemplateDTO } from './dto/renameTemplate.dto';
-import { RunTemplateDto } from './dto/run-template.dto';
 import {
   UploadTemplateDTO,
   UploadTemplateResponseDTO,
@@ -27,7 +25,7 @@ import { TemplatesService } from './templates.service';
 
 @Controller('templates')
 export class TemplatesController {
-  constructor(private readonly templateService: TemplatesService) { }
+  constructor(private readonly templateService: TemplatesService) {}
 
   @Doc({
     summary: 'Create a new templates',
@@ -144,16 +142,16 @@ export class TemplatesController {
     );
   }
 
-  @Doc({
-    summary: 'Run a template',
-    description: 'Run a template and create a job',
-    response: { serialization: Job },
-    request: {
-      getWorkspaceId: true,
-    },
-  })
-  @Post('run')
-  runTemplate(@Body() dto: RunTemplateDto, @WorkspaceId() workspaceId: string) {
-    return this.templateService.runTemplate(dto, workspaceId);
-  }
+  // @Doc({
+  //   summary: 'Run a template',
+  //   description: 'Run a template and create a job',
+  //   response: { serialization: Job },
+  //   request: {
+  //     getWorkspaceId: true,
+  //   },
+  // })
+  // @Post('run')
+  // runTemplate(@Body() dto: RunTemplateDto, @WorkspaceId() workspaceId: string) {
+  //   return this.templateService.runTemplate(dto, workspaceId);
+  // }
 }

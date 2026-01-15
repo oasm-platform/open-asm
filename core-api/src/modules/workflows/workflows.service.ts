@@ -15,10 +15,10 @@ import { Workflow } from './entities/workflow.entity';
 export class WorkflowsService implements OnModuleInit {
   constructor(
     @InjectRepository(Workflow)
-    private workflowRepository: Repository<Workflow>,
+    public workflowRepository: Repository<Workflow>,
     @InjectRepository(Workspace)
     private workspaceRepository: Repository<Workspace>,
-  ) { }
+  ) {}
 
   private readonly logger = new Logger(WorkflowsService.name);
   private readonly templatesPath = path.join(__dirname, 'templates');
@@ -52,7 +52,9 @@ export class WorkflowsService implements OnModuleInit {
 
     const files = fs.readdirSync(this.templatesPath);
 
-    const yamlFiles = files.filter((file) => file.endsWith('.yaml') || file.endsWith('.yml'));
+    const yamlFiles = files.filter(
+      (file) => file.endsWith('.yaml') || file.endsWith('.yml'),
+    );
 
     return yamlFiles;
   }
@@ -200,7 +202,8 @@ export class WorkflowsService implements OnModuleInit {
     const workflow = new Workflow();
     workflow.name = name;
     workflow.content = content;
-    workflow.filePath = filePath || `${name.toLowerCase().replace(/\s+/g, '-')}.yaml`;
+    workflow.filePath =
+      filePath || `${name.toLowerCase().replace(/\s+/g, '-')}.yaml`;
     workflow.createdBy = { id: createdBy.id } as User;
     workflow.workspace = { id: workspace.id } as Workspace;
 
@@ -214,10 +217,14 @@ export class WorkflowsService implements OnModuleInit {
    * @returns The Workflow entity if found
    * @throws Error if workflow is not found in the workspace
    */
-  async getWorkspaceWorkflow(id: string, workspace: { id: string }): Promise<Workflow> {
+  async getWorkspaceWorkflow(
+    id: string,
+    workspace: { id: string },
+  ): Promise<Workflow> {
     const workflow = await this.workflowRepository.findOne({
       where: {
-        id, workspace: { id: workspace.id },
+        id,
+        workspace: { id: workspace.id },
       },
       relations: ['createdBy', 'workspace'],
     });
@@ -237,7 +244,11 @@ export class WorkflowsService implements OnModuleInit {
    * @returns The updated Workflow entity
    * @throws Error if workflow is not found in the workspace
    */
-  async updateWorkflow(id: string, updateData: Partial<CreateWorkflowDto>, workspace: { id: string }): Promise<Workflow> {
+  async updateWorkflow(
+    id: string,
+    updateData: Partial<CreateWorkflowDto>,
+    workspace: { id: string },
+  ): Promise<Workflow> {
     const workflow = await this.getWorkspaceWorkflow(id, workspace);
 
     if (updateData.name) workflow.name = updateData.name;
@@ -268,7 +279,13 @@ export class WorkflowsService implements OnModuleInit {
     query: GetManyWorkflowsQueryDto,
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<Workflow>> {
-    const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'ASC', name } = query;
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'ASC',
+      name,
+    } = query;
 
     const queryBuilder = this.workflowRepository
       .createQueryBuilder('workflow')
@@ -309,7 +326,9 @@ export class WorkflowsService implements OnModuleInit {
    * @param workspace The workspace to retrieve workflows from
    * @returns Array of Workflow entities in the workspace
    */
-  async getWorkflowsByWorkspace(workspace: { id: string }): Promise<Workflow[]> {
+  async getWorkflowsByWorkspace(workspace: {
+    id: string;
+  }): Promise<Workflow[]> {
     return await this.workflowRepository.find({
       where: {
         workspace: { id: workspace.id },
