@@ -20,6 +20,17 @@ import { IssuesService } from './issues.service';
     JobsRegistryModule,
     BullModule.registerQueue({
       name: BullMQName.ISSUE_CREATION,
+      defaultJobOptions: {
+        removeOnComplete: {
+          age: 5,
+        },
+        removeOnFail: true,
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+      },
     }),
   ],
   controllers: [IssuesController],
