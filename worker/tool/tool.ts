@@ -1,8 +1,9 @@
 import logger from "node-color-log";
-import type { Job } from "../services/core-api/api";
+import type { Job } from "../proto/generated/jobs_registry/Job";
 import runCommand from "./runCommand";
 
 import { GrpcService } from "../services/grpc.service";
+import { status } from "@grpc/grpc-js";
 
 export class Tool {
   private queue: Job[] = [];
@@ -94,7 +95,9 @@ export class Tool {
           return;
         }
         try {
-          stream.write({ worker_token: Tool.token });
+          if (Tool.token) {
+            stream.write({ worker_token: Tool.token });
+          }
         } catch (e) {
           logger.error("Failed to write to alive stream");
         }
@@ -140,17 +143,21 @@ export class Tool {
           process.env.API_KEY! || process.env.OASM_CLOUD_APIKEY!
         );
 
-        Tool.workerId = response.worker_id;
-        Tool.token = response.worker_token;
+        Tool.workerId = response.worker_id ?? null;
+        Tool.token = response.worker_token ?? null;
         logger.success(
           `CONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`
         );
 
         return; // success
       } catch (e: any) {
-        // If we get an error, check if it's auth related (though gRPC errors are different)
-        // gRPC status 16 is UNAUTHENTICATED usually, but we need to check how it's mapped.
-        // For now, generic retry.
+        // Stop retrying if authentication fails
+        if (e.code === status.UNAUTHENTICATED) {
+          logger.error(
+            "Authentication failed: Invalid API Key. Please check your API_KEY configuration."
+          );
+          process.exit(1);
+        }
 
         attempt++;
         logger.error(
@@ -240,6 +247,7 @@ export class Tool {
    * Processes a single job concurrently.
    */
   private async processJobConcurrently(job: Job) {
+    if (!job.id) return;
     this.processingJobs.add(job.id);
 
     try {
@@ -247,7 +255,7 @@ export class Tool {
     } catch (error) {
       logger.error(`Job ${job.id} failed:`, error);
     } finally {
-      this.processingJobs.delete(job.id);
+      if (job.id) this.processingJobs.delete(job.id);
     }
   }
 
@@ -258,16 +266,15 @@ export class Tool {
     const startTime = Date.now();
 
     try {
-      const data = await this.commandExecution(job.command);
+      const data = await this.commandExecution(job.command || "");
 
       await this.grpcService.result(
         Tool.workerId!,
         {
-          job_id: job.id,
+          job_id: job.id!,
           data: {
             raw: data,
             error: false,
-            payload: {},
           },
         },
         Tool.token!
@@ -289,11 +296,10 @@ export class Tool {
         await this.grpcService.result(
           Tool.workerId!,
           {
-            job_id: job.id,
+            job_id: job.id!,
             data: {
               raw: `Error: ${e instanceof Error ? e.message : "Unknown error"}`,
               error: true,
-              payload: {},
             },
           },
           Tool.token!

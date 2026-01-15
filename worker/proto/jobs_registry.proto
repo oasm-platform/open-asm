@@ -8,7 +8,7 @@ import "google/protobuf/struct.proto";
 // Service Definition
 service JobsRegistryService {
   rpc Next (Worker) returns (Job);
-  rpc Result (JobResultRequest) returns (JobResponse); 
+  rpc Result (JobResultRequest) returns (JobResponse);
 }
 
 
