@@ -92,6 +92,7 @@ describe('AiAssistantService', () => {
           apiKey: dto.apiKey,
           model: dto.model,
           id: '',
+          apiUrl: '',
         },
         expect.any(Object), // metadata
       );
