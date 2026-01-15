@@ -68,6 +68,7 @@ export function LLMManagerContent() {
       apiKey: c.apiKey,
       isPreferred: !!c.isPreferred,
       isEditable: c.isEditable,
+      apiUrl: c.apiUrl,
     })) || [];
 
   const handleSetDefault = (id: string) => {
@@ -94,6 +95,7 @@ export function LLMManagerContent() {
     provider: string;
     apiKey: string;
     model: string;
+    apiUrl?: string;
   }) => {
     if (!selectedWorkspace) return;
 
@@ -104,6 +106,7 @@ export function LLMManagerContent() {
           provider: data.provider,
           apiKey: data.apiKey,
           model: data.model,
+          apiUrl: data.apiUrl,
         },
       },
       {
@@ -218,6 +221,7 @@ export function LLMManagerContent() {
                     provider: editingConfig.provider,
                     apiKey: editingConfig.apiKey,
                     model: editingConfig.model,
+                    apiUrl: editingConfig.apiUrl,
                   }
                 : undefined
             }
