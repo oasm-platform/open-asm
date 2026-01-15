@@ -128,6 +128,7 @@ export enum BullMQName {
   ASSET_GROUPS_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
   NOTIFICATION = 'notification',
   JOB_RESULT = 'job-result',
+  ISSUE_CREATION = 'issue-creation',
 }
 
 export enum NotificationStatus {
