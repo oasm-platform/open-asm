@@ -35,6 +35,7 @@ message LLMConfig {
     string id = 4;
     bool is_preferred = 5; // Only one config can be preferred per user/workspace
     bool is_editable = 6; // Whether the config can be edited/deleted (false for system defaults)
+    string api_url = 7;
 }
 
 message GetLLMConfigsRequest {
@@ -55,6 +56,7 @@ message UpdateLLMConfigRequest {
     string api_key = 2;
     string model = 3;
     string id = 4;
+    string api_url = 5;
 }
 
 message UpdateLLMConfigResponse {

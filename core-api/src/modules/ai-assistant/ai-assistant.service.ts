@@ -663,6 +663,7 @@ export class AiAssistantService implements OnModuleInit {
           apiKey: dto.apiKey,
           model: dto.model || '',
           id: dto.id || '',
+          apiUrl: dto.apiUrl || '',
         },
         metadata,
       ),
