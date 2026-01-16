@@ -1,7 +1,10 @@
+import { BullMQName } from '@/common/enums/enum';
 import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
+import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiAssistantModule } from '../ai-assistant/ai-assistant.module';
+import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
 import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
@@ -14,6 +17,21 @@ import { IssuesService } from './issues.service';
     TypeOrmModule.forFeature([Issue, IssueComment]),
     VulnerabilitiesModule,
     AiAssistantModule,
+    JobsRegistryModule,
+    BullModule.registerQueue({
+      name: BullMQName.ISSUE_CREATION,
+      defaultJobOptions: {
+        removeOnComplete: {
+          age: 5,
+        },
+        removeOnFail: true,
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+      },
+    }),
   ],
   controllers: [IssuesController],
   providers: [IssuesService, VulnerabilitySourceHandler],
