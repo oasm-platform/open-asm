@@ -1,8 +1,9 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { Role } from '@/common/enums/enum';
 import { Injectable } from '@nestjs/common';
+import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 import { UsersService } from '../users/users.service';
 import { CreateFirstAdminDto, GetMetadataDto } from './dto/root.dto';
-import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 
 @Injectable()
 export class RootService {
@@ -42,6 +43,9 @@ export class RootService {
     const DAYS_PER_YEAR = 365;
 
     const userCount = await this.usersService.usersRepository.count({
+      where: {
+        role: Role.ADMIN,
+      },
       cache: {
         id: 'isInit',
         milliseconds:
@@ -52,7 +56,6 @@ export class RootService {
           DAYS_PER_YEAR,
       },
     });
-
     let isAssistant = false;
     try {
       const health = await this.aiAssistantService.healthCheck();
