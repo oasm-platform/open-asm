@@ -1,7 +1,9 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { IssueSourceType, IssueStatus } from '@/common/enums/enum';
+import { BullMQName, IssueSourceType, IssueStatus } from '@/common/enums/enum';
+import { getQueueToken } from '@nestjs/bullmq';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Test, type TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
@@ -37,6 +39,18 @@ describe('IssuesService', () => {
   };
 
   beforeEach(async () => {
+    // Create mock job that simulates the async behavior
+    // The service uses polling with setTimeout, so we need to mock multiple calls
+    // The service will call getState() multiple times until it returns 'completed'
+    // We need to ensure it returns 'completed' after the first 'active' state
+    const mockJob = {
+      id: 'mock-job-id',
+      getState: jest
+        .fn()
+        .mockResolvedValueOnce('active') // First call returns 'active'
+        .mockResolvedValueOnce('completed'), // Second call returns 'completed'
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         IssuesService,
@@ -47,6 +61,13 @@ describe('IssuesService', () => {
         {
           provide: getRepositoryToken(IssueComment),
           useClass: Repository,
+        },
+        {
+          provide: getQueueToken(BullMQName.ISSUE_CREATION),
+          useValue: {
+            add: jest.fn().mockResolvedValue(mockJob),
+            getJob: jest.fn().mockResolvedValue(mockJob),
+          },
         },
         {
           provide: VulnerabilitySourceHandler,
@@ -130,19 +151,19 @@ describe('IssuesService', () => {
       const userId = '123e4567-e89b-12d3-a456-426614174002';
       const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
 
-      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(repository, 'create').mockReturnValue(mockIssue as Issue);
-
-      const mockTransactionalEntityManager = {
-        save: jest.fn().mockResolvedValue(mockIssue as Issue),
-      };
-
-      const mockTransaction = jest
-        .fn()
-        .mockImplementation((callback: (entityManager: any) => any) => {
-          return callback(mockTransactionalEntityManager) as Promise<Issue>;
-        });
-      repository.manager.transaction = mockTransaction;
+      // Mock the repository to return the created issue
+      // The service calls findOne twice: first to check for existing issues (with where clause)
+      // and second to get the last created issue (with order by no DESC)
+      jest.spyOn(repository, 'findOne').mockImplementation((options: any) => {
+        if (options.where && options.order && options.order.no === 'DESC') {
+          // This is the call to get the last issue by no DESC
+          return Promise.resolve(mockIssue as Issue);
+        } else if (options.where && !options.order) {
+          // This is the call to check if issue already exists
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+      });
 
       const result = await service.createIssue(
         createIssueDto,
@@ -158,7 +179,7 @@ describe('IssuesService', () => {
         description: 'Test Description',
         tags: ['tag1', 'tag2', 'tag3'],
       };
-      const userId = '123e4567-e89b-12d3-a456-426614174002';
+      const userId = '123e4567-e89b-12d3-a456-42661417402';
       const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
 
       const mockIssueWithTags = {
@@ -166,21 +187,17 @@ describe('IssuesService', () => {
         tags: ['tag1', 'tag2', 'tag3'],
       };
 
-      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
-      jest
-        .spyOn(repository, 'create')
-        .mockReturnValue(mockIssueWithTags as Issue);
-
-      const mockTransactionalEntityManager = {
-        save: jest.fn().mockResolvedValue(mockIssueWithTags as Issue),
-      };
-
-      const mockTransaction = jest
-        .fn()
-        .mockImplementation((callback: (entityManager: any) => any) => {
-          return callback(mockTransactionalEntityManager) as Promise<Issue>;
-        });
-      repository.manager.transaction = mockTransaction;
+      // Mock the repository to return the created issue with tags
+      jest.spyOn(repository, 'findOne').mockImplementation((options: any) => {
+        if (options.where && options.order && options.order.no === 'DESC') {
+          // This is the call to get the last issue by no DESC
+          return Promise.resolve(mockIssueWithTags as Issue);
+        } else if (options.where && !options.order) {
+          // This is the call to check if issue already exists
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+      });
 
       const result = await service.createIssue(
         createIssueDto,
