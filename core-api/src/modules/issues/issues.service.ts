@@ -1,14 +1,17 @@
+import { BOT_EMAIL, BOT_ID, BOT_NAME } from '@/common/constants/app.constants';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import {
+  BullMQName,
   IssueCommentType,
   IssueSourceType,
   IssueStatus,
   Role,
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   ForbiddenException,
   Injectable,
@@ -16,6 +19,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
 import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 import { User } from '../auth/entities/user.entity';
@@ -31,7 +35,6 @@ import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
 import { IssueSourceHandler } from './interfaces/source-handler.interface';
-import { BOT_EMAIL, BOT_ID, BOT_NAME } from '@/common/constants/app.constants';
 
 @Injectable()
 export class IssuesService {
@@ -43,6 +46,8 @@ export class IssuesService {
     private issuesRepository: Repository<Issue>,
     @InjectRepository(IssueComment)
     private issueCommentsRepository: Repository<IssueComment>,
+    @InjectQueue(BullMQName.ISSUE_CREATION)
+    private issueCreationQueue: Queue,
     private readonly vulnerabilityHandler: VulnerabilitySourceHandler,
     private readonly aiAssistantService: AiAssistantService,
   ) {
@@ -200,45 +205,53 @@ export class IssuesService {
     workspaceId: string,
     userId: string,
   ): Promise<Issue> {
-    const lastIssue = await this.issuesRepository.findOne({
-      where: { workspaceId },
-      order: { no: 'DESC' },
-    });
-    const no = (lastIssue?.no || 0) + 1;
-
-    // Extract description and tags to be handled separately
-    const { description, tags, ...issueData } = createIssueDto;
-
-    // Create issue without description and tags for comment
-    const issue = this.issuesRepository.create({
-      ...issueData,
-      tags,
-      workspaceId,
-      createdBy: { id: userId },
-      no,
-    });
-
-    // Use transaction to ensure both issue and comment are created together
-    return await this.issuesRepository.manager.transaction(
-      async (transactionalEntityManager) => {
-        // Save the issue first to get the issueId
-        const savedIssue = await transactionalEntityManager.save(issue);
-
-        // If description exists, create it as a comment
-        if (description) {
-          const comment = this.issueCommentsRepository.create({
-            content: description,
-            issue: { id: savedIssue.id },
-            createdBy: { id: userId },
-            isCanDelete: false,
-            isCanEdit: true,
-          });
-          await transactionalEntityManager.save(comment);
-        }
-
-        return savedIssue;
+    // Add job to queue for processing
+    const job = await this.issueCreationQueue.add(
+      'create-issue',
+      { createIssueDto, workspaceId, userId },
+      {
+        // Use a unique job ID to ensure proper queueing
+        jobId: `create-issue-${workspaceId}-${Date.now()}`,
+        // Add priority if needed
+        priority: 1,
       },
     );
+
+    // Wait for the job to complete and return the result
+    // We'll use a promise-based approach to wait for job completion
+    return new Promise<Issue>((resolve, reject) => {
+      const checkJob = () => {
+        this.issueCreationQueue
+          .getJob(job.id!)
+          .then(async (updatedJob) => {
+            if (updatedJob) {
+              const state = await updatedJob.getState();
+              if (state === 'completed') {
+                // For now, we'll query the database to get the created issue
+                // since the processor returns the issue object
+                const lastIssue = await this.issuesRepository.findOne({
+                  where: { workspaceId },
+                  order: { no: 'DESC' },
+                });
+                if (lastIssue) {
+                  resolve(lastIssue);
+                } else {
+                  reject(new Error('Created issue not found in database'));
+                }
+              } else if (state === 'failed') {
+                reject(new Error('Issue creation failed'));
+              } else {
+                // Still processing, check again in 100ms
+                setTimeout(checkJob, 100);
+              }
+            } else {
+              reject(new Error('Job not found'));
+            }
+          })
+          .catch(reject);
+      };
+      checkJob();
+    });
   }
 
   async getMany(
