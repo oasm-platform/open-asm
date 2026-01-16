@@ -1,10 +1,10 @@
+import { BOT_EMAIL, BOT_ID, BOT_NAME } from '@/common/constants/app.constants';
 import { Role } from '@/common/enums/enum';
 import { ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
 import { AuthService } from './../auth/auth.service';
-import { BOT_ID, BOT_EMAIL, BOT_NAME } from '@/common/constants/app.constants';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -39,7 +39,11 @@ export class UsersService implements OnModuleInit {
    * @returns The newly created user object.
    */
   public async createFirstAdmin(email: string, password: string) {
-    if ((await this.usersRepository.count()) > 0) {
+    if (
+      (await this.usersRepository.count({
+        where: { role: Role.ADMIN },
+      })) > 0
+    ) {
       throw new ForbiddenException();
     }
 
