@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --watch index.ts",
+    "dev": "bun --watch index.ts --target bun",
     "build": "bun build index.ts --outdir dist --target bun",
     "gen:proto": "mkdir -p proto/generated && proto-loader-gen-types --keepCase --longs=String --enums=String --defaults --oneofs --grpcLib=@grpc/grpc-js --outDir=proto/generated proto/*.proto"
   },

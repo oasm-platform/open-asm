@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
+import { Server } from '@grpc/grpc-js';
 import { ReflectionService } from '@grpc/reflection';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
@@ -102,9 +103,8 @@ async function bootstrap() {
         join(__dirname, 'proto/workers.proto'),
         join(__dirname, 'proto/jobs_registry.proto'),
       ],
-      url: '0.0.0.0:5000',
-      onLoadPackageDefinition: (pkg, server) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      url: process.env.CORE_API_GRPC || 'localhost:50051',
+      onLoadPackageDefinition: (pkg, server: Pick<Server, 'addService'>) => {
         new ReflectionService(pkg).addToServer(server);
       },
     },
