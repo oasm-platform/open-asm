@@ -1,5 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+import { ReflectionService } from '@grpc/reflection';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
+import type { MicroserviceOptions } from '@nestjs/microservices';
+import { Transport } from '@nestjs/microservices';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
@@ -8,6 +12,7 @@ import 'dotenv/config';
 import type { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { join } from 'path';
 import 'reflect-metadata';
 import { AppModule } from './app.module';
 import {
@@ -18,9 +23,6 @@ import {
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
-import type { MicroserviceOptions } from '@nestjs/microservices';
-import { Transport } from '@nestjs/microservices';
-import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
@@ -101,6 +103,10 @@ async function bootstrap() {
         join(__dirname, 'proto/jobs_registry.proto'),
       ],
       url: '0.0.0.0:5000',
+      onLoadPackageDefinition: (pkg, server) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        new ReflectionService(pkg).addToServer(server);
+      },
     },
   });
 
