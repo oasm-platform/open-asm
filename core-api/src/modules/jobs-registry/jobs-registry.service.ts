@@ -415,7 +415,6 @@ export class JobsRegistryService {
           return null;
         }
       }
-
       await queryRunner.commitTransaction();
 
       const response: GetNextJobResponseDto = {
@@ -425,7 +424,7 @@ export class JobsRegistryService {
         updatedAt: job.updatedAt,
         priority: job.priority,
         command: job.command,
-        asset: job.asset.value,
+        asset: job.asset,
       };
 
       return response;

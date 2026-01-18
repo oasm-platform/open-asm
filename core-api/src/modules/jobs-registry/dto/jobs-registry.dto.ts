@@ -31,10 +31,8 @@ export class GetNextJobResponseDto extends PickType(Job, [
   'createdAt',
   'updatedAt',
   'command',
-]) {
-  @ApiProperty()
-  asset: string;
-}
+  'asset',
+]) {}
 
 export class WorkerIdParams {
   @ApiProperty()

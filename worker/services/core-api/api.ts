@@ -636,10 +636,10 @@ export interface GetNextJobResponseDto {
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
+  asset: Asset;
   category: string;
   status: string;
   command: string;
-  asset: string;
 }
 
 export interface DataPayloadResult {
@@ -1803,6 +1803,7 @@ export enum ToolCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Screenshot = "screenshot",
   Classifier = "classifier",
   Assistant = "assistant",
 }
@@ -1834,6 +1835,7 @@ export enum CreateToolDtoCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Screenshot = "screenshot",
   Classifier = "classifier",
   Assistant = "assistant",
 }
@@ -1913,6 +1915,7 @@ export enum ToolsControllerGetManyToolsParamsCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Screenshot = "screenshot",
   Classifier = "classifier",
   Assistant = "assistant",
 }
@@ -1922,6 +1925,7 @@ export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Screenshot = "screenshot",
   Classifier = "classifier",
   Assistant = "assistant",
 }
