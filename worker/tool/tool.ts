@@ -245,7 +245,6 @@ export class Tool {
     const startTime = Date.now();
 
     try {
-      console.log(job.category);
       let data: string | null = null;
 
       if (job.category === ToolCategoryEnum.Screenshot) {

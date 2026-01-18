@@ -62,21 +62,25 @@ export default async function screenshotHandler(job: Job): Promise<string> {
     }
   }
 
-  if (!successUrl) {
-    await page.close();
-    throw new Error(`Cannot access domain: ${domain}`);
-  }
+  let screenshotBase64 = '';
 
-  const screenshotBuffer = await page.screenshot({
-    fullPage: false,
-  });
+  if (successUrl) {
+    try {
+      const screenshotBuffer = await page.screenshot({
+        fullPage: false,
+      });
+      screenshotBase64 = Buffer.from(screenshotBuffer).toString('base64');
+    } catch (err) {
+      console.error(`Error taking screenshot for: ${successUrl}`, err);
+      // screenshot remains empty string
+    }
+  }
 
   await page.close();
 
-  // Return base64 encoded screenshot
-  const screenshotBase64 = Buffer.from(screenshotBuffer).toString('base64');
+  // Return base64 encoded screenshot or empty if failed
   return JSON.stringify({
-    url: successUrl,
+    url: successUrl || '',
     screenshot: screenshotBase64,
   });
 }

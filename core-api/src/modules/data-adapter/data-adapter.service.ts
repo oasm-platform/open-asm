@@ -110,7 +110,6 @@ export class DataAdapterService {
     job,
   }: DataAdapterInput<HttpResponse>): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
-
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -318,15 +317,25 @@ export class DataAdapterService {
     data,
     job,
   }: DataAdapterInput<ScreenshotPayload>): Promise<void> {
-    // console.log(data);
+    if (!data.screenshot || !data.url) {
+      return;
+    }
+
     const buffer = Buffer.from(data.screenshot, 'base64');
-    console.log(buffer);
     const { path } = this.storageService.uploadFile(
-      `${crypto.randomUUID()}.png`,
+      `${crypto.createHash('md5').update(job.asset.value).digest('hex')}.png`,
       buffer,
       'screenshot',
     );
-    console.log(path);
+    if (path) {
+      await this.dataSource
+        .createQueryBuilder()
+        .update(AssetService)
+        .set({ screenshotPath: path })
+        .where({ id: job.assetServiceId })
+        .execute();
+    }
+
     return;
   }
 
