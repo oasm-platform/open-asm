@@ -1,3 +1,4 @@
+import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import {
   GetManyBaseResponseDto,
@@ -178,6 +179,8 @@ export class AssetsService {
       asset.createdAt = item.createdAt;
       asset.dnsRecords = item.asset?.dnsRecords;
       asset.isEnabled = item.asset?.isEnabled;
+      asset.screenshotPath =
+        item.screenshotPath && `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
 
       // asset.tags = item.asset.tags || [];
       asset.ipAddresses = item.asset?.ipAssets
@@ -329,6 +332,7 @@ export class AssetsService {
     asset.dnsRecords = item.asset?.dnsRecords;
     asset.isEnabled = item.asset?.isEnabled;
     asset.port = item.port;
+    asset.screenshotPath = `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
 
     // Load tags separately - tags belong to AssetService, not Asset
     const tagsResult = await this.dataSource

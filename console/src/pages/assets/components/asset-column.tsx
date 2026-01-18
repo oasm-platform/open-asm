@@ -61,6 +61,24 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
+    header: 'Screenshot',
+    enableHiding: false,
+    enableSorting: false,
+    size: 500,
+    cell: ({ row }) => {
+      const data = row.original;
+      console.log(data.screenshotPath, '1232');
+      return (
+        <img
+          width={200}
+          height={120}
+          className="rounded-lg"
+          src={data.screenshotPath}
+        />
+      );
+    },
+  },
+  {
     header: 'Technologies',
     size: 250,
     cell: ({ row }) => {

@@ -21,3 +21,4 @@ export const CACHE_STATIC_RESOURCE = 14 * 24 * 60 * 60; // 14 days in seconds
 export const BOT_ID = '019b3ae4-189e-7dfe-b10e-20d847717733';
 export const BOT_EMAIL = 'bot@oasm.local';
 export const BOT_NAME = 'Cai';
+export const STORAGE_BASE_PATH = '/api/storage';

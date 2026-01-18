@@ -569,6 +569,7 @@ export interface AssetService {
   port: number;
   assetId: string;
   isErrorPage: boolean;
+  screenshotPath?: string;
 }
 
 export interface JobErrorLog {
@@ -782,6 +783,7 @@ export interface GetAssetsResponseDto {
   httpResponses?: HttpResponseDTO;
   port?: number;
   isEnabled: boolean;
+  screenshotPath?: string;
 }
 
 export interface GetManyGetAssetsResponseDtoDto {

@@ -601,6 +601,7 @@ export type AssetService = {
   port: number;
   assetId: string;
   isErrorPage: boolean;
+  screenshotPath?: string;
 };
 
 export type JobErrorLog = {
@@ -813,6 +814,7 @@ export type GetAssetsResponseDto = {
   httpResponses?: HttpResponseDTO;
   port?: number;
   isEnabled: boolean;
+  screenshotPath?: string;
 };
 
 export type GetManyGetAssetsResponseDtoDto = {
