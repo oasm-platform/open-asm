@@ -144,7 +144,10 @@ export class JobsRegistryService {
     const jobsToInsert: Job[] = [];
 
     // Step 2: find appropriate data source based on tool category
-    if (tool.category === ToolCategory.HTTP_PROBE) {
+    if (
+      tool.category === ToolCategory.HTTP_PROBE ||
+      tool.category === ToolCategory.SCREENSHOT
+    ) {
       // For HTTP_PROBE, use asset services
       const assetServices = await this.findAssetServicesForJob(
         targetIds,
@@ -384,11 +387,14 @@ export class JobsRegistryService {
       }
 
       // Only join assetService for HTTP_PROBE category jobs
-      if (worker.tool?.category === ToolCategory.HTTP_PROBE) {
+      if (
+        worker.tool?.category === ToolCategory.HTTP_PROBE ||
+        worker.tool?.category === ToolCategory.SCREENSHOT
+      ) {
         queryBuilder
           .leftJoinAndSelect('jobs.assetService', 'assetService')
           .andWhere('jobs.category = :category', {
-            category: ToolCategory.HTTP_PROBE,
+            category: worker.tool?.category,
           });
       } else {
         queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
@@ -415,7 +421,6 @@ export class JobsRegistryService {
           return null;
         }
       }
-
       await queryRunner.commitTransaction();
 
       const response: GetNextJobResponseDto = {
@@ -425,7 +430,7 @@ export class JobsRegistryService {
         updatedAt: job.updatedAt,
         priority: job.priority,
         command: job.command,
-        asset: job.asset.value,
+        asset: job.asset,
       };
 
       return response;

@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 import { BriefcaseBusiness, Globe, Network } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
+import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
 
@@ -58,6 +59,16 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
           </div>*/}
         </div>
       );
+    },
+  },
+  {
+    header: 'Screenshot',
+    enableHiding: false,
+    enableSorting: false,
+    size: 500,
+    cell: ({ row }) => {
+      const data = row.original;
+      return <ScreenshotCell asset={data} />;
     },
   },
   {

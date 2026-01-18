@@ -1,4 +1,5 @@
 import { BOT_ID } from '@/common/constants/app.constants';
+import { ScreenshotPayload } from '@/common/interfaces/app.interface';
 import { JobDataResultType } from '@/common/types/app.types';
 import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
@@ -16,6 +17,7 @@ import { Asset } from '../assets/entities/assets.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { IssuesService } from '../issues/issues.service';
+import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterInput } from './data-adapter.interface';
@@ -25,6 +27,7 @@ export class DataAdapterService {
     private readonly dataSource: DataSource,
     private workspaceService: WorkspacesService,
     private issuesService: IssuesService,
+    private storageService: StorageService,
   ) {}
 
   public async validateData<T extends object>(
@@ -107,7 +110,6 @@ export class DataAdapterService {
     job,
   }: DataAdapterInput<HttpResponse>): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
-
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -311,6 +313,32 @@ export class DataAdapterService {
       .execute();
   }
 
+  public async screenshot({
+    data,
+    job,
+  }: DataAdapterInput<ScreenshotPayload>): Promise<void> {
+    if (!data.screenshot || !data.url) {
+      return;
+    }
+
+    const buffer = Buffer.from(data.screenshot, 'base64');
+    const { path } = this.storageService.uploadFile(
+      `${crypto.createHash('md5').update(job.asset.value).digest('hex')}.png`,
+      buffer,
+      'screenshot',
+    );
+    if (path) {
+      await this.dataSource
+        .createQueryBuilder()
+        .update(AssetService)
+        .set({ screenshotPath: path })
+        .where({ id: job.assetServiceId })
+        .execute();
+    }
+
+    return;
+  }
+
   /**
    * Sync data based on tool category
    * @param payload Data to sync
@@ -353,6 +381,11 @@ export class DataAdapterService {
           handler: (data: DataAdapterInput<AssetTag[]>) =>
             this.classifier(data),
           validationClass: AssetTag,
+        },
+        [ToolCategory.SCREENSHOT]: {
+          handler: (data: DataAdapterInput<ScreenshotPayload>) =>
+            this.screenshot(data),
+          validationClass: ScreenshotPayload,
         },
         // Note: ASSISTANT category is handled separately or not supported in this mapping
       };

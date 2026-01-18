@@ -46,11 +46,18 @@ export const builtInTools: Tool[] = [
     logoUrl: '/static/images/httpx.png',
     command:
       'httpx -duc -u {{value}} -status-code -favicon -asn -title -web-server -irr -tech-detect -ip -cname -location -tls-grab -cdn -probe -json -follow-redirects -timeout 10 -threads 100 -silent',
-    parser: (result: string) => {
-      const parsed = JSON.parse(result);
-      return parsed;
-    },
+    parser: JSON.parse,
     version: '1.7.1',
+    priority: JobPriority.MEDIUM,
+  },
+  {
+    name: 'screenshot',
+    category: ToolCategory.SCREENSHOT,
+    description: 'Take a screenshot of a website.',
+    logoUrl: '/static/images/screenshot.png',
+    parser: JSON.parse,
+    version: '1.0.0',
+    command: 'screenshot {{value}}',
     priority: JobPriority.MEDIUM,
   },
   {

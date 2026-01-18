@@ -572,6 +572,7 @@ export const ToolCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
@@ -600,6 +601,7 @@ export type AssetService = {
   port: number;
   assetId: string;
   isErrorPage: boolean;
+  screenshotPath?: string;
 };
 
 export type JobErrorLog = {
@@ -657,10 +659,10 @@ export type GetNextJobResponseDto = {
   id: string;
   createdAt: string;
   updatedAt: string;
+  asset: Asset;
   category: string;
   status: string;
   command: string;
-  asset: string;
 };
 
 export type DataPayloadResultPayload = { [key: string]: unknown };
@@ -812,6 +814,7 @@ export type GetAssetsResponseDto = {
   httpResponses?: HttpResponseDTO;
   port?: number;
   isEnabled: boolean;
+  screenshotPath?: string;
 };
 
 export type GetManyGetAssetsResponseDtoDto = {
@@ -1267,6 +1270,7 @@ export const CreateToolDtoCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
@@ -2011,6 +2015,7 @@ export const ToolsControllerGetManyToolsCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
@@ -2028,6 +2033,7 @@ export const ToolsControllerGetInstalledToolsCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
