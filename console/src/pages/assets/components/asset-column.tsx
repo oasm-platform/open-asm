@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 import { BriefcaseBusiness, Globe, Network } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
+import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
 
@@ -67,15 +68,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     size: 500,
     cell: ({ row }) => {
       const data = row.original;
-      console.log(data.screenshotPath, '1232');
-      return (
-        <img
-          width={200}
-          height={120}
-          className="rounded-lg"
-          src={data.screenshotPath}
-        />
-      );
+      return <ScreenshotCell asset={data} />;
     },
   },
   {

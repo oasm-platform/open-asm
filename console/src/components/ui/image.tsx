@@ -1,3 +1,4 @@
+import { ImageIcon } from 'lucide-react';
 import React from 'react';
 
 interface ImageProps {
@@ -13,18 +14,17 @@ export const Image: React.FC<ImageProps> = ({
   height,
   className,
 }) => {
-  //   // Check if URL is a complete HTTP URL
-  //   const isHttpUrl = url?.startsWith('http://') || url?.startsWith('https://');
+  // Check if URL is a complete HTTP URL
+  const isHttpUrl = url?.startsWith('http://') || url?.startsWith('https://');
 
-  //   // If not a complete URL, prepend with API storage path
-  //   const imageUrl = isHttpUrl ? url : `${url}`;
-  //   if (!imageUrl)
-  //     return <ImageIcon width={width} height={height} className={className} />;
-  console.log(url, 'url');
-  if (!url || url === '') return <></>;
+  // If not a complete URL, prepend with API storage path
+  const imageUrl = isHttpUrl ? url : `api${url}`;
+  if (!imageUrl)
+    return <ImageIcon width={width} height={height} className={className} />;
+  // if (!url || url === '') return <></>;
   return (
     <img
-      src={url}
+      src={imageUrl}
       width={width}
       height={height}
       alt=""

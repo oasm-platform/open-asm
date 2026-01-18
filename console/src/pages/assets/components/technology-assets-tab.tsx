@@ -47,14 +47,19 @@ export default function TechnologyAssetsTab() {
             setSortOrder(order);
           }}
           totalItems={total}
-          collapsibleElement={(row) => (
-            <AssetTable
-              filter={{
-                techs: [`${row.technology.name}:${row.technology.version}`],
-                targetIds: targetId ? [targetId] : undefined,
-              }}
-            />
-          )}
+          collapsibleElement={(row) => {
+            const techFilter = row.technology.version
+              ? `${row.technology.name}:${row.technology.version}`
+              : row.technology.name;
+            return (
+              <AssetTable
+                filter={{
+                  techs: [techFilter],
+                  targetIds: targetId ? [targetId] : undefined,
+                }}
+              />
+            );
+          }}
         />
       </TabsContent>
     </>
