@@ -12,6 +12,7 @@ services:
     ports:
       - '3000:80'
     restart: 'always'
+
     depends_on:
       core-api:
         condition: service_healthy
@@ -41,6 +42,7 @@ services:
         condition: service_healthy
     volumes:
       - ./.open-api:/.open-api
+      - api-storage:/app/.storage:rw
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:6276/api/health']
       interval: 1s
@@ -135,6 +137,7 @@ volumes:
   redis-data:
   redpanda-data:
   geoip-data:
+  api-storage:
 
 networks:
   oasm:

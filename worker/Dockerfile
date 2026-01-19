@@ -36,6 +36,13 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
+# Install Chrome for Puppeteer
+RUN apk add --no-cache chromium
+
+# Tell Puppeteer to skip installing Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/bun.lock ./bun.lock
 COPY --from=builder /app/node_modules ./node_modules

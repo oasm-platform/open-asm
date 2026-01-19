@@ -45,6 +45,7 @@ async function getBrowser(): Promise<Browser> {
     // Launch browser with args suitable for containerized environments
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: '/usr/bin/chromium-browser', // Use the installed Chromium
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -57,6 +58,14 @@ async function getBrowser(): Promise<Browser> {
         '--disable-blink-features=AutomationControlled',
         '--disable-web-security',
         '--disable-features=VizDisplayCompositor',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--no-default-browser-check',
+        '--disable-default-apps',
+        '--disable-extensions',
+        '--disable-plugins-discovery',
+        '--enable-features=NetworkService',
       ],
     });
   }

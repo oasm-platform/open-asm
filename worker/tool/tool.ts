@@ -269,6 +269,7 @@ export class Tool {
           `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split('-')[0]} - Time: ${executionTime}ms`,
         );
     } catch (e) {
+      console.log(e);
       logger.error(`Failed to handle job ${job.id}:`, e);
 
       // Optionally report failure to core

@@ -80,6 +80,8 @@ graph TD
 
 ![Assets1](docs/images/assets_1.png)
 
+![Assets2](docs/images/assets_2.png)
+
 ![Technologies](docs/images/technologies.png)
 
 ![Vulnerabilities1](docs/images/vulnerabilities_1.png)
