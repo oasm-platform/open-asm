@@ -1,5 +1,5 @@
-import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
+import { createContext, useContext, useState } from 'react';
 import type { McpServerConfig } from '../types/mcp';
 
 interface McpContextType {
@@ -47,7 +47,6 @@ export function McpProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useMcp() {
   const context = useContext(McpContext);
   if (context === undefined) {

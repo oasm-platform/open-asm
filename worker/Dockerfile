@@ -26,7 +26,7 @@ ENV NODE_ENV=production
 
 COPY . .
 RUN bun install
-RUN bun build index.ts --outdir dist
+RUN bun build index.ts --outdir dist --target bun
 # Clean bun cache and remove unused files
 RUN bun pm cache clean && rm -rf src test
 

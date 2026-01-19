@@ -1,5 +1,11 @@
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 export type AssetContextType = ReturnType<typeof useServerDataTable> & {
@@ -210,7 +216,6 @@ export default function AssetProvider({
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useAsset = () => {
   const assetContext = useContext(AssetContext);
 

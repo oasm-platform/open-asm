@@ -1,7 +1,7 @@
-import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { Github, Star } from 'lucide-react';
+import { buttonVariants } from './button-variants';
 
 const REPO_API = 'https://api.github.com/repos/oasm-platform/open-asm';
 const REPO_URL = 'https://github.com/oasm-platform/open-asm';
