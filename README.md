@@ -108,7 +108,7 @@ To quickly get started with OASM using Docker:
 2. Rename the example environment file:
 
    ```bash
-   cp example.env .env
+   cp .env.example .env
    ```
 
 3. Start the services:
