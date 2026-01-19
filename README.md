@@ -18,9 +18,15 @@ Open-source platform for cybersecurity Attack Surface Management. Built to help 
 
 ## Features
 
-- **Asset Discovery**: As a free and open-source solution, OASM provides comprehensive, continuous discovery of all internet-facing assets, including domains, subdomains, IP addresses, and web services. It automatically catalogs and inventories these assets in real-time, ensuring no hidden or forgotten resources are left unmanaged, helping security teams maintain a complete view of their digital footprint without any cost.
-- **Risk Assessment**: OASM offers ongoing, in-depth risk assessment by continuously scanning for vulnerabilities, misconfigurations, and potential security exposures across the entire attack surface. This comprehensive approach ensures that threats are identified early and thoroughly, providing detailed insights into risks without requiring expensive subscriptions or licenses.
-- **Monitoring and Alerts**: With real-time monitoring capabilities, OASM tracks changes in assets continuously and sends immediate notifications for new risks or exposures. This free, proactive system allows security teams to respond quickly to emerging threats, maintaining constant vigilance over their infrastructure at no additional cost.
+- **Asset Discovery & Management**: Comprehensive discovery and cataloging of internet-facing assets including domains, subdomains, IP addresses, and web services. Supports asset grouping, real-time inventory updates, and multi-workspace organization for efficient asset lifecycle management.
+- **Vulnerability Assessment**: Continuous scanning for vulnerabilities, misconfigurations, and security exposures across the entire attack surface. Advanced issue tracking with detailed risk analysis, prioritization, and remediation guidance.
+- **Technology Detection**: Automated identification and cataloging of technologies, frameworks, and services running on discovered assets. Provides insights into technology stacks and potential security implications.
+- **Distributed Scanning Engine**: High-performance distributed workers with auto-scaling capabilities for parallel processing of scanning tasks. Job orchestration and registry system for managing complex scanning workflows.
+- **Tool Integration**: Extensible framework for integrating various security scanning tools and services. Supports custom tool configurations and automated execution pipelines.
+- **AI Assistant Integration**: Model Context Protocol (MCP) server integration enabling AI assistants to query asset data, generate insights, and assist with security analysis through natural language interfaces.
+- **Workflow Automation**: Configurable workflows for automated scanning schedules, alert responses, and remediation processes. Template-based approach for standardizing security operations.
+- **Real-time Monitoring & Notifications**: Continuous monitoring of asset changes with instant notifications for new discoveries, vulnerabilities, and configuration changes. Statistics dashboard with trend analysis and reporting.
+- **Advanced Search & Analytics**: Powerful search capabilities across all asset data with filtering and faceting. Comprehensive analytics for attack surface metrics, risk trends, and compliance reporting.
 
 ## System Architecture
 
