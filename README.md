@@ -109,7 +109,9 @@ To quickly get started with OASM using Docker:
    docker compose up -d
    ```
 
-This will launch the entire system, including the console, core API, workers, and database. Access the application at the configured URL.
+This will launch the entire system, including the console, core API, workers, and database. Access the application at the configured URL (http://localhost:6276).
+
+[Docker Repository](https://github.com/oasm-platform/oasm-docker)
 
 ## Developer Guide
 
