@@ -35,6 +35,7 @@ import {
   Clock,
   Loader2Icon,
   MoreHorizontal,
+  X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -272,6 +273,11 @@ export default function Runs() {
       // If current tool has no jobs yet, it's pending
       if (currentToolJobs.length === 0) return 'pending';
 
+      const hasFailed = currentToolJobs.some(
+        (job) => job.status === JobStatus.failed,
+      );
+      if (hasFailed) return 'failed';
+
       const hasRunning = currentToolJobs.some(
         (job) => job.status === JobStatus.in_progress,
       );
@@ -335,6 +341,7 @@ export default function Runs() {
                     {status === 'pending' && (
                       <Clock className="text-yellow-500" />
                     )}
+                    {status === 'failed' && <X className="text-red-500" />}
                   </Link>
                   {index < jobHistoryDetail.tools.length - 1 && (
                     <ArrowRight className="text-muted-foreground" size={16} />
