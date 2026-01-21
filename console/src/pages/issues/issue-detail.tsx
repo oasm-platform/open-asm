@@ -145,13 +145,15 @@ const IssueDetail = () => {
             </span>{' '}
             opened this issue {dayjs(issue.createdAt).fromNow()}
           </span>
-          <Link
-            to={`/${mapingRouterSourceType(issue.sourceType)}/${issue.sourceId}`}
-          >
-            <Button variant="link" className="capitalize">
-              {issue?.sourceType} <MoveUpRight />
-            </Button>
-          </Link>
+          {issue.sourceId && (
+            <Link
+              to={`/${mapingRouterSourceType(issue.sourceType)}/${issue.sourceId}`}
+            >
+              <Button variant="link" className="capitalize">
+                {issue?.sourceType} <MoveUpRight />
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
