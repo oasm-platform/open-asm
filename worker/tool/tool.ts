@@ -1,8 +1,8 @@
-import logger from 'node-color-log';
-import coreApi from '../services/core-api';
-import { ToolCategoryEnum, type Job } from '../services/core-api/api';
-import screenshotHandler from './handlers/screenshot';
-import runCommand from './runCommand';
+import logger from "node-color-log";
+import coreApi from "../services/core-api";
+import { ToolCategoryEnum, type Job } from "../services/core-api/api";
+import screenshotHandler from "./handlers/screenshot";
+import runCommand from "./runCommand";
 
 export class Tool {
   private queue: Job[] = [];
@@ -52,14 +52,14 @@ export class Tool {
         this.processQueueContinuously(),
       ]);
     } catch (e) {
-      logger.error('Tool execution failed:', e);
-      throw new Error('Tool execution failed');
+      logger.error("Tool execution failed:", e);
+      throw new Error("Tool execution failed");
     }
   }
 
   private setupGracefulShutdown() {
     const gracefulShutdown = async () => {
-      logger.info('Graceful shutdown initiated...');
+      logger.info("Graceful shutdown initiated...");
       this.isShuttingDown = true;
 
       // Wait for current jobs to finish
@@ -70,12 +70,12 @@ export class Tool {
         await this.sleep(1000);
       }
 
-      logger.info('All jobs completed. Shutting down...');
+      logger.info("All jobs completed. Shutting down...");
       process.exit(0);
     };
 
-    process.on('SIGTERM', gracefulShutdown);
-    process.on('SIGINT', gracefulShutdown);
+    process.on("SIGTERM", gracefulShutdown);
+    process.on("SIGINT", gracefulShutdown);
   }
 
   private async alive() {
@@ -91,17 +91,17 @@ export class Tool {
         });
         if (this.isAliveError) {
           logger.success(
-            `RECONNECTED ✅ WorkerId: ${Tool.workerId?.split('-')[0]}`,
+            `RECONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`,
           );
           this.isAliveError = false;
         }
       } catch (error: any) {
         if (error?.response?.status === 401) {
-          logger.warn('Token unauthorized. Reconnecting...');
+          logger.warn("Token unauthorized. Reconnecting...");
           await this.connectToCore();
         } else {
           this.isAliveError = true;
-          logger.error('Alive check failed:', error.message);
+          logger.error("Alive check failed:", error.message);
         }
       }
     }, 5000);
@@ -117,11 +117,12 @@ export class Tool {
       try {
         const worker: any = await coreApi.workersControllerJoin({
           apiKey: process.env.API_KEY! || process.env.OASM_CLOUD_APIKEY!,
+          signature: process.env.WORKER_SIGNATURE || "",
         });
         Tool.workerId = worker.id;
         Tool.token = worker.token;
         logger.success(
-          `CONNECTED ✅ WorkerId: ${Tool.workerId?.split('-')[0]}`,
+          `CONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`,
         );
 
         // Wait until Tool.workerId is set (by SSE handler)
@@ -130,7 +131,7 @@ export class Tool {
       } catch (e: any) {
         // If we get a 401 error, don't retry - just throw an API key invalid error
         if (e?.response?.status === 401) {
-          logger.error('API key is invalid. Cannot connect to core.');
+          logger.error("API key is invalid. Cannot connect to core.");
         }
 
         attempt++;
@@ -175,7 +176,7 @@ export class Tool {
         }
         lastPullTime = Date.now();
       } catch (err) {
-        logger.error('Cannot get next job:', err);
+        logger.error("Cannot get next job:", err);
         await this.reconnectWithBackoff();
       }
     }
@@ -187,7 +188,7 @@ export class Tool {
         Tool.workerId!,
         {
           headers: {
-            'worker-token': Tool.token,
+            "worker-token": Tool.token,
           },
         },
       )) as Job;
@@ -216,7 +217,7 @@ export class Tool {
           }
         }
       } catch (error) {
-        logger.error('Error in queue processing:', error);
+        logger.error("Error in queue processing:", error);
       }
 
       await this.sleep(100); // Small delay to prevent tight loop
@@ -264,9 +265,9 @@ export class Tool {
 
       const executionTime = Date.now() - startTime;
       logger
-        .color('green')
+        .color("green")
         .log(
-          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split('-')[0]} - Time: ${executionTime}ms`,
+          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split("-")[0]} - Time: ${executionTime}ms`,
         );
     } catch (e) {
       console.log(e);
@@ -279,14 +280,14 @@ export class Tool {
           {
             jobId: job.id,
             data: {
-              raw: `Error: ${e instanceof Error ? e.message : 'Unknown error'}`,
+              raw: `Error: ${e instanceof Error ? e.message : "Unknown error"}`,
               error: true,
               payload: {},
             },
           },
           {
             headers: {
-              'worker-token': Tool.token,
+              "worker-token": Tool.token,
             },
           },
         );
@@ -300,12 +301,12 @@ export class Tool {
   }
 
   private async commandExecution(command: string): Promise<string> {
-    logger.color('blue').log(`[RUNNING]: ${command}`);
+    logger.color("blue").log(`[RUNNING]: ${command}`);
 
     try {
       return await runCommand(command);
     } catch (error: any) {
-      logger.error('Command execution error:', error);
+      logger.error("Command execution error:", error);
       throw new Error(`Failed to execute command: ${error.message}`);
     }
   }
@@ -332,7 +333,7 @@ export class Tool {
       }
     }
 
-    throw new Error('Failed to reconnect after maximum retries');
+    throw new Error("Failed to reconnect after maximum retries");
   }
 
   /**
@@ -351,7 +352,7 @@ export class Tool {
           resolve();
         } else if (Date.now() - startTime > timeoutMs) {
           clearInterval(interval);
-          reject(new Error('Timeout waiting for condition'));
+          reject(new Error("Timeout waiting for condition"));
         }
       }, intervalMs);
     });
