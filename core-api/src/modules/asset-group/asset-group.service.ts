@@ -43,7 +43,7 @@ export class AssetGroupService {
     private scanScheduleQueue: Queue<AssetGroupWorkflow>,
     private toolsService: ToolsService,
     private jobRegistryService: JobsRegistryService,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all asset groups with optional filtering and pagination
@@ -650,7 +650,7 @@ export class AssetGroupService {
     workspaceId: string,
   ) {
     try {
-      const { page, limit, sortBy, sortOrder } = query;
+      const { page, limit, sortBy, sortOrder, search } = query;
       const offset = (page - 1) * limit;
 
       // Find the asset group to ensure it exists and belongs to the workspace
@@ -680,6 +680,12 @@ export class AssetGroupService {
             workspaceId,
           },
         );
+
+      if (search) {
+        queryBuilder.andWhere('asset.value ILIKE :search', {
+          search: `%${search}%`,
+        });
+      }
 
       const [data, total] = await queryBuilder
         .orderBy(`asset.${sortBy}`, sortOrder)
