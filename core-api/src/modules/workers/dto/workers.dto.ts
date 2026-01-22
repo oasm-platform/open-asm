@@ -9,8 +9,7 @@ export class WorkerJoinDto {
 
   @ApiProperty({ required: false })
   @IsString()
-  @IsOptional()
-  signature?: string;
+  signature: string;
 }
 
 export class WorkerAliveDto {

@@ -117,7 +117,7 @@ export class Tool {
       try {
         const worker: any = await coreApi.workersControllerJoin({
           apiKey: process.env.API_KEY! || process.env.OASM_CLOUD_APIKEY!,
-          signature: process.env.WORKER_SIGNATURE,
+          signature: process.env.WORKER_SIGNATURE || "",
         });
         Tool.workerId = worker.id;
         Tool.token = worker.token;

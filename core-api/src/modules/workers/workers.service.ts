@@ -273,7 +273,8 @@ export class WorkersService {
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
     const { apiKey, signature } = dto;
-    const workerSignature = this.configService.get<string>('WORKER_SIGNATURE');
+    const workerSignature =
+      this.configService.get<string>('WORKER_SIGNATURE') || '';
 
     if (signature !== workerSignature) {
       throw new UnauthorizedException('Invalid worker signature');
