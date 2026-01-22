@@ -47,7 +47,8 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   const [open, setOpen] = useState(false);
 
   // Selected assets for adding to group
-  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<string>('');
 
   // Mutations
   const addAssetsMutation = useAssetGroupControllerAddManyAssets();
@@ -63,22 +64,22 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
 
   const assetsNotInGroupQuery = useAssetGroupControllerGetAssetsNotInAssetGroup(
     assetGroupId,
-    { page, limit: pageSize, sortBy, sortOrder },
+    { page, limit: pageSize, sortBy, sortOrder, search: filter },
     { query: { enabled: open } },
   );
 
   // Handle adding selected assets to the group
   const handleAddSelectedAssets = () => {
-    if (selectedAssets.length === 0) return;
+    if (selectedAssets.size === 0) return;
 
     addAssetsMutation.mutate(
       {
         groupId: assetGroupId,
-        data: { assetIds: selectedAssets },
+        data: { assetIds: Array.from(selectedAssets) },
       },
       {
         onSuccess: () => {
-          setSelectedAssets([]);
+          setSelectedAssets(new Set());
           setOpen(false);
           queryClient.invalidateQueries({
             queryKey: ['assetGroupControllerGetAssetsByAssetGroupsId'],
@@ -102,15 +103,14 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   const assetsNotInGroupColumns: ColumnDef<Asset>[] = [
     {
       id: 'select',
-      header: ({ table }) => {
+      header: () => {
         // Calculate if all page rows are selected based on our selectedAssets state
         const allIds =
           assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) || [];
         const allPageRowsSelected =
-          allIds.length > 0 &&
-          allIds.every((id) => selectedAssets.includes(id));
+          allIds.length > 0 && allIds.every((id) => selectedAssets.has(id));
         const somePageRowsSelected = allIds.some((id) =>
-          selectedAssets.includes(id),
+          selectedAssets.has(id),
         );
 
         return (
@@ -124,17 +124,17 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
                 const allIds =
                   assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) ||
                   [];
-                setSelectedAssets((prev) => [...new Set([...prev, ...allIds])]); // Use Set to avoid duplicates
-                table.toggleAllPageRowsSelected(true);
+                setSelectedAssets((prev) => new Set([...prev, ...allIds]));
               } else {
                 // When deselecting all, remove all visible assets from selection
                 const allIds =
                   assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) ||
                   [];
-                setSelectedAssets((prev) =>
-                  prev.filter((id) => !allIds.includes(id)),
-                );
-                table.toggleAllPageRowsSelected(false);
+                setSelectedAssets((prev) => {
+                  const newSet = new Set(prev);
+                  allIds.forEach((id) => newSet.delete(id));
+                  return newSet;
+                });
               }
             }}
             aria-label="Select all"
@@ -143,17 +143,21 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
       },
       cell: ({ row }) => {
         const assetId = row.original.id;
-        const isSelected = selectedAssets.includes(assetId);
+        const isSelected = selectedAssets.has(assetId);
 
         return (
           <Checkbox
             checked={isSelected}
             onCheckedChange={(value) => {
-              setSelectedAssets((prev) =>
-                value
-                  ? [...prev, assetId]
-                  : prev.filter((id) => id !== assetId),
-              );
+              setSelectedAssets((prev) => {
+                const newSet = new Set(prev);
+                if (value) {
+                  newSet.add(assetId);
+                } else {
+                  newSet.delete(assetId);
+                }
+                return newSet;
+              });
             }}
             aria-label="Select row"
           />
@@ -199,6 +203,9 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
             pageSize={assetsNotInGroupQuery.data?.limit || 10}
             sortBy={sortBy}
             sortOrder={sortOrder}
+            filterValue={filter}
+            onFilterChange={setFilter}
+            filterColumnKey="value"
             onPageChange={(newPage) => {
               // When page changes, we should ensure the table selection is handled properly
               setPage(newPage);
@@ -211,15 +218,19 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
             totalItems={assetsNotInGroupQuery.data?.total || 0}
             onRowClick={(row) => {
               const assetId = (row as Asset).id;
-              const isSelected = selectedAssets.includes(assetId);
-              setSelectedAssets((prev) =>
-                isSelected
-                  ? prev.filter((id) => id !== assetId)
-                  : [...prev, assetId],
-              );
+              const isSelected = selectedAssets.has(assetId);
+              setSelectedAssets((prev) => {
+                const newSet = new Set(prev);
+                if (isSelected) {
+                  newSet.delete(assetId);
+                } else {
+                  newSet.add(assetId);
+                }
+                return newSet;
+              });
             }}
             tableState={{
-              rowSelection: selectedAssets.reduce(
+              rowSelection: Array.from(selectedAssets).reduce(
                 (acc, id) => {
                   acc[id] = true;
                   return acc;
@@ -231,19 +242,17 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
         </div>
         <DialogFooter className="flex sm:justify-between">
           <div className="text-sm text-muted-foreground">
-            {selectedAssets.length} of {assetsNotInGroupQuery.data?.total || 0}{' '}
+            {selectedAssets.size} of {assetsNotInGroupQuery.data?.total || 0}{' '}
             selected
           </div>
           <Button
             type="submit"
             onClick={handleAddSelectedAssets}
-            disabled={
-              selectedAssets.length === 0 || addAssetsMutation.isPending
-            }
+            disabled={selectedAssets.size === 0 || addAssetsMutation.isPending}
           >
             {addAssetsMutation.isPending
               ? 'Adding...'
-              : `Add ${selectedAssets.length} Assets`}
+              : `Add ${selectedAssets.size} Assets`}
           </Button>
         </DialogFooter>
       </DialogContent>
