@@ -103,7 +103,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   const assetsNotInGroupColumns: ColumnDef<Asset>[] = [
     {
       id: 'select',
-      header: ({ table }) => {
+      header: () => {
         // Calculate if all page rows are selected based on our selectedAssets state
         const allIds =
           assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) || [];
@@ -124,18 +124,17 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
                 const allIds =
                   assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) ||
                   [];
-                setSelectedAssets((prev) => new Set([...prev, ...allIds])); // Use Set to avoid duplicates
-                table.toggleAllPageRowsSelected(true);
+                setSelectedAssets((prev) => new Set([...prev, ...allIds]));
               } else {
                 // When deselecting all, remove all visible assets from selection
                 const allIds =
                   assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) ||
                   [];
-                setSelectedAssets(
-                  (prev) =>
-                    new Set([...prev].filter((id) => !allIds.includes(id))),
-                );
-                table.toggleAllPageRowsSelected(false);
+                setSelectedAssets((prev) => {
+                  const newSet = new Set(prev);
+                  allIds.forEach((id) => newSet.delete(id));
+                  return newSet;
+                });
               }
             }}
             aria-label="Select all"
@@ -150,11 +149,15 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
           <Checkbox
             checked={isSelected}
             onCheckedChange={(value) => {
-              setSelectedAssets((prev) =>
-                value
-                  ? new Set([...prev, assetId])
-                  : new Set([...prev].filter((id) => id !== assetId)),
-              );
+              setSelectedAssets((prev) => {
+                const newSet = new Set(prev);
+                if (value) {
+                  newSet.add(assetId);
+                } else {
+                  newSet.delete(assetId);
+                }
+                return newSet;
+              });
             }}
             aria-label="Select row"
           />
@@ -216,11 +219,15 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
             onRowClick={(row) => {
               const assetId = (row as Asset).id;
               const isSelected = selectedAssets.has(assetId);
-              setSelectedAssets((prev) =>
-                isSelected
-                  ? new Set([...prev].filter((id) => id !== assetId))
-                  : new Set([...prev, assetId]),
-              );
+              setSelectedAssets((prev) => {
+                const newSet = new Set(prev);
+                if (isSelected) {
+                  newSet.delete(assetId);
+                } else {
+                  newSet.add(assetId);
+                }
+                return newSet;
+              });
             }}
             tableState={{
               rowSelection: Array.from(selectedAssets).reduce(
