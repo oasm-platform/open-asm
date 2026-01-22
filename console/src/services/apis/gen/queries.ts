@@ -983,6 +983,7 @@ export type WorkerInstance = {
 
 export type WorkerJoinDto = {
   apiKey: string;
+  signature?: string;
 };
 
 export type GetManyWorkerInstanceDto = {

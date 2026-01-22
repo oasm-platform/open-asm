@@ -272,7 +272,14 @@ export class WorkersService {
    * @returns A promise that resolves to the created worker instance.
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
-    const { apiKey } = dto;
+    const { apiKey, signature } = dto;
+    const workerSignature =
+      this.configService.get<string>('WORKER_SIGNATURE') || '';
+
+    if (signature !== workerSignature) {
+      throw new UnauthorizedException('Invalid worker signature');
+    }
+
     const cloudApiKey = this.configService.get<string>('OASM_CLOUD_APIKEY');
 
     if (cloudApiKey === apiKey) {
