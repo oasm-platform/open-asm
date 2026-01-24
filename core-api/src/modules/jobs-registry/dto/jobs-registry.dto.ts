@@ -45,14 +45,14 @@ export class DataPayloadResult {
   @IsOptional()
   @IsBoolean()
   @Expose()
-  @Transform(({ value }: { value: string }) => value ?? false)
+  @Transform(({ value }: { value: boolean }) => value ?? false)
   error: boolean;
 
   @ApiProperty()
   @IsOptional()
   @Expose()
   @Transform(({ value }: { value: string }) => value ?? null)
-  raw: string;
+  raw?: string;
 
   @ApiProperty()
   @IsOptional()
