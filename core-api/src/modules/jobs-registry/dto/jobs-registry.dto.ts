@@ -45,33 +45,40 @@ export class DataPayloadResult {
   @IsOptional()
   @IsBoolean()
   @Expose()
+  @Transform(({ value }: { value: string }) => value ?? false)
   error: boolean;
 
   @ApiProperty()
   @IsOptional()
   @Expose()
+  @Transform(({ value }: { value: string }) => value ?? null)
   raw: string;
 
   @ApiProperty()
   @IsOptional()
   @Expose()
-  @Transform(({ obj }: { obj: RawGrpcResponse }) => {
-    const unwrap = <T>(field: T | { values: T } | undefined): T | undefined => {
-      if (!field) return undefined;
-      if (typeof field === 'object' && 'values' in field) {
-        return field.values;
-      }
-      return field as T;
-    };
+  @Transform(
+    ({ obj, value }: { obj: RawGrpcResponse; value: JobDataResultType }) => {
+      if (value) return value;
+      const unwrap = <T>(
+        field: T | { values: T } | undefined,
+      ): T | undefined => {
+        if (!field) return undefined;
+        if (typeof field === 'object' && 'values' in field) {
+          return field.values;
+        }
+        return field as T;
+      };
 
-    return (
-      unwrap(obj.assets) ??
-      unwrap(obj.httpResponse) ??
-      unwrap(obj.numbers) ??
-      unwrap(obj.vulnerabilities) ??
-      unwrap(obj.assetTags)
-    );
-  })
+      return (
+        unwrap(obj.assets) ??
+        unwrap(obj.httpResponse) ??
+        unwrap(obj.numbers) ??
+        unwrap(obj.vulnerabilities) ??
+        unwrap(obj.assetTags)
+      );
+    },
+  )
   payload: JobDataResultType;
 }
 export class UpdateResultDto {
