@@ -2,6 +2,7 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { Role } from '@/common/enums/enum';
 import { Injectable } from '@nestjs/common';
 import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
+import { SystemConfigsService } from '../system-configs/system-configs.service';
 import { UsersService } from '../users/users.service';
 import { CreateFirstAdminDto, GetMetadataDto } from './dto/root.dto';
 
@@ -10,6 +11,7 @@ export class RootService {
   constructor(
     private readonly usersService: UsersService,
     private readonly aiAssistantService: AiAssistantService,
+    private readonly systemConfigsService: SystemConfigsService,
   ) {}
 
   public getHealth(): string {
@@ -64,9 +66,13 @@ export class RootService {
       isAssistant = false;
     }
 
+    const systemConfig = await this.systemConfigsService.getConfig();
+
     return {
       isInit: userCount > 0,
       isAssistant,
+      name: systemConfig.name,
+      logoPath: systemConfig.logoPath,
     };
   }
 }

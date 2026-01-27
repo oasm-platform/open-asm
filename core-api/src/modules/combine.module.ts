@@ -11,6 +11,7 @@ import { ProvidersModule } from './providers/providers.module';
 import { RootModule } from './root/root.module';
 import { SearchModule } from './search/search.module';
 import { StatisticModule } from './statistic/statistic.module';
+import { SystemConfigsModule } from './system-configs/system-configs.module';
 import { TargetsModule } from './targets/targets.module';
 import { TechnologyModule } from './technology/technology.module';
 import { TemplatesModule } from './templates/templates.module';
@@ -46,6 +47,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     AssetGroupModule,
     AiAssistantModule,
     IssuesModule,
+    SystemConfigsModule,
   ],
 })
-export class CombineModule { }
+export class CombineModule {}
