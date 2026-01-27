@@ -56,7 +56,12 @@ export class DataAdapterService {
     await queryRunner.startTransaction();
 
     try {
-      const primaryAssets = data.find(
+      // Deduplicate data based on value
+      const uniqueData = Array.from(
+        new Map(data.map((asset) => [asset.value, asset])).values(),
+      );
+
+      const primaryAssets = uniqueData.find(
         (asset) => asset.value === job.asset.value,
       );
 
@@ -81,7 +86,7 @@ export class DataAdapterService {
         .insert()
         .into(Asset)
         .values(
-          data.map((asset) => ({
+          uniqueData.map((asset) => ({
             ...asset,
             target: { id: job.asset.target.id },
             isEnabled: workspaceConfigs.isAutoEnableAssetAfterDiscovered,
@@ -159,7 +164,8 @@ export class DataAdapterService {
     await queryRunner.startTransaction();
 
     // Filter out NaN values from the port array
-    const filteredPorts = data.filter((port) => !isNaN(port));
+    // Deduplicate ports
+    const uniquePorts = [...new Set(data.filter((port) => !isNaN(port)))];
 
     try {
       // Insert ports data
@@ -168,15 +174,15 @@ export class DataAdapterService {
         .insert()
         .into(Port)
         .values({
-          ports: filteredPorts,
+          ports: uniquePorts,
           assetId: job.asset.id,
           jobHistoryId: job.jobHistory.id,
         })
         .execute();
 
       // Insert asset services data
-      if (filteredPorts && filteredPorts.length > 0) {
-        const assetServices = filteredPorts.map((port) => ({
+      if (uniquePorts && uniquePorts.length > 0) {
+        const assetServices = uniquePorts.map((port) => ({
           value: `${job.asset.value}:${port}`,
           port: port,
           assetId: job.asset.id,
@@ -236,11 +242,16 @@ export class DataAdapterService {
         };
       });
 
+      // Deduplicate based on fingerprint
+      const uniqueValues = Array.from(
+        new Map(values.map((v) => [v.fingerprint, v])).values(),
+      );
+
       const result = await manager
         .createQueryBuilder()
         .insert()
         .into(Vulnerability)
-        .values(values)
+        .values(uniqueValues)
         .orUpdate({
           conflict_target: ['fingerprint'],
           overwrite: ['updatedAt', 'severity'],

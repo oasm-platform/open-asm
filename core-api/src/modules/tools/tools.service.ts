@@ -424,31 +424,29 @@ export class ToolsService implements OnModuleInit {
     names: string[];
     isInstalled?: boolean;
   }): Promise<Tool[]> {
-    let tools: Tool[] = [];
-    if (isInstalled) {
-      tools = await this.workspaceToolRepository
-        .find({
-          where: {
+    if (!isInstalled) {
+      return await this.toolsRepository.find({
+        where: {
+          name: In(names),
+        },
+      });
+    }
+
+    return await this.toolsRepository.find({
+      where: [
+        {
+          name: In(names),
+          type: WorkerType.BUILT_IN,
+        },
+        {
+          workspaceTools: {
             tool: {
               name: In(names),
             },
           },
-          relations: ['tool'],
-        })
-        .then((res) => res.map((r) => r.tool));
-    }
-
-    tools = await this.toolsRepository.find({
-      where: {
-        name: In(names),
-      },
+        },
+      ],
     });
-
-    tools = tools.concat(
-      builtInTools.filter((tool) => names.includes(tool.name)),
-    );
-
-    return tools;
   }
 
   /**
