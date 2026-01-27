@@ -583,10 +583,12 @@ export type Tool = {
   updatedAt: string;
   name: string;
   description: string;
+  command: string;
   category: ToolCategory;
   version: string;
   /** @nullable */
   logoUrl?: string | null;
+  isBuiltIn: boolean;
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;

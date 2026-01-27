@@ -81,7 +81,13 @@ export function useAssistant() {
         );
         return;
       }
-      setMessages(messagesData.messages);
+      setMessages((prev) => {
+        const lastLocal = prev[prev.length - 1];
+        if (lastLocal?.type === 'error') {
+          return prev;
+        }
+        return messagesData.messages;
+      });
     }
   }, [messagesData, internalIsStreaming, messages.length]);
 
@@ -181,6 +187,32 @@ export function useAssistant() {
             setStreamingConversationId(flatData.conversationId);
           }
 
+          // Check if this is an error event (either from event.type or flatData.type)
+          const isErrorEvent =
+            event.type === 'error' || flatData.type === 'error';
+
+          if (isErrorEvent) {
+            const errorMessage =
+              flatData.content ||
+              flatData.error?.message ||
+              (typeof flatData === 'string' ? flatData : 'Stream error');
+
+            setMessages((prev) => {
+              const lastIndex = prev.length - 1;
+              if (lastIndex >= 0) {
+                const updated = [...prev];
+                updated[lastIndex] = {
+                  ...updated[lastIndex],
+                  type: 'error' as const,
+                  content: errorMessage,
+                };
+                return updated;
+              }
+              return prev;
+            });
+            break; // Stop streaming but keep messages
+          }
+
           if (event.type === 'message' && flatData) {
             const deltaText = flatData.content || '';
             if (flatData.type === 'text' && deltaText) {
@@ -210,27 +242,6 @@ export function useAssistant() {
               }
               return prev;
             });
-          } else if (event.type === 'error') {
-            const errorMessage =
-              flatData.error?.message ||
-              (typeof flatData === 'string' ? flatData : 'Stream error');
-            console.error('❌ Stream error:', flatData);
-
-            // Instead of throwing, update the assistant message with the error
-            setMessages((prev) => {
-              const lastIndex = prev.length - 1;
-              if (lastIndex >= 0) {
-                const updated = [...prev];
-                updated[lastIndex] = {
-                  ...updated[lastIndex],
-                  type: 'error' as const,
-                  content: errorMessage,
-                };
-                return updated;
-              }
-              return prev;
-            });
-            break; // Stop streaming but keep messages
           }
         }
 

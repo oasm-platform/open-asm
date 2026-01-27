@@ -550,9 +550,11 @@ export interface Tool {
   updatedAt: string;
   name: string;
   description: string;
+  command: string;
   category: ToolCategoryEnum;
   version: string;
   logoUrl?: string | null;
+  isBuiltIn: boolean;
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;
