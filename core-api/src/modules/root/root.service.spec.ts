@@ -1,6 +1,7 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
+import { SystemConfigsService } from '../system-configs/system-configs.service';
 import { UsersService } from '../users/users.service';
 import { RootService } from './root.service';
 
@@ -24,6 +25,15 @@ describe('RootService', () => {
           provide: AiAssistantService,
           useValue: {
             healthCheck: jest.fn(),
+          },
+        },
+        {
+          provide: SystemConfigsService,
+          useValue: {
+            getConfig: jest.fn().mockResolvedValue({
+              name: 'Open ASM',
+              logoPath: undefined,
+            }),
           },
         },
       ],

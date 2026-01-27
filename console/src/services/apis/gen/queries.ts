@@ -331,6 +331,13 @@ export type CreateFirstAdminDto = {
 export type GetMetadataDto = {
   isInit: boolean;
   isAssistant: boolean;
+  /** System name */
+  name: string;
+  /**
+   * Path to system logo
+   * @nullable
+   */
+  logoPath: string | null;
 };
 
 export type GenerateTagsResponseDto = {
@@ -549,6 +556,13 @@ export type UpdateLLMConfigDto = {
   apiKey: string;
   model?: string;
   apiUrl?: string;
+};
+
+export type UpdateSystemConfigDto = {
+  /** System name */
+  name?: string;
+  /** Path to system logo */
+  logoPath?: string;
 };
 
 export type AssetDnsRecords = { [key: string]: unknown };
@@ -8415,6 +8429,99 @@ export const useAiAssistantControllerSetPreferredLLMConfig = <
 > => {
   const mutationOptions =
     getAiAssistantControllerSetPreferredLLMConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Updates the system configuration settings
+ * @summary Update system configuration
+ */
+export const systemConfigsControllerUpdateConfig = (
+  updateSystemConfigDto: UpdateSystemConfigDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/system-configs`,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateSystemConfigDto,
+    },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerUpdateConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+    TError,
+    { data: UpdateSystemConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+  TError,
+  { data: UpdateSystemConfigDto },
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerUpdateConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+    { data: UpdateSystemConfigDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return systemConfigsControllerUpdateConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerUpdateConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>
+>;
+export type SystemConfigsControllerUpdateConfigMutationBody =
+  UpdateSystemConfigDto;
+export type SystemConfigsControllerUpdateConfigMutationError = unknown;
+
+/**
+ * @summary Update system configuration
+ */
+export const useSystemConfigsControllerUpdateConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+      TError,
+      { data: UpdateSystemConfigDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+  TError,
+  { data: UpdateSystemConfigDto },
+  TContext
+> => {
+  const mutationOptions =
+    getSystemConfigsControllerUpdateConfigMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
