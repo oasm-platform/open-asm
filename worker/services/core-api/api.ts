@@ -943,6 +943,7 @@ export interface WorkerInstance {
 
 export interface WorkerJoinDto {
   apiKey: string;
+  signature?: string;
 }
 
 export interface GetManyWorkerInstanceDto {

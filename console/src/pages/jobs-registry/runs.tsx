@@ -57,6 +57,11 @@ export default function Runs() {
   const jobsByToolId = useMemo(() => {
     if (!jobHistoryDetail?.jobs) return new Map<string, Job[]>();
     return jobHistoryDetail.jobs.reduce((acc, job) => {
+      // Check if job.tool exists before accessing its id property
+      if (!job.tool) {
+        console.warn('Job has no tool assigned:', job);
+        return acc;
+      }
       const toolId = job.tool.id;
       if (!acc.has(toolId)) {
         acc.set(toolId, []);
@@ -92,20 +97,24 @@ export default function Runs() {
       accessorKey: 'tool',
       cell: ({ row }) => (
         <div className="min-h-[60px] flex items-center">
-          <Link
-            to={`/tools/${row.original.tool.id}`}
-            className="flex items-center gap-2"
-          >
-            <Image
-              url={row.original.tool?.logoUrl}
-              width={30}
-              height={30}
-              className="rounded-full"
-            />
-            <span className="capitalize font-bold">
-              {row.original.tool.name}
-            </span>
-          </Link>
+          {row.original.tool ? (
+            <Link
+              to={`/tools/${row.original.tool.id}`}
+              className="flex items-center gap-2"
+            >
+              <Image
+                url={row.original.tool?.logoUrl}
+                width={30}
+                height={30}
+                className="rounded-full"
+              />
+              <span className="capitalize font-bold">
+                {row.original.tool.name}
+              </span>
+            </Link>
+          ) : (
+            <span className="text-muted-foreground">No tool assigned</span>
+          )}
         </div>
       ),
     },
@@ -250,6 +259,11 @@ export default function Runs() {
       // Check if any previous tool in the workflow is still running or waiting
       for (let i = 0; i < toolIndex; i++) {
         const prevTool = tools[i];
+        // Check if prevTool exists before accessing its id
+        if (!prevTool) {
+          console.warn('Previous tool is undefined at index:', i);
+          continue;
+        }
         const prevToolJobs = jobsByToolId.get(prevTool.id) || [];
 
         if (prevToolJobs.length > 0) {
@@ -268,6 +282,11 @@ export default function Runs() {
 
       // Check current tool jobs
       const currentTool = tools[toolIndex];
+      // Check if currentTool exists before accessing its id
+      if (!currentTool) {
+        console.warn('Current tool is undefined at index:', toolIndex);
+        return 'pending';
+      }
       const currentToolJobs = jobsByToolId.get(currentTool.id) || [];
 
       // If current tool has no jobs yet, it's pending
