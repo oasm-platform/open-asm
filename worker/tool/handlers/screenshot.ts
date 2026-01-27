@@ -1,5 +1,5 @@
+import os from "os";
 import puppeteer, { Browser } from "puppeteer";
-import { existsSync } from "fs";
 import type { Job } from "../../services/core-api/api";
 
 // Shared browser instance to reuse across requests
@@ -30,6 +30,70 @@ const USER_AGENTS = [
 ];
 
 /**
+ * Gets the appropriate executable path based on the operating system
+ * @returns The path to the browser executable
+ */
+function getExecutablePath(): string | undefined {
+  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (envPath) {
+    return envPath;
+  }
+
+  const platform = os.platform();
+
+  if (platform === "win32") {
+    // Try common Windows Chromium/Chrome locations
+    const windowsPaths = [
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files\\Chromium\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Chromium\\Application\\chrome.exe",
+    ];
+
+    for (const path of windowsPaths) {
+      if (require("fs").existsSync(path)) {
+        return path;
+      }
+    }
+
+    // If no specific path found, let puppeteer use its default (will auto-download if needed)
+    return undefined;
+  } else if (platform === "linux") {
+    // Common Linux paths
+    const linuxPaths = [
+      "/usr/bin/chromium-browser",
+      "/usr/bin/chromium",
+      "/usr/bin/google-chrome",
+      "/usr/bin/google-chrome-stable",
+    ];
+
+    for (const path of linuxPaths) {
+      if (require("fs").existsSync(path)) {
+        return path;
+      }
+    }
+
+    return "/usr/bin/chromium-browser"; // fallback to original
+  } else if (platform === "darwin") {
+    // macOS paths
+    const macPaths = [
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    ];
+
+    for (const path of macPaths) {
+      if (require("fs").existsSync(path)) {
+        return path;
+      }
+    }
+
+    return undefined; // let puppeteer use default
+  }
+
+  return undefined; // let puppeteer use default
+}
+
+/**
  * Gets a random user agent from the predefined list.
  * @returns A random user agent string.
  */
@@ -43,32 +107,12 @@ function getRandomUserAgent(): string | undefined {
  */
 async function getBrowser(): Promise<Browser> {
   if (!browser) {
-    // Determine the executable path
-    let executablePath: string | undefined =
-      process.env.PUPPETEER_EXECUTABLE_PATH;
-
-    // Common paths to check if not provided via environment variable
-    const commonPaths = [
-      "/usr/bin/chromium-browser",
-      "/usr/bin/chromium",
-      "/usr/bin/google-chrome",
-      "/usr/bin/google-chrome-stable",
-      "/opt/google/chrome/google-chrome",
-    ];
-
-    if (!executablePath) {
-      for (const path of commonPaths) {
-        if (existsSync(path)) {
-          executablePath = path;
-          break;
-        }
-      }
-    }
+    const executablePath = getExecutablePath();
 
     // Launch browser with args suitable for containerized environments
     browser = await puppeteer.launch({
       headless: true,
-      executablePath, // If undefined, puppeteer will use its own bundled chromium
+      executablePath, // Use the detected or configured executable path
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
