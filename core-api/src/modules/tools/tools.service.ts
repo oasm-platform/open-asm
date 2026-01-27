@@ -424,9 +424,8 @@ export class ToolsService implements OnModuleInit {
     names: string[];
     isInstalled?: boolean;
   }): Promise<Tool[]> {
-    let tools: Tool[] = [];
     if (isInstalled) {
-      tools = await this.workspaceToolRepository
+      return await this.workspaceToolRepository
         .find({
           where: {
             tool: {
@@ -438,17 +437,11 @@ export class ToolsService implements OnModuleInit {
         .then((res) => res.map((r) => r.tool));
     }
 
-    tools = await this.toolsRepository.find({
+    return await this.toolsRepository.find({
       where: {
         name: In(names),
       },
     });
-
-    tools = tools.concat(
-      builtInTools.filter((tool) => names.includes(tool.name)),
-    );
-
-    return tools;
   }
 
   /**
