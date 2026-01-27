@@ -314,6 +314,10 @@ export interface CreateFirstAdminDto {
 export interface GetMetadataDto {
   isInit: boolean;
   isAssistant: boolean;
+  /** System name */
+  name: string;
+  /** Path to system logo */
+  logoPath: string | null;
 }
 
 export interface GenerateTagsResponseDto {
@@ -527,6 +531,13 @@ export interface UpdateLLMConfigDto {
   apiKey: string;
   model?: string;
   apiUrl?: string;
+}
+
+export interface UpdateSystemConfigDto {
+  /** System name */
+  name?: string;
+  /** Path to system logo */
+  logoPath?: string;
 }
 
 export interface Asset {
@@ -3007,6 +3018,27 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/ai-assistant/configs/${id}/set-preferred`,
       method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates the system configuration settings
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerUpdateConfig
+   * @summary Update system configuration
+   * @request PUT:/api/system-configs
+   */
+  systemConfigsControllerUpdateConfig = (
+    data: UpdateSystemConfigDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs`,
+      method: "PUT",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });
