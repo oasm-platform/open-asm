@@ -7,4 +7,13 @@ export class GetManyJobsRequestDto extends GetManyBaseQueryParams {
   @IsUUID()
   @IsOptional()
   jobHistoryId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  jobStatus?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  workspaceId?: string;
 }

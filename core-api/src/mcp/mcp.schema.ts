@@ -77,3 +77,68 @@ export const getStatisticOutPutSchema = z.object({
   ports: z.number().describe('The total number of unique ports'),
   score: z.number().describe('The security score (0-10, higher is better)'),
 });
+
+export const detailAssetSchema = z
+  .object({
+    assetId: z.string().describe('The ID of the asset to get details for'),
+  })
+  .extend(workspaceParamSchema.shape);
+
+export const listAssetsInTargetSchema = z
+  .object({
+    targetId: z.string().describe('The ID of the target to list assets from'),
+    value: z.string().optional().describe('Search assets by value'),
+  })
+  .extend(getManyBaseRequestSchema.shape);
+
+export const detailVulnSchema = z
+  .object({
+    vulnId: z
+      .string()
+      .describe('The ID of the vulnerability to get details for'),
+  })
+  .extend(workspaceParamSchema.shape);
+
+export const listIssuesSchema = z
+  .object({
+    search: z
+      .string()
+      .optional()
+      .describe('Search issues by title or description'),
+    status: z
+      .array(z.string())
+      .optional()
+      .describe('Filter issues by status (OPEN, CLOSED, etc.)'),
+  })
+  .extend(getManyBaseRequestSchema.shape);
+
+export const detailIssueSchema = z
+  .object({
+    issueId: z.string().describe('The ID of the issue to get details for'),
+  })
+  .extend(workspaceParamSchema.shape);
+
+export const listToolsSchema = z
+  .object({
+    q: z.string().optional().describe('Search tools by name'),
+  })
+  .extend(getManyBaseRequestSchema.shape);
+
+export const listWorkersSchema = z
+  .object({
+    q: z
+      .string()
+      .optional()
+      .describe('Search workers by ID or Token (partial)'),
+  })
+  .extend(getManyBaseRequestSchema.shape);
+
+export const listJobsSchema = z
+  .object({
+    jobHistoryId: z
+      .string()
+      .optional()
+      .describe('Filter jobs by job history ID'),
+    jobStatus: z.string().optional().describe('Filter jobs by status'),
+  })
+  .extend(getManyBaseRequestSchema.shape);

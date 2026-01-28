@@ -71,3 +71,4 @@ core-api/.storage/*
 .kilocode/*
 .windsurf/*
 .claude/*
+searxng/
