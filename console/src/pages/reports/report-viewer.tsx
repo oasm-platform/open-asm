@@ -97,7 +97,7 @@ const ReportViewer = () => {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => navigate(`/reports/${report.id}`)}
+            onClick={() => navigate(`/reports/${report.id}/edit`)}
           >
             <Edit className="w-4 h-4 mr-2" />
             Edit Report

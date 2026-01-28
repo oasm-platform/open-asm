@@ -168,7 +168,7 @@ const ReportEditor = () => {
           },
         });
         toast.success('Report created');
-        navigate(`/reports/${response.id}`);
+        navigate(`/reports/${response.id}/edit`);
       }
     } catch {
       toast.error('Failed to save report');

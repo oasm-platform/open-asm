@@ -24,6 +24,7 @@ import {
   CirclePlay,
   CloudCheck,
   Cpu,
+  FileText,
   Group,
   LayoutDashboard,
   SquareTerminal,
@@ -84,8 +85,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: <CircleDot />,
           url: '/issues',
         },
+        {
+          title: 'Reports',
+          icon: <FileText />,
+          url: '/reports',
+        },
       ],
     },
+
     {
       title: 'Management',
       url: '#',

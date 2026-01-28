@@ -4,7 +4,7 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "assets": ["**/*.json", "**/*.yaml", "**/*.yml", "**/*.proto"],
+    "assets": ["**/*.json", "**/*.yaml", "**/*.yml", "**/*.proto", "**/*.hbs"],
     "watchAssets": true
   }
 }

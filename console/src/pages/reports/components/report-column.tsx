@@ -174,7 +174,7 @@ export const getReportColumns = ({
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="flex items-center gap-2 cursor-pointer"
-                onClick={() => onNavigate(`/reports/${report.id}`)}
+                onClick={() => onNavigate(`/reports/${report.id}/edit`)}
               >
                 <Edit className="w-4 h-4 text-slate-500" />
                 <span>Edit</span>
