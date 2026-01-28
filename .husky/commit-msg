@@ -1,4 +1,6 @@
 
+. "$(dirname -- "$0")/_/husky.sh"
+
 # Commit message format check
 # Require commit messages to start with one of the following:
 # feat(scope): for new features
