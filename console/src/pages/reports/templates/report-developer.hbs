@@ -1,0 +1,326 @@
+<html>
+  <head>
+    <meta charset='utf-8' />
+    <script src='https://cdn.tailwindcss.com'></script>
+    <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
+    <link
+      href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap'
+      rel='stylesheet'
+    />
+    <style>
+      .report-page {
+        font-family: 'Inter', sans-serif;
+        padding: 1.5cm;
+        min-height: auto;
+        position: relative;
+        background: white;
+        display: flex;
+        flex-direction: column;
+        margin: 0 auto;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      }
+      @media print {
+        .report-page {
+          min-height: 29.7cm;
+          box-shadow: none;
+        }
+      }
+      @media (max-width: 640px) {
+        .report-page {
+          padding: 0.5cm;
+        }
+      }
+      section {
+        margin-bottom: 2.5rem;
+      }
+      .chart-container {
+        position: relative;
+        height: 250px;
+        width: 100%;
+      }
+      .vulnerability-card {
+        page-break-inside: avoid;
+        padding-top: 2rem;
+        margin-top: 2rem;
+        border-top: 1px solid #f1f5f9;
+      }
+      .vulnerability-card:first-child {
+        border-top: 0;
+        margin-top: 0;
+        padding-top: 0;
+      }
+    </style>
+  </head>
+  <body class='text-slate-900'>
+    <div class='report-page relative overflow-hidden'>
+      <!-- Decorative Corner -->
+      <div
+        class='absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 rounded-bl-[200px] -mr-32 -mt-32 pointer-events-none'
+      ></div>
+
+      <!-- Header -->
+      <div
+        class='flex flex-col md:flex-row justify-between items-start border-b-[2px] border-slate-800 pb-10 mb-10'
+      >
+        <div class='flex-1 md:mr-8 mb-8 md:mb-0'>
+          <h1
+            class='text-3xl md:text-5xl font-black uppercase tracking-tighter text-slate-800 mb-6 leading-none'
+          >
+            Security Assessment<br />Report
+          </h1>
+          <div class='space-y-4'>
+            <h2
+              class='text-2xl md:text-3xl font-bold text-indigo-600 leading-tight'
+            >{{hbsInput
+                'name'
+                report.name
+                'text-2xl md:text-3xl font-bold text-indigo-600'
+              }}</h2>
+            <p
+              class='text-sm md:text-base text-slate-500 max-w-2xl leading-relaxed'
+            >{{hbsTextarea
+                'description'
+                report.description
+                'text-sm md:text-base text-slate-500'
+              }}</p>
+          </div>
+        </div>
+      </div>
+
+      <section>
+        <div class="flex justify-between items-center border-b-2 border-slate-200 pb-3 mb-10">
+          <h2
+            class='text-2xl md:text-3xl font-extrabold text-slate-800 uppercase tracking-wide'
+          >
+            III. Detailed Vulnerability Analysis
+          </h2>
+          {{#if isEditing}}
+            <button 
+              data-action="add-finding"
+              class="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-slate-800 transition-colors"
+            >
+               + Add Finding
+            </button>
+          {{/if}}
+        </div>
+
+        <div
+          class='bg-indigo-50/20 p-10 rounded-[2rem] border border-indigo-50 mb-12 shadow-inner'
+        >
+          <h3
+            class='text-[10px] font-black text-indigo-500 mb-8 tracking-[0.3em] uppercase text-center'
+          >Systemic Vulnerability Patterns</h3>
+          <div class='chart-container'>
+            <canvas id='categoryChart'></canvas>
+          </div>
+        </div>
+
+        <div class='space-y-4'>
+          {{#each report.content.developer.vulnerabilities}}
+            <div class='vulnerability-card'>
+              <div class='flex items-start gap-6 mb-8'>
+                <div class="relative group">
+                  {{#if ../isEditing}}
+                    <button 
+                      data-action="remove-finding" 
+                      data-index="{{@index}}"
+                      class="absolute -right-2 -top-2 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity z-20 bg-white rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                    >
+                      &times;
+                    </button>
+                  {{/if}}
+                  <span
+                    class='bg-slate-900 text-white font-black px-4 py-2 rounded-xl text-2xl flex-shrink-0 shadow-lg'
+                  >V-{{add @index 1}}</span>
+                </div>
+                <div class='flex-1 space-y-4'>
+                  <div
+                    class='text-3xl font-black text-slate-800 tracking-tight'
+                  >
+                    {{hbsInput
+                      (concat
+                        'content.developer.vulnerabilities[' @index '].name'
+                      )
+                      this.name
+                      'text-3xl font-black text-slate-800 tracking-tight'
+                    }}
+                  </div>
+                  <div class='flex items-center gap-4'>
+                    <span
+                      class='text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full text-white shadow-sm
+                        {{severityColorClass this.severity}}'
+                    >
+                      {{this.severity}}
+                    </span>
+                    <span
+                      class='text-[10px] font-black uppercase tracking-[0.2em] bg-slate-100 text-slate-500 px-4 py-1.5 rounded-full border border-slate-200'
+                    >
+                      {{hbsInput
+                        (concat
+                          'content.developer.vulnerabilities['
+                          @index
+                          '].category'
+                        )
+                        this.category
+                        'text-[10px] font-black uppercase tracking-[0.2em] bg-transparent'
+                      }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class='grid grid-cols-3 gap-8 mb-10'>
+                <div
+                  class='col-span-2 p-5 bg-slate-50 rounded-2xl border border-slate-100'
+                >
+                  <h4
+                    class='text-[9px] font-black text-slate-400 uppercase mb-3 tracking-[0.2em]'
+                  >Target Implementation Endpoint</h4>
+                  <div
+                    class='text-xs font-mono text-indigo-600 bg-white p-3 rounded-lg border border-slate-100 overflow-hidden text-ellipsis'
+                  >{{hbsInput
+                      (concat
+                        'content.developer.vulnerabilities[' @index '].endpoint'
+                      )
+                      this.endpoint
+                      'text-xs font-mono text-indigo-600 w-full'
+                    }}</div>
+                </div>
+                <div
+                  class='p-5 bg-slate-50 rounded-2xl border border-slate-100'
+                >
+                  <h4
+                    class='text-[9px] font-black text-slate-400 uppercase mb-3 tracking-[0.2em]'
+                  >Root Cause Vector</h4>
+                  <div
+                    class='text-xs font-black text-slate-800 bg-white p-3 rounded-lg border border-slate-100 text-center'
+                  >{{hbsInput
+                      (concat
+                        'content.developer.vulnerabilities['
+                        @index
+                        '].rootCause'
+                      )
+                      this.rootCause
+                      'text-xs font-black text-slate-800 text-center w-full'
+                    }}</div>
+                </div>
+              </div>
+
+              <div class='grid grid-cols-1 gap-8'>
+                <div class='p-2'>
+                  <h4
+                    class='text-sm font-black text-slate-800 mb-4 flex items-center gap-2'
+                  >
+                    <span class='w-1.5 h-6 bg-indigo-500 rounded-full'></span>
+                    Technical Description
+                  </h4>
+                  <div
+                    class='text-sm leading-relaxed text-slate-600 whitespace-pre-wrap ml-4'
+                  >{{hbsTextarea
+                      (concat
+                        'content.developer.vulnerabilities['
+                        @index
+                        '].description'
+                      )
+                      this.description
+                      'text-sm leading-relaxed text-slate-600'
+                    }}</div>
+                </div>
+
+                <div
+                  class='p-6 bg-slate-900 rounded-2xl shadow-xl overflow-hidden relative'
+                >
+                  <div class='absolute top-0 right-0 p-3 opacity-10'>
+                    <svg
+                      viewBox='0 0 24 24'
+                      class='w-20 h-20 text-white fill-current'
+                    ><path
+                        d='M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z'
+                      /></svg>
+                  </div>
+                  <h4
+                    class='text-sm font-black text-indigo-400 mb-4 tracking-widest uppercase'
+                  >Verified Steps to Reproduce</h4>
+                  <div
+                    class='text-xs font-mono text-slate-300 leading-relaxed overflow-x-auto p-4 bg-slate-800/50 rounded-xl whitespace-pre-wrap'
+                  >{{hbsTextarea
+                      (concat
+                        'content.developer.vulnerabilities['
+                        @index
+                        '].reproduce'
+                      )
+                      this.reproduce
+                      'text-xs font-mono text-slate-300 bg-transparent'
+                    }}</div>
+                </div>
+
+                <div
+                  class='p-8 bg-green-50/50 border-[2px] border-dashed border-green-200 rounded-3xl'
+                >
+                  <h4
+                    class='text-sm font-black text-green-800 mb-4 flex items-center gap-2'
+                  >
+                    <svg
+                      class='w-5 h-5'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    ><path
+                        stroke-linecap='round'
+                        stroke-linejoin='round'
+                        stroke-width='2'
+                        d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+                      ></path></svg>
+                    Expert Remediation Recommendation
+                  </h4>
+                  <div
+                    class='text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-wrap bg-white/50 p-4 rounded-xl shadow-sm'
+                  >{{hbsTextarea
+                      (concat
+                        'content.developer.vulnerabilities[' @index '].fix'
+                      )
+                      this.fix
+                      'text-sm font-medium text-slate-700'
+                    }}</div>
+                </div>
+              </div>
+            </div>
+          {{/each}}
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <div
+        class='mt-auto border-t-2 border-slate-100 pt-12 text-center relative'
+      >
+        <div
+          class='absolute top-0 left-1/2 -translate-x-1/2 w-48 h-1.5 bg-slate-800 rounded-full'
+        ></div>
+        <p
+          class='text-[12px] font-black uppercase tracking-[0.6em] text-slate-400 mb-3'
+        >Proprietary & Highly Confidential</p>
+        <p
+          class='text-[10px] text-slate-300 font-bold max-w-2xl mx-auto leading-relaxed'
+        >
+          &copy;
+          {{year}}
+          Open ASM Global Security Operations Team. This document is provided
+          for internal security assessment purposes only.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      new Chart(document.getElementById('categoryChart'), { type: 'bar', data: {
+      labels:
+      {{{json categoryCounts.labels}}}, datasets: [{ data:
+      {{{json categoryCounts.values}}}, backgroundColor: 'rgba(79, 70, 229,
+      0.4)', borderColor: '#4f46e5', borderWidth: 0, borderRadius: 12,
+      barThickness: 30 }] }, options: { indexAxis: 'y', plugins: { legend: {
+      display: false } }, scales: { x: { grid: { display: false }, ticks: {
+      display: false }, border: { display: false } }, y: { grid: { display:
+      false }, border: { display: false }, ticks: { font: { weight: '800', size:
+      11 }, color: '#475569' } } }, maintainAspectRatio: false } });
+    </script>
+  </body>
+</html>
