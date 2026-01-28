@@ -65,7 +65,8 @@ export class JobsRegistryService {
   public async getManyJobs(
     query: GetManyJobsRequestDto,
   ): Promise<GetManyBaseResponseDto<Job>> {
-    const { limit, page, sortOrder, jobHistoryId } = query;
+    const { limit, page, sortOrder, jobHistoryId, jobStatus, workspaceId } =
+      query;
     let { sortBy } = query;
 
     if (!(sortBy in Job)) {
@@ -79,8 +80,24 @@ export class JobsRegistryService {
       .leftJoinAndSelect('asset.target', 'target')
       .leftJoinAndSelect('job.assetService', 'assetService')
       .leftJoinAndSelect('job.errorLogs', 'errorLogs')
-      .where('job.jobHistoryId = :jobHistoryId', { jobHistoryId })
-      .take(query.limit)
+      .where('1=1');
+
+    if (jobHistoryId) {
+      qb.andWhere('job.jobHistoryId = :jobHistoryId', { jobHistoryId });
+    }
+
+    if (jobStatus) {
+      qb.andWhere('job.status = :jobStatus', { jobStatus });
+    }
+
+    if (workspaceId) {
+      qb.innerJoin('target.workspaceTargets', 'workspaceTarget').andWhere(
+        'workspaceTarget.workspaceId = :workspaceId',
+        { workspaceId },
+      );
+    }
+
+    qb.take(query.limit)
       .skip((page - 1) * limit)
       .orderBy(`job.${sortBy}`, sortOrder);
 
