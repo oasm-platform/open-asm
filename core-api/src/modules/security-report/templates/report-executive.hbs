@@ -1,0 +1,290 @@
+<html>
+  <head>
+    <meta charset='utf-8' />
+    <script src='https://cdn.tailwindcss.com'></script>
+    <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
+    <link
+      href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap'
+      rel='stylesheet'
+    />
+    <style>
+      .report-page {
+        font-family: 'Inter', sans-serif;
+        padding: 1.5cm;
+        min-height: auto;
+        position: relative;
+        background: white;
+        display: flex;
+        flex-direction: column;
+        margin: 0 auto;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      }
+      @media print {
+        .report-page {
+          min-height: 29.7cm;
+          box-shadow: none;
+          padding: 1.5cm;
+        }
+      }
+      @media (max-width: 640px) {
+        .report-page {
+          padding: 0.5cm;
+        }
+      }
+      section {
+        page-break-inside: avoid;
+        margin-bottom: 2.5rem;
+      }
+      .chart-container {
+        position: relative;
+        height: 250px;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body class='text-slate-900'>
+    <div class='report-page relative overflow-hidden'>
+      <!-- Decorative Corner -->
+      <div
+        class='absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 rounded-bl-[200px] -mr-32 -mt-32 pointer-events-none'
+      ></div>
+
+      <!-- Header -->
+      <div
+        class='flex flex-col md:flex-row justify-between items-start border-b-[2px] border-slate-800 pb-10 mb-10'
+      >
+        <div class='flex-1 md:mr-8 mb-8 md:mb-0'>
+          <h1
+            class='text-3xl md:text-5xl font-black uppercase tracking-tighter text-slate-800 mb-6 leading-none'
+          >
+            Security Assessment<br />Report
+          </h1>
+          <div class='space-y-4'>
+            <h2
+              class='text-2xl md:text-3xl font-bold text-indigo-600 leading-tight'
+            >{{hbsInput
+                'name'
+                report.name
+                'text-2xl md:text-3xl font-bold text-indigo-600'
+              }}</h2>
+            <p
+              class='text-sm md:text-base text-slate-500 max-w-2xl leading-relaxed'
+            >{{hbsTextarea
+                'description'
+                report.description
+                'text-sm md:text-base text-slate-500'
+              }}</p>
+          </div>
+        </div>
+      </div>
+
+      <section>
+        <h2
+          class='text-2xl md:text-3xl font-extrabold border-b-2 border-slate-200 pb-3 mb-8 text-slate-800 uppercase tracking-wide'
+        >
+          I. Executive Summary
+        </h2>
+
+        <div class='grid grid-cols-1 md:grid-cols-2 gap-10 items-start mb-10'>
+          <div class='space-y-8'>
+            <div class='flex flex-col sm:flex-row gap-6'>
+              <div
+                class='flex-1 p-6 bg-red-50 rounded-2xl border-red-500 shadow-sm'
+              >
+                <p
+                  class='text-[10px] font-black text-red-600 uppercase mb-2 tracking-widest'
+                >Critical/High Findings</p>
+                <p
+                  class='text-3xl font-black text-red-800'
+                >{{executiveStats.criticalHigh}}</p>
+              </div>
+              <div
+                class='flex-1 p-6 bg-amber-50 rounded-2xl border-amber-500 shadow-sm'
+              >
+                <p
+                  class='text-[10px] font-black text-amber-600 uppercase mb-2 tracking-widest'
+                >Total Findings Identified</p>
+                <p
+                  class='text-3xl font-black text-amber-800'
+                >{{executiveStats.total}}</p>
+              </div>
+            </div>
+
+            <div>
+              <h3
+                class='text-xl font-bold text-slate-800 mb-4 underline decoration-indigo-500 decoration-[4px] underline-offset-[6px]'
+              >1. Strategic Overview</h3>
+              <p
+                class='text-sm leading-relaxed text-slate-700 whitespace-pre-wrap'
+              >{{hbsTextarea
+                  'content.executive.summary'
+                  report.content.executive.summary
+                  'text-sm leading-relaxed text-slate-700'
+                }}</p>
+            </div>
+
+            <div
+              class='p-8 bg-slate-900 rounded-2xl text-white relative shadow-xl overflow-hidden'
+            >
+              <div
+                class='absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -mr-16 -mt-16'
+              ></div>
+              <h3
+                class='text-[10px] font-black text-indigo-400 uppercase mb-2 tracking-widest'
+              >Final Risk Rating</h3>
+              <div
+                class='text-4xl font-black uppercase tracking-tighter text-white'
+              >
+                {{hbsInput
+                  'content.executive.riskRating'
+                  report.content.executive.riskRating
+                  'text-4xl font-black uppercase tracking-tighter text-white'
+                }}
+              </div>
+            </div>
+          </div>
+
+          <div
+            class='p-8 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex flex-col items-center'
+          >
+            <h3
+              class='text-[10px] font-black text-slate-400 uppercase mb-8 tracking-widest text-center'
+            >Severity Distribution Matrix</h3>
+            <div class='chart-container'>
+              <canvas id='severityChart'></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class='p-8 bg-slate-50 rounded-2xl border-slate-400 mb-10'>
+          <h3
+            class='text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest'
+          >Systemic Business Impact</h3>
+          <p class='text-xl font-bold text-slate-800'>{{hbsTextarea
+              'content.executive.businessImpact'
+              report.content.executive.businessImpact
+              'text-xl font-bold text-slate-800'
+            }}</p>
+        </div>
+
+        <div class='mb-10'>
+          <div class='flex justify-between items-center mb-6'>
+            <h3 class='text-xl font-bold text-slate-800'>Top Evaluated Risks</h3>
+            {{#if isEditing}}
+              <button
+                data-action='add-risk'
+                class='bg-indigo-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-indigo-700 transition-colors'
+              >
+                + Add Risk
+              </button>
+            {{/if}}
+          </div>
+          <div class='grid grid-cols-1 gap-4'>
+            {{#each report.content.executive.top3Risks}}
+              <div
+                class='p-6 bg-slate-50/50 border border-slate-100 rounded-2xl shadow-sm'
+              >
+                <div class='flex items-center gap-3 mb-3 relative group'>
+                  {{#if ../isEditing}}
+                    <button 
+                      data-action="remove-risk" 
+                      data-index="{{@index}}"
+                      class="absolute -right-2 top-0 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      &times;
+                    </button>
+                  {{/if}}
+                  <span
+                    class='bg-indigo-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm'
+                  >#{{add @index 1}}</span>
+                  <div class='flex-1 font-extrabold text-slate-800'>
+                    {{hbsInput
+                      (concat 'content.executive.top3Risks[' @index '].name')
+                      this.name
+                      'font-extrabold text-slate-800'
+                    }}
+                  </div>
+                </div>
+                <div
+                  class='text-sm text-slate-600 mb-4 ml-11 leading-relaxed text-slate-600'
+                >
+                  {{hbsTextarea
+                    (concat
+                      'content.executive.top3Risks[' @index '].description'
+                    )
+                    this.description
+                    'text-sm text-slate-600'
+                  }}
+                </div>
+                <div
+                  class='flex items-center gap-2 pt-3 border-t border-slate-100 mt-2 ml-11'
+                >
+                  <span
+                    class='text-[9px] font-black text-slate-400 uppercase tracking-widest'
+                  >Impact Severity:</span>
+                  <div
+                    class='text-[10px] font-black uppercase text-indigo-700 px-2 py-0.5 bg-indigo-50 rounded'
+                  >
+                    {{hbsInput
+                      (concat 'content.executive.top3Risks[' @index '].impact')
+                      this.impact
+                      'text-[10px] font-black uppercase text-indigo-700'
+                    }}
+                  </div>
+                </div>
+              </div>
+            {{/each}}
+          </div>
+        </div>
+
+        <div class='p-8 bg-indigo-50 border border-indigo-100 rounded-2xl'>
+          <h3
+            class='text-xl font-bold text-slate-800 mb-4 underline decoration-indigo-500 decoration-[4px] underline-offset-[6px]'
+          >2. Recommended Action Plan</h3>
+          <p
+            class='text-sm leading-relaxed text-slate-700 whitespace-pre-wrap'
+          >{{hbsTextarea
+              'content.executive.actionPlan'
+              report.content.executive.actionPlan
+              'text-sm leading-relaxed text-slate-700'
+            }}</p>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <div
+        class='mt-auto border-t-2 border-slate-100 pt-12 text-center relative'
+      >
+        <div
+          class='absolute top-0 left-1/2 -translate-x-1/2 w-48 h-1.5 bg-slate-800 rounded-full'
+        ></div>
+        <p
+          class='text-[12px] font-black uppercase tracking-[0.6em] text-slate-400 mb-3'
+        >Proprietary & Highly Confidential</p>
+        <p
+          class='text-[10px] text-slate-300 font-bold max-w-2xl mx-auto leading-relaxed'
+        >
+          &copy;
+          {{year}}
+          Open ASM Global Security Operations Team. This document is provided
+          for internal security assessment purposes only.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      new Chart(document.getElementById('severityChart'), { type: 'doughnut',
+      data: { labels: ['Critical', 'High', 'Medium', 'Low', 'Info'], datasets:
+      [{ data: [{{severityCounts.critical}},
+      {{severityCounts.high}},
+      {{severityCounts.medium}},
+      {{severityCounts.low}},
+      {{severityCounts.info}}], backgroundColor: ['#ef4444', '#f97316',
+      '#eab308', '#22c55e', '#64748b'], borderWidth: 8, borderColor: '#ffffff',
+      hoverOffset: 20 }] }, options: { cutout: '65%', plugins: { legend: {
+      position: 'bottom', labels: { boxWidth: 15, padding: 20, usePointStyle:
+      true, font: { size: 10, weight: 'bold' } } } }, maintainAspectRatio: false
+      } });
+    </script>
+  </body>
+</html>

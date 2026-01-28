@@ -49,6 +49,10 @@ export class Tool {
   @Column({ nullable: true })
   description: string;
 
+  @ApiProperty()
+  @IsOptional()
+  @IsString()
+  @Column({ nullable: true })
   command?: string;
 
   @OneToMany(() => WorkspaceTool, (workspaceTool) => workspaceTool.tool)
@@ -73,6 +77,10 @@ export class Tool {
 
   // @ApiProperty()
   parser?: (result: string | undefined) => JobDataResultType;
+
+  @ApiProperty()
+  @Column({ type: 'boolean', default: false })
+  isBuiltIn?: boolean;
 
   @ApiProperty()
   isInstalled?: boolean;

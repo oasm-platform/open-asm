@@ -18,6 +18,7 @@ export interface IDocOptions<T> {
   response?: IDocResponseOptions<T>;
   request?: IDocRequestOptions;
   summary?: string;
+  operationId?: string;
 }
 
 interface IDocRequestOptions {
