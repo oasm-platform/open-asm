@@ -317,7 +317,7 @@ export interface GetMetadataDto {
   /** System name */
   name: string;
   /** Path to system logo */
-  logoPath: string | null;
+  logoPath: object | null;
 }
 
 export interface GenerateTagsResponseDto {
@@ -537,14 +537,14 @@ export interface SystemConfigResponseDto {
   /** System name */
   name: string;
   /** Path to system logo */
-  logoPath: string | null;
+  logoPath: object | null;
 }
 
 export interface UpdateSystemConfigDto {
   /** System name */
   name?: string;
   /** Path to system logo */
-  logoPath?: string;
+  logoPath?: object;
 }
 
 export interface Asset {
@@ -5125,6 +5125,30 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications/${id}/read`,
       method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Storage
+   * @name StorageControllerUploadLogo
+   * @summary Upload app logo to system bucket
+   * @request POST:/api/storage/logo
+   */
+  storageControllerUploadLogo = (
+    data: {
+      /** @format binary */
+      file: File;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<DefaultMessageResponseDto, any>({
+      path: `/api/storage/logo`,
+      method: "POST",
+      body: data,
+      type: ContentType.FormData,
       format: "json",
       ...params,
     });

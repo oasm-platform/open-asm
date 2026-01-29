@@ -328,6 +328,12 @@ export type CreateFirstAdminDto = {
   password: string;
 };
 
+/**
+ * Path to system logo
+ * @nullable
+ */
+export type GetMetadataDtoLogoPath = { [key: string]: unknown } | null;
+
 export type GetMetadataDto = {
   isInit: boolean;
   isAssistant: boolean;
@@ -337,7 +343,7 @@ export type GetMetadataDto = {
    * Path to system logo
    * @nullable
    */
-  logoPath: string | null;
+  logoPath: GetMetadataDtoLogoPath;
 };
 
 export type GenerateTagsResponseDto = {
@@ -558,6 +564,12 @@ export type UpdateLLMConfigDto = {
   apiUrl?: string;
 };
 
+/**
+ * Path to system logo
+ * @nullable
+ */
+export type SystemConfigResponseDtoLogoPath = { [key: string]: unknown } | null;
+
 export type SystemConfigResponseDto = {
   /** System name */
   name: string;
@@ -565,14 +577,19 @@ export type SystemConfigResponseDto = {
    * Path to system logo
    * @nullable
    */
-  logoPath: string | null;
+  logoPath: SystemConfigResponseDtoLogoPath;
 };
+
+/**
+ * Path to system logo
+ */
+export type UpdateSystemConfigDtoLogoPath = { [key: string]: unknown };
 
 export type UpdateSystemConfigDto = {
   /** System name */
   name?: string;
   /** Path to system logo */
-  logoPath?: string;
+  logoPath?: UpdateSystemConfigDtoLogoPath;
 };
 
 export type AssetDnsRecords = { [key: string]: unknown };
@@ -2162,6 +2179,10 @@ export type NotificationsControllerGetNotificationsParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type StorageControllerUploadLogoBody = {
+  file: Blob;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -25742,6 +25763,103 @@ export const useNotificationsControllerMarkAsRead = <
 > => {
   const mutationOptions =
     getNotificationsControllerMarkAsReadMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * @summary Upload app logo to system bucket
+ */
+export const storageControllerUploadLogo = (
+  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`file`, storageControllerUploadLogoBody.file);
+
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/storage/logo`,
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data' },
+      data: formData,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerUploadLogoMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    TError,
+    { data: StorageControllerUploadLogoBody },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  const mutationKey = ['storageControllerUploadLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    { data: StorageControllerUploadLogoBody }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerUploadLogo(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StorageControllerUploadLogoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>
+>;
+export type StorageControllerUploadLogoMutationBody =
+  StorageControllerUploadLogoBody;
+export type StorageControllerUploadLogoMutationError = void;
+
+/**
+ * @summary Upload app logo to system bucket
+ */
+export const useStorageControllerUploadLogo = <
+  TError = void,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+      TError,
+      { data: StorageControllerUploadLogoBody },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  const mutationOptions =
+    getStorageControllerUploadLogoMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
