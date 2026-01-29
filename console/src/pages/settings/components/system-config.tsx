@@ -1,27 +1,39 @@
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import {
   getRootControllerGetMetadataQueryKey,
-  useStorageControllerUploadFile,
+  useStorageControllerUploadLogo,
   useSystemConfigsControllerGetConfig,
   useSystemConfigsControllerUpdateConfig,
 } from '@/services/apis/gen/queries';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { Upload } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { z } from 'zod';
+
+// Define validation schema
+const systemConfigSchema = z.object({
+  name: z.string().min(1, 'System name is required').max(100, 'Name too long'),
+});
+
+type SystemConfigFormValues = z.infer<typeof systemConfigSchema>;
 
 /**
  * System Configuration Settings Component
- * Allows administrators to configure system-wide settings including the logo
+ * Allows administrators to configure system-wide settings including the system name and logo
  */
 export default function SystemConfigSettings() {
   const {
@@ -29,196 +41,252 @@ export default function SystemConfigSettings() {
     isLoading,
     refetch,
   } = useSystemConfigsControllerGetConfig();
-  const { mutateAsync: updateConfig } =
-    useSystemConfigsControllerUpdateConfig();
-  const { mutateAsync: uploadFile } = useStorageControllerUploadFile();
 
-  const [systemName, setSystemName] = useState(config?.name || '');
-  const [originalSystemName, setOriginalSystemName] = useState(
-    config?.name || '',
-  );
-  const [logoPreview, setLogoPreview] = useState<string | null>(
-    config?.logoPath ? config.logoPath : null,
-  );
-  const [uploadedLogoPath, setUploadedLogoPath] = useState<string | null>(null); // Store the actual uploaded path
-  const [originalLogoPath, setOriginalLogoPath] = useState<string | null>(
-    config?.logoPath ? config.logoPath : null,
-  );
-  const [hasChanges, setHasChanges] = useState(false);
   const queryClient = useQueryClient();
+  const updateConfigMutation = useSystemConfigsControllerUpdateConfig({
+    mutation: {
+      onSuccess: () => {
+        toast.success('System configuration updated successfully');
+        // Reset the logo removal flag after successful update
+        setShouldRemoveLogo(false);
+        refetch();
+        queryClient.invalidateQueries({
+          queryKey: getRootControllerGetMetadataQueryKey(),
+        });
+      },
+      onError: (error) => {
+        console.error('Update error:', error);
+        toast.error('Failed to update system configuration');
+      },
+    },
+  });
 
-  useEffect(() => {
-    const nameChanged = systemName !== originalSystemName;
-    const logoChanged = logoPreview !== originalLogoPath;
-    setHasChanges(nameChanged || logoChanged);
-  }, [systemName, logoPreview, originalSystemName, originalLogoPath]);
+  // Add upload logo mutation
+  const uploadLogoMutation = useStorageControllerUploadLogo({
+    mutation: {
+      onSuccess: () => {
+        toast.success('Logo uploaded successfully');
+        refetch(); // Refresh config to get updated logo path
+      },
+      onError: (error) => {
+        console.error('Upload error:', error);
+        toast.error('Failed to upload logo');
+      },
+    },
+  });
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const form = useForm<SystemConfigFormValues>({
+    resolver: zodResolver(systemConfigSchema),
+    defaultValues: {
+      name: '',
+    },
+  });
 
-    // Validate file type
-    const allowedTypes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/webp',
-      'image/svg+xml',
-    ];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Only image formats are allowed: JPG, PNG, WEBP, SVG');
-      return;
-    }
+  // State for logo file and preview
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [shouldRemoveLogo, setShouldRemoveLogo] = useState<boolean>(false); // Track if logo should be removed
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image size must not exceed 2MB');
-      return;
-    }
-
-    // Create a preview URL from the selected file
-    const previewUrl = URL.createObjectURL(file);
-    setLogoPreview(previewUrl);
-
-    try {
-      // Upload the file
-      const uploadResult = await uploadFile({
-        data: {
-          file: file,
-        },
+  // Set initial values when config data is loaded
+  React.useEffect(() => {
+    if (config) {
+      form.reset({
+        name: config.name || '',
       });
 
-      // Store the uploaded path but continue using blob URL for preview
-      // The server path has issues with missing "/api/storage" prefix
-      setUploadedLogoPath(uploadResult.path || null);
-      toast.success('Image uploaded successfully');
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Image upload failed');
-      // Revert to the original logo if upload fails
-      setLogoPreview(config?.logoPath || null);
+      // Set initial logo preview if logo exists
+      if (config.logoPath && typeof config.logoPath === 'object') {
+        // Extract the actual path from the object structure
+        // Since the type is { [key: string]: unknown } | null, we need to handle it carefully
+        const pathEntries = Object.entries(config.logoPath);
+        if (pathEntries.length > 0) {
+          // Try to find a string value that looks like a file path
+          for (const [, value] of pathEntries) {
+            if (typeof value === 'string') {
+              setLogoPreview(
+                `${window.location.origin}/api/storage/system/${value.split('/').pop()}`,
+              );
+              break;
+            }
+          }
+        }
+      } else if (config.logoPath === null) {
+        // If logoPath is null, no logo exists
+        setLogoPreview(null);
+        // Reset the removal flag since there's no logo anyway
+        setShouldRemoveLogo(false);
+      }
+    }
+  }, [config, form]);
+
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size exceeds 5MB limit');
+        return;
+      }
+
+      setLogoFile(file);
+
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setLogoPreview(previewUrl);
+
+      // Mark the form as dirty to enable the Save button
+      form.setValue('name', form.getValues('name'), { shouldDirty: true }); // This marks form as dirty
+
+      // Clean up previous preview URL
+      return () => URL.revokeObjectURL(previewUrl);
     }
   };
 
-  const handleSave = async () => {
-    try {
-      // When saving, if we have an uploaded path from the server, use that
-      // Otherwise, if we only have a blob URL preview, we should not save it as the logo path
-      // because blob URLs are temporary. We should only save the actual server path.
-      const logoPathToSend =
-        uploadedLogoPath !== null
-          ? uploadedLogoPath
-          : logoPreview && !logoPreview.startsWith('blob:')
-            ? logoPreview
-            : undefined;
+  const handleRemoveLogo = () => {
+    // Update the form to set logoPath to null and make it dirty
+    setLogoFile(null);
+    setLogoPreview(null);
+    setShouldRemoveLogo(true); // Mark that logo should be removed on save
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
 
-      await updateConfig({
+    // Mark the form as dirty to enable the Save button
+    form.setValue('name', form.getValues('name'), { shouldDirty: true }); // This marks form as dirty
+  };
+
+  const onSubmit = async (values: SystemConfigFormValues) => {
+    // If there's a new logo file, upload it first
+    if (logoFile) {
+      try {
+        await uploadLogoMutation.mutateAsync({
+          data: { file: logoFile },
+        });
+        // If logo upload succeeds, then update the config
+        updateConfigMutation.mutate({
+          data: {
+            name: values.name,
+          },
+        });
+      } catch (error) {
+        console.error('Logo upload failed:', error);
+        toast.error('Failed to upload logo');
+      }
+    } else if (shouldRemoveLogo) {
+      // If logo should be removed, update the config without logoPath
+      updateConfigMutation.mutate({
         data: {
-          name: systemName,
-          logoPath: logoPathToSend,
+          name: values.name,
+          // Don't include logoPath to remove it (assuming the API handles this)
         },
       });
-
-      await refetch();
-      // Update original values to match current values after successful save
-      setOriginalSystemName(systemName);
-      setOriginalLogoPath(logoPathToSend ?? null);
-      setHasChanges(false);
-      toast.success('System configuration updated successfully');
-      queryClient.invalidateQueries({
-        queryKey: getRootControllerGetMetadataQueryKey(),
+    } else {
+      // If no new logo and no logo removal, just update the config
+      updateConfigMutation.mutate({
+        data: {
+          name: values.name,
+        },
       });
-    } catch (error) {
-      console.error('Update error:', error);
-      toast.error('Configuration update failed');
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <Card>
+        <CardContent className="p-6 flex justify-center items-center h-32">
+          <div>Loading...</div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <Card className="w-full max-w-3xl">
+    <Card>
       <CardHeader>
         <CardTitle>System Configuration</CardTitle>
-        <CardDescription>
-          Manage system-wide settings such as name and logo
-        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-4">
-          <Label htmlFor="system-name">System Name</Label>
-          <Input
-            id="system-name"
-            value={systemName}
-            onChange={(e) => setSystemName(e.target.value)}
-            placeholder="Enter system name"
-          />
-        </div>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>System Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter system name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <Separator />
+            {/* Logo Upload Section */}
+            <div className="space-y-4">
+              <Label>System Logo</Label>
 
-        <div className="space-y-4">
-          <Label>System Logo</Label>
-          <div className="flex flex-col space-y-4 md:flex-row md:space-x-6 md:space-y-0">
-            <div className="flex-shrink-0">
-              {logoPreview ? (
-                <div className="relative">
+              {/* Current Logo Preview */}
+              {logoPreview && (
+                <div className="flex items-center space-x-4">
                   <img
                     src={logoPreview}
-                    alt="Logo preview"
-                    className="h-16 w-16 object-contain rounded-md border bg-white"
+                    alt="Current logo"
+                    className="w-16 h-16 object-contain rounded border"
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLogoPreview(null);
-                    }}
-                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90"
-                    aria-label="Remove logo"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
+                  <div className="flex space-x-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleRemoveLogo}
+                      disabled={uploadLogoMutation.isPending}
                     >
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ) : (
-                <div className="h-16 w-16 flex items-center justify-center rounded-md border bg-muted">
-                  <span className="text-sm text-muted-foreground">No logo</span>
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               )}
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Input
-                id="logo-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-              />
-              <p className="text-xs text-muted-foreground">
-                Supported formats: JPG, PNG, WEBP, SVG. Max size: 2MB
-              </p>
-            </div>
-          </div>
-        </div>
 
-        <div className="pt-4">
-          <Button onClick={handleSave} disabled={!hasChanges}>
-            Save
-          </Button>
-        </div>
+              {/* File Upload */}
+              <div className="flex items-center space-x-4">
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleLogoChange}
+                    accept="image/*"
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  <Label
+                    htmlFor="logo-upload"
+                    className="flex items-center justify-center px-4 py-2 border border-dashed rounded cursor-pointer hover:bg-muted"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {logoFile ? logoFile.name : 'Choose logo file'}
+                  </Label>
+                </div>
+              </div>
+
+              {!logoPreview && !logoFile && (
+                <p className="text-sm text-muted-foreground">
+                  No logo uploaded yet. Supported formats: JPG, PNG, GIF, WEBP
+                </p>
+              )}
+            </div>
+
+            <Button type="submit">
+              {updateConfigMutation.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </form>
+        </Form>
       </CardContent>
     </Card>
   );
