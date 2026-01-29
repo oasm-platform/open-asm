@@ -558,6 +558,16 @@ export type UpdateLLMConfigDto = {
   apiUrl?: string;
 };
 
+export type SystemConfigResponseDto = {
+  /** System name */
+  name: string;
+  /**
+   * Path to system logo
+   * @nullable
+   */
+  logoPath: string | null;
+};
+
 export type UpdateSystemConfigDto = {
   /** System name */
   name?: string;
@@ -1828,6 +1838,8 @@ export type JobsRegistryControllerGetManyJobsParams = {
   sortBy?: string;
   sortOrder?: string;
   jobHistoryId?: string;
+  jobStatus?: string;
+  workspaceId?: string;
 };
 
 export type JobsRegistryControllerGetManyJobHistoriesParams = {
@@ -8432,6 +8444,162 @@ export const useAiAssistantControllerSetPreferredLLMConfig = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * Retrieves the current system configuration settings
+ * @summary Get system configuration
+ */
+export const systemConfigsControllerGetConfig = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SystemConfigResponseDto>(
+    { url: `/api/system-configs`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerGetConfigQueryKey = () => {
+  return [`/api/system-configs`] as const;
+};
+
+export const getSystemConfigsControllerGetConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getSystemConfigsControllerGetConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+  > = ({ signal }) => systemConfigsControllerGetConfig(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SystemConfigsControllerGetConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+>;
+export type SystemConfigsControllerGetConfigQueryError = unknown;
+
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get system configuration
+ */
+
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSystemConfigsControllerGetConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * Updates the system configuration settings

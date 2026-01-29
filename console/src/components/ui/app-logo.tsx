@@ -1,4 +1,7 @@
-import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
+import {
+  getRootControllerGetMetadataQueryKey,
+  useRootControllerGetMetadata,
+} from '@/services/apis/gen/queries';
 import { Radar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSidebar } from './sidebar';
@@ -8,7 +11,11 @@ interface AppLogoProps {
 }
 export default function AppLogo({ type }: AppLogoProps) {
   const { state, isMobile } = useSidebar();
-  const { data: metadata } = useRootControllerGetMetadata();
+  const { data: metadata } = useRootControllerGetMetadata({
+    query: {
+      queryKey: getRootControllerGetMetadataQueryKey(),
+    },
+  });
   return (
     <Link to={'/'} className="flex h-13 justify-start items-center gap-2">
       {metadata?.logoPath ? (

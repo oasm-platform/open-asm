@@ -21,5 +21,5 @@ export class GetMetadataDto {
   name: string;
 
   @ApiProperty({ description: 'Path to system logo', nullable: true })
-  logoPath?: string;
+  logoPath?: string | null;
 }

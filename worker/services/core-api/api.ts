@@ -533,6 +533,13 @@ export interface UpdateLLMConfigDto {
   apiUrl?: string;
 }
 
+export interface SystemConfigResponseDto {
+  /** System name */
+  name: string;
+  /** Path to system logo */
+  logoPath: string | null;
+}
+
 export interface UpdateSystemConfigDto {
   /** System name */
   name?: string;
@@ -3021,6 +3028,22 @@ export class Api<
     });
 
   /**
+   * @description Retrieves the current system configuration settings
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerGetConfig
+   * @summary Get system configuration
+   * @request GET:/api/system-configs
+   */
+  systemConfigsControllerGetConfig = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Updates the system configuration settings
    *
    * @tags System Configs
@@ -3061,6 +3084,8 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
       jobHistoryId?: string;
+      jobStatus?: string;
+      workspaceId?: string;
     },
     params: RequestParams = {},
   ) =>
