@@ -49,8 +49,11 @@ export function ListUsers() {
         query: {
           limit: pageSize,
           offset: (page - 1) * pageSize,
-          filterValue: filter,
           searchField: 'name',
+          searchValue: filter,
+          filterField: 'role',
+          filterOperator: 'ne',
+          filterValue: 'bot',
           sortBy: sortBy,
           sortDirection: sortOrder.toLowerCase() as 'asc' | 'desc',
         },
