@@ -214,8 +214,12 @@ export const HandlebarsRenderer = ({
         const src = oldScript.getAttribute('src');
         if (src) {
           try {
+            const allowedHosts = new Set([
+              'tailwindcss.com',
+              'cdn.tailwindcss.com',
+            ]);
             const url = new URL(src, window.location.href);
-            if (url.hostname.endsWith('tailwindcss.com')) {
+            if (allowedHosts.has(url.hostname)) {
               // Skip Tailwind CDN script to avoid breaking root app borders
               return;
             }
