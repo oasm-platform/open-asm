@@ -1,4 +1,7 @@
-import { GET_WORKSPACE_MCP_TOOL_NAME } from '@/common/constants/app.constants';
+import {
+  GET_WORKSPACE_MCP_TOOL_NAME,
+  WORKER_TIMEOUT,
+} from '@/common/constants/app.constants';
 import { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import { AssetsService } from '@/modules/assets/assets.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
@@ -9,7 +12,7 @@ import { IssuesService } from '@/modules/issues/issues.service';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { WorkersService } from '@/modules/workers/workers.service';
-import { IssueStatus } from '@/common/enums/enum';
+import { IssueStatus, WorkerType } from '@/common/enums/enum';
 import { Injectable } from '@nestjs/common';
 import { Context, Tool } from '@rekog/mcp-nest';
 import z from 'zod';
@@ -47,18 +50,18 @@ export class McpTools {
   @Tool({
     name: GET_WORKSPACE_MCP_TOOL_NAME,
     description:
-      'Retrieve a list of accessible workspaces. Use this tool first to get the "workspaceId" required for almost all other tools.',
+      'Retrieves a list of workspaces accessible to the user. This is typically the first tool to call to obtain the "workspaceId" required for almost all other operations.',
     outputSchema: z.object({
       workspaces: z
         .array(
           z.object({
-            id: z.string().describe('The unique identifier of the workspace'),
+            id: z.string().describe('The unique identifier of the workspace.'),
             name: z
               .string()
-              .describe('The human-readable name of the workspace'),
+              .describe('The human-readable name of the workspace.'),
           }),
         )
-        .describe('List of workspaces the user has access to'),
+        .describe('A list of workspaces the user has permission to access.'),
     }),
   })
   async getWorkspaces(_, context: Context, req: RequestWithMetadata) {
@@ -83,12 +86,16 @@ export class McpTools {
   @Tool({
     name: 'get_assets',
     description:
-      'Search and list assets within a workspace. Assets are individual items like subdomains, IPs, or URLs found during scanning. Use this to explore the attack surface.',
+      'Lists discovered assets (domains, subdomains, IPs, URLs) within a workspace. Assets represent the entities found during scanning, distinct from targets (scope) or tools (scanners). Use this when the user asks about discovered infrastructure, IPs, or domains. Keywords: asset, domain, IP, URL.',
     parameters: getAssetsSchema,
     outputSchema: getManyBaseResponseSchema(
       z.object({
-        id: z.string(),
-        value: z.string().describe('The asset value (e.g., domain, IP)'),
+        id: z.string().describe('The unique identifier of the asset.'),
+        value: z
+          .string()
+          .describe(
+            'The actual value of the asset (e.g., "example.com" or "192.168.1.1").',
+          ),
       }),
     ),
   })
@@ -115,15 +122,15 @@ export class McpTools {
   @Tool({
     name: 'get_vulnerabilities',
     description:
-      'List security vulnerabilities identified in the workspace. Returns basic info like name and severity. Use "detail_vuln" for full technical details.',
+      'Retrieves a list of security vulnerabilities identified during scans. Provides high-level info like name and severity. Use this when the user asks about security issues, CVEs, or "vulns". For in-depth technical details or remediation steps, use "detail_vuln". Keywords: vulnerability, vuln, CVE, security issue.',
     parameters: getVulnerabilitiesSchema,
     outputSchema: getManyBaseResponseSchema(
       z.object({
-        id: z.string(),
-        name: z.string().describe('Name of the vulnerability'),
+        id: z.string().describe('The unique identifier of the vulnerability.'),
+        name: z.string().describe('The title or name of the vulnerability.'),
         severity: z
           .string()
-          .describe('Severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO)'),
+          .describe('Severity level: CRITICAL, HIGH, MEDIUM, LOW, or INFO.'),
       }),
     ),
   })
@@ -149,12 +156,16 @@ export class McpTools {
   @Tool({
     name: 'get_targets',
     description:
-      'List defined targets (root domains, IP ranges, CIDRs) that are being scanned. Targets are the starting points for discovery.',
+      'Lists defined targets (root domains, IP ranges, CIDRs) that constitute the scanning scope. Targets are the starting points for discovery, whereas assets are the actual items found. Use this when the user asks about the "scope" or "what is being scanned". Keywords: target, scan scope, root domain, IP range.',
     parameters: getTargetsSchema,
     outputSchema: getManyBaseResponseSchema(
       z.object({
-        id: z.string(),
-        value: z.string().describe('The target value (e.g., example.com)'),
+        id: z.string().describe('The unique identifier of the target.'),
+        value: z
+          .string()
+          .describe(
+            'The target definition (e.g., "example.com" or "10.0.0.0/24").',
+          ),
       }),
     ),
   })
@@ -181,7 +192,7 @@ export class McpTools {
   @Tool({
     name: 'get_statistics',
     description:
-      'Get high-level security metrics for the workspace: counts of assets, vulnerabilities by severity, and overall security score.',
+      'Provides high-level security metrics and workspace statistics, including total counts of assets, targets, and vulnerabilities by severity. Also includes the overall security score and technology counts. Use this for summaries or "how many" questions. Keywords: statistics, summary, count, score, metrics.',
     parameters: workspaceParamSchema,
     outputSchema: getStatisticOutPutSchema,
   })
@@ -192,20 +203,34 @@ export class McpTools {
   @Tool({
     name: 'detail_asset',
     description:
-      'Retrieve comprehensive details for a specific asset, including detected technologies, open ports, and metadata.',
+      'Retrieves comprehensive details for a specific asset by its ID, including detected technologies (e.g., Nginx, WordPress), open ports, and metadata. Use this when the user asks for more information about a specific domain or IP. Keywords: asset details, technology, ports, service info.',
     parameters: detailAssetSchema,
     outputSchema: z.object({
-      id: z.string(),
-      value: z.string(),
-      workspaceId: z.string(),
-      targetId: z.string().nullable(),
-      options: z.any().optional(),
-      createdAt: z.date().or(z.string()),
-      updatedAt: z.date().or(z.string()),
+      id: z.string().describe('The unique identifier of the asset.'),
+      value: z.string().describe('The asset value.'),
+      workspaceId: z.string().describe('The ID of the containing workspace.'),
+      targetId: z
+        .string()
+        .nullable()
+        .describe('The ID of the parent target if applicable.'),
+      options: z
+        .any()
+        .optional()
+        .describe('Additional asset configuration or metadata.'),
+      createdAt: z
+        .date()
+        .or(z.string())
+        .describe('The timestamp when the asset was first discovered.'),
+      updatedAt: z
+        .date()
+        .or(z.string())
+        .describe('The timestamp of the last update.'),
       technologies: z
         .array(z.any())
         .optional()
-        .describe('List of detected technologies'),
+        .describe(
+          'Detailed list of technologies and services detected on the asset.',
+        ),
     }),
   })
   async getAssetDetails(params: z.infer<typeof detailAssetSchema>) {
@@ -216,13 +241,18 @@ export class McpTools {
   @Tool({
     name: 'list_assets_in_target',
     description:
-      'List all assets discovered under a specific target. Useful for narrowing down the scope to a single domain or network range.',
+      'Lists all assets discovered within the scope of a specific target ID. Useful for drilling down into what was found for a particular root domain or IP range. Keywords: assets in target, subdomain list for domain.',
     parameters: listAssetsInTargetSchema,
     outputSchema: getManyBaseResponseSchema(
       z.object({
-        id: z.string(),
-        value: z.string(),
-        type: z.string().optional(),
+        id: z.string().describe('The unique identifier of the asset.'),
+        value: z
+          .string()
+          .describe('The asset value (e.g., subdomain name or IP).'),
+        type: z
+          .string()
+          .optional()
+          .describe('The category or type of the asset.'),
       }),
     ),
   })
@@ -243,17 +273,32 @@ export class McpTools {
   @Tool({
     name: 'detail_vuln',
     description:
-      'Get full technical details of a vulnerability, including description, proof of concept (if available), remediation steps, and references.',
+      'Retrieves full technical details for a specific vulnerability by its ID, including description, Proof of Concept (PoC), remediation steps, and references. Use this when the user needs to understand how to fix an issue or see evidence. Keywords: vuln details, fix, remediation, PoC, CVE info.',
     parameters: detailVulnSchema,
     outputSchema: z.object({
-      id: z.string(),
-      name: z.string(),
-      severity: z.string(),
-      description: z.string().optional(),
-      remediation: z.string().optional(),
-      proof: z.string().optional(),
-      references: z.array(z.string()).optional(),
-      createdAt: z.date().or(z.string()),
+      id: z.string().describe('The unique identifier of the vulnerability.'),
+      name: z.string().describe('Title of the vulnerability.'),
+      severity: z.string().describe('Severity level.'),
+      description: z
+        .string()
+        .optional()
+        .describe('Detailed explanation of the security risk.'),
+      remediation: z
+        .string()
+        .optional()
+        .describe('Steps and recommendations to fix the vulnerability.'),
+      proof: z
+        .string()
+        .optional()
+        .describe('Proof of concept or evidence of the vulnerability.'),
+      references: z
+        .array(z.string())
+        .optional()
+        .describe('External links and resources for further reading.'),
+      createdAt: z
+        .date()
+        .or(z.string())
+        .describe('The timestamp when the vulnerability was reported.'),
     }),
   })
   async getVulnerabilityDetails(params: z.infer<typeof detailVulnSchema>) {
@@ -267,14 +312,19 @@ export class McpTools {
   @Tool({
     name: 'list_issues',
     description:
-      'Search and filter operational issues or security tasks tracked in the system. Use this to find things like "SSL expired" or manual review tasks.',
+      'Lists operational issues or security tasks tracked within the system (e.g., tickets, manual review tasks). Provides title, status, and creation date. Use this when the user asks about "tasks", "tickets", or "system problems". Keywords: issues, tasks, tickets, status.',
     parameters: listIssuesSchema,
     outputSchema: getManyBaseResponseSchema(
       z.object({
-        id: z.string(),
-        title: z.string(),
-        status: z.string(),
-        createdAt: z.date().or(z.string()),
+        id: z.string().describe('The unique identifier of the issue.'),
+        title: z.string().describe('The title or summary of the issue.'),
+        status: z
+          .string()
+          .describe('The current status of the issue (e.g., OPEN, CLOSED).'),
+        createdAt: z
+          .date()
+          .or(z.string())
+          .describe('The timestamp when the issue was created.'),
       }),
     ),
   })
@@ -305,15 +355,25 @@ export class McpTools {
   @Tool({
     name: 'detail_issue',
     description:
-      'Get detailed information about a specific issue, including its description, history, and status.',
+      'Retrieves detailed information for a specific issue by its ID, including full description, comments, and history. Use this to get the context or progress of a particular ticket. Keywords: issue details, comments, history.',
     parameters: detailIssueSchema,
     outputSchema: z.object({
-      id: z.string(),
-      title: z.string(),
-      description: z.string().optional(),
-      status: z.string(),
-      workspaceId: z.string(),
-      comments: z.array(z.any()).optional(),
+      id: z.string().describe('The unique identifier of the issue.'),
+      title: z.string().describe('The issue title.'),
+      description: z
+        .string()
+        .optional()
+        .describe('Full textual description of the issue.'),
+      status: z.string().describe('The current status.'),
+      workspaceId: z
+        .string()
+        .describe('The ID of the workspace this issue belongs to.'),
+      comments: z
+        .array(z.any())
+        .optional()
+        .describe(
+          'List of comments or activity logs associated with the issue.',
+        ),
     }),
   })
   async getIssueDetails(params: z.infer<typeof detailIssueSchema>) {
@@ -324,76 +384,154 @@ export class McpTools {
   @Tool({
     name: 'list_tools',
     description:
-      'List available security tools installed in the workspace (e.g., nucleus, nmap, etc.) with their versions and status.',
+      'Provides a catalog of available security software, scanning engines, and tool definitions (e.g., Nuclei, Nmap, Subfinder). Use this when the user asks what scanners are supported or the "software list". Keywords: tools list, scanner catalog, engine types.',
     parameters: listToolsSchema,
     outputSchema: getManyBaseResponseSchema(
       z.object({
-        id: z.string(),
-        name: z.string(),
-        description: z.string().optional(),
-        version: z.string().optional(),
-        isInstalled: z.boolean().optional(),
+        id: z.string().describe('The unique identifier of the tool.'),
+        name: z.string().describe('The name of the tool (e.g., "Nuclei").'),
+        description: z
+          .string()
+          .optional()
+          .describe('A brief summary of what the tool does.'),
+        version: z
+          .string()
+          .optional()
+          .describe('The installed version of the tool.'),
+        isInstalled: z
+          .boolean()
+          .optional()
+          .describe('Whether the tool is currently active and installed.'),
+        type: z
+          .string()
+          .optional()
+          .describe('The type of the tool (built_in or provider).'),
       }),
     ),
   })
   async getTools(params: z.infer<typeof listToolsSchema>) {
     const { workspaceId, limit, page } = params;
     // q param is not supported by service yet
-    return this.toolsService.getManyTools({
+    const response = await this.toolsService.getManyTools({
       limit: limit || 100,
       page: page || 1,
       workspaceId,
       sortBy: 'createdAt',
     });
+
+    return {
+      ...response,
+      data: response.data.map((t) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        type: t.type,
+        version: t.version,
+        isInstalled: t.isInstalled,
+      })),
+    };
   }
 
   @Tool({
     name: 'list_workers',
     description:
-      'List registered worker nodes that execute scanning jobs. Check their status (online/offline) and current workload.',
+      'Lists the physical/virtual worker nodes and infrastructure machines (scanners) that are currently online and executing jobs. Use this when the user asks about system health, node status, workload, or "where are my scans running". Keywords: workers, nodes, infrared status, machines.',
     parameters: listWorkersSchema,
     outputSchema: getManyBaseResponseSchema(
       z.object({
-        id: z.string(),
-        name: z.string().optional().describe('Worker name or ID'),
-        status: z.string().optional().describe('Online status'),
-        ip: z.string().optional(),
+        id: z.string().describe('Unique identifier of the worker.'),
+        name: z.string().describe('Readable name or ID fragment.'),
+        status: z.string().describe('Current status: online or offline.'),
+        type: z.string().describe('Worker type (e.g., BUILT_IN, PROVIDER).'),
+        scope: z.string().describe('Worker scope (e.g., WORKSPACE, CLOUD).'),
+        currentJobsCount: z
+          .number()
+          .describe('Number of active jobs currently running on this worker.'),
+        toolName: z
+          .string()
+          .optional()
+          .describe(
+            'The specific security tool this worker is dedicated to, if any.',
+          ),
+        lastSeenAt: z
+          .string()
+          .describe('Timestamp of the last signal received from this worker.'),
       }),
     ),
   })
   async getWorkers(params: z.infer<typeof listWorkersSchema>) {
     const { workspaceId, limit, page } = params;
-    // q param is not supported by service yet
-    return this.workersService.getWorkers({
+    const response = await this.workersService.getWorkers({
       limit: limit || 100,
       page: page || 1,
       workspaceId,
       sortBy: 'createdAt',
     });
+
+    return {
+      ...response,
+      data: response.data.map((w) => {
+        const isOnline =
+          w.lastSeenAt &&
+          Date.now() - new Date(w.lastSeenAt).getTime() < WORKER_TIMEOUT;
+        return {
+          id: w.id,
+          name: `Worker-${w.id.slice(0, 8)}`,
+          status: isOnline ? 'online' : 'offline',
+          type: w.type,
+          scope: w.scope,
+          currentJobsCount: w.currentJobsCount || 0,
+          toolName: w.tool?.name || 'General Purpose',
+          lastSeenAt: w.lastSeenAt?.toISOString(),
+        };
+      }),
+    };
   }
 
   @Tool({
     name: 'job_manager',
     description:
-      'View and manage background jobs. Use this to check the progress of scans, see failed jobs, or find running tasks.',
+      'Lists background jobs and scan activities. Provides status, timing, priority, and technical context (tool, target). Use this when the user asks about "scans running", "job progress", or "what is the system doing". Keywords: jobs, scan progress, active tasks, failed scans.',
     parameters: listJobsSchema,
     outputSchema: getManyBaseResponseSchema(
       z.object({
-        id: z.string(),
-        name: z.string().describe('Name or type of the job'),
+        id: z.string().describe('The unique identifier of the job.'),
+        toolName: z
+          .string()
+          .describe('The name of the security tool being executed.'),
         status: z
           .string()
-          .describe('Job status (completed, failed, active, etc.)'),
-        progress: z.number().optional(),
-        startedAt: z.date().or(z.string()).optional(),
-        finishedAt: z.date().or(z.string()).optional(),
-        jobHistoryId: z.string().optional(),
+          .describe(
+            'Execution status (e.g., pending, in_progress, completed, failed).',
+          ),
+        priority: z
+          .string()
+          .describe('Job priority level (CRITICAL to BACKGROUND).'),
+        targetValue: z
+          .string()
+          .optional()
+          .describe('The asset value being scanned (e.g., domain or IP).'),
+        retryCount: z
+          .number()
+          .describe('Number of times the job has been retried after failure.'),
+        errorCount: z
+          .number()
+          .describe('Number of error logs recorded for this job.'),
+        startedAt: z.string().optional().describe('When the job was created.'),
+        finishedAt: z
+          .string()
+          .optional()
+          .describe('When the job reached a terminal state.'),
+        jobHistoryId: z
+          .string()
+          .optional()
+          .describe('ID of the associated scan run history.'),
       }),
     ),
   })
   async listJobs(params: z.infer<typeof listJobsSchema>) {
     const { workspaceId, limit, page, jobHistoryId, jobStatus } = params;
-    return this.jobsRegistryService.getManyJobs({
+    const response = await this.jobsRegistryService.getManyJobs({
       limit: limit || 100,
       page: page || 1,
       jobHistoryId: jobHistoryId,
@@ -401,5 +539,21 @@ export class McpTools {
       workspaceId,
       sortBy: 'createdAt',
     });
+
+    return {
+      ...response,
+      data: response.data.map((j) => ({
+        id: j.id,
+        toolName: j.tool?.name || j.category,
+        status: j.status,
+        priority: j.priority,
+        targetValue: j.asset?.value,
+        retryCount: j.retryCount,
+        errorCount: j.errorLogs?.length || 0,
+        startedAt: j.createdAt?.toISOString(),
+        finishedAt: j.completedAt?.toISOString() || j.updatedAt?.toISOString(),
+        jobHistoryId: j.jobHistory?.id,
+      })),
+    };
   }
 }
