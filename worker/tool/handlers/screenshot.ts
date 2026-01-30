@@ -1,3 +1,4 @@
+import fs from "fs";
 import os from "os";
 import puppeteer, { Browser } from "puppeteer";
 import type { Job } from "../../services/core-api/api";
@@ -51,7 +52,7 @@ function getExecutablePath(): string | undefined {
     ];
 
     for (const path of windowsPaths) {
-      if (require("fs").existsSync(path)) {
+      if (fs.existsSync(path)) {
         return path;
       }
     }
@@ -68,7 +69,7 @@ function getExecutablePath(): string | undefined {
     ];
 
     for (const path of linuxPaths) {
-      if (require("fs").existsSync(path)) {
+      if (fs.existsSync(path)) {
         return path;
       }
     }
@@ -82,7 +83,7 @@ function getExecutablePath(): string | undefined {
     ];
 
     for (const path of macPaths) {
-      if (require("fs").existsSync(path)) {
+      if (fs.existsSync(path)) {
         return path;
       }
     }

@@ -212,9 +212,16 @@ export const HandlebarsRenderer = ({
       const scripts = containerRef.current.querySelectorAll('script');
       scripts.forEach((oldScript) => {
         const src = oldScript.getAttribute('src');
-        if (src && src.includes('tailwindcss.com')) {
-          // Skip Tailwind CDN script to avoid breaking root app borders
-          return;
+        if (src) {
+          try {
+            const url = new URL(src, window.location.href);
+            if (url.hostname.endsWith('tailwindcss.com')) {
+              // Skip Tailwind CDN script to avoid breaking root app borders
+              return;
+            }
+          } catch {
+            // ignore
+          }
         }
 
         const newScript = document.createElement('script');

@@ -59,7 +59,7 @@ export default function Runs() {
     return jobHistoryDetail.jobs.reduce((acc, job) => {
       // Check if job.tool exists before accessing its id property
       if (!job.tool) {
-        console.warn('Job has no tool assigned:', job);
+        console.warn(`Job ${job.id} has no tool assigned:`, job);
         return acc;
       }
       const toolId = job.tool.id;
@@ -261,7 +261,7 @@ export default function Runs() {
         const prevTool = tools[i];
         // Check if prevTool exists before accessing its id
         if (!prevTool) {
-          console.warn('Previous tool is undefined at index:', i);
+          console.warn(`Previous tool is undefined at index: ${i}`);
           continue;
         }
         const prevToolJobs = jobsByToolId.get(prevTool.id) || [];
@@ -284,7 +284,7 @@ export default function Runs() {
       const currentTool = tools[toolIndex];
       // Check if currentTool exists before accessing its id
       if (!currentTool) {
-        console.warn('Current tool is undefined at index:', toolIndex);
+        console.warn(`Current tool is undefined at index: ${toolIndex}`);
         return 'pending';
       }
       const currentToolJobs = jobsByToolId.get(currentTool.id) || [];
