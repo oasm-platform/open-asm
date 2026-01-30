@@ -28,6 +28,7 @@ import {
   LayoutDashboard,
   SquareTerminal,
   Target,
+  User,
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
 import { NewBadge } from '../new-badge';
@@ -45,6 +46,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Dashboard',
           icon: <LayoutDashboard />,
           url: '',
+        },
+      ],
+    },
+    {
+      title: 'Admin',
+      url: '#',
+      items: [
+        {
+          title: 'Users',
+          icon: <User />,
+          url: '/admin/users',
         },
       ],
     },

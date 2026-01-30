@@ -58,17 +58,21 @@ export function useServerDataTable({
     ? urlParams.get('filter') || ''
     : internalParams.filter;
 
-  const setParam = useCallback(
-    (key: string, value: string | number | undefined) => {
+  const setParams = useCallback(
+    (newParams: Partial<typeof internalParams>) => {
       if (isUpdateSearchQueryParam) {
         setUrlParams(
           (prev) => {
             const next = new URLSearchParams(prev);
-            if (!value) {
-              next.delete(key);
-            } else {
-              next.set(key, value.toString());
-            }
+
+            Object.entries(newParams).forEach(([key, value]) => {
+              if (value === undefined || value === null || value === '') {
+                next.delete(key);
+              } else {
+                next.set(key, String(value));
+              }
+            });
+
             return next;
           },
           { replace: true },
@@ -76,7 +80,7 @@ export function useServerDataTable({
       } else {
         setInternalParams((prev) => ({
           ...prev,
-          [key]: value ?? '',
+          ...newParams,
         }));
       }
     },
@@ -92,36 +96,29 @@ export function useServerDataTable({
       filter,
     },
     tableHandlers: {
-      setPage: useCallback((v: number) => setParam('page', v), [setParam]),
+      setParams,
+      setPage: useCallback((v: number) => setParams({ page: v }), [setParams]),
       setPageSize: useCallback(
-        (v: number) => setParam('pageSize', v),
-        [setParam],
+        (v: number) => setParams({ pageSize: v }),
+        [setParams],
       ),
-      setSortBy: useCallback((v: string) => setParam('sortBy', v), [setParam]),
+      setSortBy: useCallback(
+        (v: string) => setParams({ sortBy: v }),
+        [setParams],
+      ),
       setSortOrder: useCallback(
-        (v: 'ASC' | 'DESC') => setParam('sortOrder', v),
-        [setParam],
+        (v: 'ASC' | 'DESC') => setParams({ sortOrder: v }),
+        [setParams],
       ),
       setFilter: useCallback(
         (v: string) => {
-          if (isUpdateSearchQueryParam) {
-            setUrlParams(
-              (prev) => {
-                const next = new URLSearchParams(prev);
-                if (next.get('filter') === v) return prev;
-                next.set('page', '1');
-                next.set('filter', v);
-                return next;
-              },
-              { replace: true },
-            );
-          } else {
-            if (internalParams.filter === v) return;
-            setParam('page', 1);
-            setParam('filter', v);
-          }
+          if (filter === v) return;
+          setParams({
+            filter: v,
+            page: 1,
+          });
         },
-        [isUpdateSearchQueryParam, setUrlParams, setParam, internalParams.filter],
+        [filter, setParams],
       ),
     },
   };

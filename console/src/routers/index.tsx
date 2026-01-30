@@ -32,6 +32,7 @@ import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
 import ProtectedRoute from './ProtectedRoute';
 import RegisterRoute from './RegisterRoute';
+import Users from '@/pages/admin/users';
 
 export const router = createBrowserRouter([
   {
@@ -87,6 +88,15 @@ export const router = createBrowserRouter([
               {
                 path: ':tab',
                 element: <Settings />,
+              },
+            ],
+          },
+          {
+            path: 'admin',
+            children: [
+              {
+                path: 'users',
+                element: <Users />,
               },
             ],
           },
