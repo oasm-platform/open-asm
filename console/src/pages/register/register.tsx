@@ -1,5 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import AuthHeader from '@/components/common/auth-header';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -7,39 +8,39 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import {
   useRootControllerCreateFirstAdmin,
   type CreateFirstAdminDto,
-} from "@/services/apis/gen/queries";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon } from "lucide-react";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
-import { z } from "zod";
+} from '@/services/apis/gen/queries';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2Icon } from 'lucide-react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import { z } from 'zod';
 
 const formSchema = z
   .object({
-    email: z.string().email("Invalid email address"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z
       .string()
-      .min(8, "Confirm password must be at least 8 characters"),
+      .min(8, 'Confirm password must be at least 8 characters'),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
+    message: 'Passwords do not match.',
+    path: ['confirmPassword'],
   });
 
 export default function Register() {
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
-      password: "",
-      confirmPassword: "",
+      email: '',
+      password: '',
+      confirmPassword: '',
     },
   });
 
@@ -53,10 +54,10 @@ export default function Register() {
       { data: values as CreateFirstAdminDto },
       {
         onSuccess: () => {
-          navigate("/login");
+          navigate('/login');
         },
         onError: () => {
-          form.setError("email", { message: "Invalid email or password" });
+          form.setError('email', { message: 'Invalid email or password' });
         },
       },
     );
@@ -64,15 +65,13 @@ export default function Register() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center">
+    <div className="flex h-screen items-center justify-center flex-col gap-4">
+      <AuthHeader />
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">
             Create your first admin account
           </CardTitle>
-          <span>
-            Welcome to our system, please initialize your account to continue
-          </span>
         </CardHeader>
         <CardContent>
           <Form {...form}>

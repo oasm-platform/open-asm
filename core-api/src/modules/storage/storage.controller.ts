@@ -105,7 +105,7 @@ export class StorageController {
     }
 
     // Upload file with fixed filename "logo.{extension}" to "system" bucket
-    const filename = `logo.${extension}`;
+    const filename = `logo-${randomUUID()}.${extension}`;
     const bucket = 'system';
     const result = this.storageService.uploadFile(
       filename,

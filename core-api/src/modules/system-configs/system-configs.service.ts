@@ -3,6 +3,7 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { StorageService } from '../storage/storage.service';
 import {
   SystemConfigResponseDto,
   UpdateSystemConfigDto,
@@ -20,6 +21,7 @@ export class SystemConfigsService {
   constructor(
     @InjectRepository(SystemConfig)
     private readonly systemConfigRepository: Repository<SystemConfig>,
+    private storageService: StorageService,
   ) {}
 
   /**
@@ -67,11 +69,14 @@ export class SystemConfigsService {
    */
   async removeLogo(): Promise<DefaultMessageResponseDto> {
     const config = await this.findOrCreateConfig();
-    config.logoPath = null;
-
-    await this.systemConfigRepository.save(config);
-
-    return { message: 'System logo removed successfully' };
+    if (config.logoPath) {
+      const [bucket, fileName] = config.logoPath.split('/');
+      this.storageService.deleteFile(fileName, bucket);
+      config.logoPath = null;
+      await this.systemConfigRepository.save(config);
+      return { message: 'System logo removed successfully' };
+    }
+    return { message: 'No system logo to remove' };
   }
 
   /**

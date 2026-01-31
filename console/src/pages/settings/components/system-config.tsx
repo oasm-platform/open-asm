@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Form,
   FormControl,
@@ -10,7 +11,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   getRootControllerGetMetadataQueryKey,
   useStorageControllerUploadLogo,
@@ -165,7 +165,10 @@ export default function SystemConfigSettings() {
       onSuccess: () => {
         toast.success('Logo removed successfully');
         // Cleanup preview URL if it's a blob URL
-        if (previewUrlRef.current && previewUrlRef.current.startsWith('blob:')) {
+        if (
+          previewUrlRef.current &&
+          previewUrlRef.current.startsWith('blob:')
+        ) {
           URL.revokeObjectURL(previewUrlRef.current);
           previewUrlRef.current = null;
         }
@@ -239,94 +242,92 @@ export default function SystemConfigSettings() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>System Configuration</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>System Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter system name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+    <Card className="space-y-4 p-4 w-full lg:w-3/4 xl:w-1/2 2xl:w-1/3">
+      <CardTitle>System</CardTitle>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter system name" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-            {/* Logo Upload Section */}
-            <div className="space-y-4">
-              <Label>System Logo</Label>
+          {/* Logo Upload Section */}
+          <div className="space-y-4">
+            <Label>Logo</Label>
 
-              {/* Current Logo Preview */}
-              {logoPreview && (
-                <div className="flex items-center space-x-4">
-                  <img
-                    src={logoPreview}
-                    alt="Current logo"
-                    className="w-16 h-16 object-contain rounded border"
-                  />
-                  <div className="flex space-x-2">
-                    <ConfirmDialog
-                      title="Remove Logo"
-                      description="Are you sure you want to remove the system logo? This action cannot be undone."
-                      onConfirm={handleRemoveLogo}
-                      trigger={
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={uploadLogoMutation.isPending}
-                        >
-                          Remove
-                        </Button>
-                      }
-                      confirmText="Remove"
-                      cancelText="Cancel"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* File Upload */}
+            {/* Current Logo Preview */}
+            {logoPreview && (
               <div className="flex items-center space-x-4">
-                <div className="flex-1">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleLogoChange}
-                    accept="image/*"
-                    className="hidden"
-                    id="logo-upload"
+                <img
+                  src={logoPreview}
+                  alt="Current logo"
+                  className="w-16 h-16 object-contain rounded border"
+                />
+                <div className="flex space-x-2">
+                  <ConfirmDialog
+                    title="Remove Logo"
+                    description="Are you sure you want to remove the system logo? This action cannot be undone."
+                    onConfirm={handleRemoveLogo}
+                    trigger={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={uploadLogoMutation.isPending}
+                      >
+                        Remove
+                      </Button>
+                    }
+                    confirmText="Remove"
+                    cancelText="Cancel"
                   />
-                  <Label
-                    htmlFor="logo-upload"
-                    className="flex items-center justify-center px-4 py-2 border border-dashed rounded cursor-pointer hover:bg-muted"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {logoFile ? logoFile.name : 'Choose logo file'}
-                  </Label>
                 </div>
               </div>
+            )}
 
-              {!logoPreview && !logoFile && (
-                <p className="text-sm text-muted-foreground">
-                  No logo uploaded yet. Supported formats: JPG, PNG, GIF, WEBP
-                </p>
-              )}
+            {/* File Upload */}
+            <div className="flex items-center space-x-4">
+              <div className="flex-1">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleLogoChange}
+                  accept="image/*"
+                  className="hidden"
+                  id="logo-upload"
+                />
+                <Label
+                  htmlFor="logo-upload"
+                  className="flex items-center justify-center px-4 py-2 border border-dashed rounded cursor-pointer hover:bg-muted"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {logoFile ? logoFile.name : 'Choose logo file'}
+                </Label>
+              </div>
             </div>
 
+            {!logoPreview && !logoFile && (
+              <p className="text-sm text-muted-foreground">
+                No logo uploaded yet. Supported formats: JPG, PNG, GIF, WEBP
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end">
             <Button type="submit">
               {updateConfigMutation.isPending ? 'Saving...' : 'Save'}
             </Button>
-          </form>
-        </Form>
-      </CardContent>
+          </div>
+        </form>
+      </Form>
     </Card>
   );
 }
