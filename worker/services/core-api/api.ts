@@ -317,7 +317,7 @@ export interface GetMetadataDto {
   /** System name */
   name: string;
   /** Path to system logo */
-  logoPath: object | null;
+  logoPath: string | null;
 }
 
 export interface GenerateTagsResponseDto {
@@ -3060,6 +3060,22 @@ export class Api<
       method: "PUT",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Removes the system logo and reverts to default avatar
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerRemoveLogo
+   * @summary Remove system logo
+   * @request DELETE:/api/system-configs/logo
+   */
+  systemConfigsControllerRemoveLogo = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs/logo`,
+      method: "DELETE",
       format: "json",
       ...params,
     });

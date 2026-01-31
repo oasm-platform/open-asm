@@ -10,10 +10,12 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   getRootControllerGetMetadataQueryKey,
   useStorageControllerUploadLogo,
   useSystemConfigsControllerGetConfig,
+  useSystemConfigsControllerRemoveLogo,
   useSystemConfigsControllerUpdateConfig,
 } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -41,7 +43,7 @@ export default function SystemConfigSettings() {
     isLoading,
     refetch,
   } = useSystemConfigsControllerGetConfig();
-
+  const { mutate: removeLogoMutate } = useSystemConfigsControllerRemoveLogo();
   const queryClient = useQueryClient();
   const updateConfigMutation = useSystemConfigsControllerUpdateConfig({
     mutation: {
@@ -87,6 +89,16 @@ export default function SystemConfigSettings() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [shouldRemoveLogo, setShouldRemoveLogo] = useState<boolean>(false); // Track if logo should be removed
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef<string | null>(null); // Store preview URL for cleanup
+
+  // Cleanup preview URL on unmount
+  React.useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
 
   // Set initial values when config data is loaded
   React.useEffect(() => {
@@ -95,22 +107,17 @@ export default function SystemConfigSettings() {
         name: config.name || '',
       });
 
+      // Cleanup previous blob URL if exists
+      if (previewUrlRef.current && previewUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+
       // Set initial logo preview if logo exists
-      if (config.logoPath && typeof config.logoPath === 'object') {
-        // Extract the actual path from the object structure
-        // Since the type is { [key: string]: unknown } | null, we need to handle it carefully
-        const pathEntries = Object.entries(config.logoPath);
-        if (pathEntries.length > 0) {
-          // Try to find a string value that looks like a file path
-          for (const [, value] of pathEntries) {
-            if (typeof value === 'string') {
-              setLogoPreview(
-                `${window.location.origin}/api/storage/system/${value.split('/').pop()}`,
-              );
-              break;
-            }
-          }
-        }
+      // logoPath is a string like "/api/storage/system/logo.png" or null
+      if (config.logoPath && typeof config.logoPath === 'string') {
+        const fullUrl = `${window.location.origin}${config.logoPath}`;
+        setLogoPreview(fullUrl);
       } else if (config.logoPath === null) {
         // If logoPath is null, no logo exists
         setLogoPreview(null);
@@ -137,29 +144,53 @@ export default function SystemConfigSettings() {
 
       setLogoFile(file);
 
+      // Cleanup previous preview URL
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+
       // Create preview URL
       const previewUrl = URL.createObjectURL(file);
+      previewUrlRef.current = previewUrl;
       setLogoPreview(previewUrl);
 
-      // Mark the form as dirty to enable the Save button
-      form.setValue('name', form.getValues('name'), { shouldDirty: true }); // This marks form as dirty
-
-      // Clean up previous preview URL
-      return () => URL.revokeObjectURL(previewUrl);
+      // Mark form as dirty to enable the Save button
+      form.setValue('name', form.getValues('name'), { shouldDirty: true });
     }
   };
 
   const handleRemoveLogo = () => {
-    // Update the form to set logoPath to null and make it dirty
-    setLogoFile(null);
-    setLogoPreview(null);
-    setShouldRemoveLogo(true); // Mark that logo should be removed on save
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    // Call the remove logo API directly
+    removeLogoMutate(undefined, {
+      onSuccess: () => {
+        toast.success('Logo removed successfully');
+        // Cleanup preview URL if it's a blob URL
+        if (previewUrlRef.current && previewUrlRef.current.startsWith('blob:')) {
+          URL.revokeObjectURL(previewUrlRef.current);
+          previewUrlRef.current = null;
+        }
 
-    // Mark the form as dirty to enable the Save button
-    form.setValue('name', form.getValues('name'), { shouldDirty: true }); // This marks form as dirty
+        // Update the form to set logoPath to null and make it dirty
+        setLogoFile(null);
+        setLogoPreview(null);
+        setShouldRemoveLogo(true); // Mark that logo should be removed on save
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+
+        // Mark the form as dirty to enable the Save button
+        form.setValue('name', form.getValues('name'), { shouldDirty: true });
+
+        // Invalidate metadata query to refresh the logo in header
+        queryClient.invalidateQueries({
+          queryKey: getRootControllerGetMetadataQueryKey(),
+        });
+      },
+      onError: (error) => {
+        console.error('Remove logo error:', error);
+        toast.error('Failed to remove logo');
+      },
+    });
   };
 
   const onSubmit = async (values: SystemConfigFormValues) => {
@@ -242,14 +273,22 @@ export default function SystemConfigSettings() {
                     className="w-16 h-16 object-contain rounded border"
                   />
                   <div className="flex space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleRemoveLogo}
-                      disabled={uploadLogoMutation.isPending}
-                    >
-                      Remove
-                    </Button>
+                    <ConfirmDialog
+                      title="Remove Logo"
+                      description="Are you sure you want to remove the system logo? This action cannot be undone."
+                      onConfirm={handleRemoveLogo}
+                      trigger={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={uploadLogoMutation.isPending}
+                        >
+                          Remove
+                        </Button>
+                      }
+                      confirmText="Remove"
+                      cancelText="Cancel"
+                    />
                   </div>
                 </div>
               )}

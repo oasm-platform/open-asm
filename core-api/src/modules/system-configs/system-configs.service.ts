@@ -61,6 +61,20 @@ export class SystemConfigsService {
   }
 
   /**
+   * Remove the system logo and revert to default avatar
+   * Creates default config if none exists before updating
+   * @returns Success message
+   */
+  async removeLogo(): Promise<DefaultMessageResponseDto> {
+    const config = await this.findOrCreateConfig();
+    config.logoPath = null;
+
+    await this.systemConfigRepository.save(config);
+
+    return { message: 'System logo removed successfully' };
+  }
+
+  /**
    * Find existing config or create default if not exists
    * @returns System config entity
    */

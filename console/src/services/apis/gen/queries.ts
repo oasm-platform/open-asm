@@ -328,12 +328,6 @@ export type CreateFirstAdminDto = {
   password: string;
 };
 
-/**
- * Path to system logo
- * @nullable
- */
-export type GetMetadataDtoLogoPath = { [key: string]: unknown } | null;
-
 export type GetMetadataDto = {
   isInit: boolean;
   isAssistant: boolean;
@@ -343,7 +337,7 @@ export type GetMetadataDto = {
    * Path to system logo
    * @nullable
    */
-  logoPath: GetMetadataDtoLogoPath;
+  logoPath: string | null;
 };
 
 export type GenerateTagsResponseDto = {
@@ -8711,6 +8705,90 @@ export const useSystemConfigsControllerUpdateConfig = <
 > => {
   const mutationOptions =
     getSystemConfigsControllerUpdateConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Removes the system logo and reverts to default avatar
+ * @summary Remove system logo
+ */
+export const systemConfigsControllerRemoveLogo = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/system-configs/logo`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerRemoveLogoMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerRemoveLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+    void
+  > = () => {
+    return systemConfigsControllerRemoveLogo(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerRemoveLogoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>
+>;
+
+export type SystemConfigsControllerRemoveLogoMutationError = unknown;
+
+/**
+ * @summary Remove system logo
+ */
+export const useSystemConfigsControllerRemoveLogo = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getSystemConfigsControllerRemoveLogoMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

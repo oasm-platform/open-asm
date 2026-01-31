@@ -2,7 +2,7 @@ import { Roles } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Role } from '@/common/enums/enum';
-import { Body, Controller, Get, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
   SystemConfigResponseDto,
@@ -53,5 +53,21 @@ export class SystemConfigsController {
     @Body() dto: UpdateSystemConfigDto,
   ): Promise<DefaultMessageResponseDto> {
     return this.systemConfigsService.updateConfig(dto);
+  }
+
+  /**
+   * Remove system logo and revert to default avatar
+   * @returns Success message
+   */
+  @Delete('logo')
+  @Doc<DefaultMessageResponseDto>({
+    summary: 'Remove system logo',
+    description: 'Removes the system logo and reverts to default avatar',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  async removeLogo(): Promise<DefaultMessageResponseDto> {
+    return this.systemConfigsService.removeLogo();
   }
 }
