@@ -55,7 +55,7 @@ describe('StorageController', () => {
 
   describe('uploadLogo', () => {
     it('should upload logo successfully with PNG file', async () => {
-      const mockUploadResult = { path: 'system/logo.png' };
+      const mockUploadResult = { path: 'system/logo-testuuid.png' };
       (mockStorageService.uploadFile as jest.Mock).mockReturnValue(
         mockUploadResult,
       );
@@ -66,12 +66,12 @@ describe('StorageController', () => {
       const result = await controller.uploadLogo(mockFile);
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
-        'logo.png',
+        expect.stringMatching(/^logo-[a-f0-9-]+\.png$/),
         mockFile.buffer,
         'system',
       );
       expect(mockSystemConfigsService.updateConfig).toHaveBeenCalledWith({
-        logoPath: 'system/logo.png',
+        logoPath: 'system/logo-testuuid.png',
       });
       expect(result).toEqual({ message: 'Logo uploaded successfully' });
     });
@@ -82,7 +82,7 @@ describe('StorageController', () => {
         originalname: 'logo.jpg',
         mimetype: 'image/jpeg',
       };
-      const mockUploadResult = { path: 'system/logo.jpg' };
+      const mockUploadResult = { path: 'system/logo-testuuid.jpg' };
       (mockStorageService.uploadFile as jest.Mock).mockReturnValue(
         mockUploadResult,
       );
@@ -93,12 +93,12 @@ describe('StorageController', () => {
       const result = await controller.uploadLogo(jpegFile);
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
-        'logo.jpg',
+        expect.stringMatching(/^logo-[a-f0-9-]+\.jpg$/),
         jpegFile.buffer,
         'system',
       );
       expect(mockSystemConfigsService.updateConfig).toHaveBeenCalledWith({
-        logoPath: 'system/logo.jpg',
+        logoPath: 'system/logo-testuuid.jpg',
       });
       expect(result).toEqual({ message: 'Logo uploaded successfully' });
     });
@@ -109,7 +109,7 @@ describe('StorageController', () => {
         originalname: 'logo.svg',
         mimetype: 'image/svg+xml',
       };
-      const mockUploadResult = { path: 'system/logo.svg' };
+      const mockUploadResult = { path: 'system/logo-testuuid.svg' };
       (mockStorageService.uploadFile as jest.Mock).mockReturnValue(
         mockUploadResult,
       );
@@ -120,12 +120,12 @@ describe('StorageController', () => {
       const result = await controller.uploadLogo(svgFile);
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
-        'logo.svg',
+        expect.stringMatching(/^logo-[a-f0-9-]+\.svg$/),
         svgFile.buffer,
         'system',
       );
       expect(mockSystemConfigsService.updateConfig).toHaveBeenCalledWith({
-        logoPath: 'system/logo.svg',
+        logoPath: 'system/logo-testuuid.svg',
       });
       expect(result).toEqual({ message: 'Logo uploaded successfully' });
     });
@@ -202,7 +202,7 @@ describe('StorageController', () => {
         ...mockFile,
         originalname: 'logo.PNG',
       };
-      const mockUploadResult = { path: 'system/logo.png' };
+      const mockUploadResult = { path: 'system/logo-testuuid.png' };
       (mockStorageService.uploadFile as jest.Mock).mockReturnValue(
         mockUploadResult,
       );
@@ -213,10 +213,13 @@ describe('StorageController', () => {
       const result = await controller.uploadLogo(uppercaseFile);
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
-        'logo.png',
+        expect.stringMatching(/^logo-[a-f0-9-]+\.png$/),
         uppercaseFile.buffer,
         'system',
       );
+      expect(mockSystemConfigsService.updateConfig).toHaveBeenCalledWith({
+        logoPath: 'system/logo-testuuid.png',
+      });
       expect(result).toEqual({ message: 'Logo uploaded successfully' });
     });
 
@@ -225,7 +228,7 @@ describe('StorageController', () => {
         ...mockFile,
         originalname: 'logo.PnG',
       };
-      const mockUploadResult = { path: 'system/logo.png' };
+      const mockUploadResult = { path: 'system/logo-testuuid.png' };
       (mockStorageService.uploadFile as jest.Mock).mockReturnValue(
         mockUploadResult,
       );
@@ -236,10 +239,13 @@ describe('StorageController', () => {
       const result = await controller.uploadLogo(mixedCaseFile);
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
-        'logo.png',
+        expect.stringMatching(/^logo-[a-f0-9-]+\.png$/),
         mixedCaseFile.buffer,
         'system',
       );
+      expect(mockSystemConfigsService.updateConfig).toHaveBeenCalledWith({
+        logoPath: 'system/logo-testuuid.png',
+      });
       expect(result).toEqual({ message: 'Logo uploaded successfully' });
     });
 
@@ -249,7 +255,7 @@ describe('StorageController', () => {
         originalname: 'logo.webp',
         mimetype: 'image/webp',
       };
-      const mockUploadResult = { path: 'system/logo.webp' };
+      const mockUploadResult = { path: 'system/logo-testuuid.webp' };
       (mockStorageService.uploadFile as jest.Mock).mockReturnValue(
         mockUploadResult,
       );
@@ -260,12 +266,12 @@ describe('StorageController', () => {
       const result = await controller.uploadLogo(webpFile);
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
-        'logo.webp',
+        expect.stringMatching(/^logo-[a-f0-9-]+\.webp$/),
         webpFile.buffer,
         'system',
       );
       expect(mockSystemConfigsService.updateConfig).toHaveBeenCalledWith({
-        logoPath: 'system/logo.webp',
+        logoPath: 'system/logo-testuuid.webp',
       });
       expect(result).toEqual({ message: 'Logo uploaded successfully' });
     });
@@ -276,7 +282,7 @@ describe('StorageController', () => {
         originalname: 'logo.gif',
         mimetype: 'image/gif',
       };
-      const mockUploadResult = { path: 'system/logo.gif' };
+      const mockUploadResult = { path: 'system/logo-testuuid.gif' };
       (mockStorageService.uploadFile as jest.Mock).mockReturnValue(
         mockUploadResult,
       );
@@ -287,12 +293,12 @@ describe('StorageController', () => {
       const result = await controller.uploadLogo(gifFile);
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
-        'logo.gif',
+        expect.stringMatching(/^logo-[a-f0-9-]+\.gif$/),
         gifFile.buffer,
         'system',
       );
       expect(mockSystemConfigsService.updateConfig).toHaveBeenCalledWith({
-        logoPath: 'system/logo.gif',
+        logoPath: 'system/logo-testuuid.gif',
       });
       expect(result).toEqual({ message: 'Logo uploaded successfully' });
     });

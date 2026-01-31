@@ -2,12 +2,14 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import { StorageService } from '../storage/storage.service';
 import { SystemConfig } from './entities/system-config.entity';
 import { SystemConfigsService } from './system-configs.service';
 
 describe('SystemConfigsService', () => {
   let service: SystemConfigsService;
   let mockSystemConfigRepository: Partial<Repository<SystemConfig>>;
+  let mockStorageService: Partial<StorageService>;
 
   beforeEach(async () => {
     mockSystemConfigRepository = {
@@ -16,12 +18,20 @@ describe('SystemConfigsService', () => {
       save: jest.fn(),
     };
 
+    mockStorageService = {
+      deleteFile: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SystemConfigsService,
         {
           provide: getRepositoryToken(SystemConfig),
           useValue: mockSystemConfigRepository,
+        },
+        {
+          provide: StorageService,
+          useValue: mockStorageService,
         },
       ],
     }).compile();
@@ -61,7 +71,7 @@ describe('SystemConfigsService', () => {
       });
     });
 
-    it('should create default config if none exists and set logoPath to null', async () => {
+    it('should create default config if none exists and return no logo message', async () => {
       const mockConfig = {
         id: 1,
         name: 'OASM',
@@ -83,9 +93,8 @@ describe('SystemConfigsService', () => {
         name: 'OASM',
         logoPath: undefined,
       });
-      expect(mockSystemConfigRepository.save).toHaveBeenCalledWith(mockConfig);
       expect(result).toEqual({
-        message: 'System logo removed successfully',
+        message: 'No system logo to remove',
       });
     });
   });
