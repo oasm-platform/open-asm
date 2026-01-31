@@ -533,11 +533,18 @@ export interface UpdateLLMConfigDto {
   apiUrl?: string;
 }
 
+export interface SystemConfigResponseDto {
+  /** System name */
+  name: string;
+  /** Path to system logo */
+  logoPath: object | null;
+}
+
 export interface UpdateSystemConfigDto {
   /** System name */
   name?: string;
   /** Path to system logo */
-  logoPath?: string;
+  logoPath?: object;
 }
 
 export interface Asset {
@@ -3173,6 +3180,22 @@ export class Api<
     });
 
   /**
+   * @description Retrieves the current system configuration settings
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerGetConfig
+   * @summary Get system configuration
+   * @request GET:/api/system-configs
+   */
+  systemConfigsControllerGetConfig = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Updates the system configuration settings
    *
    * @tags System Configs
@@ -3189,6 +3212,22 @@ export class Api<
       method: "PUT",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Removes the system logo and reverts to default avatar
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerRemoveLogo
+   * @summary Remove system logo
+   * @request DELETE:/api/system-configs/logo
+   */
+  systemConfigsControllerRemoveLogo = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs/logo`,
+      method: "DELETE",
       format: "json",
       ...params,
     });
@@ -3213,6 +3252,8 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
       jobHistoryId?: string;
+      jobStatus?: string;
+      workspaceId?: string;
     },
     params: RequestParams = {},
   ) =>
@@ -5384,6 +5425,30 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications/${id}/read`,
       method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Storage
+   * @name StorageControllerUploadLogo
+   * @summary Upload app logo to system bucket
+   * @request POST:/api/storage/logo
+   */
+  storageControllerUploadLogo = (
+    data: {
+      /** @format binary */
+      file: File;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<DefaultMessageResponseDto, any>({
+      path: `/api/storage/logo`,
+      method: "POST",
+      body: data,
+      type: ContentType.FormData,
       format: "json",
       ...params,
     });

@@ -558,11 +558,32 @@ export type UpdateLLMConfigDto = {
   apiUrl?: string;
 };
 
+/**
+ * Path to system logo
+ * @nullable
+ */
+export type SystemConfigResponseDtoLogoPath = { [key: string]: unknown } | null;
+
+export type SystemConfigResponseDto = {
+  /** System name */
+  name: string;
+  /**
+   * Path to system logo
+   * @nullable
+   */
+  logoPath: SystemConfigResponseDtoLogoPath;
+};
+
+/**
+ * Path to system logo
+ */
+export type UpdateSystemConfigDtoLogoPath = { [key: string]: unknown };
+
 export type UpdateSystemConfigDto = {
   /** System name */
   name?: string;
   /** Path to system logo */
-  logoPath?: string;
+  logoPath?: UpdateSystemConfigDtoLogoPath;
 };
 
 export type AssetDnsRecords = { [key: string]: unknown };
@@ -2008,6 +2029,8 @@ export type JobsRegistryControllerGetManyJobsParams = {
   sortBy?: string;
   sortOrder?: string;
   jobHistoryId?: string;
+  jobStatus?: string;
+  workspaceId?: string;
 };
 
 export type JobsRegistryControllerGetManyJobHistoriesParams = {
@@ -2334,6 +2357,10 @@ export type NotificationsControllerGetNotificationsParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type StorageControllerUploadLogoBody = {
+  file: Blob;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -8618,6 +8645,162 @@ export const useAiAssistantControllerSetPreferredLLMConfig = <
 };
 
 /**
+ * Retrieves the current system configuration settings
+ * @summary Get system configuration
+ */
+export const systemConfigsControllerGetConfig = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SystemConfigResponseDto>(
+    { url: `/api/system-configs`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerGetConfigQueryKey = () => {
+  return [`/api/system-configs`] as const;
+};
+
+export const getSystemConfigsControllerGetConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getSystemConfigsControllerGetConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+  > = ({ signal }) => systemConfigsControllerGetConfig(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SystemConfigsControllerGetConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+>;
+export type SystemConfigsControllerGetConfigQueryError = unknown;
+
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get system configuration
+ */
+
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSystemConfigsControllerGetConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Updates the system configuration settings
  * @summary Update system configuration
  */
@@ -8706,6 +8889,90 @@ export const useSystemConfigsControllerUpdateConfig = <
 > => {
   const mutationOptions =
     getSystemConfigsControllerUpdateConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Removes the system logo and reverts to default avatar
+ * @summary Remove system logo
+ */
+export const systemConfigsControllerRemoveLogo = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/system-configs/logo`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerRemoveLogoMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerRemoveLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+    void
+  > = () => {
+    return systemConfigsControllerRemoveLogo(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerRemoveLogoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>
+>;
+
+export type SystemConfigsControllerRemoveLogoMutationError = unknown;
+
+/**
+ * @summary Remove system logo
+ */
+export const useSystemConfigsControllerRemoveLogo = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getSystemConfigsControllerRemoveLogoMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
@@ -26608,6 +26875,103 @@ export const useNotificationsControllerMarkAsRead = <
 > => {
   const mutationOptions =
     getNotificationsControllerMarkAsReadMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * @summary Upload app logo to system bucket
+ */
+export const storageControllerUploadLogo = (
+  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`file`, storageControllerUploadLogoBody.file);
+
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/storage/logo`,
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data' },
+      data: formData,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerUploadLogoMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    TError,
+    { data: StorageControllerUploadLogoBody },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  const mutationKey = ['storageControllerUploadLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    { data: StorageControllerUploadLogoBody }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerUploadLogo(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StorageControllerUploadLogoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>
+>;
+export type StorageControllerUploadLogoMutationBody =
+  StorageControllerUploadLogoBody;
+export type StorageControllerUploadLogoMutationError = void;
+
+/**
+ * @summary Upload app logo to system bucket
+ */
+export const useStorageControllerUploadLogo = <
+  TError = void,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+      TError,
+      { data: StorageControllerUploadLogoBody },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  const mutationOptions =
+    getStorageControllerUploadLogoMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
