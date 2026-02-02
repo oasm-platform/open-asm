@@ -32,9 +32,6 @@ import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
 import ProtectedRoute from './ProtectedRoute';
 import RegisterRoute from './RegisterRoute';
-import Reports from '@/pages/reports';
-import ReportEditor from '@/pages/reports/report-editor';
-import ReportViewer from '@/pages/reports/report-viewer';
 
 export const router = createBrowserRouter([
   {
@@ -210,27 +207,6 @@ export const router = createBrowserRouter([
               {
                 path: ':id',
                 element: <IssueDetail />,
-              },
-            ],
-          },
-          {
-            path: 'reports',
-            children: [
-              {
-                path: '',
-                element: <Reports />,
-              },
-              {
-                path: 'new',
-                element: <ReportEditor />,
-              },
-              {
-                path: ':id/view',
-                element: <ReportViewer />,
-              },
-              {
-                path: ':id/edit',
-                element: <ReportEditor />,
               },
             ],
           },
