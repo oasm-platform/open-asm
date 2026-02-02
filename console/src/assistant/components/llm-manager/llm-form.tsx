@@ -83,7 +83,7 @@ export function LLMForm({
           <Label htmlFor="apiKey">API Token</Label>
           <Input
             id="apiKey"
-            type="password"
+            type="text"
             placeholder="Enter your API key"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}

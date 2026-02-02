@@ -230,10 +230,20 @@ export class ToolsService implements OnModuleInit {
 
       // Add isInstalled flag to each tool
       const toolsWithInstalledFlag = data.map((tool) => {
-        const isInstalled = installedTools.some((wt) => wt.tool.id === tool.id);
+        // Built-in tools are always considered installed
+        if (tool.type === WorkerType.BUILT_IN) {
+          return {
+            ...tool,
+            isInstalled: true,
+          };
+        }
+
+        const workspaceTool = installedTools.find(
+          (wt) => wt.tool.id === tool.id,
+        );
         return {
           ...tool,
-          isInstalled,
+          isInstalled: !!workspaceTool?.isEnabled,
         };
       });
 
@@ -447,35 +457,5 @@ export class ToolsService implements OnModuleInit {
         },
       ],
     });
-  }
-
-  /**
-   * Check if AI Assistant tool is installed and enabled in a workspace.
-   * @param {string} workspaceId - The workspace ID.
-   * @returns {Promise<boolean>} True if AI Assistant is installed and enabled.
-   */
-  public async isAiAssistantEnabled(workspaceId: string): Promise<boolean> {
-    // Find the AI Assistant tool
-    const aiAssistantTool = await this.toolsRepository.findOne({
-      where: {
-        name: 'AI Assistant',
-        category: ToolCategory.ASSISTANT,
-      },
-    });
-
-    if (!aiAssistantTool) {
-      return false;
-    }
-
-    // Check if the tool is installed in the workspace
-    const workspaceTool = await this.workspaceToolRepository.findOne({
-      where: {
-        workspace: { id: workspaceId },
-        tool: { id: aiAssistantTool.id },
-        isEnabled: true,
-      },
-    });
-
-    return !!workspaceTool;
   }
 }

@@ -1,7 +1,9 @@
 import z from 'zod';
 
 export const workspaceParamSchema = z.object({
-  workspaceId: z.string().describe('The ID of the workspace to get resource'),
+  workspaceId: z
+    .string()
+    .describe('The unique identifier of the workspace to query data from.'),
 });
 
 /**
@@ -15,14 +17,16 @@ export const getManyBaseRequestSchema = z
       .positive()
       .optional()
       .default(100)
-      .describe('The number of resources to return per page'),
+      .describe(
+        'Maximum number of items to return in a single page (pagination).',
+      ),
     page: z
       .number()
       .int()
       .nonnegative()
       .optional()
       .default(1)
-      .describe('The page number to return'),
+      .describe('The page number to retrieve for paginated results.'),
   })
   .extend(workspaceParamSchema.shape);
 
@@ -46,48 +50,96 @@ export const getManyBaseResponseSchema = (dataShape: z.ZodSchema) =>
 
 export const getAssetsSchema = z
   .object({
-    value: z.string().optional().describe('Search assets by value'),
+    value: z
+      .string()
+      .optional()
+      .describe(
+        'Filter assets by value (e.g., searching for a specific domain or IP).',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);
 
 export const getVulnerabilitiesSchema = z
   .object({
-    q: z.string().optional().describe('Search vulnerabilities by name'),
+    q: z
+      .string()
+      .optional()
+      .describe(
+        'Search query to filter vulnerabilities by their name or title.',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);
 
 export const getTargetsSchema = z
   .object({
-    value: z.string().optional().describe('Search targets by value'),
+    value: z
+      .string()
+      .optional()
+      .describe(
+        'Filter targets by value (e.g., searching for a specific root domain or IP range).',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);
 
 export const getStatisticOutPutSchema = z.object({
-  assets: z.number().describe('The total number of assets'),
-  targets: z.number().describe('The total number of targets'),
-  vuls: z.number().describe('The total number of vulnerabilities'),
-  criticalVuls: z.number().describe('The number of critical vulnerabilities'),
-  highVuls: z.number().describe('The number of high severity vulnerabilities'),
+  assets: z
+    .number()
+    .describe('Total number of discovered assets in the workspace.'),
+  targets: z
+    .number()
+    .describe('Total number of defined targets (scan scope) in the workspace.'),
+  vuls: z
+    .number()
+    .describe('Total number of vulnerabilities found across all assets.'),
+  criticalVuls: z
+    .number()
+    .describe('Number of vulnerabilities with CRITICAL severity.'),
+  highVuls: z
+    .number()
+    .describe('Number of vulnerabilities with HIGH severity.'),
   mediumVuls: z
     .number()
-    .describe('The number of medium severity vulnerabilities'),
-  lowVuls: z.number().describe('The number of low severity vulnerabilities'),
-  infoVuls: z.number().describe('The number of info level vulnerabilities'),
-  techs: z.number().describe('The total number of unique technologies'),
-  ports: z.number().describe('The total number of unique ports'),
-  score: z.number().describe('The security score (0-10, higher is better)'),
+    .describe('Number of vulnerabilities with MEDIUM severity.'),
+  lowVuls: z.number().describe('Number of vulnerabilities with LOW severity.'),
+  infoVuls: z
+    .number()
+    .describe('Number of vulnerabilities with INFO/informational severity.'),
+  techs: z
+    .number()
+    .describe(
+      'Total number of unique technologies detected (e.g., Nginx, WordPress).',
+    ),
+  ports: z.number().describe('Total number of unique open ports discovered.'),
+  score: z
+    .number()
+    .describe(
+      'Overall security score (0-10), where higher means better security posture.',
+    ),
 });
 
 export const detailAssetSchema = z
   .object({
-    assetId: z.string().describe('The ID of the asset to get details for'),
+    assetId: z
+      .string()
+      .describe(
+        'The unique identifier (ID) of the asset to retrieve detailed information for.',
+      ),
   })
   .extend(workspaceParamSchema.shape);
 
 export const listAssetsInTargetSchema = z
   .object({
-    targetId: z.string().describe('The ID of the target to list assets from'),
-    value: z.string().optional().describe('Search assets by value'),
+    targetId: z
+      .string()
+      .describe(
+        'The unique identifier (ID) of the target from which to list discovered assets.',
+      ),
+    value: z
+      .string()
+      .optional()
+      .describe(
+        'Optional filter to search for specific assets within this target.',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);
 
@@ -95,7 +147,9 @@ export const detailVulnSchema = z
   .object({
     vulnId: z
       .string()
-      .describe('The ID of the vulnerability to get details for'),
+      .describe(
+        'The unique identifier (ID) of the vulnerability to retrieve technical details for.',
+      ),
   })
   .extend(workspaceParamSchema.shape);
 
@@ -104,23 +158,34 @@ export const listIssuesSchema = z
     search: z
       .string()
       .optional()
-      .describe('Search issues by title or description'),
+      .describe('Search query to filter issues by title or their content.'),
     status: z
       .array(z.string())
       .optional()
-      .describe('Filter issues by status (OPEN, CLOSED, etc.)'),
+      .describe(
+        'Filter issues by their status (e.g., OPEN, IN_PROGRESS, RESOLVED).',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);
 
 export const detailIssueSchema = z
   .object({
-    issueId: z.string().describe('The ID of the issue to get details for'),
+    issueId: z
+      .string()
+      .describe(
+        'The unique identifier (ID) of the issue to retrieve full details for.',
+      ),
   })
   .extend(workspaceParamSchema.shape);
 
 export const listToolsSchema = z
   .object({
-    q: z.string().optional().describe('Search tools by name'),
+    q: z
+      .string()
+      .optional()
+      .describe(
+        'Search query to filter installed security tools/scanners by name.',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);
 
@@ -129,7 +194,9 @@ export const listWorkersSchema = z
     q: z
       .string()
       .optional()
-      .describe('Search workers by ID or Token (partial)'),
+      .describe(
+        'Search query to filter worker nodes by their name or metadata.',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);
 
@@ -138,7 +205,12 @@ export const listJobsSchema = z
     jobHistoryId: z
       .string()
       .optional()
-      .describe('Filter jobs by job history ID'),
-    jobStatus: z.string().optional().describe('Filter jobs by status'),
+      .describe('Filter background jobs by a specific job history/run ID.'),
+    jobStatus: z
+      .string()
+      .optional()
+      .describe(
+        'Filter jobs by their execution status (e.g., completed, failed, active).',
+      ),
   })
   .extend(getManyBaseRequestSchema.shape);

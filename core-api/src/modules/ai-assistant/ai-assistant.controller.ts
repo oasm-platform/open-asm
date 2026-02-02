@@ -457,6 +457,7 @@ export class AiAssistantController {
       provider: c.provider,
       apiKey: c.apiKey, // Already masked by assistant service
       model: c.model,
+      apiUrl: c.apiUrl,
       isPreferred: c.isPreferred,
       isEditable: c.isEditable ?? false,
     }));
@@ -494,6 +495,7 @@ export class AiAssistantController {
       provider: config.provider,
       apiKey: config.apiKey,
       model: config.model,
+      apiUrl: config.apiUrl,
       isPreferred: config.isPreferred,
       isEditable: config.isEditable ?? false,
     };
@@ -552,6 +554,7 @@ export class AiAssistantController {
       provider: config.provider,
       apiKey: config.apiKey,
       model: config.model,
+      apiUrl: config.apiUrl,
       isPreferred: config.isPreferred,
       isEditable: config.isEditable ?? false,
     };
