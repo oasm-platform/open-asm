@@ -41,11 +41,6 @@ interface TlsRawData {
   tls_connection: string;
 }
 
-// Type cho item từ raw query result
-interface TlsRawQueryItem {
-  tls: TlsRawData;
-}
-
 @Injectable()
 export class AssetsService {
   constructor(
@@ -777,39 +772,10 @@ export class AssetsService {
     const page = 1;
     const limit = 10;
 
-    // Query to get total count
-
-    const totalResult = await this.dataSource
-      .createQueryBuilder()
-      .select('COUNT(DISTINCT("httpResponses"."tls"))', 'count')
-      .from('http_responses', 'httpResponses')
-      .innerJoin(
-        'asset_services',
-        'assetServices',
-        '"httpResponses"."assetServiceId" = "assetServices"."id"',
-      )
-      .innerJoin(
-        'assets',
-        'assets',
-        '"assetServices"."assetId" = "assets"."id"',
-      )
-      .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
-      .innerJoin(
-        'workspace_targets',
-        'workspaceTargets',
-        '"targets"."id" = "workspaceTargets"."targetId"',
-      )
-      .where('"httpResponses"."tls" IS NOT NULL')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
-        workspaceId,
-      })
-      .getRawOne<{ count: number }>();
-
-    // Main query ordered by expiry date (earliest first)
-
+    // Combined query using window function to avoid duplicate joins
     const queryResult = await this.dataSource
       .createQueryBuilder()
-      .select(['"httpResponses"."tls"'])
+      .select(['"httpResponses"."tls"', 'COUNT(*) OVER() as total_count'])
       .from('http_responses', 'httpResponses')
       .innerJoin(
         'asset_services',
@@ -831,10 +797,16 @@ export class AssetsService {
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       })
+      .andWhere(
+        '(("httpResponses"."tls"->>\'not_after\')::timestamp >= CURRENT_TIMESTAMP - INTERVAL \'90 days\')',
+      )
+      .andWhere(
+        '(("httpResponses"."tls"->>\'not_after\')::timestamp <= CURRENT_TIMESTAMP + INTERVAL \'90 days\')',
+      )
       .groupBy('"httpResponses"."tls"')
       .orderBy('("httpResponses"."tls"->>\'not_after\')::timestamp', 'ASC')
       .limit(limit)
-      .getRawMany<TlsRawQueryItem>();
+      .getRawMany<{ tls: TlsRawData; total_count: number }>();
 
     const data = queryResult.map((item): GetTlsResponseDto => {
       const obj = new GetTlsResponseDto();
@@ -851,6 +823,9 @@ export class AssetsService {
       return obj;
     });
 
+    // Get total count from the first row (same for all rows due to OVER() clause)
+    const total = queryResult.length > 0 ? queryResult[0].total_count : 0;
+
     // Create query object with proper typing
     const queryObj = {
       page,
@@ -862,7 +837,7 @@ export class AssetsService {
     return getManyResponse({
       query: queryObj,
       data,
-      total: totalResult?.count ?? 0,
+      total,
     });
   }
 
