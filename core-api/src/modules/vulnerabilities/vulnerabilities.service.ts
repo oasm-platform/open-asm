@@ -77,7 +77,16 @@ export class VulnerabilitiesService {
    * @returns A promise that resolves to a paginated list of vulnerabilities, including total count and pagination information.
    */
   async getVulnerabilities(query: GetVulnerabilitiesQueryDto) {
-    const { limit, page, sortOrder, targetIds, workspaceId, q, status } = query;
+    const {
+      limit,
+      page,
+      sortOrder,
+      targetIds,
+      workspaceId,
+      q,
+      status,
+      severity,
+    } = query;
 
     const { sortBy } = query;
 
@@ -119,6 +128,13 @@ export class VulnerabilitiesService {
       queryBuilder.andWhere('dismissal.vulnerabilityId IS NULL');
     } else if (status === VulnerabilityStatus.DISMISSED) {
       queryBuilder.andWhere('dismissal.vulnerabilityId IS NOT NULL');
+    }
+
+    // Filter by severity levels
+    if (Array.isArray(severity) && severity.length > 0) {
+      queryBuilder.andWhere('vulnerabilities.severity IN (:...severity)', {
+        severity,
+      });
     }
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
