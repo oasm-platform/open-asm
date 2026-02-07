@@ -1,21 +1,37 @@
 import { useMemo, memo, useCallback, useRef, useEffect } from 'react';
 import type { ChatMessagesProps } from '../types/types';
 import { Markdown } from '@/components/common/markdown';
-import { Loader } from 'lucide-react';
+import { Loader, AlertCircle } from 'lucide-react';
 
 const messageBaseStyles = 'max-w-[95%] text-sm break-words leading-relaxed';
 const userMessageStyles = `${messageBaseStyles} whitespace-pre-wrap bg-secondary text-secondary-foreground rounded-2xl rounded-tr-sm shadow-sm px-4 py-3`;
 const assistantMessageStyles = `${messageBaseStyles} bg-transparent text-foreground px-1 py-1`;
+const errorMessageStyles = `${messageBaseStyles} whitespace-pre-wrap bg-transparent text-foreground px-1 py-1`;
 
 interface MessageBubbleProps {
   content: string;
   isUser: boolean;
+  isError?: boolean;
 }
 
 const MessageBubble = memo(function MessageBubble({
   content,
   isUser,
+  isError,
 }: MessageBubbleProps) {
+  if (isError) {
+    return (
+      <div className="flex justify-start">
+        <div className={errorMessageStyles}>
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">{content}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isUser) {
     return (
       <div className="flex justify-end">
@@ -41,7 +57,6 @@ interface ChatMessagesExtendedProps extends ChatMessagesProps {
 export const ChatMessages = memo(function ChatMessages({
   messages,
   isStreaming,
-  streamingStatus,
 }: ChatMessagesExtendedProps) {
   const uniqueMessages = useMemo(() => {
     return messages.filter((msg, index) => {
@@ -70,10 +85,11 @@ export const ChatMessages = memo(function ChatMessages({
     <div className="flex-1 overflow-y-auto overflow-x-hidden mb-4 space-y-4 px-2 pt-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-300 transition-colors">
       {uniqueMessages.map((message, index) => {
         const isUser = message.type === 'user';
+        const isError = message.type === 'error';
         const hasContent = Boolean(message.content?.trim());
         const hasQuestion = Boolean(message.question?.trim());
 
-        if (!isUser && !hasContent && !hasQuestion) return null;
+        if (!isUser && !isError && !hasContent && !hasQuestion) return null;
 
         const showEmbeddedQuestion = shouldShowEmbeddedQuestion(
           index,
@@ -85,7 +101,11 @@ export const ChatMessages = memo(function ChatMessages({
           return (
             <div key={message.messageId} className="space-y-4">
               <MessageBubble content={message.question!} isUser={true} />
-              <MessageBubble content={message.content!} isUser={false} />
+              <MessageBubble
+                content={message.content!}
+                isUser={false}
+                isError={isError}
+              />
             </div>
           );
         }
@@ -95,6 +115,7 @@ export const ChatMessages = memo(function ChatMessages({
             key={message.messageId}
             content={isUser ? message.question! : message.content!}
             isUser={isUser}
+            isError={isError}
           />
         );
       })}
@@ -102,9 +123,7 @@ export const ChatMessages = memo(function ChatMessages({
         <div className="flex justify-start px-1 -mt-2">
           <div className="flex items-center gap-2 text-muted-foreground text-xs italic">
             <Loader className="h-3 w-3 animate-spin" />
-            <span>
-              {streamingStatus?.content || 'Assistant is thinking...'}
-            </span>
+            <span>Assistant is thinking...</span>
           </div>
         </div>
       )}

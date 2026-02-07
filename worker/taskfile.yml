@@ -1,15 +1,15 @@
-version: "3"
+version: '3'
 
 vars:
-  replicas: "{{.replicas | default 1}}"
-  apiKey: "{{.apiKey | default .API_KEY}}"
-  maxJobs: "{{.maxJobs | default .MAX_JOBS}}"
+  replicas: '{{.replicas | default 1}}'
+  apiKey: '{{.apiKey | default .API_KEY}}'
+  maxJobs: '{{.maxJobs | default .MAX_JOBS}}'
 
 tasks:
   dev:
     env:
-      API_KEY: "{{.apiKey}}"
-      MAX_JOBS: "{{.maxJobs}}"
+      API_KEY: '{{.apiKey}}'
+      MAX_JOBS: '{{.maxJobs}}'
     cmds:
       - |
         for i in $(seq 1 {{.replicas}}); do
@@ -32,3 +32,6 @@ tasks:
     cmds:
       - go install -v github.com/projectdiscovery/pdtm/cmd/pdtm@latest
       - pdtm -duc -dc -install-go-path -install httpx,subfinder,nuclei,dnsx,naabu
+  build:
+    cmds:
+      - bun run build

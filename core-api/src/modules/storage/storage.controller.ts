@@ -1,5 +1,6 @@
 import { CACHE_STATIC_RESOURCE } from '@/common/constants/app.constants';
 import { Public, Roles } from '@/common/decorators/app.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Role } from '@/common/enums/enum';
 import {
   BadRequestException,
@@ -26,6 +27,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
+import { SystemConfigsService } from '../system-configs/system-configs.service';
 import { StorageService } from './storage.service';
 
 @Controller('storage')
@@ -44,7 +46,80 @@ export class StorageController {
     'jar',
   ];
 
-  constructor(private readonly storageService: StorageService) { }
+  constructor(
+    private readonly storageService: StorageService,
+    private readonly systemConfigsService: SystemConfigsService,
+  ) {}
+
+  private readonly allowedImageExtensions = [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'webp',
+    'svg',
+  ];
+
+  @Post('logo')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload app logo to system bucket' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Logo uploaded successfully',
+    type: DefaultMessageResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid file type or extension',
+  })
+  @Roles(Role.ADMIN)
+  async uploadLogo(
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<DefaultMessageResponseDto> {
+    // Get file extension
+    const lastDotIndex = file.originalname.lastIndexOf('.');
+    if (lastDotIndex === -1 || lastDotIndex === file.originalname.length - 1) {
+      throw new BadRequestException('Invalid file extension');
+    }
+
+    const extension = file.originalname.slice(lastDotIndex + 1).toLowerCase();
+
+    // Check if extension is allowed (only images)
+    if (!this.allowedImageExtensions.includes(extension)) {
+      throw new BadRequestException(
+        `File type .${extension} is not allowed. Only image files are supported.`,
+      );
+    }
+
+    // Upload file with fixed filename "logo.{extension}" to "system" bucket
+    const filename = `logo-${randomUUID()}.${extension}`;
+    const bucket = 'system';
+    const result = this.storageService.uploadFile(
+      filename,
+      file.buffer,
+      bucket,
+    );
+
+    // Update system config with new logo path
+    await this.systemConfigsService.updateConfig({
+      logoPath: result.path,
+    });
+
+    return { message: 'Logo uploaded successfully' };
+  }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))

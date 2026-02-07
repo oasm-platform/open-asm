@@ -27,7 +27,7 @@ tasks:
     deps:
       - api:build
       - console:build
-
+      - worker:build
   # Production deployment
   # Starts the production server for the API service
   # Environment: production mode

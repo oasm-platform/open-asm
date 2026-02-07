@@ -14,17 +14,12 @@ export enum Role {
  * Enum representing tool categories used in the system
  */
 export enum ToolCategory {
-  /** Subdomain discovery tool */
   SUBDOMAINS = 'subdomains',
-  /** HTTP probe checking tool */
   HTTP_PROBE = 'http_probe',
-  /** Port scanning tool */
   PORTS_SCANNER = 'ports_scanner',
-  /** Vulnerability detection tool */
   VULNERABILITIES = 'vulnerabilities',
-  /** Data classification tool */
+  SCREENSHOT = 'screenshot',
   CLASSIFIER = 'classifier',
-  /** AI Assistant tool */
   ASSISTANT = 'assistant',
 }
 
@@ -128,6 +123,7 @@ export enum BullMQName {
   ASSET_GROUPS_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
   NOTIFICATION = 'notification',
   JOB_RESULT = 'job-result',
+  ISSUE_CREATION = 'issue-creation',
 }
 
 export enum NotificationStatus {

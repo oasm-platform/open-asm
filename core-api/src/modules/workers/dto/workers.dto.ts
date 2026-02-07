@@ -6,6 +6,10 @@ export class WorkerJoinDto {
   @ApiProperty()
   @IsString()
   apiKey: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  signature: string;
 }
 
 export class WorkerAliveDto {

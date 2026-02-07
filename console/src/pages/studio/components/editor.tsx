@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useStudioTemplate, defaultTemplate } from '@/hooks/useStudioTemplate';
+import { defaultTemplate, useStudioTemplate } from '@/hooks/useStudioTemplate';
 import {
   getTemplatesControllerGetAllTemplatesQueryKey,
   useStorageControllerGetFile,
@@ -229,7 +229,7 @@ export default function Editor() {
     <div className="flex flex-col flex-1 min-h-0">
       {activeTemplate && (
         <>
-          {activeTemplate && <ScanComponent template={activeTemplate} />}
+          {activeTemplate && <ScanComponent />}
           <div className="flex-1 min-h-0">
             <CodeMirror
               value={activeTemplate?.content}

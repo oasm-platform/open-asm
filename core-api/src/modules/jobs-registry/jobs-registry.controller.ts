@@ -22,6 +22,7 @@ import {
 } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { plainToInstance } from 'class-transformer';
+import { Asset } from '../assets/entities/assets.entity';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
@@ -76,8 +77,9 @@ export class JobsRegistryController {
   @WorkerTokenAuth()
   @Public()
   @Get('/:workerId/next')
-  getNextJob(@Param() { workerId }: WorkerIdParams) {
-    return this.jobsRegistryService.getNextJob(workerId);
+  async getNextJob(@Param() { workerId }: WorkerIdParams) {
+    const job = await this.jobsRegistryService.getNextJob(workerId);
+    return job;
   }
 
   @Doc({ summary: 'Updates the result of a job with the given worker ID.' })
@@ -190,11 +192,11 @@ export class JobsRegistryController {
   @GrpcMethod('JobsRegistryService', 'Next')
   async next(worker: {
     id: string;
-  }): Promise<{ id: string; asset: string; command?: string }> {
+  }): Promise<{ id: string; asset: Asset; command?: string }> {
     const job = await this.jobsRegistryService.getNextJob(worker.id);
 
     if (!job) {
-      return { id: '', asset: '', command: '' };
+      return { id: '', asset: {} as Asset, command: '' };
     }
 
     return {

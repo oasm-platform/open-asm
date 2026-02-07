@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsOptional } from 'class-validator';
 import {
   Column,
   Entity,
@@ -63,4 +64,9 @@ export class AssetService extends BaseEntity {
   @Index({ where: '"isErrorPage" = false' })
   @Column({ default: false })
   isErrorPage?: boolean;
+
+  @ApiProperty({ required: false })
+  @Column({ nullable: true })
+  @IsOptional()
+  screenshotPath?: string;
 }

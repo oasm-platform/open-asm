@@ -1,3 +1,4 @@
+import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import {
   GetManyBaseResponseDto,
@@ -178,6 +179,8 @@ export class AssetsService {
       asset.createdAt = item.createdAt;
       asset.dnsRecords = item.asset?.dnsRecords;
       asset.isEnabled = item.asset?.isEnabled;
+      asset.screenshotPath =
+        item.screenshotPath && `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
 
       // asset.tags = item.asset.tags || [];
       asset.ipAddresses = item.asset?.ipAssets
@@ -329,6 +332,7 @@ export class AssetsService {
     asset.dnsRecords = item.asset?.dnsRecords;
     asset.isEnabled = item.asset?.isEnabled;
     asset.port = item.port;
+    asset.screenshotPath = `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
 
     // Load tags separately - tags belong to AssetService, not Asset
     const tagsResult = await this.dataSource
@@ -764,7 +768,7 @@ export class AssetsService {
    */
   /**
    * Retrieves TLS certificates expiring soonest (for warning notifications)
-   * Returns top 10 certificates with earliest expiry dates
+   * Returns top 10 certificates with earliest expiry dates within ±30 days from now
    */
   public async getManyTls(
     workspaceId: string,
@@ -773,8 +777,14 @@ export class AssetsService {
     const page = 1;
     const limit = 10;
 
-    // Query to get total count
+    // Calculate date range: 30 days before and 30 days after current date
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+    const thirtyDaysFromNow = new Date(now);
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
 
+    // Query to get total count with date range filter
     const totalResult = await this.dataSource
       .createQueryBuilder()
       .select('COUNT(DISTINCT("httpResponses"."tls"))', 'count')
@@ -799,10 +809,13 @@ export class AssetsService {
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       })
+      .andWhere(
+        '("httpResponses"."tls"->>\'not_after\')::timestamp BETWEEN :thirtyDaysAgo AND :thirtyDaysFromNow',
+        { thirtyDaysAgo, thirtyDaysFromNow },
+      )
       .getRawOne<{ count: number }>();
 
-    // Main query ordered by expiry date (earliest first)
-
+    // Main query ordered by expiry date (earliest first) with date range filter
     const queryResult = await this.dataSource
       .createQueryBuilder()
       .select(['"httpResponses"."tls"'])
@@ -827,6 +840,10 @@ export class AssetsService {
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       })
+      .andWhere(
+        '("httpResponses"."tls"->>\'not_after\')::timestamp BETWEEN :thirtyDaysAgo AND :thirtyDaysFromNow',
+        { thirtyDaysAgo, thirtyDaysFromNow },
+      )
       .groupBy('"httpResponses"."tls"')
       .orderBy('("httpResponses"."tls"->>\'not_after\')::timestamp', 'ASC')
       .limit(limit)

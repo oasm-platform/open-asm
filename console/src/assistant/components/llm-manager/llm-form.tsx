@@ -21,9 +21,15 @@ interface LLMFormProps {
     provider: string;
     apiKey: string;
     model: string;
+    apiUrl?: string;
   };
   isUpdating: boolean;
-  onSubmit: (data: { provider: string; apiKey: string; model: string }) => void;
+  onSubmit: (data: {
+    provider: string;
+    apiKey: string;
+    model: string;
+    apiUrl?: string;
+  }) => void;
   onCancel: () => void;
   mode: 'add' | 'edit';
 }
@@ -38,18 +44,20 @@ export function LLMForm({
   const [provider, setProvider] = useState(initialData?.provider || '');
   const [apiKey, setApiKey] = useState(initialData?.apiKey || '');
   const [model, setModel] = useState(initialData?.model || '');
+  const [apiUrl, setApiUrl] = useState(initialData?.apiUrl || '');
 
   useEffect(() => {
     if (initialData) {
       setProvider(initialData.provider);
       setApiKey(initialData.apiKey);
       setModel(initialData.model);
+      setApiUrl(initialData.apiUrl || '');
     }
   }, [initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ provider, apiKey, model });
+    onSubmit({ provider, apiKey, model, apiUrl });
   };
 
   return (
@@ -75,12 +83,24 @@ export function LLMForm({
           <Label htmlFor="apiKey">API Token</Label>
           <Input
             id="apiKey"
-            type="password"
+            type="text"
             placeholder="Enter your API key"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             className="font-mono"
             required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="apiUrl">API URL (Optional)</Label>
+          <Input
+            id="apiUrl"
+            type="text"
+            placeholder="https://api.example.com/v1"
+            value={apiUrl}
+            onChange={(e) => setApiUrl(e.target.value)}
+            className="font-mono"
           />
         </div>
 

@@ -17,6 +17,7 @@ import {
   useMcpControllerCreateMcpPermission,
   useMcpControllerGetMcpTools,
 } from '@/services/apis/gen/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { Box, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -34,6 +35,7 @@ type PermissionSelection = {
 };
 
 const CreateMcpPermission = () => {
+  const queryClient = useQueryClient();
   const { mutate, isPending } = useMcpControllerCreateMcpPermission();
   const { data: tools } = useMcpControllerGetMcpTools();
   const { refetch, workspaces } = useWorkspaceSelector();
@@ -166,6 +168,8 @@ const CreateMcpPermission = () => {
       {
         onSuccess: () => {
           toast.success('MCP Permission created successfully');
+          // Invalidate and refetch MCP permissions query to update the list
+          queryClient.invalidateQueries({ queryKey: ['mcp-permissions'] });
           refetch();
           setOpen(false);
           reset();

@@ -1,6 +1,7 @@
 import logger from "node-color-log";
 import coreApi from "../services/core-api";
-import type { Job } from '../services/core-api/api';
+import { ToolCategoryEnum, type Job } from "../services/core-api/api";
+import screenshotHandler from "./handlers/screenshot";
 import runCommand from "./runCommand";
 
 export class Tool {
@@ -35,7 +36,7 @@ export class Tool {
         (currentStatus.processingJobs > 0 || currentStatus.queueLength > 0)
       ) {
         logger.info(
-          `Worker ${Tool.workerId} status - Running: ${currentStatus.processingJobs}/${currentStatus.maxConcurrentJobs} jobs | Queue: ${currentStatus.queueLength}/${currentStatus.maxJobsQueue}`
+          `Worker ${Tool.workerId} status - Running: ${currentStatus.processingJobs}/${currentStatus.maxConcurrentJobs} jobs | Queue: ${currentStatus.queueLength}/${currentStatus.maxJobsQueue}`,
         );
         prevStatus = { ...currentStatus };
       }
@@ -64,7 +65,7 @@ export class Tool {
       // Wait for current jobs to finish
       while (this.processingJobs.size > 0) {
         logger.info(
-          `Waiting for ${this.processingJobs.size} jobs to complete...`
+          `Waiting for ${this.processingJobs.size} jobs to complete...`,
         );
         await this.sleep(1000);
       }
@@ -90,7 +91,7 @@ export class Tool {
         });
         if (this.isAliveError) {
           logger.success(
-            `RECONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`
+            `RECONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`,
           );
           this.isAliveError = false;
         }
@@ -116,11 +117,12 @@ export class Tool {
       try {
         const worker: any = await coreApi.workersControllerJoin({
           apiKey: process.env.API_KEY! || process.env.OASM_CLOUD_APIKEY!,
+          signature: process.env.WORKER_SIGNATURE || "",
         });
         Tool.workerId = worker.id;
         Tool.token = worker.token;
         logger.success(
-          `CONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`
+          `CONNECTED ✅ WorkerId: ${Tool.workerId?.split("-")[0]}`,
         );
 
         // Wait until Tool.workerId is set (by SSE handler)
@@ -134,7 +136,7 @@ export class Tool {
 
         attempt++;
         logger.error(
-          `Cannot connect to core ${process.env.API} (attempt ${attempt}):`
+          `Cannot connect to core ${process.env.API} (attempt ${attempt}):`,
         );
         await this.sleep(1000 * attempt); // exponential backoff delay
       }
@@ -167,7 +169,7 @@ export class Tool {
             if (this.queue.length % 5 === 0) {
               // Log every 5 jobs to reduce noise
               logger.info(
-                `Queue size: ${this.queue.length}/${this.maxJobsQueue}`
+                `Queue size: ${this.queue.length}/${this.maxJobsQueue}`,
               );
             }
           }
@@ -183,11 +185,12 @@ export class Tool {
   private async pullSingleJob(): Promise<Job | null> {
     try {
       const job = (await coreApi.jobsRegistryControllerGetNextJob(
-        Tool.workerId!, {
-        headers: {
-          'worker-token': Tool.token
-        }
-      }
+        Tool.workerId!,
+        {
+          headers: {
+            "worker-token": Tool.token,
+          },
+        },
       )) as Job;
       return job || null;
     } catch (error) {
@@ -243,14 +246,20 @@ export class Tool {
     const startTime = Date.now();
 
     try {
-      const data = await this.commandExecution(job.command);
+      let data: string | null = null;
+
+      if (job.category === ToolCategoryEnum.Screenshot) {
+        data = await screenshotHandler(job);
+      } else {
+        data = await this.commandExecution(job.command);
+      }
 
       await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
         jobId: job.id,
         data: {
           raw: data,
           error: false,
-          payload: {}
+          payload: {},
         },
       });
 
@@ -258,37 +267,40 @@ export class Tool {
       logger
         .color("green")
         .log(
-          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split("-")[0]} - Time: ${executionTime}ms`
+          `[DONE] - JobId: ${job.command} - WorkerId: ${Tool.workerId?.split("-")[0]} - Time: ${executionTime}ms`,
         );
     } catch (e) {
+      console.log(e);
       logger.error(`Failed to handle job ${job.id}:`, e);
 
       // Optionally report failure to core
       try {
-        await coreApi.jobsRegistryControllerUpdateResult(Tool.workerId!, {
-          jobId: job.id,
-          data: {
-            raw: `Error: ${e instanceof Error ? e.message : "Unknown error"}`,
-            error: true,
-            payload: {}
+        await coreApi.jobsRegistryControllerUpdateResult(
+          Tool.workerId!,
+          {
+            jobId: job.id,
+            data: {
+              raw: `Error: ${e instanceof Error ? e.message : "Unknown error"}`,
+              error: true,
+              payload: {},
+            },
           },
-        }, {
-          headers: {
-            'worker-token': Tool.token
-          }
-        });
+          {
+            headers: {
+              "worker-token": Tool.token,
+            },
+          },
+        );
       } catch (reportError) {
         logger.error(
           `Failed to report job failure for ${job.id}:`,
-          reportError
+          reportError,
         );
       }
     }
   }
 
-  private async commandExecution(
-    command: string
-  ): Promise<string> {
+  private async commandExecution(command: string): Promise<string> {
     logger.color("blue").log(`[RUNNING]: ${command}`);
 
     try {
@@ -310,7 +322,7 @@ export class Tool {
       try {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
         logger.warn(
-          `Reconnecting in ${delay}ms... (attempt ${retryCount + 1}/${maxRetries})`
+          `Reconnecting in ${delay}ms... (attempt ${retryCount + 1}/${maxRetries})`,
         );
         await this.sleep(delay);
         await this.connectToCore();
@@ -330,7 +342,7 @@ export class Tool {
   private async waitUntil(
     condition: () => boolean,
     intervalMs: number,
-    timeoutMs: number = 30000
+    timeoutMs: number = 30000,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const startTime = Date.now();

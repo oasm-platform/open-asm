@@ -13,6 +13,17 @@ export class CreateFirstAdminDto {
 export class GetMetadataDto {
   @ApiProperty()
   isInit: boolean;
+
   @ApiProperty()
   isAssistant: boolean;
+
+  @ApiProperty({ description: 'System name' })
+  name: string;
+
+  @ApiProperty({
+    description: 'Path to system logo',
+    type: String,
+    nullable: true,
+  })
+  logoPath?: string | null;
 }

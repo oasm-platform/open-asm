@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 import { BriefcaseBusiness, Globe, Network } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
+import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
 
@@ -26,7 +27,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       // const tags = data.tags;
 
       return (
-        <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
+        <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-125">
           <div className="flex items-center gap-2 w-full">
             <AssetValue httpResponse={httpResponse} value={data.value} />
             <HTTPXStatusCode httpResponse={httpResponse} />
@@ -61,6 +62,16 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
+    header: 'Screenshot',
+    enableHiding: false,
+    enableSorting: false,
+    size: 500,
+    cell: ({ row }) => {
+      const data = row.original;
+      return <ScreenshotCell asset={data} />;
+    },
+  },
+  {
     header: 'Technologies',
     size: 250,
     cell: ({ row }) => {
@@ -72,7 +83,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
       const remainCount = technologies?.length - maxDisplay;
 
       return (
-        <div className="flex flex-wrap gap-1 max-w-[250px] min-h-[60px]">
+        <div className="flex flex-wrap gap-1 max-w-62.5 min-h-15">
           {displayList?.map((item) => (
             <TechnologyTooltip tech={item} key={item.name} />
           ))}
@@ -91,10 +102,10 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     cell: ({ row }) => {
       const data = row.original;
       const tls = data.httpResponses?.tls;
-      if (!tls) return <div className="min-h-[60px]" />;
+      if (!tls) return <div className="min-h-15" />;
 
       return (
-        <div className="flex flex-col gap-1 max-w-[200px] min-h-[60px]">
+        <div className="flex flex-col gap-1 max-w-50 min-h-15">
           <TlsDateBadge date={tls.not_after} />
           {(tls?.issuer_org as string[]) && (
             <BadgeList list={tls.issuer_org as string[]} Icon={Globe} />
@@ -116,10 +127,10 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     cell: ({ row }) => {
       const data = row.original;
       const createdAt = data.createdAt;
-      if (!createdAt) return <div className="min-h-[60px]" />;
+      if (!createdAt) return <div className="min-h-15" />;
 
       return (
-        <div className="flex flex-col gap-1 max-w-[120px] min-h-[60px] justify-center">
+        <div className="flex flex-col gap-1 max-w-30 min-h-15 justify-center">
           <span>{dayjs(createdAt).fromNow()}</span>
         </div>
       );

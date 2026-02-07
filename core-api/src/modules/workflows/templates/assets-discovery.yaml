@@ -12,3 +12,6 @@ jobs:
 
   - name: HTTP Probe
     run: httpx
+
+  - name: Take Screenshot
+    run: screenshot

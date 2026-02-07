@@ -86,6 +86,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         },
       ],
     },
+
     {
       title: 'Management',
       url: '#',

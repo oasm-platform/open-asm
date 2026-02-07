@@ -1,5 +1,6 @@
 import type { McpPermission } from '@/mcp/entities/mcp-permission.entity';
 import type { Job } from '@/modules/jobs-registry/entities/job.entity';
+import { IsString } from 'class-validator';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
 import type { Role } from '../enums/enum';
@@ -64,4 +65,11 @@ export interface Technology {
   iconUrl: string;
   categoryNames: string[];
   website: string;
+}
+
+export class ScreenshotPayload {
+  @IsString()
+  url: string;
+  @IsString()
+  screenshot: string;
 }

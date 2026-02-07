@@ -10,10 +10,10 @@ import {
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Check, PencilIcon, X } from 'lucide-react';
+import { Check, MoveUpRight, PencilIcon, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 
 dayjs.extend(relativeTime);
@@ -69,6 +69,15 @@ const IssueDetail = () => {
   if (!issue) {
     return null;
   }
+
+  const mapingRouterSourceType = (sourceType: string): string | null => {
+    switch (sourceType) {
+      case 'vulnerability':
+        return 'vulnerabilities';
+      default:
+        return null;
+    }
+  };
 
   return (
     <Page className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 mx-auto">
@@ -136,6 +145,15 @@ const IssueDetail = () => {
             </span>{' '}
             opened this issue {dayjs(issue.createdAt).fromNow()}
           </span>
+          {issue.sourceId && (
+            <Link
+              to={`/${mapingRouterSourceType(issue.sourceType)}/${issue.sourceId}`}
+            >
+              <Button variant="link" className="capitalize">
+                {issue?.sourceType} <MoveUpRight />
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 

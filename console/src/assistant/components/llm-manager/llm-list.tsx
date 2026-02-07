@@ -12,6 +12,7 @@ interface LLMConfig {
   apiKey: string;
   isPreferred: boolean;
   isEditable?: boolean;
+  apiUrl?: string;
 }
 
 interface LLMListProps {
@@ -61,10 +62,19 @@ export function LLMList({
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <code className="relative rounded bg-muted px-[0.3rem] py-[0.1rem] font-mono text-xs text-muted-foreground">
-                    {config.model || 'Not set'}
-                  </code>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <code className="relative rounded bg-muted px-[0.3rem] py-[0.1rem] font-mono text-xs text-muted-foreground">
+                      {config.model || 'Not set'}
+                    </code>
+                  </div>
+                  {config.apiUrl && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[300px]">
+                        {config.apiUrl}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

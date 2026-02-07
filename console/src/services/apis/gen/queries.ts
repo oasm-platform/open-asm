@@ -331,6 +331,13 @@ export type CreateFirstAdminDto = {
 export type GetMetadataDto = {
   isInit: boolean;
   isAssistant: boolean;
+  /** System name */
+  name: string;
+  /**
+   * Path to system logo
+   * @nullable
+   */
+  logoPath: string | null;
 };
 
 export type GenerateTagsResponseDto = {
@@ -538,6 +545,7 @@ export type LLMConfigResponseDto = {
   provider: string;
   apiKey: string;
   model: string;
+  apiUrl: string;
   isPreferred: boolean;
   isEditable: boolean;
 };
@@ -547,6 +555,35 @@ export type UpdateLLMConfigDto = {
   provider: string;
   apiKey: string;
   model?: string;
+  apiUrl?: string;
+};
+
+/**
+ * Path to system logo
+ * @nullable
+ */
+export type SystemConfigResponseDtoLogoPath = { [key: string]: unknown } | null;
+
+export type SystemConfigResponseDto = {
+  /** System name */
+  name: string;
+  /**
+   * Path to system logo
+   * @nullable
+   */
+  logoPath: SystemConfigResponseDtoLogoPath;
+};
+
+/**
+ * Path to system logo
+ */
+export type UpdateSystemConfigDtoLogoPath = { [key: string]: unknown };
+
+export type UpdateSystemConfigDto = {
+  /** System name */
+  name?: string;
+  /** Path to system logo */
+  logoPath?: UpdateSystemConfigDtoLogoPath;
 };
 
 export type AssetDnsRecords = { [key: string]: unknown };
@@ -570,6 +607,7 @@ export const ToolCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
@@ -580,10 +618,12 @@ export type Tool = {
   updatedAt: string;
   name: string;
   description: string;
+  command: string;
   category: ToolCategory;
   version: string;
   /** @nullable */
   logoUrl?: string | null;
+  isBuiltIn: boolean;
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;
@@ -598,6 +638,7 @@ export type AssetService = {
   port: number;
   assetId: string;
   isErrorPage: boolean;
+  screenshotPath?: string;
 };
 
 export type JobErrorLog = {
@@ -655,10 +696,10 @@ export type GetNextJobResponseDto = {
   id: string;
   createdAt: string;
   updatedAt: string;
+  asset: Asset;
   category: string;
   status: string;
   command: string;
-  asset: string;
 };
 
 export type DataPayloadResultPayload = { [key: string]: unknown };
@@ -672,11 +713,6 @@ export type DataPayloadResult = {
 export type UpdateResultDto = {
   jobId: string;
   data: DataPayloadResult;
-};
-
-export type CreateJobsDto = {
-  toolIds: string[];
-  targetId: string;
 };
 
 export type JobHistoryResponseDtoStatus =
@@ -815,6 +851,7 @@ export type GetAssetsResponseDto = {
   httpResponses?: HttpResponseDTO;
   port?: number;
   isEnabled: boolean;
+  screenshotPath?: string;
 };
 
 export type GetManyGetAssetsResponseDtoDto = {
@@ -981,6 +1018,7 @@ export type WorkerInstance = {
 
 export type WorkerJoinDto = {
   apiKey: string;
+  signature?: string;
 };
 
 export type GetManyWorkerInstanceDto = {
@@ -1270,6 +1308,7 @@ export const CreateToolDtoCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
@@ -1423,11 +1462,6 @@ export type GetManyTemplateDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
-};
-
-export type RunTemplateDto = {
-  templateId: string;
-  assetId: string;
 };
 
 export type AssetGroup = {
@@ -1648,6 +1682,184 @@ export type UpdateIssueCommentDto = {
 
 export type Object = { [key: string]: unknown };
 
+export type Top3RiskDto = {
+  name: string;
+  description: string;
+  impact: string;
+};
+
+export type ExecutiveReportContentDto = {
+  summary: string;
+  riskRating: string;
+  top3Risks: Top3RiskDto[];
+  businessImpact: string;
+  actionPlan: string;
+};
+
+export type TechnicalReportContentDto = {
+  scope: string;
+  architecture: string;
+  vulnerabilitySummary: string;
+  owaspCwe: string;
+  components: string;
+  roadmap: string;
+};
+
+export type DeveloperVulnerabilityDto = {
+  name: string;
+  description: string;
+  severity: string;
+  category: string;
+  endpoint: string;
+  reproduce: string;
+  evidence: string;
+  rootCause: string;
+  fix: string;
+};
+
+export type DeveloperReportContentDto = {
+  vulnerabilities: DeveloperVulnerabilityDto[];
+};
+
+export type InfrastructureReportContentDto = {
+  assets: string;
+  networkExposure: string;
+  misconfig: string;
+  tls: string;
+  secrets: string;
+  hardening: string;
+};
+
+export type SeverityDistributionDto = {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+};
+
+export type CoverageRadarDto = {
+  web: number;
+  network: number;
+  cloud: number;
+  identity: number;
+  tls: number;
+};
+
+export type CategoryBreakdownDto = {
+  name: string;
+  count: number;
+};
+
+export type ReportChartsDto = {
+  severityDistribution?: SeverityDistributionDto;
+  coverageRadar?: CoverageRadarDto;
+  categoryBreakdown?: CategoryBreakdownDto[];
+};
+
+export type ReportContentDto = {
+  executive?: ExecutiveReportContentDto;
+  technical?: TechnicalReportContentDto;
+  developer?: DeveloperReportContentDto;
+  infrastructure?: InfrastructureReportContentDto;
+  charts?: ReportChartsDto;
+};
+
+export type SecurityReportTargetRole =
+  (typeof SecurityReportTargetRole)[keyof typeof SecurityReportTargetRole];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const SecurityReportTargetRole = {
+  EXECUTIVE: 'EXECUTIVE',
+  TECHNICAL: 'TECHNICAL',
+  DEVELOPER: 'DEVELOPER',
+  INFRASTRUCTURE: 'INFRASTRUCTURE',
+} as const;
+
+/**
+ * @nullable
+ */
+export type SecurityReportContent = ReportContentDto | null;
+
+export type SecurityReport = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  name: string;
+  description: string;
+  status: string;
+  targetRole?: SecurityReportTargetRole;
+  /** @nullable */
+  content: SecurityReportContent;
+  workspaceId: string;
+  workspace: Workspace;
+  creatorId: string;
+  creator: User;
+};
+
+export type CreateReportDtoContent = { [key: string]: unknown };
+
+export type CreateReportDtoStatus =
+  (typeof CreateReportDtoStatus)[keyof typeof CreateReportDtoStatus];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const CreateReportDtoStatus = {
+  DRAFT: 'DRAFT',
+  COMPLETED: 'COMPLETED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export type CreateReportDtoTargetRole =
+  (typeof CreateReportDtoTargetRole)[keyof typeof CreateReportDtoTargetRole];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const CreateReportDtoTargetRole = {
+  EXECUTIVE: 'EXECUTIVE',
+  TECHNICAL: 'TECHNICAL',
+  DEVELOPER: 'DEVELOPER',
+  INFRASTRUCTURE: 'INFRASTRUCTURE',
+} as const;
+
+export type CreateReportDto = {
+  name: string;
+  description?: string;
+  workspaceId: string;
+  content?: CreateReportDtoContent;
+  status?: CreateReportDtoStatus;
+  targetRole?: CreateReportDtoTargetRole;
+};
+
+export type UpdateReportDtoContent = { [key: string]: unknown };
+
+export type UpdateReportDtoStatus =
+  (typeof UpdateReportDtoStatus)[keyof typeof UpdateReportDtoStatus];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UpdateReportDtoStatus = {
+  DRAFT: 'DRAFT',
+  COMPLETED: 'COMPLETED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export type UpdateReportDtoTargetRole =
+  (typeof UpdateReportDtoTargetRole)[keyof typeof UpdateReportDtoTargetRole];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UpdateReportDtoTargetRole = {
+  EXECUTIVE: 'EXECUTIVE',
+  TECHNICAL: 'TECHNICAL',
+  DEVELOPER: 'DEVELOPER',
+  INFRASTRUCTURE: 'INFRASTRUCTURE',
+} as const;
+
+export type UpdateReportDto = {
+  name?: string;
+  description?: string;
+  content?: UpdateReportDtoContent;
+  status?: UpdateReportDtoStatus;
+  targetRole?: UpdateReportDtoTargetRole;
+};
+
 export type NotificationResponseDtoStatus =
   (typeof NotificationResponseDtoStatus)[keyof typeof NotificationResponseDtoStatus];
 
@@ -1817,6 +2029,8 @@ export type JobsRegistryControllerGetManyJobsParams = {
   sortBy?: string;
   sortOrder?: string;
   jobHistoryId?: string;
+  jobStatus?: string;
+  workspaceId?: string;
 };
 
 export type JobsRegistryControllerGetManyJobHistoriesParams = {
@@ -2019,6 +2233,7 @@ export const ToolsControllerGetManyToolsCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
@@ -2036,6 +2251,7 @@ export const ToolsControllerGetInstalledToolsCategory = {
   http_probe: 'http_probe',
   ports_scanner: 'ports_scanner',
   vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
   classifier: 'classifier',
   assistant: 'assistant',
 } as const;
@@ -2131,12 +2347,20 @@ export type IssuesControllerGetCommentsByIssueIdParams = {
   sortOrder?: string;
 };
 
+export type SecurityReportControllerFindAll200 = AppResponseSerialization & {
+  data?: SecurityReport[];
+};
+
 export type NotificationsControllerGetNotificationsParams = {
   search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type StorageControllerUploadLogoBody = {
+  file: Blob;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -8421,6 +8645,339 @@ export const useAiAssistantControllerSetPreferredLLMConfig = <
 };
 
 /**
+ * Retrieves the current system configuration settings
+ * @summary Get system configuration
+ */
+export const systemConfigsControllerGetConfig = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SystemConfigResponseDto>(
+    { url: `/api/system-configs`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerGetConfigQueryKey = () => {
+  return [`/api/system-configs`] as const;
+};
+
+export const getSystemConfigsControllerGetConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getSystemConfigsControllerGetConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+  > = ({ signal }) => systemConfigsControllerGetConfig(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SystemConfigsControllerGetConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+>;
+export type SystemConfigsControllerGetConfigQueryError = unknown;
+
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get system configuration
+ */
+
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSystemConfigsControllerGetConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates the system configuration settings
+ * @summary Update system configuration
+ */
+export const systemConfigsControllerUpdateConfig = (
+  updateSystemConfigDto: UpdateSystemConfigDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/system-configs`,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateSystemConfigDto,
+    },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerUpdateConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+    TError,
+    { data: UpdateSystemConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+  TError,
+  { data: UpdateSystemConfigDto },
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerUpdateConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+    { data: UpdateSystemConfigDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return systemConfigsControllerUpdateConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerUpdateConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>
+>;
+export type SystemConfigsControllerUpdateConfigMutationBody =
+  UpdateSystemConfigDto;
+export type SystemConfigsControllerUpdateConfigMutationError = unknown;
+
+/**
+ * @summary Update system configuration
+ */
+export const useSystemConfigsControllerUpdateConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+      TError,
+      { data: UpdateSystemConfigDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateConfig>>,
+  TError,
+  { data: UpdateSystemConfigDto },
+  TContext
+> => {
+  const mutationOptions =
+    getSystemConfigsControllerUpdateConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Removes the system logo and reverts to default avatar
+ * @summary Remove system logo
+ */
+export const systemConfigsControllerRemoveLogo = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/system-configs/logo`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerRemoveLogoMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerRemoveLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+    void
+  > = () => {
+    return systemConfigsControllerRemoveLogo(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerRemoveLogoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>
+>;
+
+export type SystemConfigsControllerRemoveLogoMutationError = unknown;
+
+/**
+ * @summary Remove system logo
+ */
+export const useSystemConfigsControllerRemoveLogo = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getSystemConfigsControllerRemoveLogoMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Retrieves a list of jobs that the user is a member of.
  * @summary Get Jobs
  */
@@ -8787,101 +9344,6 @@ export function useJobsRegistryControllerGetManyJobs<
 
   return query;
 }
-
-/**
- * @summary Creates a new job associated with the given asset and worker name.
- */
-export const jobsRegistryControllerCreateJobsForTarget = (
-  createJobsDto: CreateJobsDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/jobs-registry`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createJobsDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getJobsRegistryControllerCreateJobsForTargetMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-    TError,
-    { data: CreateJobsDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-  TError,
-  { data: CreateJobsDto },
-  TContext
-> => {
-  const mutationKey = ['jobsRegistryControllerCreateJobsForTarget'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-    { data: CreateJobsDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return jobsRegistryControllerCreateJobsForTarget(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type JobsRegistryControllerCreateJobsForTargetMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>
-  >;
-export type JobsRegistryControllerCreateJobsForTargetMutationBody =
-  CreateJobsDto;
-export type JobsRegistryControllerCreateJobsForTargetMutationError = unknown;
-
-/**
- * @summary Creates a new job associated with the given asset and worker name.
- */
-export const useJobsRegistryControllerCreateJobsForTarget = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-      TError,
-      { data: CreateJobsDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof jobsRegistryControllerCreateJobsForTarget>>,
-  TError,
-  { data: CreateJobsDto },
-  TContext
-> => {
-  const mutationOptions =
-    getJobsRegistryControllerCreateJobsForTargetMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
 
 /**
  * Retrieves a timeline of jobs grouped by tool name and target.
@@ -19801,100 +20263,6 @@ export const useTemplatesControllerDeleteTemplate = <
 };
 
 /**
- * Run a template and create a job
- * @summary Run a template
- */
-export const templatesControllerRunTemplate = (
-  runTemplateDto: RunTemplateDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<Job>(
-    {
-      url: `/api/templates/run`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: runTemplateDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getTemplatesControllerRunTemplateMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-    TError,
-    { data: RunTemplateDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-  TError,
-  { data: RunTemplateDto },
-  TContext
-> => {
-  const mutationKey = ['templatesControllerRunTemplate'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-    { data: RunTemplateDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return templatesControllerRunTemplate(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type TemplatesControllerRunTemplateMutationResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerRunTemplate>>
->;
-export type TemplatesControllerRunTemplateMutationBody = RunTemplateDto;
-export type TemplatesControllerRunTemplateMutationError = unknown;
-
-/**
- * @summary Run a template
- */
-export const useTemplatesControllerRunTemplate = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-      TError,
-      { data: RunTemplateDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof templatesControllerRunTemplate>>,
-  TError,
-  { data: RunTemplateDto },
-  TContext
-> => {
-  const mutationOptions =
-    getTemplatesControllerRunTemplateMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
  * Retrieves all asset groups with optional filtering and pagination.
  * @summary Get all asset groups
  */
@@ -24626,6 +24994,856 @@ export const useIssuesControllerDeleteCommentById = <
 };
 
 /**
+ * Creates a new security report with the provided content.
+ * @summary Create a new security report
+ */
+export const securityReportControllerCreate = (
+  createReportDto: CreateReportDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SecurityReport>(
+    {
+      url: `/api/security-reports`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createReportDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getSecurityReportControllerCreateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof securityReportControllerCreate>>,
+    TError,
+    { data: CreateReportDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof securityReportControllerCreate>>,
+  TError,
+  { data: CreateReportDto },
+  TContext
+> => {
+  const mutationKey = ['securityReportControllerCreate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof securityReportControllerCreate>>,
+    { data: CreateReportDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return securityReportControllerCreate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SecurityReportControllerCreateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof securityReportControllerCreate>>
+>;
+export type SecurityReportControllerCreateMutationBody = CreateReportDto;
+export type SecurityReportControllerCreateMutationError = unknown;
+
+/**
+ * @summary Create a new security report
+ */
+export const useSecurityReportControllerCreate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof securityReportControllerCreate>>,
+      TError,
+      { data: CreateReportDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof securityReportControllerCreate>>,
+  TError,
+  { data: CreateReportDto },
+  TContext
+> => {
+  const mutationOptions =
+    getSecurityReportControllerCreateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves a list of all security reports in the current workspace.
+ * @summary Get all security reports in workspace
+ */
+export const securityReportControllerFindAll = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SecurityReportControllerFindAll200>(
+    { url: `/api/security-reports`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getSecurityReportControllerFindAllQueryKey = () => {
+  return [`/api/security-reports`] as const;
+};
+
+export const getSecurityReportControllerFindAllQueryOptions = <
+  TData = Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getSecurityReportControllerFindAllQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof securityReportControllerFindAll>>
+  > = ({ signal }) => securityReportControllerFindAll(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SecurityReportControllerFindAllQueryResult = NonNullable<
+  Awaited<ReturnType<typeof securityReportControllerFindAll>>
+>;
+export type SecurityReportControllerFindAllQueryError = unknown;
+
+export function useSecurityReportControllerFindAll<
+  TData = Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof securityReportControllerFindAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSecurityReportControllerFindAll<
+  TData = Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof securityReportControllerFindAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSecurityReportControllerFindAll<
+  TData = Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get all security reports in workspace
+ */
+
+export function useSecurityReportControllerFindAll<
+  TData = Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof securityReportControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSecurityReportControllerFindAllQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Aggregates data for a security report without saving it to the database.
+ * @summary Preview a security report
+ */
+export const securityReportControllerPreview = (
+  createReportDto: CreateReportDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SecurityReport>(
+    {
+      url: `/api/security-reports/preview`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createReportDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getSecurityReportControllerPreviewMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof securityReportControllerPreview>>,
+    TError,
+    { data: CreateReportDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof securityReportControllerPreview>>,
+  TError,
+  { data: CreateReportDto },
+  TContext
+> => {
+  const mutationKey = ['securityReportControllerPreview'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof securityReportControllerPreview>>,
+    { data: CreateReportDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return securityReportControllerPreview(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SecurityReportControllerPreviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof securityReportControllerPreview>>
+>;
+export type SecurityReportControllerPreviewMutationBody = CreateReportDto;
+export type SecurityReportControllerPreviewMutationError = unknown;
+
+/**
+ * @summary Preview a security report
+ */
+export const useSecurityReportControllerPreview = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof securityReportControllerPreview>>,
+      TError,
+      { data: CreateReportDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof securityReportControllerPreview>>,
+  TError,
+  { data: CreateReportDto },
+  TContext
+> => {
+  const mutationOptions =
+    getSecurityReportControllerPreviewMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Retrieves a single security report by its ID.
+ * @summary Get security report by ID
+ */
+export const securityReportControllerFindOne = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SecurityReport>(
+    { url: `/api/security-reports/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getSecurityReportControllerFindOneQueryKey = (id?: string) => {
+  return [`/api/security-reports/${id}`] as const;
+};
+
+export const getSecurityReportControllerFindOneQueryOptions = <
+  TData = Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getSecurityReportControllerFindOneQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof securityReportControllerFindOne>>
+  > = ({ signal }) =>
+    securityReportControllerFindOne(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SecurityReportControllerFindOneQueryResult = NonNullable<
+  Awaited<ReturnType<typeof securityReportControllerFindOne>>
+>;
+export type SecurityReportControllerFindOneQueryError = unknown;
+
+export function useSecurityReportControllerFindOne<
+  TData = Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+          TError,
+          Awaited<ReturnType<typeof securityReportControllerFindOne>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSecurityReportControllerFindOne<
+  TData = Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+          TError,
+          Awaited<ReturnType<typeof securityReportControllerFindOne>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSecurityReportControllerFindOne<
+  TData = Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get security report by ID
+ */
+
+export function useSecurityReportControllerFindOne<
+  TData = Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof securityReportControllerFindOne>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSecurityReportControllerFindOneQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Updates an existing security report.
+ * @summary Update security report
+ */
+export const securityReportControllerUpdate = (
+  id: string,
+  updateReportDto: UpdateReportDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<SecurityReport>(
+    {
+      url: `/api/security-reports/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateReportDto,
+    },
+    options,
+  );
+};
+
+export const getSecurityReportControllerUpdateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof securityReportControllerUpdate>>,
+    TError,
+    { id: string; data: UpdateReportDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof securityReportControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateReportDto },
+  TContext
+> => {
+  const mutationKey = ['securityReportControllerUpdate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof securityReportControllerUpdate>>,
+    { id: string; data: UpdateReportDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return securityReportControllerUpdate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SecurityReportControllerUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof securityReportControllerUpdate>>
+>;
+export type SecurityReportControllerUpdateMutationBody = UpdateReportDto;
+export type SecurityReportControllerUpdateMutationError = unknown;
+
+/**
+ * @summary Update security report
+ */
+export const useSecurityReportControllerUpdate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof securityReportControllerUpdate>>,
+      TError,
+      { id: string; data: UpdateReportDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof securityReportControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateReportDto },
+  TContext
+> => {
+  const mutationOptions =
+    getSecurityReportControllerUpdateMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Deletes a security report by its ID.
+ * @summary Delete security report
+ */
+export const securityReportControllerRemove = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/security-reports/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getSecurityReportControllerRemoveMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof securityReportControllerRemove>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof securityReportControllerRemove>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['securityReportControllerRemove'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof securityReportControllerRemove>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return securityReportControllerRemove(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SecurityReportControllerRemoveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof securityReportControllerRemove>>
+>;
+
+export type SecurityReportControllerRemoveMutationError = unknown;
+
+/**
+ * @summary Delete security report
+ */
+export const useSecurityReportControllerRemove = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof securityReportControllerRemove>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof securityReportControllerRemove>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getSecurityReportControllerRemoveMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Generates and downloads a PDF version of the security report.
+ * @summary Download security report as PDF
+ */
+export const downloadPdf = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Blob>(
+    {
+      url: `/api/security-reports/${id}/pdf`,
+      method: 'GET',
+      responseType: 'blob',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getDownloadPdfQueryKey = (id?: string) => {
+  return [`/api/security-reports/${id}/pdf`] as const;
+};
+
+export const getDownloadPdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadPdf>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadPdf>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getDownloadPdfQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadPdf>>> = ({
+    signal,
+  }) => downloadPdf(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadPdf>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type DownloadPdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadPdf>>
+>;
+export type DownloadPdfQueryError = unknown;
+
+export function useDownloadPdf<
+  TData = Awaited<ReturnType<typeof downloadPdf>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadPdf>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadPdf>>,
+          TError,
+          Awaited<ReturnType<typeof downloadPdf>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useDownloadPdf<
+  TData = Awaited<ReturnType<typeof downloadPdf>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadPdf>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadPdf>>,
+          TError,
+          Awaited<ReturnType<typeof downloadPdf>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useDownloadPdf<
+  TData = Awaited<ReturnType<typeof downloadPdf>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadPdf>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Download security report as PDF
+ */
+
+export function useDownloadPdf<
+  TData = Awaited<ReturnType<typeof downloadPdf>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadPdf>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getDownloadPdfQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Retrieve a paginated list of notifications for the current user
  * @summary Get all notifications
  */
@@ -25657,6 +26875,103 @@ export const useNotificationsControllerMarkAsRead = <
 > => {
   const mutationOptions =
     getNotificationsControllerMarkAsReadMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * @summary Upload app logo to system bucket
+ */
+export const storageControllerUploadLogo = (
+  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`file`, storageControllerUploadLogoBody.file);
+
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/storage/logo`,
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data' },
+      data: formData,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerUploadLogoMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    TError,
+    { data: StorageControllerUploadLogoBody },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  const mutationKey = ['storageControllerUploadLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    { data: StorageControllerUploadLogoBody }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerUploadLogo(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StorageControllerUploadLogoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>
+>;
+export type StorageControllerUploadLogoMutationBody =
+  StorageControllerUploadLogoBody;
+export type StorageControllerUploadLogoMutationError = void;
+
+/**
+ * @summary Upload app logo to system bucket
+ */
+export const useStorageControllerUploadLogo = <
+  TError = void,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+      TError,
+      { data: StorageControllerUploadLogoBody },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  const mutationOptions =
+    getStorageControllerUploadLogoMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

@@ -42,6 +42,8 @@ export class GetAssetsResponseDto {
   port: number;
   @ApiProperty()
   isEnabled?: boolean;
+  @ApiProperty({ required: false })
+  screenshotPath?: string;
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {

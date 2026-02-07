@@ -21,6 +21,11 @@ export class UpdateLLMConfigDto {
   @IsString()
   @IsOptional()
   model?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  apiUrl?: string;
 }
 
 export class LLMConfigResponseDto {
@@ -35,6 +40,9 @@ export class LLMConfigResponseDto {
 
   @ApiProperty()
   model?: string;
+
+  @ApiProperty()
+  apiUrl?: string;
 
   @ApiProperty()
   isPreferred: boolean;

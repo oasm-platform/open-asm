@@ -8,6 +8,7 @@ import type { Asset } from '../assets/entities/assets.entity';
 import type { HttpResponse } from '../assets/entities/http-response.entity';
 import { IssuesService } from '../issues/issues.service';
 import type { Job } from '../jobs-registry/entities/job.entity';
+import { StorageService } from '../storage/storage.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterService } from './data-adapter.service';
@@ -75,6 +76,18 @@ describe('DataAdapterService', () => {
           provide: IssuesService,
           useValue: {
             createIssue: jest.fn(),
+          },
+        },
+        {
+          provide: StorageService,
+          useValue: {
+            uploadFile: jest
+              .fn()
+              .mockReturnValue({ path: 'mock/path/file.png' }),
+            getFile: jest.fn(),
+            deleteFile: jest.fn(),
+            forwardImage: jest.fn(),
+            readJsonFile: jest.fn(),
           },
         },
       ],
@@ -526,11 +539,13 @@ describe('DataAdapterService', () => {
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({
           raw: mockVulnerabilities,
-          identifiers: mockVulnerabilities.map(v => ({ id: v.id })),
+          identifiers: mockVulnerabilities.map((v) => ({ id: v.id })),
         }),
       };
 
-      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder,
+      );
 
       await service.vulnerabilities({
         data: mockVulnerabilities,

@@ -314,6 +314,10 @@ export interface CreateFirstAdminDto {
 export interface GetMetadataDto {
   isInit: boolean;
   isAssistant: boolean;
+  /** System name */
+  name: string;
+  /** Path to system logo */
+  logoPath: string | null;
 }
 
 export interface GenerateTagsResponseDto {
@@ -516,6 +520,7 @@ export interface LLMConfigResponseDto {
   provider: string;
   apiKey: string;
   model: string;
+  apiUrl: string;
   isPreferred: boolean;
   isEditable: boolean;
 }
@@ -525,6 +530,21 @@ export interface UpdateLLMConfigDto {
   provider: string;
   apiKey: string;
   model?: string;
+  apiUrl?: string;
+}
+
+export interface SystemConfigResponseDto {
+  /** System name */
+  name: string;
+  /** Path to system logo */
+  logoPath: object | null;
+}
+
+export interface UpdateSystemConfigDto {
+  /** System name */
+  name?: string;
+  /** Path to system logo */
+  logoPath?: object;
 }
 
 export interface Asset {
@@ -548,9 +568,11 @@ export interface Tool {
   updatedAt: string;
   name: string;
   description: string;
+  command: string;
   category: ToolCategoryEnum;
   version: string;
   logoUrl?: string | null;
+  isBuiltIn: boolean;
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;
@@ -567,6 +589,7 @@ export interface AssetService {
   port: number;
   assetId: string;
   isErrorPage: boolean;
+  screenshotPath?: string;
 }
 
 export interface JobErrorLog {
@@ -634,10 +657,10 @@ export interface GetNextJobResponseDto {
   createdAt: string;
   /** @format date-time */
   updatedAt: string;
+  asset: Asset;
   category: string;
   status: string;
   command: string;
-  asset: string;
 }
 
 export interface DataPayloadResult {
@@ -649,11 +672,6 @@ export interface DataPayloadResult {
 export interface UpdateResultDto {
   jobId: string;
   data: DataPayloadResult;
-}
-
-export interface CreateJobsDto {
-  toolIds: string[];
-  targetId: string;
 }
 
 export interface JobHistoryResponseDto {
@@ -785,6 +803,7 @@ export interface GetAssetsResponseDto {
   httpResponses?: HttpResponseDTO;
   port?: number;
   isEnabled: boolean;
+  screenshotPath?: string;
 }
 
 export interface GetManyGetAssetsResponseDtoDto {
@@ -944,6 +963,7 @@ export interface WorkerInstance {
 
 export interface WorkerJoinDto {
   apiKey: string;
+  signature?: string;
 }
 
 export interface GetManyWorkerInstanceDto {
@@ -1482,11 +1502,6 @@ export interface GetManyTemplateDto {
   pageCount: number;
 }
 
-export interface RunTemplateDto {
-  templateId: string;
-  assetId: string;
-}
-
 export interface AssetGroup {
   id: string;
   /** @format date-time */
@@ -1686,6 +1701,123 @@ export interface UpdateIssueCommentDto {
 
 export type Object = object;
 
+export interface Top3RiskDto {
+  name: string;
+  description: string;
+  impact: string;
+}
+
+export interface ExecutiveReportContentDto {
+  summary: string;
+  riskRating: string;
+  top3Risks: Top3RiskDto[];
+  businessImpact: string;
+  actionPlan: string;
+}
+
+export interface TechnicalReportContentDto {
+  scope: string;
+  architecture: string;
+  vulnerabilitySummary: string;
+  owaspCwe: string;
+  components: string;
+  roadmap: string;
+}
+
+export interface DeveloperVulnerabilityDto {
+  name: string;
+  description: string;
+  severity: string;
+  category: string;
+  endpoint: string;
+  reproduce: string;
+  evidence: string;
+  rootCause: string;
+  fix: string;
+}
+
+export interface DeveloperReportContentDto {
+  vulnerabilities: DeveloperVulnerabilityDto[];
+}
+
+export interface InfrastructureReportContentDto {
+  assets: string;
+  networkExposure: string;
+  misconfig: string;
+  tls: string;
+  secrets: string;
+  hardening: string;
+}
+
+export interface SeverityDistributionDto {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+}
+
+export interface CoverageRadarDto {
+  web: number;
+  network: number;
+  cloud: number;
+  identity: number;
+  tls: number;
+}
+
+export interface CategoryBreakdownDto {
+  name: string;
+  count: number;
+}
+
+export interface ReportChartsDto {
+  severityDistribution?: SeverityDistributionDto;
+  coverageRadar?: CoverageRadarDto;
+  categoryBreakdown?: CategoryBreakdownDto[];
+}
+
+export interface ReportContentDto {
+  executive?: ExecutiveReportContentDto;
+  technical?: TechnicalReportContentDto;
+  developer?: DeveloperReportContentDto;
+  infrastructure?: InfrastructureReportContentDto;
+  charts?: ReportChartsDto;
+}
+
+export interface SecurityReport {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+  name: string;
+  description: string;
+  status: string;
+  targetRole?: SecurityReportTargetRoleEnum;
+  content: ReportContentDto | null;
+  workspaceId: string;
+  workspace: Workspace;
+  creatorId: string;
+  creator: User;
+}
+
+export interface CreateReportDto {
+  name: string;
+  description?: string;
+  workspaceId: string;
+  content?: object;
+  status?: CreateReportDtoStatusEnum;
+  targetRole?: CreateReportDtoTargetRoleEnum;
+}
+
+export interface UpdateReportDto {
+  name?: string;
+  description?: string;
+  content?: object;
+  status?: UpdateReportDtoStatusEnum;
+  targetRole?: UpdateReportDtoTargetRoleEnum;
+}
+
 export interface NotificationResponseDto {
   id: string;
   status: NotificationResponseDtoStatusEnum;
@@ -1811,6 +1943,7 @@ export enum ToolCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Screenshot = "screenshot",
   Classifier = "classifier",
   Assistant = "assistant",
 }
@@ -1842,6 +1975,7 @@ export enum CreateToolDtoCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Screenshot = "screenshot",
   Classifier = "classifier",
   Assistant = "assistant",
 }
@@ -1878,6 +2012,39 @@ export enum IssueCommentTypeEnum {
   Content = "content",
   Open = "open",
   Closed = "closed",
+}
+
+export enum SecurityReportTargetRoleEnum {
+  EXECUTIVE = "EXECUTIVE",
+  TECHNICAL = "TECHNICAL",
+  DEVELOPER = "DEVELOPER",
+  INFRASTRUCTURE = "INFRASTRUCTURE",
+}
+
+export enum CreateReportDtoStatusEnum {
+  DRAFT = "DRAFT",
+  COMPLETED = "COMPLETED",
+  ARCHIVED = "ARCHIVED",
+}
+
+export enum CreateReportDtoTargetRoleEnum {
+  EXECUTIVE = "EXECUTIVE",
+  TECHNICAL = "TECHNICAL",
+  DEVELOPER = "DEVELOPER",
+  INFRASTRUCTURE = "INFRASTRUCTURE",
+}
+
+export enum UpdateReportDtoStatusEnum {
+  DRAFT = "DRAFT",
+  COMPLETED = "COMPLETED",
+  ARCHIVED = "ARCHIVED",
+}
+
+export enum UpdateReportDtoTargetRoleEnum {
+  EXECUTIVE = "EXECUTIVE",
+  TECHNICAL = "TECHNICAL",
+  DEVELOPER = "DEVELOPER",
+  INFRASTRUCTURE = "INFRASTRUCTURE",
 }
 
 export enum NotificationResponseDtoStatusEnum {
@@ -1921,6 +2088,7 @@ export enum ToolsControllerGetManyToolsParamsCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Screenshot = "screenshot",
   Classifier = "classifier",
   Assistant = "assistant",
 }
@@ -1930,6 +2098,7 @@ export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
   HttpProbe = "http_probe",
   PortsScanner = "ports_scanner",
   Vulnerabilities = "vulnerabilities",
+  Screenshot = "screenshot",
   Classifier = "classifier",
   Assistant = "assistant",
 }
@@ -3011,6 +3180,59 @@ export class Api<
     });
 
   /**
+   * @description Retrieves the current system configuration settings
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerGetConfig
+   * @summary Get system configuration
+   * @request GET:/api/system-configs
+   */
+  systemConfigsControllerGetConfig = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates the system configuration settings
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerUpdateConfig
+   * @summary Update system configuration
+   * @request PUT:/api/system-configs
+   */
+  systemConfigsControllerUpdateConfig = (
+    data: UpdateSystemConfigDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs`,
+      method: "PUT",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Removes the system logo and reverts to default avatar
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerRemoveLogo
+   * @summary Remove system logo
+   * @request DELETE:/api/system-configs/logo
+   */
+  systemConfigsControllerRemoveLogo = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs/logo`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Retrieves a list of jobs that the user is a member of.
    *
    * @tags JobsRegistry
@@ -3030,6 +3252,8 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
       jobHistoryId?: string;
+      jobStatus?: string;
+      workspaceId?: string;
     },
     params: RequestParams = {},
   ) =>
@@ -3037,27 +3261,6 @@ export class Api<
       path: `/api/jobs-registry`,
       method: "GET",
       query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * No description
-   *
-   * @tags JobsRegistry
-   * @name JobsRegistryControllerCreateJobsForTarget
-   * @summary Creates a new job associated with the given asset and worker name.
-   * @request POST:/api/jobs-registry
-   */
-  jobsRegistryControllerCreateJobsForTarget = (
-    data: CreateJobsDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/jobs-registry`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
       format: "json",
       ...params,
     });
@@ -4397,27 +4600,6 @@ export class Api<
     });
 
   /**
-   * @description Run a template and create a job
-   *
-   * @tags Templates
-   * @name TemplatesControllerRunTemplate
-   * @summary Run a template
-   * @request POST:/api/templates/run
-   */
-  templatesControllerRunTemplate = (
-    data: RunTemplateDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/templates/run`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
    * @description Retrieves all asset groups with optional filtering and pagination.
    *
    * @tags Asset Group
@@ -4982,6 +5164,138 @@ export class Api<
     });
 
   /**
+   * @description Creates a new security report with the provided content.
+   *
+   * @tags Security Reports
+   * @name SecurityReportControllerCreate
+   * @summary Create a new security report
+   * @request POST:/api/security-reports
+   */
+  securityReportControllerCreate = (
+    data: CreateReportDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/security-reports`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a list of all security reports in the current workspace.
+   *
+   * @tags Security Reports
+   * @name SecurityReportControllerFindAll
+   * @summary Get all security reports in workspace
+   * @request GET:/api/security-reports
+   */
+  securityReportControllerFindAll = (params: RequestParams = {}) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: SecurityReport[];
+      },
+      any
+    >({
+      path: `/api/security-reports`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Aggregates data for a security report without saving it to the database.
+   *
+   * @tags Security Reports
+   * @name SecurityReportControllerPreview
+   * @summary Preview a security report
+   * @request POST:/api/security-reports/preview
+   */
+  securityReportControllerPreview = (
+    data: CreateReportDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/security-reports/preview`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a single security report by its ID.
+   *
+   * @tags Security Reports
+   * @name SecurityReportControllerFindOne
+   * @summary Get security report by ID
+   * @request GET:/api/security-reports/{id}
+   */
+  securityReportControllerFindOne = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/security-reports/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Updates an existing security report.
+   *
+   * @tags Security Reports
+   * @name SecurityReportControllerUpdate
+   * @summary Update security report
+   * @request PATCH:/api/security-reports/{id}
+   */
+  securityReportControllerUpdate = (
+    id: string,
+    data: UpdateReportDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/security-reports/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Deletes a security report by its ID.
+   *
+   * @tags Security Reports
+   * @name SecurityReportControllerRemove
+   * @summary Delete security report
+   * @request DELETE:/api/security-reports/{id}
+   */
+  securityReportControllerRemove = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/security-reports/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Generates and downloads a PDF version of the security report.
+   *
+   * @tags Security Reports
+   * @name DownloadPdf
+   * @summary Download security report as PDF
+   * @request GET:/api/security-reports/{id}/pdf
+   */
+  downloadPdf = (id: string, params: RequestParams = {}) =>
+    this.request<File, any>({
+      path: `/api/security-reports/${id}/pdf`,
+      method: "GET",
+      ...params,
+    });
+
+  /**
    * @description Retrieve a paginated list of notifications for the current user
    *
    * @tags Notifications
@@ -5111,6 +5425,30 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications/${id}/read`,
       method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Storage
+   * @name StorageControllerUploadLogo
+   * @summary Upload app logo to system bucket
+   * @request POST:/api/storage/logo
+   */
+  storageControllerUploadLogo = (
+    data: {
+      /** @format binary */
+      file: File;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<DefaultMessageResponseDto, any>({
+      path: `/api/storage/logo`,
+      method: "POST",
+      body: data,
+      type: ContentType.FormData,
       format: "json",
       ...params,
     });

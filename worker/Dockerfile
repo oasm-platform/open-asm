@@ -26,7 +26,7 @@ ENV NODE_ENV=production
 
 COPY . .
 RUN bun install
-RUN bun build index.ts --outdir dist
+RUN bun build index.ts --outdir dist --target bun
 # Clean bun cache and remove unused files
 RUN bun pm cache clean && rm -rf src test
 
@@ -35,6 +35,13 @@ FROM base AS runner
 ENV NODE_ENV=production
 
 WORKDIR /app
+
+# Install Chrome for Puppeteer
+RUN apk add --no-cache chromium
+
+# Tell Puppeteer to skip installing Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/bun.lock ./bun.lock

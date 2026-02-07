@@ -3,6 +3,7 @@ import { Image } from '@/components/ui/image';
 import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
 import {
   OnSchedule,
+  ToolCategory,
   ToolsControllerGetManyToolsType,
   UpdateTargetDtoScanSchedule,
   useAssetGroupControllerAddManyWorkflows,
@@ -44,7 +45,9 @@ export default function AssetGroupWorkflow({
   // Filter tools with category "vulnerabilities"
   const toolProviders =
     workspaceToolsInstalled?.data?.filter(
-      (tool) => tool.type === ToolsControllerGetManyToolsType.provider,
+      (tool) =>
+        tool.type === ToolsControllerGetManyToolsType.provider ||
+        tool.category === ToolCategory.vulnerabilities,
     ) || [];
 
   // Check if a tool is already added to this group

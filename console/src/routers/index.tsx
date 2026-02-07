@@ -18,9 +18,7 @@ import EditProviderPage from '@/pages/providers/edit-provider';
 import ProvidersPage from '@/pages/providers/providers';
 import Register from '@/pages/register/register';
 import Search from '@/pages/search/search';
-
 import Settings from '@/pages/settings/settings';
-import Studio from '@/pages/studio/studio';
 import DetailTarget from '@/pages/targets/detail-target';
 import Targets from '@/pages/targets/targets';
 import ToolDetail from '@/pages/tools/components/tool-detail';
@@ -71,10 +69,10 @@ export const router = createBrowserRouter([
             path: 'notifications',
             element: <NotificationsPage />,
           },
-          {
-            path: 'studio',
-            children: [{ path: '', element: <Studio /> }],
-          },
+          // {
+          //   path: 'studio',
+          //   children: [{ path: '', element: <Studio /> }],
+          // },
           {
             path: 'groups',
             children: [{ path: '', element: <Workflow /> }],

@@ -1,6 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { WEBAPP_ANALYZER_SRC_URL } from '../../common/constants/app.constants';
+import {
+  STORAGE_BASE_PATH,
+  WEBAPP_ANALYZER_SRC_URL,
+} from '../../common/constants/app.constants';
 import { RedisService } from '../../services/redis/redis.service';
 import { StorageService } from '../storage/storage.service';
 import {
@@ -555,7 +558,7 @@ export class TechnologyForwarderService implements OnModuleInit {
         this.ICONS_BUCKET,
       );
 
-      return `/api/storage/${uploadResult.path}`;
+      return `${STORAGE_BASE_PATH}/${uploadResult.path}`;
     } catch (error) {
       this.logger.error(`Error processing icon ${iconName}:`, error);
       return '';
