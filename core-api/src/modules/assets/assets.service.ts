@@ -200,6 +200,7 @@ export class AssetsService {
               description: e.description,
               iconUrl: e.iconUrl,
               categoryNames: e.categoryNames,
+              website: e.website,
             };
           });
 
