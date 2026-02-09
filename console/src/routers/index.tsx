@@ -26,7 +26,6 @@ import Tools from '@/pages/tools/tools';
 import DetailVulnerability from '@/pages/vulnerabilities/detail-vulnerability';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 import Workers from '@/pages/workers/workers';
-import Workflow from '@/pages/workflow/workflow';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
@@ -73,10 +72,10 @@ export const router = createBrowserRouter([
           //   path: 'studio',
           //   children: [{ path: '', element: <Studio /> }],
           // },
-          {
-            path: 'groups',
-            children: [{ path: '', element: <Workflow /> }],
-          },
+          // {
+          //   path: 'groups',
+          //   children: [{ path: '', element: <Workflow /> }],
+          // },
           {
             path: 'settings',
             children: [
@@ -147,6 +146,19 @@ export const router = createBrowserRouter([
             path: 'search',
           },
           {
+            path: 'groups',
+            children: [
+              {
+                path: '',
+                element: <AssetGroups />,
+              },
+              {
+                path: ':id',
+                element: <AssetGroupDetail />,
+              },
+            ],
+          },
+          {
             path: 'assets',
             children: [
               {
@@ -156,19 +168,6 @@ export const router = createBrowserRouter([
               {
                 path: ':id',
                 element: <DetailAsset />,
-              },
-              {
-                path: 'groups',
-                children: [
-                  {
-                    path: '',
-                    element: <AssetGroups />,
-                  },
-                  {
-                    path: ':id',
-                    element: <AssetGroupDetail />,
-                  },
-                ],
               },
             ],
           },
