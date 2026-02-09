@@ -3912,6 +3912,16 @@ export class Api<
       status?: VulnerabilitiesControllerGetVulnerabilitiesParamsStatusEnum;
       /** Filter by severity levels: info, low, medium, high, critical */
       severity?: VulnerabilitiesControllerGetVulnerabilitiesParamsSeverityEnum[];
+      /**
+       * Filter by creation date from (ISO 8601 format, e.g., 2026-01-01)
+       * @example "2026-01-01"
+       */
+      createdFrom?: string;
+      /**
+       * Filter by creation date to (ISO 8601 format, e.g., 2026-01-31)
+       * @example "2026-01-31"
+       */
+      createdTo?: string;
     },
     params: RequestParams = {},
   ) =>
