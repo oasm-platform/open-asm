@@ -200,6 +200,7 @@ export class AssetsService {
               description: e.description,
               iconUrl: e.iconUrl,
               categoryNames: e.categoryNames,
+              website: e.website,
             };
           });
 
@@ -768,7 +769,7 @@ export class AssetsService {
    */
   /**
    * Retrieves TLS certificates expiring soonest (for warning notifications)
-   * Returns top 10 certificates with earliest expiry dates
+   * Returns top 10 certificates with earliest expiry dates within ±30 days from now
    */
   public async getManyTls(
     workspaceId: string,
@@ -777,8 +778,14 @@ export class AssetsService {
     const page = 1;
     const limit = 10;
 
-    // Query to get total count
+    // Calculate date range: 30 days before and 30 days after current date
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+    const thirtyDaysFromNow = new Date(now);
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
 
+    // Query to get total count with date range filter
     const totalResult = await this.dataSource
       .createQueryBuilder()
       .select('COUNT(DISTINCT("httpResponses"."tls"))', 'count')
@@ -803,10 +810,13 @@ export class AssetsService {
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       })
+      .andWhere(
+        '("httpResponses"."tls"->>\'not_after\')::timestamp BETWEEN :thirtyDaysAgo AND :thirtyDaysFromNow',
+        { thirtyDaysAgo, thirtyDaysFromNow },
+      )
       .getRawOne<{ count: number }>();
 
-    // Main query ordered by expiry date (earliest first)
-
+    // Main query ordered by expiry date (earliest first) with date range filter
     const queryResult = await this.dataSource
       .createQueryBuilder()
       .select(['"httpResponses"."tls"'])
@@ -831,6 +841,10 @@ export class AssetsService {
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       })
+      .andWhere(
+        '("httpResponses"."tls"->>\'not_after\')::timestamp BETWEEN :thirtyDaysAgo AND :thirtyDaysFromNow',
+        { thirtyDaysAgo, thirtyDaysFromNow },
+      )
       .groupBy('"httpResponses"."tls"')
       .orderBy('("httpResponses"."tls"->>\'not_after\')::timestamp', 'ASC')
       .limit(limit)
