@@ -472,17 +472,23 @@ export class StatisticService {
    * @returns An array of objects containing the workspaceId and unique technology count.
    */
   async getTechCounts(workspaceIds: string[]) {
-    // Subquery to unnest the 'tech' array from HttpResponse and link to workspaceId
+    // Subquery to unnest the 'tech' array from latest HttpResponse and link to workspaceId
     const subQuery = this.dataSource
       .createQueryBuilder()
       .select('wt.workspaceId', 'workspaceId')
-      .addSelect('unnest(http.tech)', 'tech') // Unnest the 'tech' array
-      .from(HttpResponse, 'http')
-      .leftJoin('http.assetService', 'assetService')
-      .leftJoin('assetService.asset', 'asset')
-      .leftJoin('asset.target', 'target')
-      .leftJoin('target.workspaceTargets', 'wt')
-      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+      .addSelect('unnest(latest_http.tech)', 'tech') // Unnest the 'tech' array from latest response
+      .from(AssetService, 'assetService')
+      .innerJoin('assetService.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .innerJoin('target.workspaceTargets', 'wt')
+      .innerJoin(
+        'assetService.httpResponses',
+        'latest_http',
+        'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
+      )
+      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .andWhere('assetService.isErrorPage = false')
+      .andWhere('latest_http.tech IS NOT NULL');
 
     // Main query to count distinct technologies for each workspaceId
     return this.dataSource
@@ -511,7 +517,8 @@ export class StatisticService {
       .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspaceTargets', 'wt')
-      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .andWhere('"assetService"."isErrorPage" = false');
 
     // Main query to count distinct ports for each workspaceId
     return this.dataSource
