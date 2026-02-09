@@ -86,6 +86,8 @@ export class VulnerabilitiesService {
       q,
       status,
       severity,
+      createdFrom,
+      createdTo,
     } = query;
 
     const { sortBy } = query;
@@ -134,6 +136,21 @@ export class VulnerabilitiesService {
     if (Array.isArray(severity) && severity.length > 0) {
       queryBuilder.andWhere('vulnerabilities.severity IN (:...severity)', {
         severity,
+      });
+    }
+
+    // Filter by creation date range
+    if (createdFrom) {
+      queryBuilder.andWhere('vulnerabilities.createdAt >= :createdFrom', {
+        createdFrom: new Date(createdFrom),
+      });
+    }
+    if (createdTo) {
+      // Set time to end of day (23:59:59.999) to include the entire day
+      const endDate = new Date(createdTo);
+      endDate.setHours(23, 59, 59, 999);
+      queryBuilder.andWhere('vulnerabilities.createdAt <= :createdTo', {
+        createdTo: endDate,
       });
     }
 
