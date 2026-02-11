@@ -16,6 +16,7 @@ interface DatePickerWithRangeProps {
   value?: DateRange;
   onChange?: (date: DateRange | undefined) => void;
   className?: string;
+  label?: string;
 }
 
 const PRESET_OPTIONS = [
@@ -29,6 +30,7 @@ export function DatePickerWithRange({
   value,
   onChange,
   className,
+  label,
 }: DatePickerWithRangeProps) {
   const internalDate = value ?? {
     from: new Date(new Date().getFullYear(), 0, 20),
@@ -71,7 +73,7 @@ export function DatePickerWithRange({
                 format(value.from, 'LLL dd, y')
               )
             ) : (
-              <span>Pick a date</span>
+              <span>{label ?? 'Pick a date range'}</span>
             )}
           </Button>
         </PopoverTrigger>
