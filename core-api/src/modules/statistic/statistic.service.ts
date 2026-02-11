@@ -219,6 +219,7 @@ export class StatisticService {
         techs: 0,
         ports: 0,
         score: 0, // Default score when no statistics found
+        services: 0,
       };
     }
 
@@ -236,6 +237,7 @@ export class StatisticService {
       techs: workspaceStats.techs,
       ports: workspaceStats.ports,
       score: workspaceStats.score,
+      services: workspaceStats.services,
     };
   }
 
@@ -502,6 +504,36 @@ export class StatisticService {
   }
 
   /**
+   * Retrieves the count of AssetService entities for each workspace.
+   * Only includes services where isErrorPage = false.
+   * @param workspaceIds An array of workspace IDs.
+   * @returns An array of objects containing the workspaceId and service count.
+   */
+  async getServiceCounts(workspaceIds: string[]) {
+    // Subquery to get AssetService linked to workspaceId
+    const subQuery = this.dataSource
+      .createQueryBuilder()
+      .select('wt.workspaceId', 'workspaceId')
+      .addSelect('assetService.id', 'serviceId')
+      .from(AssetService, 'assetService')
+      .leftJoin('assetService.asset', 'asset')
+      .leftJoin('asset.target', 'target')
+      .leftJoin('target.workspaceTargets', 'wt')
+      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .andWhere('"assetService"."isErrorPage" = false');
+
+    // Main query to count distinct services for each workspaceId
+    return this.dataSource
+      .createQueryBuilder()
+      .select('sq."workspaceId"', 'workspaceId')
+      .addSelect('COUNT(DISTINCT sq."serviceId")', 'count')
+      .from(`(${subQuery.getQuery()})`, 'sq')
+      .setParameters(subQuery.getParameters())
+      .groupBy('sq."workspaceId"')
+      .getRawMany<{ workspaceId: string; count: string }>();
+  }
+
+  /**
    * Retrieves the count of unique ports for each workspace.
    * Uses a subquery to unnest the ports array and count distinct values.
    * @param workspaceIds An array of workspace IDs.
@@ -551,12 +583,14 @@ export class StatisticService {
       vulnerabilityCounts,
       techCounts,
       portCounts,
+      serviceCounts,
     ] = await Promise.all([
       this.getAssetCounts(workspaceIds),
       this.getTargetCounts(workspaceIds),
       this.getVulnerabilityCounts(workspaceIds),
       this.getTechCounts(workspaceIds),
       this.getPortCounts(workspaceIds),
+      this.getServiceCounts(workspaceIds),
     ]);
 
     // Initialize a Map to store statistics for each workspace
@@ -576,6 +610,7 @@ export class StatisticService {
       statistic.infoVuls = 0;
       statistic.techs = 0;
       statistic.ports = 0;
+      statistic.services = 0;
       statistic.score = 0; // Initialize score to 0
       statisticsMap.set(id, statistic);
     }
@@ -627,6 +662,12 @@ export class StatisticService {
     portCounts.forEach((row) => {
       const stat = statisticsMap.get(row.workspaceId);
       if (stat) stat.ports = Number(row.count);
+    });
+
+    // Update service counts in the statistics Map
+    serviceCounts.forEach((row) => {
+      const stat = statisticsMap.get(row.workspaceId);
+      if (stat) stat.services = Number(row.count);
     });
 
     // Calculate scores for each workspace

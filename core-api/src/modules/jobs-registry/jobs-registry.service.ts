@@ -29,7 +29,7 @@ import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
 import { StorageService } from '../storage/storage.service';
 import { Tool } from '../tools/entities/tools.entity';
-import { builtInTools } from '../tools/tools-privider/built-in-tools';
+import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';

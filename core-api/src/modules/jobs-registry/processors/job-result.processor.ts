@@ -2,7 +2,7 @@ import { BullMQName, JobStatus, WorkerType } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { StorageService } from '@/modules/storage/storage.service';
-import { builtInTools } from '@/modules/tools/tools-privider/built-in-tools';
+import { builtInTools } from '@/modules/tools/tools-provider/built-in-tools';
 import { RedisService } from '@/services/redis/redis.service';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { BadGatewayException, Logger } from '@nestjs/common';
