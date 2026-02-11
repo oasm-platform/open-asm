@@ -164,38 +164,6 @@ export class StatisticService {
   }
 
   /**
-   * Retrieves the total count of vulnerabilities in a workspace.
-   *
-   * @param query - The query parameters containing workspaceId.
-   * @returns A promise that resolves to the total count of vulnerabilities.
-   */
-  async getTotalVulnerabilities(query: GetStatisticQueryDto): Promise<number> {
-    return this.countVulnerabilities(query.workspaceId);
-  }
-
-  /**
-   * Retrieves the total count of unique technologies in a workspace.
-   *
-   * @param query - The query parameters containing workspaceId.
-   * @returns A promise that resolves to the total count of unique technologies.
-   */
-  async getTotalUniqueTechnologies(
-    query: GetStatisticQueryDto,
-  ): Promise<number> {
-    return this.countUniqueTechnologies(query.workspaceId);
-  }
-
-  /**
-   * Retrieves the total count of unique ports in a workspace.
-   *
-   * @param query - The query parameters containing workspaceId.
-   * @returns A promise that resolves to the total count of unique ports.
-   */
-  async getTotalUniquePorts(query: GetStatisticQueryDto): Promise<number> {
-    return this.countUniquePorts(query.workspaceId);
-  }
-
-  /**
    * Retrieves all statistics for a workspace.
    *
    * @param query - The query parameters containing workspaceId.
@@ -205,23 +173,6 @@ export class StatisticService {
     query: GetStatisticQueryDto,
   ): Promise<StatisticResponseDto> {
     const statistics = await this.calculateStatistics([query.workspaceId]);
-    if (statistics.length === 0) {
-      // Return default values if no statistics found for the workspace
-      return {
-        assets: 0,
-        targets: 0,
-        vuls: 0,
-        criticalVuls: 0,
-        highVuls: 0,
-        mediumVuls: 0,
-        lowVuls: 0,
-        infoVuls: 0,
-        techs: 0,
-        ports: 0,
-        score: 0, // Default score when no statistics found
-        services: 0,
-      };
-    }
 
     const workspaceStats = statistics[0]; // Get the first (and only) workspace statistics
 
