@@ -40,7 +40,7 @@
     "@rekog/mcp-nest": "^1.8.4",
     "@types/cookie-parser": "^1.4.10",
     "@types/multer": "^2.0.0",
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "better-auth": "^1.4.7",
     "bullmq": "^5.65.1",
     "class-transformer": "^0.5.1",
