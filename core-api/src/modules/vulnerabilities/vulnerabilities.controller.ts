@@ -1,22 +1,22 @@
+import { UserContext } from '@/common/decorators/app.decorator';
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { User } from '../auth/entities/user.entity';
+import {
+  BulkDismissVulnerabilitiesDto,
+  BulkReopenVulnerabilitiesDto,
+} from './dto/bulk-vulnerability.dto';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   GetVulnerabilitiesStatisticsResponseDto,
 } from './dto/get-vulnerability-statistics.dto';
 import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import { ScanDto } from './dto/scan.dto';
+import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilitiesService } from './vulnerabilities.service';
-import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
-import { UserContext } from '@/common/decorators/app.decorator';
-import { User } from '../auth/entities/user.entity';
-import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
-import {
-  BulkDismissVulnerabilitiesDto,
-  BulkReopenVulnerabilitiesDto,
-} from './dto/bulk-vulnerability.dto';
 
 @Controller('vulnerabilities')
 export class VulnerabilitiesController {
@@ -44,10 +44,16 @@ export class VulnerabilitiesController {
     response: {
       serialization: GetManyResponseDto(Vulnerability),
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get()
-  async getVulnerabilities(@Query() query: GetVulnerabilitiesQueryDto) {
-    return this.vulnerabilitiesService.getVulnerabilities(query);
+  async getVulnerabilities(
+    @Query() query: GetVulnerabilitiesQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.vulnerabilitiesService.getVulnerabilities(query, workspaceId);
   }
 
   @Doc({
