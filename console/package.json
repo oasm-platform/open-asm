@@ -79,7 +79,7 @@
     "@types/react-dom": "^19.1.2",
     "@types/react-leaflet": "^2.8.3",
     "@vitejs/plugin-react": "^4.4.1",
-    "ajv": "^8.17.1",
+    "ajv": "^8.18.0",
     "dotenv": "^16.4.7",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
