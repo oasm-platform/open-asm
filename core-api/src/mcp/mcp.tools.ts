@@ -2,17 +2,17 @@ import {
   GET_WORKSPACE_MCP_TOOL_NAME,
   WORKER_TIMEOUT,
 } from '@/common/constants/app.constants';
+import { IssueStatus } from '@/common/enums/enum';
 import { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import { AssetsService } from '@/modules/assets/assets.service';
-import { StatisticService } from '@/modules/statistic/statistic.service';
-import { TargetsService } from '@/modules/targets/targets.service';
-import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
-import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { IssuesService } from '@/modules/issues/issues.service';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
+import { StatisticService } from '@/modules/statistic/statistic.service';
+import { TargetsService } from '@/modules/targets/targets.service';
 import { ToolsService } from '@/modules/tools/tools.service';
+import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import { WorkersService } from '@/modules/workers/workers.service';
-import { IssueStatus, WorkerType } from '@/common/enums/enum';
+import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { Injectable } from '@nestjs/common';
 import { Context, Tool } from '@rekog/mcp-nest';
 import z from 'zod';
@@ -136,13 +136,15 @@ export class McpTools {
   })
   async getVulnerabilities(params: z.infer<typeof getVulnerabilitiesSchema>) {
     const { workspaceId, page, limit, q } = params;
-    const response = await this.vulnerabilitiesService.getVulnerabilities({
-      limit,
-      page,
-      q,
+    const response = await this.vulnerabilitiesService.getVulnerabilities(
+      {
+        limit,
+        page,
+        q,
+        sortBy: 'createdAt',
+      },
       workspaceId,
-      sortBy: 'createdAt',
-    });
+    );
     return {
       ...response,
       data: response.data.map((i) => ({

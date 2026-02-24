@@ -76,13 +76,15 @@ export class VulnerabilitiesService {
    *                including page, limit, sortOrder, targetIds, workspaceId, and optional search query 'q'.
    * @returns A promise that resolves to a paginated list of vulnerabilities, including total count and pagination information.
    */
-  async getVulnerabilities(query: GetVulnerabilitiesQueryDto) {
+  async getVulnerabilities(
+    query: GetVulnerabilitiesQueryDto,
+    workspaceId: string,
+  ) {
     const {
       limit,
       page,
       sortOrder,
       targetIds,
-      workspaceId,
       q,
       status,
       severity,
