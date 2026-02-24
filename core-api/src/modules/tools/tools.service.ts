@@ -25,8 +25,8 @@ import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
-import { builtInTools } from './tools-privider/built-in-tools';
-import { officialSupportTools } from './tools-privider/official-support-tools';
+import { builtInTools } from './tools-provider/built-in-tools';
+import { officialSupportTools } from './tools-provider/official-support-tools';
 @Injectable()
 export class ToolsService implements OnModuleInit {
   constructor(

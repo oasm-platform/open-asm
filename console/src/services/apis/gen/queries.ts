@@ -1091,6 +1091,8 @@ export type StatisticResponseDto = {
   ports: number;
   /** Security score */
   score: number;
+  /** Number of services */
+  services: number;
 };
 
 export type Statistic = {
@@ -1117,6 +1119,8 @@ export type Statistic = {
   techs: number;
   /** Number of ports */
   ports: number;
+  /** Number of services */
+  services: number;
   /** Security score */
   score: number;
 };
@@ -1998,7 +2002,6 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
-  workspaceId: string;
   targetIds?: string[];
   q?: string;
   /**
@@ -15848,7 +15851,7 @@ export const useVulnerabilitiesControllerScan = <
  * @summary Get vulnerabilities
  */
 export const vulnerabilitiesControllerGetVulnerabilities = (
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -15882,7 +15885,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryOptions 
     >,
     TError = unknown,
   >(
-    params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+    params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
     options?: {
       query?: Partial<
         UseInfiniteQueryOptions<
@@ -15938,7 +15941,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params: undefined | VulnerabilitiesControllerGetVulnerabilitiesParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -15975,7 +15978,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -16012,7 +16015,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -16040,7 +16043,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -16081,7 +16084,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesQueryOptions = <
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -16123,7 +16126,7 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params: undefined | VulnerabilitiesControllerGetVulnerabilitiesParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -16156,7 +16159,7 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -16189,7 +16192,7 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -16214,7 +16217,7 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<

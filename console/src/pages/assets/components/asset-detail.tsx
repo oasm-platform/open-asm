@@ -141,27 +141,28 @@ export default function AssetDetail({ id }: { id: string }) {
           <AddTagDialog id={id} domain={value} tags={tags} refetch={refetch} />
         </div>
         <Separator className="my-5" />
-
-        <section>
-          <h3 className="font-bold text-indigo-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <Network size={20} className="text-indigo-500" /> Network
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
-            {tls?.host && (
-              <div>
-                <span className="block mb-1">Host</span>
-                <span className="">{tls.host}</span>
-              </div>
-            )}
-            {/* Port from TLS data, but presented in Network section */}
-            {tls?.port && (
-              <div>
-                <span className="block mb-1">Port</span>
-                <span className="">{tls.port}</span>
-              </div>
-            )}
-          </div>
-        </section>
+        {tls && (
+          <section>
+            <h3 className="font-bold text-indigo-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+              <Network size={20} className="text-indigo-500" /> Network
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
+              {tls?.host && (
+                <div>
+                  <span className="block mb-1">Host</span>
+                  <span className="">{tls.host}</span>
+                </div>
+              )}
+              {/* Port from TLS data, but presented in Network section */}
+              {tls?.port && (
+                <div>
+                  <span className="block mb-1">Port</span>
+                  <span className="">{tls.port}</span>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {tls && (
           <>

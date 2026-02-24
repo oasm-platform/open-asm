@@ -13,7 +13,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { DataSource, Repository } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyDetailDTO } from '../technology/dto/technology-detail.dto';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
@@ -122,8 +122,13 @@ export class AssetsService {
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
       })
-      .andWhere('"statusCodeAssets"."statusCode" IS NOT NULL')
-      .andWhere('"statusCodeAssets"."statusCode" != 0');
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('"statusCodeAssets"."statusCode" IS NULL').orWhere(
+            '"statusCodeAssets"."statusCode" != 0',
+          );
+        }),
+      );
 
     for (const [key, value] of Object.entries(whereBuilder)) {
       if (query[key]) {
@@ -319,9 +324,7 @@ export class AssetsService {
     const queryBuilder = this.buildBaseQuery(
       new GetAssetsQueryDto(),
       workspaceId,
-    )
-      .andWhere('"statusCodeAssets"."statusCode" != 0')
-      .andWhere('asset_service.id = :id', { id });
+    ).andWhere('asset_service.id = :id', { id });
 
     const item = await queryBuilder.getOneOrFail();
 
