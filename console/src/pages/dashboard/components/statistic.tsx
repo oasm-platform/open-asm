@@ -5,7 +5,7 @@ import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 import {
   CloudCheck,
   Cpu,
-  EthernetPort,
+  Server,
   Target,
   TrendingDown,
   TrendingUp,
@@ -54,19 +54,27 @@ export default function Statistic() {
       trend: calculateTrend('assets'),
     },
     {
+      title: 'Services',
+      icon: <Server className="h-5 w-5 text-primary" />,
+      value: statistics?.services || 0,
+      path: '/assets',
+      trend: calculateTrend('services'),
+    },
+    {
       title: 'Technologies',
       icon: <Cpu className="h-5 w-5 text-primary" />,
       value: statistics?.techs || 0,
       path: '/assets?tab=technology',
       trend: calculateTrend('techs'),
     },
-    {
-      title: 'Ports',
-      icon: <EthernetPort className="h-5 w-5 text-primary" />,
-      value: statistics?.ports || 0,
-      path: '/assets?tab=port',
-      trend: calculateTrend('ports'),
-    },
+
+    // {
+    //   title: 'Ports',
+    //   icon: <EthernetPort className="h-5 w-5 text-primary" />,
+    //   value: statistics?.ports || 0,
+    //   path: '/assets?tab=port',
+    //   trend: calculateTrend('ports'),
+    // },
   ];
 
   return (

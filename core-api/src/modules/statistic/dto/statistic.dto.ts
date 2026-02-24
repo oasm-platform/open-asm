@@ -78,4 +78,10 @@ export class StatisticResponseDto {
     example: 7.5,
   })
   score: number;
+
+  @ApiProperty({
+    description: 'Number of services',
+    example: 100,
+  })
+  services: number;
 }

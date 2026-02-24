@@ -44,7 +44,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {
           title: 'Dashboard',
           icon: <LayoutDashboard />,
-          url: '',
+          url: '/',
         },
       ],
     },
