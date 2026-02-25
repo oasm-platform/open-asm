@@ -32,4 +32,12 @@ export class WorkerInstance extends BaseEntity {
   @ApiProperty({ type: () => Tool })
   @ManyToOne(() => Tool, (tool) => tool.workers)
   tool: Tool;
+
+  /**
+   * Active tools on this worker.
+   * For BUILT_IN workers: returns all built-in tools (array).
+   * For PROVIDER workers: returns the current tool (array with single element).
+   */
+  @ApiProperty({ isArray: true, type: () => Tool })
+  tools?: Tool[];
 }

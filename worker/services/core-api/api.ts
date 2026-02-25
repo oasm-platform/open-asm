@@ -959,6 +959,7 @@ export interface WorkerInstance {
   type: string;
   scope: string;
   tool: Tool;
+  tools: Tool[];
 }
 
 export interface WorkerJoinDto {

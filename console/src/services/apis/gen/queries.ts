@@ -1016,6 +1016,7 @@ export type WorkerInstance = {
   type: string;
   scope: string;
   tool: Tool;
+  tools: Tool[];
 };
 
 export type WorkerJoinDto = {
