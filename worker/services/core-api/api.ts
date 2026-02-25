@@ -1072,6 +1072,11 @@ export interface StatisticResponseDto {
    * @example 7.5
    */
   score: number;
+  /**
+   * Number of services
+   * @example 100
+   */
+  services: number;
 }
 
 export interface Statistic {
@@ -1130,6 +1135,11 @@ export interface Statistic {
    * @default 0
    */
   ports: number;
+  /**
+   * Number of services
+   * @default 0
+   */
+  services: number;
   /**
    * Security score
    * @default 0
@@ -3892,7 +3902,7 @@ export class Api<
    * @request GET:/api/vulnerabilities
    */
   vulnerabilitiesControllerGetVulnerabilities = (
-    query: {
+    query?: {
       search?: string;
       /** @example 1 */
       page?: number;
@@ -3902,7 +3912,6 @@ export class Api<
       sortBy?: string;
       /** @example "DESC" */
       sortOrder?: string;
-      workspaceId: string;
       targetIds?: string[];
       q?: string;
       /**
