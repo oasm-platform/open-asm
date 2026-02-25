@@ -60,7 +60,9 @@ export class Workflow extends BaseEntity {
   @JoinColumn({ name: 'createdBy' })
   createdBy?: User;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.id, { nullable: true })
+  @ManyToOne(() => Workspace, (workspace) => workspace.workflows, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 

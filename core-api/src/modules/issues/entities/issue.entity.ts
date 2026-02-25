@@ -48,7 +48,9 @@ export class Issue extends BaseEntity {
   @Column('simple-array', { nullable: true })
   tags?: string[];
 
-  @ManyToOne(() => Workspace)
+  @ManyToOne(() => Workspace, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 

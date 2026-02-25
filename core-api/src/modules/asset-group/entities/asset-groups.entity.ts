@@ -22,7 +22,9 @@ export class AssetGroup extends BaseEntity {
   @Column()
   name: string;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.id)
+  @ManyToOne(() => Workspace, (workspace) => workspace.id, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 
