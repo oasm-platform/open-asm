@@ -142,10 +142,48 @@ async function getBrowser(): Promise<Browser> {
 
 /**
  * Takes a screenshot of the visible viewport of the given domain by attempting to access it via HTTPS and HTTP.
+ * Maximum timeout for the entire job is 15 seconds - it will ALWAYS return within 15s regardless of website response.
  * @param job - The job containing the domain asset.
  * @returns A JSON string with the successful URL and base64-encoded screenshot.
  */
 export default async function screenshotHandler(job: Job): Promise<string> {
+  // Maximum timeout for entire job (15 seconds) - hard limit
+  const JOB_TIMEOUT = 15000;
+
+  // Create abort controller for cleanup on timeout
+  const abortController = new AbortController();
+
+  // Create a timeout promise that rejects after JOB_TIMEOUT
+  let timeoutHandle: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      abortController.abort();
+      reject(new Error("Job timeout exceeded"));
+    }, JOB_TIMEOUT);
+  });
+
+  // Wrap the entire handler in a race against the timeout
+  try {
+    return await Promise.race([doScreenshot(job, abortController), timeoutPromise]);
+  } catch (error) {
+    // If timeout exceeded, return empty result
+    console.error(`Screenshot job timeout for domain: ${job.asset.value.trim()}`);
+    return JSON.stringify({
+      url: "",
+      screenshot: "",
+    });
+  } finally {
+    // Clean up timeout handle
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
+/**
+ * Internal screenshot function that does the actual work
+ */
+async function doScreenshot(job: Job, abortController: AbortController): Promise<string> {
   const browserInstance = await getBrowser();
   const page = await browserInstance.newPage();
 
@@ -202,23 +240,38 @@ export default async function screenshotHandler(job: Job): Promise<string> {
 
   let successUrl: string | null = null;
 
+  // Use domcontentloaded instead of networkidle2 to avoid being blocked by analytics/websockets
+  // This waits for HTML to be parsed but doesn't wait for all resources/images
+  const NAVIGATION_TIMEOUT = 10000; // 10s per navigation attempt
+
   for (const url of candidates) {
+    // Check if aborted before trying
+    if (abortController.signal.aborted) {
+      throw new Error("Job aborted due to timeout");
+    }
+
     try {
       await page.goto(url, {
-        waitUntil: "networkidle2",
-        timeout: 15000,
+        waitUntil: "domcontentloaded", // Changed from networkidle2 - faster, won't block on long-running requests
+        timeout: NAVIGATION_TIMEOUT,
         referer: "https://www.google.com/",
+        signal: abortController.signal, // Pass abort signal to support cancellation
       });
       successUrl = page.url(); // Actual URL after redirect
       break;
-    } catch (err) {
+    } catch (err: any) {
+      // Handle abort error specifically
+      if (err.name === "AbortError" || abortController.signal.aborted) {
+        throw new Error("Job aborted due to timeout");
+      }
       console.error(`Error accessing: ${url}`, err);
     }
   }
 
   let screenshotBase64 = "";
 
-  if (successUrl) {
+  // Only attempt screenshot if we have a successful URL and not aborted
+  if (successUrl && !abortController.signal.aborted) {
     try {
       const screenshotBuffer = await page.screenshot({
         fullPage: false,
@@ -230,9 +283,14 @@ export default async function screenshotHandler(job: Job): Promise<string> {
     }
   }
 
-  await page.close();
+  // Always close the page to prevent resource leaks
+  try {
+    await page.close();
+  } catch (err) {
+    console.error("Error closing page:", err);
+  }
 
-  // Return base64 encoded screenshot or empty if failed
+  // Return base64 encoded screenshot or empty if failed/timeout
   return JSON.stringify({
     url: successUrl || "",
     screenshot: screenshotBase64,
