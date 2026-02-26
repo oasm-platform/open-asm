@@ -40,4 +40,6 @@ export class CreateNotificationDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, string>;
+
+  workspaceId?: string;
 }

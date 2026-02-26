@@ -9,12 +9,16 @@ import { AssetGroup } from './asset-groups.entity';
 @Entity('asset_group_workflows')
 export class AssetGroupWorkflow extends BaseEntity {
   @ApiProperty()
-  @ManyToOne(() => AssetGroup, (assetGroup) => assetGroup.assetGroupWorkflows)
+  @ManyToOne(() => AssetGroup, (assetGroup) => assetGroup.assetGroupWorkflows, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'assetGroupId' })
   assetGroup: AssetGroup;
 
   @ApiProperty()
-  @ManyToOne(() => Workflow, (workflow) => workflow.id)
+  @ManyToOne(() => Workflow, (workflow) => workflow.id, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workflowId' })
   workflow: Workflow;
 

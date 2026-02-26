@@ -6,6 +6,7 @@ import { WorkspaceTarget } from '@/modules/targets/entities/workspace-target.ent
 import { Template } from '@/modules/templates/entities/templates.entity';
 import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
+import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
 import {
@@ -18,7 +19,6 @@ import {
   OneToOne,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
-import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 
 @Entity('workspaces')
 export class Workspace extends BaseEntity {
@@ -50,6 +50,7 @@ export class Workspace extends BaseEntity {
   @OneToMany(
     () => WorkspaceTarget,
     (workspaceTarget) => workspaceTarget.workspace,
+    { onDelete: 'CASCADE' },
   )
   workspaceTargets: WorkspaceTarget[];
 

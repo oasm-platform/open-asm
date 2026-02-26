@@ -59,6 +59,7 @@ export function ListAssets() {
   };
 
   if (workspaces.length === 0) return <CreateWorkspace />;
+
   return (
     <div className="w-full">
       <div className="mb-4">

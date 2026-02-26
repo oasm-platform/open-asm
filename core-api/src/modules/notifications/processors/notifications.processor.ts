@@ -24,10 +24,11 @@ export class NotificationsConsumer extends WorkerHost {
   }
 
   async process(job: Job<CreateNotificationDto>): Promise<void> {
-    const { recipients, scope, metadata, type } = job.data;
+    const { recipients, scope, metadata, type, workspaceId } = job.data;
     const notification = await this.notificationRepo.save({
       scope,
       type,
+      workspace: { id: workspaceId },
       metadata,
     });
 

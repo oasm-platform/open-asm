@@ -21,6 +21,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
 import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -50,9 +51,9 @@ export class WorkspacesService implements OnModuleInit {
     private notificationsService: NotificationsService,
     @Inject(forwardRef(() => WorkflowsService))
     private workflowsService: WorkflowsService,
-  ) { }
+  ) {}
 
-  async onModuleInit() { }
+  async onModuleInit() {}
 
   /**
    * Creates a new workspace, and adds the requesting user as a member.
@@ -76,7 +77,10 @@ export class WorkspacesService implements OnModuleInit {
       throw new BadRequestException('You have reached the limit of workspaces');
     }
 
+    const newWorkspaceId = randomUUID();
+
     const newWorkspace = await this.repo.save({
+      id: newWorkspaceId,
       name: dto.name,
       description: dto?.description,
       owner: { id },
@@ -91,6 +95,7 @@ export class WorkspacesService implements OnModuleInit {
     await this.notificationsService.createNotification({
       recipients: [id],
       scope: NotificationScope.USER,
+      workspaceId: newWorkspaceId,
       type: NotificationType.WORKSPACE_CREATED,
       metadata: {
         name: newWorkspace.name,
@@ -192,7 +197,7 @@ export class WorkspacesService implements OnModuleInit {
   ): Promise<DefaultMessageResponseDto> {
     await this.getWorkspaceByIdAndOwner(id, userContext);
 
-    await this.repo.softDelete({ id });
+    await this.repo.delete({ id });
 
     return {
       message: 'Workspace deleted successfully',
