@@ -14,16 +14,16 @@ import getSwaggerMetadata, {
 import {
   BadRequestException,
   ForbiddenException,
-  Inject,
   Injectable,
   NotFoundException,
   OnModuleInit,
-  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
 import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { Target } from '../targets/entities/target.entity';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
@@ -48,11 +48,10 @@ export class WorkspacesService implements OnModuleInit {
     private readonly workspaceTargetRepository: Repository<WorkspaceTarget>,
     private apiKeyService: ApiKeysService,
     private notificationsService: NotificationsService,
-    @Inject(forwardRef(() => WorkflowsService))
     private workflowsService: WorkflowsService,
-  ) { }
+  ) {}
 
-  async onModuleInit() { }
+  async onModuleInit() {}
 
   /**
    * Creates a new workspace, and adds the requesting user as a member.
@@ -76,7 +75,10 @@ export class WorkspacesService implements OnModuleInit {
       throw new BadRequestException('You have reached the limit of workspaces');
     }
 
+    const newWorkspaceId = randomUUID();
+
     const newWorkspace = await this.repo.save({
+      id: newWorkspaceId,
       name: dto.name,
       description: dto?.description,
       owner: { id },
@@ -91,6 +93,7 @@ export class WorkspacesService implements OnModuleInit {
     await this.notificationsService.createNotification({
       recipients: [id],
       scope: NotificationScope.USER,
+      workspaceId: newWorkspaceId,
       type: NotificationType.WORKSPACE_CREATED,
       metadata: {
         name: newWorkspace.name,
@@ -177,6 +180,58 @@ export class WorkspacesService implements OnModuleInit {
   }
 
   /**
+   * Deletes all targets associated with a specific workspace.
+   * Uses transaction and createQueryBuilder for atomic operation.
+   *
+   * @param workspaceId - The ID of the workspace whose targets will be deleted.
+   * @returns An object containing the list of deleted target IDs.
+   */
+  public async deleteAllTargetsFromWorkspace(
+    workspaceId: string,
+  ): Promise<{ deletedTargetIds: string[] }> {
+    // Use transaction to ensure atomicity of deletion
+    const result = await this.repo.manager.transaction(
+      async (transactionalEntityManager) => {
+        // Get target IDs from workspace_targets using createQueryBuilder
+        const workspaceTargets = await transactionalEntityManager
+          .getRepository(WorkspaceTarget)
+          .createQueryBuilder('workspaceTarget')
+          .innerJoin('workspaceTarget.workspace', 'workspace')
+          .innerJoin('workspaceTarget.target', 'target')
+          .where('workspace.id = :workspaceId', { workspaceId })
+          .select(['target.id as id'])
+          .getRawMany<{ id: string }>();
+
+        const targetIds = workspaceTargets.map((wt) => wt.id);
+
+        if (targetIds.length === 0) {
+          return { deletedTargetIds: [] };
+        }
+
+        // Delete all workspace targets for this workspace
+        await transactionalEntityManager
+          .getRepository(WorkspaceTarget)
+          .createQueryBuilder()
+          .delete()
+          .where('"workspaceId" = :workspaceId', { workspaceId })
+          .execute();
+
+        // Delete the actual targets
+        await transactionalEntityManager
+          .getRepository(Target)
+          .createQueryBuilder()
+          .delete()
+          .where('id IN (:...targetIds)', { targetIds })
+          .execute();
+
+        return { deletedTargetIds: targetIds };
+      },
+    );
+
+    return result;
+  }
+
+  /**
    * Deletes a workspace by its ID, but only if the requesting user is the owner.
    * The workspace is soft deleted, meaning it is not actually removed from the
    * database, but its `deletedAt` field is set to the current timestamp.
@@ -192,7 +247,10 @@ export class WorkspacesService implements OnModuleInit {
   ): Promise<DefaultMessageResponseDto> {
     await this.getWorkspaceByIdAndOwner(id, userContext);
 
-    await this.repo.softDelete({ id });
+    // Delete all targets associated with the workspace first
+    await this.deleteAllTargetsFromWorkspace(id);
+
+    await this.repo.delete({ id });
 
     return {
       message: 'Workspace deleted successfully',

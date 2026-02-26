@@ -25,7 +25,9 @@ export class IssueComment extends BaseEntity {
   @Column({ nullable: true })
   createdById: string;
 
-  @ManyToOne(() => Issue, (issue) => issue.comments)
+  @ManyToOne(() => Issue, (issue) => issue.comments, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'issueId' })
   issue: Issue;
 

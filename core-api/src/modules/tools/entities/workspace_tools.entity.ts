@@ -9,7 +9,9 @@ export class WorkspaceTool extends BaseEntity {
   @JoinColumn({ name: 'toolId' })
   tool: Tool;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.workspaceTools)
+  @ManyToOne(() => Workspace, (workspace) => workspace.workspaceTools, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 

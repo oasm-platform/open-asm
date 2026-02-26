@@ -26,7 +26,9 @@ export class WorkerInstance extends BaseEntity {
   @Column({ type: 'enum', enum: WorkerScope, default: WorkerScope.WORKSPACE })
   scope: WorkerScope;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.workers)
+  @ManyToOne(() => Workspace, (workspace) => workspace.workers, {
+    onDelete: 'CASCADE',
+  })
   workspace: Workspace;
 
   @ApiProperty({ type: () => Tool })

@@ -140,9 +140,6 @@ export class WorkflowsService implements OnModuleInit {
               isCanDelete: false,
               isCanEdit: false,
             });
-            this.logger.log(
-              `Inserted new workflow: ${workflowName} for workspace: ${workspaceId}`,
-            );
           } else if (
             JSON.stringify(newContent) !== JSON.stringify(existing.content) ||
             existing.name !== workflowName

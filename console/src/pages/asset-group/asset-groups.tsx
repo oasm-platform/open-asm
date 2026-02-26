@@ -67,8 +67,6 @@ export function AssetGroups() {
   const assetGroups = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading asset groups.</div>;
-
   return (
     <Page
       title="Groups"

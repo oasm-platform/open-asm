@@ -68,6 +68,8 @@ export class Statistic extends BaseEntity {
   @Column({ default: 0, type: 'decimal', precision: 5, scale: 2 })
   score: number;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.statistics)
+  @ManyToOne(() => Workspace, (workspace) => workspace.statistics, {
+    onDelete: 'CASCADE',
+  })
   workspace: Workspace;
 }
