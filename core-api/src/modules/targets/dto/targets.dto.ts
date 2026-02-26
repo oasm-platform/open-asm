@@ -4,14 +4,7 @@ import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { Target } from '../entities/target.entity';
 
-export class CreateTargetDto extends PickType(Target, ['value'] as const) {
-  @ApiProperty({
-    example: 'xxxxxxxx',
-    description: 'The id of the workspace',
-  })
-  @IsUUID('4')
-  workspaceId: string;
-}
+export class CreateTargetDto extends PickType(Target, ['value'] as const) {}
 
 export class GetManyTargetResponseDto {
   @ApiProperty()

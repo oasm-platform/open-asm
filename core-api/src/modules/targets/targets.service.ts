@@ -7,7 +7,9 @@ import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job, Queue } from 'bullmq';
+import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
+import { Asset } from '../assets/entities/assets.entity';
 import { AssetsService } from '../assets/assets.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
@@ -93,16 +95,17 @@ export class TargetsService implements OnModuleInit {
    */
   public async createTarget(
     dto: CreateTargetDto,
+    workspaceId: string,
     userContext: UserContextPayload,
   ): Promise<Target> {
-    const { workspaceId, value } = dto;
+    const { value } = dto;
     // Check if the workspace exists and the user is the owner
     await this.workspacesService.getWorkspaceByIdAndOwner(
       workspaceId,
       userContext,
     );
 
-    // Use transaction to ensure atomicity of target and workspace_target creation
+    // Use transaction to ensure atomicity of target, workspace_target, and primary asset creation
     const target = await this.repo.manager.transaction(
       async (transactionalEntityManager) => {
         // Check if target already exists in this workspace
@@ -147,23 +150,30 @@ export class TargetsService implements OnModuleInit {
           target: { id: target.id },
         });
 
+        // Create primary asset within the same transaction for data integrity
+        const existingAsset = await transactionalEntityManager
+          .getRepository(Asset)
+          .findOne({
+            where: {
+              value,
+              target: { id: target.id },
+            },
+          });
+
+        if (!existingAsset) {
+          await transactionalEntityManager.getRepository(Asset).save({
+            id: randomUUID(),
+            target: { id: target.id },
+            value,
+            isPrimary: true,
+          });
+        }
+
         return target;
       },
     );
 
-    // Create primary asset after transaction completes
-    await this.assetService.createPrimaryAsset({
-      target,
-      value,
-    });
-
-    // Trigger workflow run assets discovery
-    const workspaceConfigs =
-      await this.workspacesService.getWorkspaceConfigValue(workspaceId);
-
-    if (workspaceConfigs.isAssetsDiscovery) {
-      this.eventEmitter.emit('target.create', target);
-    }
+    this.eventEmitter.emit('target.create', target);
 
     // trigger update schedule to schedule registry
     await this.updateTarget(target.id, { scanSchedule: target.scanSchedule });

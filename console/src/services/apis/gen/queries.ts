@@ -66,8 +66,6 @@ export type AppResponseSerialization = { [key: string]: unknown };
 export type CreateTargetDto = {
   /** The target domain (with optional URL path, will be parsed to extract domain) */
   value: string;
-  /** The id of the workspace */
-  workspaceId: string;
 };
 
 export type GetManyTargetResponseDtoScanSchedule =

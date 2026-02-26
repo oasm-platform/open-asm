@@ -47,7 +47,6 @@ export function CreateTarget() {
         {
           data: {
             value: data.value,
-            workspaceId: selectedWorkspace,
           },
         },
         {

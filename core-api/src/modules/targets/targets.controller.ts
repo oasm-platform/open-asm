@@ -44,8 +44,9 @@ export class TargetsController {
   createTarget(
     @Body() dto: CreateTargetDto,
     @UserContext() userContext: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.targetsService.createTarget(dto, userContext);
+    return this.targetsService.createTarget(dto, workspaceId, userContext);
   }
 
   @Doc({
@@ -131,12 +132,15 @@ export class TargetsController {
     response: {
       serialization: Target,
     },
-    request:{
-      getWorkspaceId: true
-    }
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @Get(':id')
-  getTargetById(@Param() { id }: IdQueryParamDto, @WorkspaceId() workspaceId: string) {
+  getTargetById(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.targetsService.getTargetById(id, workspaceId);
   }
 

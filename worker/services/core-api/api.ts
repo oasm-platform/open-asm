@@ -53,11 +53,6 @@ export interface CreateTargetDto {
    * @example "example.com"
    */
   value: string;
-  /**
-   * The id of the workspace
-   * @example "xxxxxxxx"
-   */
-  workspaceId: string;
 }
 
 export interface GetManyTargetResponseDto {
