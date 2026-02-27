@@ -19,7 +19,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { v7 } from 'uuid';
 import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -75,7 +75,7 @@ export class WorkspacesService implements OnModuleInit {
       throw new BadRequestException('You have reached the limit of workspaces');
     }
 
-    const newWorkspaceId = randomUUID();
+    const newWorkspaceId = v7();
 
     const newWorkspace = await this.repo.save({
       id: newWorkspaceId,

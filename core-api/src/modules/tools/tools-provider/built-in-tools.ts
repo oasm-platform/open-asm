@@ -2,7 +2,7 @@
 
 import type { Severity } from '@/common/enums/enum';
 import { JobPriority, ToolCategory } from '@/common/enums/enum';
-import { randomUUID } from 'crypto';
+import { v7 } from 'uuid';
 import { Asset } from '../../assets/entities/assets.entity';
 import type { Vulnerability } from '../../vulnerabilities/entities/vulnerability.entity';
 import { Tool } from '../entities/tools.entity';
@@ -30,7 +30,7 @@ export const builtInTools: Tool[] = [
       });
 
       return Object.keys(parsed).map((i) => ({
-        id: randomUUID(),
+        id: v7(),
         value: i,
         dnsRecords: parsed[i],
       })) as Asset[];
@@ -92,7 +92,7 @@ export const builtInTools: Tool[] = [
         .filter((line) => line.trim())
         .map((line) => {
           const finding = JSON.parse(line.trim());
-          const vulId = randomUUID();
+          const vulId = v7();
           const filePath = `${vulId}.json`;
           return {
             id: vulId,

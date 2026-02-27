@@ -11,7 +11,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { v7 } from 'uuid';
 import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
@@ -53,7 +53,7 @@ export class ToolsService implements OnModuleInit {
       // Convert builtInTools to Tool entities
       const builtInToolsToInsert = builtInTools.map((tool) => ({
         ...tool,
-        id: randomUUID(),
+        id: v7(),
         isBuiltIn: true,
         isOfficialSupport: true,
         type: WorkerType.BUILT_IN,
@@ -61,7 +61,7 @@ export class ToolsService implements OnModuleInit {
 
       const officialSupportToolsToInsert = officialSupportTools.map((tool) => ({
         ...tool,
-        id: randomUUID(),
+        id: v7(),
         isBuiltIn: false,
         isOfficialSupport: true,
         type: WorkerType.PROVIDER,

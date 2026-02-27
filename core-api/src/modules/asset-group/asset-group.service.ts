@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { randomUUID } from 'crypto';
+import { v7 } from 'uuid';
 import { In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -275,7 +275,7 @@ export class AssetGroupService {
       const assetGroupWorkflowRecords: AssetGroupWorkflow[] = [];
 
       for (const workflowId of workflowIds) {
-        const assetGroupWorkflowId = randomUUID();
+        const assetGroupWorkflowId = v7();
         const job = await this.scanScheduleQueue.add(
           assetGroupWorkflowId,
           { id: assetGroupWorkflowId } as AssetGroupWorkflow,

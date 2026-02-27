@@ -23,7 +23,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { randomUUID } from 'crypto';
+import { v7 } from 'uuid';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
@@ -180,7 +180,7 @@ export class JobsRegistryService {
       // Create jobs for each asset service
       for (const assetService of assetServices) {
         const job = jobRepo.create({
-          id: randomUUID(),
+          id: v7(),
           asset: assetService.asset, // Use the associated asset from asset service
           assetService, // Store the asset service reference
           jobName: tool.name,
@@ -220,7 +220,7 @@ export class JobsRegistryService {
 
       for (const asset of filteredAssets) {
         const job = jobRepo.create({
-          id: randomUUID(),
+          id: v7(),
           asset,
           jobName: tool.name,
           status: JobStatus.PENDING,

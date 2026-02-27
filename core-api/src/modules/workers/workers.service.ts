@@ -19,7 +19,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { v7 } from 'uuid';
 import { LessThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
@@ -310,7 +310,7 @@ export class WorkersService {
    * @returns A promise that resolves to the created cloud worker.
    */
   private async createCloudWorker(): Promise<WorkerInstance> {
-    const workerId = randomUUID();
+    const workerId = v7();
     const TOKEN_LENGTH = 48;
 
     const data: Partial<WorkerInstance> = {
@@ -347,7 +347,7 @@ export class WorkersService {
       throw new NotFoundException(`API key not found: ${apiKey}`);
     }
 
-    const workerId = randomUUID();
+    const workerId = v7();
     const TOKEN_LENGTH = 48;
 
     const { type, scope } = this.determineWorkerTypeAndScope(apiKeyRecord.type);

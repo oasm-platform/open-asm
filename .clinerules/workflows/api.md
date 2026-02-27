@@ -88,7 +88,7 @@ You MUST explicitly document:
 - Service tests are **MANDATORY** (`*.service.spec.ts`).
 - Tests MUST cover: Valid input → success, Invalid input / edge cases, Error handling, Performance scenarios (pagination, large datasets).
 - Mock **ALL external dependencies**.
-- IDs MUST be valid UUID v4+ using `import { randomUUID } from 'crypto';`.
+- IDs MUST be valid UUID v7 using `import { v7 } from 'uuid';`.
 - Include integration tests for database operations and external API calls where applicable.
 
 > ❌ Do NOT proceed to Step 4 until all required tests are written and pass automatically via pre-commit hooks or CI pipeline.
@@ -182,8 +182,8 @@ Provide a final summary including automated verification results:
 ```ts
 // target-services.service.spec.ts
 it('should return history for a valid service id', async () => {
-  const serviceId = randomUUID();
-  mockRepo.find.mockResolvedValue([{ id: randomUUID(), change: 'Updated' }]);
+  const serviceId = v7();
+  mockRepo.find.mockResolvedValue([{ id: v7(), change: 'Updated' }]);
   const result = await service.getHistory(serviceId);
   expect(result).toHaveLength(1);
 });

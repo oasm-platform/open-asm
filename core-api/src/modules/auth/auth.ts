@@ -3,7 +3,7 @@ import { Role } from '@/common/enums/enum';
 import { databaseConnectionConfig } from '@/database/database-config';
 import { betterAuth } from 'better-auth';
 import { admin, openAPI } from 'better-auth/plugins';
-import { randomUUID } from 'crypto';
+import { v7 } from 'uuid';
 import 'dotenv/config';
 import { Pool } from 'pg';
 
@@ -22,7 +22,7 @@ export const auth = betterAuth({
   trustedOrigins: ['*'],
   advanced: {
     database: {
-      generateId: () => randomUUID(),
+      generateId: () => v7(),
     },
     cookies: {
       session_token: {

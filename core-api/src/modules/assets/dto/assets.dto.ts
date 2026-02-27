@@ -56,7 +56,7 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
     required: false,
     isArray: true,
   })
-  @IsUUID(4, { each: true })
+  @IsUUID('all', { each: true })
   @IsOptional()
   @Transform(({ value }: { value: string | string[] }): string[] =>
     Array.isArray(value) ? value : [value],
