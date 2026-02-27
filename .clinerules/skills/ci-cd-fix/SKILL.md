@@ -94,7 +94,7 @@ The security considerations are particularly important in CI/CD contexts. Pipeli
 - CI environment (through actual pipeline run)
 
 **Validation should cover**:
-- Successful build completion ’ now fixed
+- Successful build completion now fixed
 - Proper dependency installation and caching
 - Test execution without timeout issues
 - Docker image size optimization (if applicable)

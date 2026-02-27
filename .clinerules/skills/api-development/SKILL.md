@@ -52,11 +52,11 @@ The user data exposure rule reflects real privacy considerations - limiting resp
 **API Definition (Mandatory):**
 - HTTP method, endpoint path, request body/query/params
 - Swagger documentation using `@Doc()`
-- Workspace handling: If `workspaceId` is required ’ set `getWorkspaceId: true`
+- Workspace handling: If `workspaceId` is required set `getWorkspaceId: true`
 - DTOs: Body, Query, Params, Response using `class-validator` in `/dtos`
 - Error response structure: Standardized format with `code`, `message`, and optional `details`
 
-### 2. Implementation: Controller � Service
+### 2. Implementation: Controller Service
 
 **Controller Rules:**
 - MUST exist for new APIs
@@ -92,7 +92,7 @@ The user data exposure rule reflects real privacy considerations - limiting resp
 ### 3. Test-Driven Development: Service Tests
 
 **Service tests are MANDATORY** (`*.service.spec.ts`):
-- Tests MUST cover: Valid input � success, Invalid input / edge cases, Error handling, Performance scenarios (pagination, large datasets)
+- Tests MUST cover: Valid input success, Invalid input / edge cases, Error handling, Performance scenarios (pagination, large datasets)
 - Mock ALL external dependencies
 - IDs MUST be valid UUID v7 using `import { v7 } from 'uuid';`
 - Include integration tests for database operations and external API calls where applicable

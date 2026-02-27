@@ -101,7 +101,7 @@ The emphasis on reusing existing UI components and design tokens isn't about cre
 - Create test file in same directory as component (`*.test.tsx`)
 
 **Tests should cover:**
-- Render with required props ’ success case
+- Render with required props success case
 - Render with optional props
 - User interactions (clicks, form inputs, etc.)
 - Conditional rendering

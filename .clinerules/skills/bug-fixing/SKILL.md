@@ -96,7 +96,7 @@ The focus on test cases for preventing recurrence shows that bug fixing is also 
 - Add additional test cases for edge cases
 
 **Tests should cover**:
-- The specific bug scenario ’ now fixed
+- The specific bug scenario now fixed
 - Related edge cases that might trigger similar issues
 - Regression testing to ensure existing functionality works
 - Input validation and error handling
