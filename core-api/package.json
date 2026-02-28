@@ -64,6 +64,7 @@
     "swagger-typescript-api": "^13.2.16",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.28",
+    "uuid": "^13.0.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -82,7 +83,7 @@
     "@types/jest": "^29.5.14",
     "@types/node": "^22.19.2",
     "@types/supertest": "^6.0.3",
-    "eslint": "^9.39.1",
+    "eslint": "9.25.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "globals": "^16.5.0",
