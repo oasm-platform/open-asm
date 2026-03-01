@@ -11,6 +11,7 @@ import PortAssetsTab from './components/port-assets-tab';
 import StatusCodeAssetsTab from './components/status-code-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
+import TlsAssetsTab from './components/tls-assets-tab';
 
 const tabList = [
   {
@@ -42,6 +43,11 @@ const tabList = [
     value: 'status-code',
     text: 'Status Code',
     tab: <StatusCodeAssetsTab />,
+  },
+  {
+    value: 'tls',
+    text: 'TLS',
+    tab: <TlsAssetsTab />,
   },
 ];
 

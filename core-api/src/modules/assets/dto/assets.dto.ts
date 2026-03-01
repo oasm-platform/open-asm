@@ -112,4 +112,14 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
     Array.isArray(value) ? value : [value],
   )
   statusCodes?: string[];
+
+  @ApiProperty({
+    required: false,
+  })
+  @IsString({ each: true })
+  @IsOptional()
+  @Transform(({ value }: { value: string | string[] }): string[] =>
+    Array.isArray(value) ? value : [value],
+  )
+  tlsHosts?: string[];
 }

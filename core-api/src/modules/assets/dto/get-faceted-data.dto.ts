@@ -9,4 +9,6 @@ export class GetFacetedDataDTO {
   ports: string[];
   @ApiProperty()
   statusCodes: string[];
+  @ApiProperty()
+  tlsHosts: string[];
 }

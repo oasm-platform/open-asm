@@ -1,9 +1,6 @@
 import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import {
-  GetManyBaseResponseDto,
-  SortOrder,
-} from '@/common/dtos/get-many-base.dto';
+import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
@@ -24,27 +21,28 @@ import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
 import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
-import { GetTlsResponseDto } from './dto/tls.dto';
+import { GetTlsQueryDto, GetTlsResponseDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { AssetService } from './entities/asset-services.entity';
 import { AssetTag } from './entities/asset-tags.entity';
 import { Asset } from './entities/assets.entity';
+import { TlsAssetsView } from './entities/tls-assets.entity';
 
 // Type cho raw database response từ TLS query
-interface TlsRawData {
-  host: string;
-  sni: string;
-  subject_dn: string;
-  subject_an: string[];
-  not_after: string;
-  not_before: string;
-  tls_connection: string;
-}
+// interface TlsRawData {
+//   host: string;
+//   sni: string;
+//   subject_dn: string;
+//   subject_an: string[];
+//   not_after: string;
+//   not_before: string;
+//   tls_connection: string;
+// }
 
 // Type cho item từ raw query result
-interface TlsRawQueryItem {
-  tls: TlsRawData;
-}
+// interface TlsRawQueryItem {
+//   tls: TlsRawData;
+// }
 
 @Injectable()
 export class AssetsService {
@@ -55,6 +53,8 @@ export class AssetsService {
     public readonly assetServiceRepo: Repository<AssetService>,
     @InjectRepository(Target)
     public readonly targetRepo: Repository<Target>,
+    @InjectRepository(TlsAssetsView)
+    public readonly tlsAssetsViewRepo: Repository<TlsAssetsView>,
     private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
     private workspaceService: WorkspacesService,
@@ -77,7 +77,15 @@ export class AssetsService {
   }
 
   private buildBaseQuery(query: GetAssetsQueryDto, workspaceId: string) {
-    const { targetIds, hosts, ipAddresses, ports, techs, statusCodes } = query;
+    const {
+      targetIds,
+      hosts,
+      ipAddresses,
+      ports,
+      techs,
+      statusCodes,
+      tlsHosts,
+    } = query;
 
     const whereBuilder = {
       targetIds: {
@@ -104,6 +112,10 @@ export class AssetsService {
         value: statusCodes,
         whereClause: `"statusCodeAssets"."statusCode" = ANY(:param)`,
       },
+      tlsHosts: {
+        value: tlsHosts,
+        whereClause: `"tlsAssets"."host" = ANY(:param)`,
+      },
     };
 
     const queryBuilder = this.assetServiceRepo
@@ -118,6 +130,7 @@ export class AssetsService {
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
       .leftJoin('asset.ipAssets', 'ipAssets')
       .leftJoin('asset_service.statusCodeAssets', 'statusCodeAssets')
+      .leftJoin('asset_service.tlsAssets', 'tlsAssets')
       .where('asset_service."isErrorPage" = false')
       .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
         workspaceId,
@@ -763,124 +776,130 @@ export class AssetsService {
   }
 
   /**
-   * Toggle the enabled/disabled status of an asset
-   *
-   * @param assetId - The ID of the asset to toggle
-   * @param isEnabled - The new enabled status
-   * @returns A promise that resolves to the updated asset
-   * @throws NotFoundException if the asset with the given ID is not found
-   */
-  /**
-   * Retrieves TLS certificates expiring soonest (for warning notifications)
-   * Returns top 10 certificates with earliest expiry dates within ±30 days from now
+   * Retrieves a paginated list of TLS certificates.
+   * Built on top of buildBaseQuery so workspace isolation, and all other
+   * filters (targetIds, hosts, …) come for free via the tlsAssets left-join
+   * that is already wired into the base query.
    */
   public async getManyTls(
+    query: GetTlsQueryDto,
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetTlsResponseDto>> {
-    // Hard-coded pagination for notification purposes
-    const page = 1;
-    const limit = 10;
+    const allowedSortColumns = [
+      'host',
+      'sni',
+      'not_after',
+      'not_before',
+      'subject_dn',
+      'tls_version',
+    ];
+    if (!allowedSortColumns.includes(query.sortBy)) {
+      query.sortBy = 'not_after';
+    }
 
-    // Calculate date range: 30 days before and 30 days after current date
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now);
-    thirtyDaysAgo.setDate(now.getDate() - 30);
-    const thirtyDaysFromNow = new Date(now);
-    thirtyDaysFromNow.setDate(now.getDate() + 30);
+    const offset = (query.page - 1) * query.limit;
 
-    // Query to get total count with date range filter
+    // Re-use the base query (workspace isolation + all standard filters).
+    // Cast to GetAssetsQueryDto so we can forward targetIds / hosts filters.
+    const baseQuery = query as unknown as GetAssetsQueryDto;
+    const qb = this.buildBaseQuery(baseQuery, workspaceId).select([
+      '"tlsAssets"."host"              AS host',
+      '"tlsAssets"."sni"               AS sni',
+      '"tlsAssets"."subject_dn"        AS subject_dn',
+      '"tlsAssets"."subject_cn"        AS subject_cn',
+      '"tlsAssets"."issuer_dn"         AS issuer_dn',
+      '"tlsAssets"."not_before"        AS not_before',
+      '"tlsAssets"."not_after"         AS not_after',
+      '"tlsAssets"."tls_version"       AS tls_version',
+      '"tlsAssets"."cipher"            AS cipher',
+      '"tlsAssets"."tls_connection"    AS tls_connection',
+      '"tlsAssets"."subject_an"        AS subject_an',
+    ]);
+
+    // Only rows that actually have TLS data
+    qb.andWhere('"tlsAssets"."host" IS NOT NULL');
+
+    // Deduplicate: same TLS cert can be joined via multiple asset_service rows
+    // (e.g. same host on different ports). Group by all TLS columns so each
+    // distinct certificate appears only once.
+    qb.groupBy('"tlsAssets"."host"')
+      .addGroupBy('"tlsAssets"."sni"')
+      .addGroupBy('"tlsAssets"."subject_dn"')
+      .addGroupBy('"tlsAssets"."subject_cn"')
+      .addGroupBy('"tlsAssets"."issuer_dn"')
+      .addGroupBy('"tlsAssets"."not_before"')
+      .addGroupBy('"tlsAssets"."not_after"')
+      .addGroupBy('"tlsAssets"."tls_version"')
+      .addGroupBy('"tlsAssets"."cipher"')
+      .addGroupBy('"tlsAssets"."tls_connection"')
+      .addGroupBy('"tlsAssets"."subject_an"');
+
+    // Text search on host
+    if (query.search) {
+      qb.andWhere('"tlsAssets"."host" ILIKE :tlsSearch', {
+        tlsSearch: `%${query.search}%`,
+      });
+    }
+
+    // Faceted host filter (query.hosts maps to tlsHosts in buildBaseQuery
+    // via the whereBuilder, but GetTlsQueryDto uses `hosts` directly)
+    if (query.hosts && query.hosts.length > 0) {
+      qb.andWhere('"tlsAssets"."host" = ANY(:tlsHostFilter)', {
+        tlsHostFilter: query.hosts,
+      });
+    }
+
     const totalResult = await this.dataSource
       .createQueryBuilder()
-      .select('COUNT(DISTINCT("httpResponses"."tls"))', 'count')
-      .from('http_responses', 'httpResponses')
-      .innerJoin(
-        'asset_services',
-        'assetServices',
-        '"httpResponses"."assetServiceId" = "assetServices"."id"',
-      )
-      .innerJoin(
-        'assets',
-        'assets',
-        '"assetServices"."assetId" = "assets"."id"',
-      )
-      .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
-      .innerJoin(
-        'workspace_targets',
-        'workspaceTargets',
-        '"targets"."id" = "workspaceTargets"."targetId"',
-      )
-      .where('"httpResponses"."tls" IS NOT NULL')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
-        workspaceId,
-      })
-      .andWhere(
-        '("httpResponses"."tls"->>\'not_after\')::timestamp BETWEEN :thirtyDaysAgo AND :thirtyDaysFromNow',
-        { thirtyDaysAgo, thirtyDaysFromNow },
-      )
-      .getRawOne<{ count: number }>();
+      .select('COUNT(*)')
+      .from('(' + qb.getQuery() + ')', 'cnt_sub')
+      .setParameters(qb.getParameters())
+      .getRawOne<{ count: string }>();
+    const total = Number(totalResult?.count ?? 0);
 
-    // Main query ordered by expiry date (earliest first) with date range filter
-    const queryResult = await this.dataSource
-      .createQueryBuilder()
-      .select(['"httpResponses"."tls"'])
-      .from('http_responses', 'httpResponses')
-      .innerJoin(
-        'asset_services',
-        'assetServices',
-        '"httpResponses"."assetServiceId" = "assetServices"."id"',
-      )
-      .innerJoin(
-        'assets',
-        'assets',
-        '"assetServices"."assetId" = "assets"."id"',
-      )
-      .innerJoin('targets', 'targets', '"assets"."targetId" = "targets"."id"')
-      .innerJoin(
-        'workspace_targets',
-        'workspaceTargets',
-        '"targets"."id" = "workspaceTargets"."targetId"',
-      )
-      .where('"httpResponses"."tls" IS NOT NULL')
-      .andWhere('"workspaceTargets"."workspaceId" = :workspaceId', {
-        workspaceId,
-      })
-      .andWhere(
-        '("httpResponses"."tls"->>\'not_after\')::timestamp BETWEEN :thirtyDaysAgo AND :thirtyDaysFromNow',
-        { thirtyDaysAgo, thirtyDaysFromNow },
-      )
-      .groupBy('"httpResponses"."tls"')
-      .orderBy('("httpResponses"."tls"->>\'not_after\')::timestamp', 'ASC')
-      .limit(limit)
-      .getRawMany<TlsRawQueryItem>();
+    type TlsRaw = {
+      host: string;
+      sni: string;
+      subject_dn: string;
+      subject_cn: string;
+      issuer_dn: string;
+      not_before: string;
+      not_after: string;
+      tls_version: string;
+      cipher: string;
+      tls_connection: string;
+      subject_an: string;
+    };
 
-    const data = queryResult.map((item): GetTlsResponseDto => {
+    const list = await qb
+      .orderBy(`"tlsAssets"."${query.sortBy}"`, query.sortOrder)
+      .limit(query.limit)
+      .offset(offset)
+      .getRawMany<TlsRaw>();
+
+    const data = list.map((item): GetTlsResponseDto => {
       const obj = new GetTlsResponseDto();
-
-      if (item.tls) {
-        obj.host = item.tls.host;
-        obj.sni = item.tls.sni;
-        obj.subject_dn = item.tls.subject_dn;
-        obj.subject_an = item.tls.subject_an;
-        obj.not_after = item.tls.not_after;
-        obj.not_before = item.tls.not_before;
-        obj.tls_connection = item.tls.tls_connection;
+      obj.host = item.host;
+      obj.sni = item.sni;
+      obj.subject_dn = item.subject_dn;
+      obj.subject_cn = item.subject_cn;
+      obj.issuer_dn = item.issuer_dn;
+      obj.not_after = item.not_after;
+      obj.not_before = item.not_before;
+      obj.tls_version = item.tls_version;
+      obj.cipher = item.cipher;
+      obj.tls_connection = item.tls_connection;
+      try {
+        obj.subject_an = item.subject_an
+          ? (JSON.parse(item.subject_an) as string[])
+          : [];
+      } catch {
+        obj.subject_an = [];
       }
       return obj;
     });
 
-    // Create query object with proper typing
-    const queryObj = {
-      page,
-      limit,
-      sortBy: 'not_after',
-      sortOrder: SortOrder.ASC,
-    };
-
-    return getManyResponse({
-      query: queryObj,
-      data,
-      total: totalResult?.count ?? 0,
-    });
+    return getManyResponse({ query, data, total });
   }
 
   public async switchAsset(
