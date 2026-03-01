@@ -15,8 +15,7 @@ function ExpiryBadge({ notAfter }: { notAfter?: string }) {
 
   let variant: 'default' | 'secondary' | 'destructive' | 'outline' =
     'secondary';
-  if (daysLeft < 0) variant = 'destructive';
-  else if (daysLeft <= 7) variant = 'destructive';
+  if (daysLeft <= 7) variant = 'destructive';
   else if (daysLeft <= 30) variant = 'outline';
 
   return (

@@ -511,7 +511,7 @@ export function TlsFacetedFilter() {
       },
     );
   const options = useMemo(() => data ?? [], [data]);
-  const tlsHosts = (filterParams as { tlsHosts?: string[] }).tlsHosts;
+  const { tlsHosts } = filterParams;
   return (
     <FacetedFilterTemplate
       setValue={setValue}

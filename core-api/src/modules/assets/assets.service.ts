@@ -801,7 +801,7 @@ export class AssetsService {
 
     // Re-use the base query (workspace isolation + all standard filters).
     // Cast to GetAssetsQueryDto so we can forward targetIds / hosts filters.
-    const baseQuery = query as unknown as GetAssetsQueryDto;
+    const baseQuery: GetAssetsQueryDto = { ...query, tlsHosts: query.hosts };
     const qb = this.buildBaseQuery(baseQuery, workspaceId).select([
       '"tlsAssets"."host"              AS host',
       '"tlsAssets"."sni"               AS sni',
