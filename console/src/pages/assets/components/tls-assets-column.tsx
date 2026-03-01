@@ -20,12 +20,12 @@ function ExpiryBadge({ notAfter }: { notAfter?: string }) {
 
   return (
     <div className="flex items-center gap-1.5">
-      <Clock className="size-3 text-muted-foreground" />
-      <Badge variant={variant} className="text-xs font-mono whitespace-nowrap">
+      <Clock className="size-4 text-muted-foreground" />
+      <Badge variant={variant} className="font-mono whitespace-nowrap">
         {expiry.format('YYYY-MM-DD')}
       </Badge>
       {daysLeft >= 0 && (
-        <span className="text-xs text-muted-foreground">({daysLeft}d)</span>
+        <span className="text-muted-foreground">({daysLeft}d)</span>
       )}
     </div>
   );
@@ -34,17 +34,13 @@ function ExpiryBadge({ notAfter }: { notAfter?: string }) {
 export const tlsAssetsColumn = [
   columnHelper.accessor('host', {
     header: 'Host',
-    cell: (info) => (
-      <span className="font-mono text-xs">{info.getValue() ?? '–'}</span>
-    ),
+    cell: (info) => <span className="font-mono">{info.getValue() ?? '–'}</span>,
     enableSorting: true,
   }),
   columnHelper.accessor('sni', {
     header: 'SNI',
     cell: (info) => (
-      <span className="text-xs text-muted-foreground">
-        {info.getValue() ?? '–'}
-      </span>
+      <span className="text-muted-foreground">{info.getValue() ?? '–'}</span>
     ),
     enableSorting: false,
   }),
@@ -52,7 +48,7 @@ export const tlsAssetsColumn = [
     header: 'Subject DN',
     cell: (info) => (
       <span
-        className="text-xs truncate max-w-[260px] block text-muted-foreground"
+        className="truncate max-w-[260px] block text-muted-foreground"
         title={info.getValue()}
       >
         {info.getValue() ?? '–'}
@@ -63,7 +59,7 @@ export const tlsAssetsColumn = [
   columnHelper.accessor('tls_version', {
     header: 'TLS Version',
     cell: (info) => (
-      <Badge variant="secondary" className="text-xs font-mono">
+      <Badge variant="secondary" className="font-mono">
         {info.getValue() ?? '–'}
       </Badge>
     ),
@@ -72,7 +68,7 @@ export const tlsAssetsColumn = [
   columnHelper.accessor('not_before', {
     header: 'Valid From',
     cell: (info) => (
-      <span className="text-xs font-mono text-muted-foreground">
+      <span className="font-mono text-muted-foreground">
         {info.getValue() ? dayjs(info.getValue()).format('YYYY-MM-DD') : '–'}
       </span>
     ),
