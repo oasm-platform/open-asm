@@ -52,7 +52,7 @@ export class DataPayloadResult {
   @IsOptional()
   @Expose()
   @Transform(({ value }: { value: string }) => value ?? null)
-  raw?: string;
+  raw?: string | null;
 
   @ApiProperty()
   @IsOptional()

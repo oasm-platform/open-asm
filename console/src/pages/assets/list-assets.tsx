@@ -11,6 +11,7 @@ import PortAssetsTab from './components/port-assets-tab';
 import StatusCodeAssetsTab from './components/status-code-assets-tab';
 import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
+import TlsAssetsTab from './components/tls-assets-tab';
 
 const tabList = [
   {
@@ -43,6 +44,11 @@ const tabList = [
     text: 'Status Code',
     tab: <StatusCodeAssetsTab />,
   },
+  {
+    value: 'tls',
+    text: 'TLS',
+    tab: <TlsAssetsTab />,
+  },
 ];
 
 export function ListAssets() {
@@ -59,6 +65,7 @@ export function ListAssets() {
   };
 
   if (workspaces.length === 0) return <CreateWorkspace />;
+
   return (
     <div className="w-full">
       <div className="mb-4">

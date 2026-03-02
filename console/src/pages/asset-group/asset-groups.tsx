@@ -67,8 +67,6 @@ export function AssetGroups() {
   const assetGroups = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading asset groups.</div>;
-
   return (
     <Page
       title="Groups"
@@ -90,7 +88,7 @@ export function AssetGroups() {
         sortBy={sortBy}
         sortOrder={sortOrder}
         isShowBorder={true}
-        onRowClick={(row) => navigate('/assets/groups/' + row.id)}
+        onRowClick={(row) => navigate('/groups/' + row.id)}
         emptyMessage="No asset groups found"
         filterColumnKey="name"
         filterValue={filter}

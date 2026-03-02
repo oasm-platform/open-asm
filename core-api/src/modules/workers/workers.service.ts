@@ -25,6 +25,7 @@ import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
+import { ToolsService } from '../tools/tools.service';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import {
@@ -53,6 +54,8 @@ export class WorkersService {
     private apiKeyService: ApiKeysService,
 
     private configService: ConfigService,
+
+    private toolsService: ToolsService,
   ) {}
 
   /**
@@ -199,7 +202,7 @@ export class WorkersService {
       .take(limit)
       .getManyAndCount();
 
-    // Get current jobs count for each worker
+    // Get current jobs count and active tools for each worker
     const workersWithJobCount = await Promise.all(
       workers.map(async (worker) => {
         const count = await this.jobsRegistryService['repo'].count({
@@ -208,9 +211,22 @@ export class WorkersService {
             status: JobStatus.IN_PROGRESS,
           },
         });
+
+        // Determine active tools based on worker type
+        let tools: Tool[] = [];
+        if (worker.type === WorkerType.BUILT_IN) {
+          // For BUILT_IN workers, return all built-in tools
+          const builtInTools = await this.toolsService.getBuiltInTools();
+          tools = builtInTools.data;
+        } else if (worker.tool) {
+          // For PROVIDER workers, return the current tool as array
+          tools = [worker.tool];
+        }
+
         return {
           ...worker,
           currentJobsCount: count,
+          tools,
         };
       }),
     );
@@ -219,7 +235,7 @@ export class WorkersService {
       query,
       data: workersWithJobCount,
       total,
-      ignoreFields: ['token'],
+      ignoreFields: ['token', 'tool'],
     });
   }
 

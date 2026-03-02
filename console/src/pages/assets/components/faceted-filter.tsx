@@ -25,6 +25,7 @@ import {
   useAssetsControllerGetPortAssetsInfinite,
   useAssetsControllerGetStatusCodeAssetsInfinite,
   useAssetsControllerGetTechnologyAssetsInfinite,
+  useAssetsControllerGetTlsAssetsInfinite,
 } from '@/services/apis/gen/queries';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Check, CirclePlus } from 'lucide-react';
@@ -475,6 +476,50 @@ export function HostsFacetedFilter() {
       paramValues={filterParams.hosts}
       title="Host"
       filterKey="hosts"
+      options={options}
+      hasNextPage={hasNextPage}
+      fetchNextPage={fetchNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      isFetching={isFetching}
+    />
+  );
+}
+
+export function TlsFacetedFilter() {
+  const [open, setOpen] = useState(false);
+  const { filterParams, queryFilterParams } = useAsset();
+  const [value, setValue] = useState('');
+  const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetching } =
+    useAssetsControllerGetTlsAssetsInfinite(
+      { ...queryFilterParams, search: value },
+      {
+        query: {
+          getNextPageParam: (lastGroup) =>
+            lastGroup.hasNextPage ? lastGroup.page + 1 : undefined,
+          enabled: open,
+          initialPageParam: 1,
+          select: (res) => {
+            const items = res?.pages.flatMap((page) => page.data) || [];
+            return items
+              .filter((e) => !!e.host)
+              .map((e) => ({
+                value: e.host?.toString() ?? '',
+                label: e.host?.toString() ?? '',
+              }));
+          },
+        },
+      },
+    );
+  const options = useMemo(() => data ?? [], [data]);
+  const { tlsHosts } = filterParams;
+  return (
+    <FacetedFilterTemplate
+      setValue={setValue}
+      open={open}
+      setOpen={setOpen}
+      paramValues={tlsHosts}
+      title="TLS Host"
+      filterKey="tlsHosts"
       options={options}
       hasNextPage={hasNextPage}
       fetchNextPage={fetchNextPage}

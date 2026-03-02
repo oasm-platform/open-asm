@@ -558,11 +558,32 @@ export type UpdateLLMConfigDto = {
   apiUrl?: string;
 };
 
+/**
+ * Path to system logo
+ * @nullable
+ */
+export type SystemConfigResponseDtoLogoPath = { [key: string]: unknown } | null;
+
+export type SystemConfigResponseDto = {
+  /** System name */
+  name: string;
+  /**
+   * Path to system logo
+   * @nullable
+   */
+  logoPath: SystemConfigResponseDtoLogoPath;
+};
+
+/**
+ * Path to system logo
+ */
+export type UpdateSystemConfigDtoLogoPath = { [key: string]: unknown };
+
 export type UpdateSystemConfigDto = {
   /** System name */
   name?: string;
   /** Path to system logo */
-  logoPath?: string;
+  logoPath?: UpdateSystemConfigDtoLogoPath;
 };
 
 export type AssetDnsRecords = { [key: string]: unknown };
@@ -597,10 +618,12 @@ export type Tool = {
   updatedAt: string;
   name: string;
   description: string;
+  command: string;
   category: ToolCategory;
   version: string;
   /** @nullable */
   logoUrl?: string | null;
+  isBuiltIn: boolean;
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;
@@ -679,11 +702,13 @@ export type GetNextJobResponseDto = {
   command: string;
 };
 
+export type DataPayloadResultRaw = { [key: string]: unknown };
+
 export type DataPayloadResultPayload = { [key: string]: unknown };
 
 export type DataPayloadResult = {
   error: boolean;
-  raw: string;
+  raw: DataPayloadResultRaw;
   payload: DataPayloadResultPayload;
 };
 
@@ -952,9 +977,13 @@ export type GetTlsResponseDto = {
   host: string;
   sni: string;
   subject_dn: string;
+  subject_cn: string;
+  issuer_dn: string;
   subject_an: string[];
   not_after: string;
   not_before: string;
+  tls_version: string;
+  cipher: string;
   tls_connection: string;
 };
 
@@ -991,6 +1020,7 @@ export type WorkerInstance = {
   type: string;
   scope: string;
   tool: Tool;
+  tools: Tool[];
 };
 
 export type WorkerJoinDto = {
@@ -1066,6 +1096,8 @@ export type StatisticResponseDto = {
   ports: number;
   /** Security score */
   score: number;
+  /** Number of services */
+  services: number;
 };
 
 export type Statistic = {
@@ -1092,6 +1124,8 @@ export type Statistic = {
   techs: number;
   /** Number of ports */
   ports: number;
+  /** Number of services */
+  services: number;
   /** Security score */
   score: number;
 };
@@ -1828,6 +1862,8 @@ export type JobsRegistryControllerGetManyJobsParams = {
   sortBy?: string;
   sortOrder?: string;
   jobHistoryId?: string;
+  jobStatus?: string;
+  workspaceId?: string;
 };
 
 export type JobsRegistryControllerGetManyJobHistoriesParams = {
@@ -1928,6 +1964,16 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
   statusCodes?: string[];
 };
 
+export type AssetsControllerGetTlsAssetsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  hosts?: string[];
+  targetIds?: string[];
+};
+
 export type WorkersControllerGetWorkersParams = {
   search?: string;
   page?: number;
@@ -1971,13 +2017,24 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
-  workspaceId: string;
   targetIds?: string[];
   q?: string;
   /**
    * Filter by vulnerability status: open, dismissed, or all
    */
   status?: VulnerabilitiesControllerGetVulnerabilitiesStatus;
+  /**
+   * Filter by severity levels: info, low, medium, high, critical
+   */
+  severity?: VulnerabilitiesControllerGetVulnerabilitiesSeverityItem[];
+  /**
+   * Filter by creation date from (ISO 8601 format, e.g., 2026-01-01)
+   */
+  createdFrom?: string;
+  /**
+   * Filter by creation date to (ISO 8601 format, e.g., 2026-01-31)
+   */
+  createdTo?: string;
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatus =
@@ -1988,6 +2045,18 @@ export const VulnerabilitiesControllerGetVulnerabilitiesStatus = {
   open: 'open',
   dismissed: 'dismissed',
   all: 'all',
+} as const;
+
+export type VulnerabilitiesControllerGetVulnerabilitiesSeverityItem =
+  (typeof VulnerabilitiesControllerGetVulnerabilitiesSeverityItem)[keyof typeof VulnerabilitiesControllerGetVulnerabilitiesSeverityItem];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const VulnerabilitiesControllerGetVulnerabilitiesSeverityItem = {
+  info: 'info',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
 } as const;
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
@@ -2150,6 +2219,10 @@ export type NotificationsControllerGetNotificationsParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type StorageControllerUploadLogoBody = {
+  file: Blob;
 };
 
 export type StorageControllerUploadFileBody = {
@@ -8434,6 +8507,162 @@ export const useAiAssistantControllerSetPreferredLLMConfig = <
 };
 
 /**
+ * Retrieves the current system configuration settings
+ * @summary Get system configuration
+ */
+export const systemConfigsControllerGetConfig = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SystemConfigResponseDto>(
+    { url: `/api/system-configs`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerGetConfigQueryKey = () => {
+  return [`/api/system-configs`] as const;
+};
+
+export const getSystemConfigsControllerGetConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getSystemConfigsControllerGetConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+  > = ({ signal }) => systemConfigsControllerGetConfig(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SystemConfigsControllerGetConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+>;
+export type SystemConfigsControllerGetConfigQueryError = unknown;
+
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get system configuration
+ */
+
+export function useSystemConfigsControllerGetConfig<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getSystemConfigsControllerGetConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Updates the system configuration settings
  * @summary Update system configuration
  */
@@ -8522,6 +8751,90 @@ export const useSystemConfigsControllerUpdateConfig = <
 > => {
   const mutationOptions =
     getSystemConfigsControllerUpdateConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Removes the system logo and reverts to default avatar
+ * @summary Remove system logo
+ */
+export const systemConfigsControllerRemoveLogo = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/system-configs/logo`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerRemoveLogoMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerRemoveLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+    void
+  > = () => {
+    return systemConfigsControllerRemoveLogo(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerRemoveLogoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>
+>;
+
+export type SystemConfigsControllerRemoveLogoMutationError = unknown;
+
+/**
+ * @summary Remove system logo
+ */
+export const useSystemConfigsControllerRemoveLogo = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerRemoveLogo>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getSystemConfigsControllerRemoveLogoMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
@@ -12313,44 +12626,244 @@ export function useAssetsControllerGetStatusCodeAssets<
 }
 
 /**
- * Retrieves a list of TLS certificates expiring soon.
+ * Retrieves a paginated list of TLS certificates with filtering and sorting support.
  * @summary Get TLS certificates
  */
 export const assetsControllerGetTlsAssets = (
+  params?: AssetsControllerGetTlsAssetsParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<GetManyGetTlsResponseDtoDto>(
-    { url: `/api/assets/tls`, method: 'GET', signal },
+    { url: `/api/assets/tls`, method: 'GET', params, signal },
     options,
   );
 };
 
-export const getAssetsControllerGetTlsAssetsQueryKey = () => {
-  return [`/api/assets/tls`] as const;
+export const getAssetsControllerGetTlsAssetsInfiniteQueryKey = (
+  params?: AssetsControllerGetTlsAssetsParams,
+) => {
+  return ['infinite', `/api/assets/tls`, ...(params ? [params] : [])] as const;
 };
+
+export const getAssetsControllerGetTlsAssetsQueryKey = (
+  params?: AssetsControllerGetTlsAssetsParams,
+) => {
+  return [`/api/assets/tls`, ...(params ? [params] : [])] as const;
+};
+
+export const getAssetsControllerGetTlsAssetsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+    AssetsControllerGetTlsAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTlsAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTlsAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAssetsControllerGetTlsAssetsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+    QueryKey,
+    AssetsControllerGetTlsAssetsParams['page']
+  > = ({ signal, pageParam }) =>
+    assetsControllerGetTlsAssets(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+    TError,
+    TData,
+    QueryKey,
+    AssetsControllerGetTlsAssetsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AssetsControllerGetTlsAssetsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
+>;
+export type AssetsControllerGetTlsAssetsInfiniteQueryError = unknown;
+
+export function useAssetsControllerGetTlsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+    AssetsControllerGetTlsAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AssetsControllerGetTlsAssetsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTlsAssetsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTlsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+    AssetsControllerGetTlsAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTlsAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTlsAssetsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAssetsControllerGetTlsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+    AssetsControllerGetTlsAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTlsAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTlsAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get TLS certificates
+ */
+
+export function useAssetsControllerGetTlsAssetsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+    AssetsControllerGetTlsAssetsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AssetsControllerGetTlsAssetsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData,
+        QueryKey,
+        AssetsControllerGetTlsAssetsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAssetsControllerGetTlsAssetsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 export const getAssetsControllerGetTlsAssetsQueryOptions = <
   TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
   TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
+>(
+  params?: AssetsControllerGetTlsAssetsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getAssetsControllerGetTlsAssetsQueryKey();
+    queryOptions?.queryKey ?? getAssetsControllerGetTlsAssetsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>
-  > = ({ signal }) => assetsControllerGetTlsAssets(requestOptions, signal);
+  > = ({ signal }) =>
+    assetsControllerGetTlsAssets(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
@@ -12368,6 +12881,7 @@ export function useAssetsControllerGetTlsAssets<
   TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
   TError = unknown,
 >(
+  params: undefined | AssetsControllerGetTlsAssetsParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -12394,6 +12908,7 @@ export function useAssetsControllerGetTlsAssets<
   TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
   TError = unknown,
 >(
+  params?: AssetsControllerGetTlsAssetsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -12420,6 +12935,7 @@ export function useAssetsControllerGetTlsAssets<
   TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
   TError = unknown,
 >(
+  params?: AssetsControllerGetTlsAssetsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -12442,6 +12958,7 @@ export function useAssetsControllerGetTlsAssets<
   TData = Awaited<ReturnType<typeof assetsControllerGetTlsAssets>>,
   TError = unknown,
 >(
+  params?: AssetsControllerGetTlsAssetsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -12456,7 +12973,10 @@ export function useAssetsControllerGetTlsAssets<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getAssetsControllerGetTlsAssetsQueryOptions(options);
+  const queryOptions = getAssetsControllerGetTlsAssetsQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -15553,7 +16073,7 @@ export const useVulnerabilitiesControllerScan = <
  * @summary Get vulnerabilities
  */
 export const vulnerabilitiesControllerGetVulnerabilities = (
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -15587,7 +16107,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesInfiniteQueryOptions 
     >,
     TError = unknown,
   >(
-    params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+    params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
     options?: {
       query?: Partial<
         UseInfiniteQueryOptions<
@@ -15643,7 +16163,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params: undefined | VulnerabilitiesControllerGetVulnerabilitiesParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -15680,7 +16200,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -15717,7 +16237,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -15745,7 +16265,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesInfinite<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -15786,7 +16306,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesQueryOptions = <
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15828,7 +16348,7 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params: undefined | VulnerabilitiesControllerGetVulnerabilitiesParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -15861,7 +16381,7 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15894,7 +16414,7 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -15919,7 +16439,7 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -25574,6 +26094,103 @@ export const useNotificationsControllerMarkAsRead = <
 > => {
   const mutationOptions =
     getNotificationsControllerMarkAsReadMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * @summary Upload app logo to system bucket
+ */
+export const storageControllerUploadLogo = (
+  storageControllerUploadLogoBody: StorageControllerUploadLogoBody,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`file`, storageControllerUploadLogoBody.file);
+
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/storage/logo`,
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data' },
+      data: formData,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerUploadLogoMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    TError,
+    { data: StorageControllerUploadLogoBody },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  const mutationKey = ['storageControllerUploadLogo'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+    { data: StorageControllerUploadLogoBody }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerUploadLogo(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StorageControllerUploadLogoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>
+>;
+export type StorageControllerUploadLogoMutationBody =
+  StorageControllerUploadLogoBody;
+export type StorageControllerUploadLogoMutationError = void;
+
+/**
+ * @summary Upload app logo to system bucket
+ */
+export const useStorageControllerUploadLogo = <
+  TError = void,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+      TError,
+      { data: StorageControllerUploadLogoBody },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerUploadLogo>>,
+  TError,
+  { data: StorageControllerUploadLogoBody },
+  TContext
+> => {
+  const mutationOptions =
+    getStorageControllerUploadLogoMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

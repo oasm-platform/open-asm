@@ -190,7 +190,7 @@ export function DataTable<TData, TValue>({
   return (
     <div className="w-full">
       <div className="flex flex-col gap-2 md:flex-row-reverse md:justify-between md:items-center mb-2">
-        <div className="flex gap-2 w-full justify-end md:w-auto">
+        <div className="flex gap-2 flex-col w-full justify-end md:w-auto">
           {toolbarComponents.map((c, i) => (
             <div key={i}>{c}</div>
           ))}

@@ -1,14 +1,14 @@
 import Page from '@/components/common/page';
-import CreateMcpPermission from './components/create-mcp-permission';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useEffect, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import CreateWorkspaceDialog from '../workspaces/create-workspace-dialog';
 import AccountSettings from './components/account-settings';
+import ConfigsSettings from './components/configs';
+import CreateMcpPermission from './components/create-mcp-permission';
 import ListMcpPermissions from './components/list-mcp-permissions';
 import ListWorkspaces from './components/list-workspaces';
 import { ThemeSwitcher } from './components/theme-switcher';
-import { WorkspaceConfigs } from './components/workspace-configs';
 
 interface TabContentProps {
   title: string;
@@ -92,9 +92,9 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
       label: 'Configs',
       content: {
         title: 'Configs',
-        description: 'Manage your workspace configs',
+        description: '',
       },
-      component: <WorkspaceConfigs />,
+      component: <ConfigsSettings />,
     },
   ];
 
@@ -108,7 +108,7 @@ const Settings = ({ defaultTab = 'account' }: SettingsProps) => {
           onValueChange={handleTabChange}
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-5 max-w-lg mb-4">
+          <TabsList className="grid w-full grid-cols-5 max-w-5xl mb-4">
             {settingsTabs.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id}>
                 {tab.label}

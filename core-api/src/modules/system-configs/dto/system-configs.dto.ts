@@ -9,7 +9,7 @@ export class SystemConfigResponseDto {
   name: string;
 
   @ApiProperty({ description: 'Path to system logo', nullable: true })
-  logoPath?: string;
+  logoPath?: string | null;
 }
 
 /**
@@ -24,5 +24,5 @@ export class UpdateSystemConfigDto {
   @ApiPropertyOptional({ description: 'Path to system logo' })
   @IsOptional()
   @IsString()
-  logoPath?: string;
+  logoPath?: string | null;
 }

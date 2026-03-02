@@ -51,7 +51,7 @@ export function StatusFilter({ value, onValueChange }: StatusFilterProps) {
         onValueChange(val as VulnerabilitiesControllerGetVulnerabilitiesStatus)
       }
     >
-      <SelectTrigger className="w-[140px] h-8">
+      <SelectTrigger className="border-dashed text-xs py-0">
         <SelectValue placeholder="Status" />
       </SelectTrigger>
       <SelectContent>

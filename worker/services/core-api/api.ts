@@ -533,11 +533,18 @@ export interface UpdateLLMConfigDto {
   apiUrl?: string;
 }
 
+export interface SystemConfigResponseDto {
+  /** System name */
+  name: string;
+  /** Path to system logo */
+  logoPath: object | null;
+}
+
 export interface UpdateSystemConfigDto {
   /** System name */
   name?: string;
   /** Path to system logo */
-  logoPath?: string;
+  logoPath?: object;
 }
 
 export interface Asset {
@@ -561,9 +568,11 @@ export interface Tool {
   updatedAt: string;
   name: string;
   description: string;
+  command: string;
   category: ToolCategoryEnum;
   version: string;
   logoUrl?: string | null;
+  isBuiltIn: boolean;
   isInstalled: boolean;
   isOfficialSupport: boolean;
   type: string;
@@ -656,7 +665,7 @@ export interface GetNextJobResponseDto {
 
 export interface DataPayloadResult {
   error: boolean;
-  raw: string;
+  raw: object;
   payload: object;
 }
 
@@ -908,9 +917,13 @@ export interface GetTlsResponseDto {
   host: string;
   sni: string;
   subject_dn: string;
+  subject_cn: string;
+  issuer_dn: string;
   subject_an: string[];
   not_after: string;
   not_before: string;
+  tls_version: string;
+  cipher: string;
   tls_connection: string;
 }
 
@@ -950,6 +963,7 @@ export interface WorkerInstance {
   type: string;
   scope: string;
   tool: Tool;
+  tools: Tool[];
 }
 
 export interface WorkerJoinDto {
@@ -1063,6 +1077,11 @@ export interface StatisticResponseDto {
    * @example 7.5
    */
   score: number;
+  /**
+   * Number of services
+   * @example 100
+   */
+  services: number;
 }
 
 export interface Statistic {
@@ -1121,6 +1140,11 @@ export interface Statistic {
    * @default 0
    */
   ports: number;
+  /**
+   * Number of services
+   * @default 0
+   */
+  services: number;
   /**
    * Security score
    * @default 0
@@ -1917,6 +1941,14 @@ export enum VulnerabilitiesControllerGetVulnerabilitiesParamsStatusEnum {
   Open = "open",
   Dismissed = "dismissed",
   All = "all",
+}
+
+export enum VulnerabilitiesControllerGetVulnerabilitiesParamsSeverityEnum {
+  Info = "info",
+  Low = "low",
+  Medium = "medium",
+  High = "high",
+  Critical = "critical",
 }
 
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
@@ -3021,6 +3053,22 @@ export class Api<
     });
 
   /**
+   * @description Retrieves the current system configuration settings
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerGetConfig
+   * @summary Get system configuration
+   * @request GET:/api/system-configs
+   */
+  systemConfigsControllerGetConfig = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Updates the system configuration settings
    *
    * @tags System Configs
@@ -3037,6 +3085,22 @@ export class Api<
       method: "PUT",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Removes the system logo and reverts to default avatar
+   *
+   * @tags System Configs
+   * @name SystemConfigsControllerRemoveLogo
+   * @summary Remove system logo
+   * @request DELETE:/api/system-configs/logo
+   */
+  systemConfigsControllerRemoveLogo = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/system-configs/logo`,
+      method: "DELETE",
       format: "json",
       ...params,
     });
@@ -3061,6 +3125,8 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
       jobHistoryId?: string;
+      jobStatus?: string;
+      workspaceId?: string;
     },
     params: RequestParams = {},
   ) =>
@@ -3449,17 +3515,33 @@ export class Api<
     });
 
   /**
-   * @description Retrieves a list of TLS certificates expiring soon.
+   * @description Retrieves a paginated list of TLS certificates with filtering and sorting support.
    *
    * @tags Assets
    * @name AssetsControllerGetTlsAssets
    * @summary Get TLS certificates
    * @request GET:/api/assets/tls
    */
-  assetsControllerGetTlsAssets = (params: RequestParams = {}) =>
+  assetsControllerGetTlsAssets = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      hosts?: string[];
+      targetIds?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/tls`,
       method: "GET",
+      query: query,
       format: "json",
       ...params,
     });
@@ -3841,7 +3923,7 @@ export class Api<
    * @request GET:/api/vulnerabilities
    */
   vulnerabilitiesControllerGetVulnerabilities = (
-    query: {
+    query?: {
       search?: string;
       /** @example 1 */
       page?: number;
@@ -3851,7 +3933,6 @@ export class Api<
       sortBy?: string;
       /** @example "DESC" */
       sortOrder?: string;
-      workspaceId: string;
       targetIds?: string[];
       q?: string;
       /**
@@ -3859,6 +3940,18 @@ export class Api<
        * @default "open"
        */
       status?: VulnerabilitiesControllerGetVulnerabilitiesParamsStatusEnum;
+      /** Filter by severity levels: info, low, medium, high, critical */
+      severity?: VulnerabilitiesControllerGetVulnerabilitiesParamsSeverityEnum[];
+      /**
+       * Filter by creation date from (ISO 8601 format, e.g., 2026-01-01)
+       * @example "2026-01-01"
+       */
+      createdFrom?: string;
+      /**
+       * Filter by creation date to (ISO 8601 format, e.g., 2026-01-31)
+       * @example "2026-01-31"
+       */
+      createdTo?: string;
     },
     params: RequestParams = {},
   ) =>
@@ -5100,6 +5193,30 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/notifications/${id}/read`,
       method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Storage
+   * @name StorageControllerUploadLogo
+   * @summary Upload app logo to system bucket
+   * @request POST:/api/storage/logo
+   */
+  storageControllerUploadLogo = (
+    data: {
+      /** @format binary */
+      file: File;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<DefaultMessageResponseDto, any>({
+      path: `/api/storage/logo`,
+      method: "POST",
+      body: data,
+      type: ContentType.FormData,
       format: "json",
       ...params,
     });

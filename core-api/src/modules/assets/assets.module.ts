@@ -9,11 +9,19 @@ import { AssetsService } from './assets.service';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
 import { HttpResponse } from './entities/http-response.entity';
+import { TlsAssetsView } from './entities/tls-assets.entity';
 
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Asset, Job, Target, HttpResponse, AssetService]),
+    TypeOrmModule.forFeature([
+      Asset,
+      Job,
+      Target,
+      HttpResponse,
+      AssetService,
+      TlsAssetsView,
+    ]),
     TechnologyModule,
     WorkspacesModule,
   ],

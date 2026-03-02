@@ -16,7 +16,7 @@ export class Template extends BaseEntity {
   path?: string;
 
   @ManyToOne(() => Workspace, (workspace) => workspace.templates, {
-    cascade: true,
+    onDelete: 'CASCADE',
   })
   workspace: Workspace;
 }

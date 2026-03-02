@@ -26,10 +26,20 @@ export class WorkerInstance extends BaseEntity {
   @Column({ type: 'enum', enum: WorkerScope, default: WorkerScope.WORKSPACE })
   scope: WorkerScope;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.workers)
+  @ManyToOne(() => Workspace, (workspace) => workspace.workers, {
+    onDelete: 'CASCADE',
+  })
   workspace: Workspace;
 
   @ApiProperty({ type: () => Tool })
   @ManyToOne(() => Tool, (tool) => tool.workers)
   tool: Tool;
+
+  /**
+   * Active tools on this worker.
+   * For BUILT_IN workers: returns all built-in tools (array).
+   * For PROVIDER workers: returns the current tool (array with single element).
+   */
+  @ApiProperty({ isArray: true, type: () => Tool })
+  tools?: Tool[];
 }

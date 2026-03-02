@@ -259,6 +259,8 @@ export class TargetsService implements OnModuleInit {
       workspace: { id: workspaceId },
     });
 
+    await this.repo.delete(id);
+
     if (!workspaceTarget) {
       throw new NotFoundException('Target not found in workspace');
     }

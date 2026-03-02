@@ -7,6 +7,37 @@ import { ThemeProvider } from './components/ui/theme-provider';
 
 import { router } from './routers';
 
+// Import React for useEffect
+import React from 'react';
+
+// Import hook for metadata
+import {
+  getRootControllerGetMetadataQueryKey,
+  useRootControllerGetMetadata,
+} from './services/apis/gen/queries';
+
+// Hook to update document title based on metadata
+function useMetadataTitle() {
+  const { data: metadata } = useRootControllerGetMetadata({
+    query: {
+      queryKey: getRootControllerGetMetadataQueryKey(),
+    },
+  });
+
+  React.useEffect(() => {
+    if (metadata?.name) {
+      document.title = metadata.name;
+    }
+  }, [metadata]);
+}
+
+// MetadataProvider component
+function MetadataProvider({ children }: { children: React.ReactNode }) {
+  useMetadataTitle();
+
+  return <>{children}</>;
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -28,16 +59,18 @@ const localStoragePersister = createAsyncStoragePersister({
 persistQueryClient({
   queryClient,
   persister: localStoragePersister,
-  maxAge: 1000 * 60 * 60 * 24,
+  maxAge: 1000 * 60 * 24,
 });
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="dark" storageKey="theme">
-        <RouterProvider router={router} />
-        <Toaster position="bottom-center" />
-      </ThemeProvider>
+      <MetadataProvider>
+        <ThemeProvider defaultTheme="dark" storageKey="theme">
+          <RouterProvider router={router} />
+          <Toaster position="bottom-center" />
+        </ThemeProvider>
+      </MetadataProvider>
     </QueryClientProvider>
   );
 }

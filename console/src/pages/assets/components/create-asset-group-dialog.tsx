@@ -70,7 +70,7 @@ export function CreateAssetGroupDialog({
         onSuccess: (response: AssetGroup) => {
           setCreateDialogOpen(false);
           onSuccess?.();
-          navigate(`/assets/groups/${response.id}`);
+          navigate(`/groups/${response.id}`);
           form.reset();
         },
       },

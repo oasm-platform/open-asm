@@ -76,8 +76,21 @@ export class VulnerabilitiesService {
    *                including page, limit, sortOrder, targetIds, workspaceId, and optional search query 'q'.
    * @returns A promise that resolves to a paginated list of vulnerabilities, including total count and pagination information.
    */
-  async getVulnerabilities(query: GetVulnerabilitiesQueryDto) {
-    const { limit, page, sortOrder, targetIds, workspaceId, q, status } = query;
+  async getVulnerabilities(
+    query: GetVulnerabilitiesQueryDto,
+    workspaceId: string,
+  ) {
+    const {
+      limit,
+      page,
+      sortOrder,
+      targetIds,
+      q,
+      status,
+      severity,
+      createdFrom,
+      createdTo,
+    } = query;
 
     const { sortBy } = query;
 
@@ -119,6 +132,28 @@ export class VulnerabilitiesService {
       queryBuilder.andWhere('dismissal.vulnerabilityId IS NULL');
     } else if (status === VulnerabilityStatus.DISMISSED) {
       queryBuilder.andWhere('dismissal.vulnerabilityId IS NOT NULL');
+    }
+
+    // Filter by severity levels
+    if (Array.isArray(severity) && severity.length > 0) {
+      queryBuilder.andWhere('vulnerabilities.severity IN (:...severity)', {
+        severity,
+      });
+    }
+
+    // Filter by creation date range
+    if (createdFrom) {
+      queryBuilder.andWhere('vulnerabilities.createdAt >= :createdFrom', {
+        createdFrom: new Date(createdFrom),
+      });
+    }
+    if (createdTo) {
+      // Set time to end of day (23:59:59.999) to include the entire day
+      const endDate = new Date(createdTo);
+      endDate.setHours(23, 59, 59, 999);
+      queryBuilder.andWhere('vulnerabilities.createdAt <= :createdTo', {
+        createdTo: endDate,
+      });
     }
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();

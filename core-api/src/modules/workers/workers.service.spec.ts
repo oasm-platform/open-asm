@@ -7,6 +7,7 @@ import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
+import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
 
@@ -18,6 +19,7 @@ describe('WorkersService', () => {
   let mockJobsRegistryService: Partial<JobsRegistryService>;
   let mockApiKeysService: Partial<ApiKeysService>;
   let mockConfigService: Partial<ConfigService>;
+  let mockToolsService: Partial<ToolsService>;
 
   beforeEach(async () => {
     mockWorkerInstanceRepository = {
@@ -69,6 +71,10 @@ describe('WorkersService', () => {
       get: jest.fn(),
     } as any;
 
+    mockToolsService = {
+      getBuiltInTools: jest.fn().mockResolvedValue({ data: [] }),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkersService,
@@ -95,6 +101,10 @@ describe('WorkersService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: ToolsService,
+          useValue: mockToolsService,
         },
       ],
     }).compile();

@@ -10,6 +10,7 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import { AssetsService } from './assets.service';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
+import { TlsAssetsView } from './entities/tls-assets.entity';
 
 describe('AssetsService', () => {
   let service: AssetsService;
@@ -95,6 +96,10 @@ describe('AssetsService', () => {
         {
           provide: getRepositoryToken(Target),
           useValue: mockTargetRepository,
+        },
+        {
+          provide: getRepositoryToken(TlsAssetsView),
+          useValue: {},
         },
         {
           provide: EventEmitter2,

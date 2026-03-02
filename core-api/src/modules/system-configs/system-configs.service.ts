@@ -1,8 +1,9 @@
-import { APP_NAME } from '@/common/constants/app.constants';
+import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { StorageService } from '../storage/storage.service';
 import {
   SystemConfigResponseDto,
   UpdateSystemConfigDto,
@@ -15,11 +16,12 @@ import { SystemConfig } from './entities/system-config.entity';
  */
 @Injectable()
 export class SystemConfigsService {
-  private static readonly DEFAULT_SYSTEM_NAME = APP_NAME;
+  private static readonly DEFAULT_SYSTEM_NAME = 'OASM';
 
   constructor(
     @InjectRepository(SystemConfig)
     private readonly systemConfigRepository: Repository<SystemConfig>,
+    private storageService: StorageService,
   ) {}
 
   /**
@@ -32,7 +34,9 @@ export class SystemConfigsService {
 
     return {
       name: config.name,
-      logoPath: config.logoPath,
+      logoPath: config.logoPath
+        ? `${STORAGE_BASE_PATH}/${config.logoPath}`
+        : null,
     };
   }
 
@@ -46,18 +50,33 @@ export class SystemConfigsService {
     dto: UpdateSystemConfigDto,
   ): Promise<DefaultMessageResponseDto> {
     const config = await this.findOrCreateConfig();
+    config.name = dto.name || SystemConfigsService.DEFAULT_SYSTEM_NAME;
 
-    if (dto.name !== undefined) {
-      config.name = dto.name;
-    }
-
+    // Handle logoPath update: allow null to clear the logo, and string values to update it
     if (dto.logoPath !== undefined) {
-      config.logoPath = dto.logoPath;
+      config.logoPath = dto.logoPath; // Can be string or null
     }
 
     await this.systemConfigRepository.save(config);
 
     return { message: 'System configuration updated successfully' };
+  }
+
+  /**
+   * Remove the system logo and revert to default avatar
+   * Creates default config if none exists before updating
+   * @returns Success message
+   */
+  async removeLogo(): Promise<DefaultMessageResponseDto> {
+    const config = await this.findOrCreateConfig();
+    if (config.logoPath) {
+      const [bucket, fileName] = config.logoPath.split('/');
+      this.storageService.deleteFile(fileName, bucket);
+      config.logoPath = null;
+      await this.systemConfigRepository.save(config);
+      return { message: 'System logo removed successfully' };
+    }
+    return { message: 'No system logo to remove' };
   }
 
   /**

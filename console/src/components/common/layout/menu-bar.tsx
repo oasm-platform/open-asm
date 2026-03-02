@@ -45,7 +45,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {
           title: 'Dashboard',
           icon: <LayoutDashboard />,
-          url: '',
+          url: '/',
         },
       ],
     },
@@ -72,7 +72,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {
           title: 'Groups',
           icon: <Group />,
-          url: 'assets/groups',
+          url: '/groups',
           isNew: false,
         },
         {
@@ -98,6 +98,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         },
       ],
     },
+
     {
       title: 'Management',
       url: '#',
@@ -141,11 +142,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenu className="gap-0.5">
                 {item.items.map((item) => {
                   // Ensure all URLs are absolute for comparison
-                  const toUrl = item.url.startsWith('/')
-                    ? item.url
-                    : `/${item.url}`;
-                  const isActive = location.pathname === toUrl;
-
+                  const toUrl = item.url;
+                  const isActive =
+                    `/${location.pathname.split('/')[1]}` === toUrl;
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton

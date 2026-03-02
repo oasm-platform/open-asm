@@ -6,6 +6,7 @@ interface PageProps {
   children?: React.ReactNode;
   title?: string | React.ReactNode;
   header?: React.ReactNode;
+  action?: React.ReactNode;
   isShowButtonGoBack?: boolean;
   className?: string;
 }
@@ -13,13 +14,14 @@ const Page = ({
   children,
   title,
   header,
+  action,
   isShowButtonGoBack,
   className,
 }: PageProps) => {
   const navigate = useNavigate();
 
   return (
-    <div className={className + ' h-full flex flex-col gap-4'}>
+    <div className={(className || '') + ' h-full flex flex-col gap-4'}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 mr-3">
           {isShowButtonGoBack && (
@@ -31,7 +33,10 @@ const Page = ({
             <h3 className="text-2xl font-bold tracking-tight">{title}</h3>
           )}
         </div>
-        <div className="flex w-ful">{header}</div>
+        <div className="flex items-center gap-2">
+          {header}
+          {action}
+        </div>
       </div>
       <div className="overflow-hidden">{children}</div>
     </div>

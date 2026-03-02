@@ -15,6 +15,7 @@ import { AssetTag } from './asset-tags.entity';
 import { Asset } from './assets.entity';
 import { HttpResponse } from './http-response.entity';
 import { StatusCodeAssetsView } from './status-code-assets.entity';
+import { TlsAssetsView } from './tls-assets.entity';
 
 @Entity('asset_services')
 @Unique(['assetId', 'port'])
@@ -54,6 +55,9 @@ export class AssetService extends BaseEntity {
     (statusCodeAssets) => statusCodeAssets.assetService,
   )
   statusCodeAssets?: StatusCodeAssetsView[];
+
+  @OneToMany(() => TlsAssetsView, (tlsAssets) => tlsAssets.assetService)
+  tlsAssets?: TlsAssetsView[];
 
   @OneToMany(() => AssetTag, (assetTag) => assetTag.assetService, {
     onDelete: 'CASCADE',

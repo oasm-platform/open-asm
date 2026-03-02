@@ -18,4 +18,4 @@ import { WorkspacesService } from './workspaces.service';
   providers: [WorkspacesService],
   exports: [WorkspacesService],
 })
-export class WorkspacesModule { }
+export class WorkspacesModule {}

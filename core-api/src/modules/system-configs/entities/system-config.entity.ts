@@ -14,5 +14,5 @@ export class SystemConfig extends BaseEntity {
 
   @ApiProperty({ description: 'Path to system logo', nullable: true })
   @Column('text', { nullable: true })
-  logoPath?: string;
+  logoPath?: string | null;
 }

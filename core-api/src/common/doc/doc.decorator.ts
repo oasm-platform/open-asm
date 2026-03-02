@@ -70,11 +70,12 @@ function applyOperationDecorators<T>(
 ): MethodDecorator[] {
   const decorators: MethodDecorator[] = [];
 
-  if (options?.description || options?.summary) {
+  if (options?.description || options?.summary || options?.operationId) {
     decorators.push(
       ApiOperation({
         description: options.description,
         summary: options.summary,
+        operationId: options.operationId,
       }),
     );
   }

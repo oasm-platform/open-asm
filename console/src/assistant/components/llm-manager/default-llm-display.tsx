@@ -78,6 +78,11 @@ export function DefaultLLMDisplay({
                   <span className="text-[10px] text-zinc-500 font-mono">
                     Model: {config.model}
                   </span>
+                  {config.apiUrl && (
+                    <span className="text-[10px] text-zinc-500 font-mono truncate max-w-[200px]">
+                      URL: {config.apiUrl}
+                    </span>
+                  )}
                 </div>
                 {preferredProvider === config.provider && (
                   <Check className="w-4 h-4 text-primary" />
