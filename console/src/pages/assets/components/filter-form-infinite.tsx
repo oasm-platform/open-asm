@@ -11,6 +11,7 @@ import {
   PortFacetedFilter,
   StatusCodesFacetedFilter,
   TechsFacetedFilter,
+  TlsFacetedFilter,
 } from './faceted-filter';
 
 export default function FilterFormInfinite() {
@@ -26,7 +27,14 @@ export default function FilterFormInfinite() {
     setFilter(debouncedValue);
   }, [debouncedValue, setFilter]);
 
-  const facets = ['ipAddresses', 'statusCodes', 'techs', 'ports', 'hosts'];
+  const facets = [
+    'ipAddresses',
+    'statusCodes',
+    'techs',
+    'ports',
+    'hosts',
+    'tlsHosts',
+  ];
   const isFiltered = facets.some((e: string) => params.has(e));
 
   return (
@@ -44,6 +52,7 @@ export default function FilterFormInfinite() {
           <TechsFacetedFilter />
           <StatusCodesFacetedFilter />
           <HostsFacetedFilter />
+          <TlsFacetedFilter />
         </div>
         {isFiltered && (
           <Button

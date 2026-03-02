@@ -22,7 +22,7 @@ import { GetPortAssetsDTO } from './dto/get-port-assets.dto';
 import { GetStatusCodeAssetsDTO } from './dto/get-status-code-assets.dto';
 import { GetTechnologyAssetsDTO } from './dto/get-technology-assets.dto';
 import { SwitchAssetDto } from './dto/switch-asset.dto';
-import { GetTlsResponseDto } from './dto/tls.dto';
+import { GetTlsResponseDto, GetTlsQueryDto } from './dto/tls.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
 
@@ -141,7 +141,8 @@ export class AssetsController {
 
   @Doc({
     summary: 'Get TLS certificates',
-    description: 'Retrieves a list of TLS certificates expiring soon.',
+    description:
+      'Retrieves a paginated list of TLS certificates with filtering and sorting support.',
     response: {
       serialization: GetManyResponseDto(GetTlsResponseDto),
     },
@@ -150,8 +151,11 @@ export class AssetsController {
     },
   })
   @Get('/tls')
-  getTlsAssets(@WorkspaceId() workspaceId: string) {
-    return this.assetsService.getManyTls(workspaceId);
+  getTlsAssets(
+    @Query() query: GetTlsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.assetsService.getManyTls(query, workspaceId);
   }
 
   @Doc({
