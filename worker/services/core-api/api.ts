@@ -912,9 +912,13 @@ export interface GetTlsResponseDto {
   host: string;
   sni: string;
   subject_dn: string;
+  subject_cn: string;
+  issuer_dn: string;
   subject_an: string[];
   not_after: string;
   not_before: string;
+  tls_version: string;
+  cipher: string;
   tls_connection: string;
 }
 
@@ -3506,17 +3510,33 @@ export class Api<
     });
 
   /**
-   * @description Retrieves a list of TLS certificates expiring soon.
+   * @description Retrieves a paginated list of TLS certificates with filtering and sorting support.
    *
    * @tags Assets
    * @name AssetsControllerGetTlsAssets
    * @summary Get TLS certificates
    * @request GET:/api/assets/tls
    */
-  assetsControllerGetTlsAssets = (params: RequestParams = {}) =>
+  assetsControllerGetTlsAssets = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      hosts?: string[];
+      targetIds?: string[];
+    },
+    params: RequestParams = {},
+  ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/assets/tls`,
       method: "GET",
+      query: query,
       format: "json",
       ...params,
     });

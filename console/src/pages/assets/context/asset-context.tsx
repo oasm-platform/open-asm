@@ -16,6 +16,7 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ipAddresses?: string[];
     ports?: string[];
     techs?: string[];
+    tlsHosts?: string[];
     statusCodes?: string[];
     hosts?: string[];
     page: number;
@@ -42,6 +43,7 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ports?: string[];
     hosts?: string[];
     statusCodes?: string[];
+    tlsHosts?: string[];
   };
   filterHandlers: (key: string, value: string[]) => void;
   generatingAssets: Set<string>;
@@ -76,6 +78,7 @@ export default function AssetProvider({
   const techs = params.getAll('techs');
   const hosts = params.getAll('hosts');
   const statusCodes = params.getAll('statusCodes');
+  const tlsHosts = params.getAll('tlsHosts');
 
   const filterHandlers = useCallback(
     (key: string, value: string[]) => {
@@ -124,6 +127,7 @@ export default function AssetProvider({
       techs: techs,
       hosts: hosts,
       statusCodes: statusCodes,
+      tlsHosts: tlsHosts,
       page: tableParams.page,
       sortBy: tableParams.sortBy,
       sortOrder: tableParams.sortOrder,
@@ -140,6 +144,7 @@ export default function AssetProvider({
       techs,
       hosts,
       statusCodes,
+      tlsHosts,
     ],
   );
 
@@ -168,6 +173,7 @@ export default function AssetProvider({
           techs,
           hosts,
           statusCodes,
+          tlsHosts,
         ],
       },
     }),
@@ -184,6 +190,7 @@ export default function AssetProvider({
       techs,
       hosts,
       statusCodes,
+      tlsHosts,
     ],
   );
 
@@ -202,6 +209,7 @@ export default function AssetProvider({
           techs,
           hosts,
           statusCodes,
+          tlsHosts,
         },
         filterHandlers,
         targetId,
