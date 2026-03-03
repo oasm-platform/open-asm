@@ -26,7 +26,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { randomUUID } from 'crypto';
+import { v7 } from 'uuid';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
 import { StorageService } from './storage.service';
 
@@ -105,7 +105,7 @@ export class StorageController {
     }
 
     // Upload file with fixed filename "logo.{extension}" to "system" bucket
-    const filename = `logo-${randomUUID()}.${extension}`;
+    const filename = `logo-${v7()}.${extension}`;
     const bucket = 'system';
     const result = this.storageService.uploadFile(
       filename,
@@ -179,7 +179,7 @@ export class StorageController {
       throw new BadRequestException(`File type .${extension} is not allowed`);
     }
 
-    const filename = `${randomUUID()}.${extension}`;
+    const filename = `${v7()}.${extension}`;
     const result = this.storageService.uploadFile(
       filename,
       file.buffer,

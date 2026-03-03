@@ -17,7 +17,7 @@ export class GetManyWorkflowsQueryDto extends GetManyBaseQueryParams {
  */
 export class GetManyWorkflowsResponseDto {
     @ApiProperty({ description: 'The unique identifier of the workflow' })
-    @IsUUID('4')
+    @IsUUID('all')
     id: string;
 
     @ApiProperty({ description: 'The name of the workflow' })

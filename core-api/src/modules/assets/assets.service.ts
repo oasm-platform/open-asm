@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { v7 } from 'uuid';
 import { Brackets, DataSource, Repository } from 'typeorm';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyDetailDTO } from '../technology/dto/technology-detail.dto';
@@ -261,7 +261,7 @@ export class AssetsService {
     }
 
     return this.assetRepo.save({
-      id: randomUUID(),
+      id: v7(),
       target,
       value,
       isPrimary: true,

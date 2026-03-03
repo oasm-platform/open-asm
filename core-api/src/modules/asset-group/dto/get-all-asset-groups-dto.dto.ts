@@ -8,7 +8,7 @@ export class GetAllAssetGroupsQueryDto extends GetManyBaseQueryParams {
     required: false,
     isArray: true,
   })
-  @IsUUID(4, { each: true })
+  @IsUUID('all', { each: true })
   @IsOptional()
   @Transform(({ value }): string[] => (Array.isArray(value) ? value : [value]))
   targetIds?: string[];

@@ -77,7 +77,7 @@ The guidance about comments in tests is particularly important. Tests should be 
 - Clear categorization: unit / integration / e2e
 
 **Rules:**
-- New business logic ’ **tests are required**
+- New business logic **tests are required**
 - All external dependencies must be mocked
 - Test data must reflect real scenarios
 
@@ -132,7 +132,7 @@ cd console && npm run test -- --coverage
 ```
 
 - Verify coverage meets targets
-- Run tests multiple times ’ **no flakiness**
+- Run tests multiple times **no flakiness**
 - Avoid slow tests that block CI
 
 ### 6. Documentation & Comments

@@ -44,7 +44,7 @@ The guidance about comments reflects the understanding that refactoring is about
 ### 0. Non-Negotiable Principles
 
 1. **Strict Behavior Preservation**
-   - Same input ’ **exact same output** as before refactoring
+   - Same input **exact same output** as before refactoring
    - No changes to side-effects, error handling, timing, or public contracts
 
 2. **Tests Are the Source of Truth**
@@ -54,7 +54,7 @@ The guidance about comments reflects the understanding that refactoring is about
 3. **Clear Separation**
    - Refactoring ` Feature development
    - Refactoring ` Bug fixing
-   - If logic must change ’ **stop and create a separate PR**
+   - If logic must change **stop and create a separate PR**
 
 4. **Incremental & Safe Changes**
    - Small, controlled steps
@@ -87,19 +87,19 @@ Select **only 12 techniques per iteration**:
 
 **Test Existence Gate (Hard Rule):**
 - For **every service file being refactored**:
-  - If **no corresponding test file exists** ’ **tests MUST be added first**
+  - If **no corresponding test file exists** **tests MUST be added first**
   - New tests must describe the **current (legacy) behavior** exactly
   - **Refactoring is forbidden** until:
     - The new tests pass 100%
     - Tests accurately lock in existing behavior
 
->   These tests exist to **freeze current behavior**, not to improve or change logic.
+> ï¿½ These tests exist to **freeze current behavior**, not to improve or change logic.
 
 **Establish Baseline:**
 Before modifying any production code:
 1. Run **all related tests** (including newly added ones)
 2. Verify: All tests **pass**
-3. If any test fails ’ **stop refactoring and handle separately**
+3. If any test fails **stop refactoring and handle separately**
 
 ### 3. Refactoring Implementation
 
@@ -137,7 +137,7 @@ After **each small refactoring step**:
   - Skipping tests
   - Updating snapshots just to make tests pass
 
->   New tests may be added **only if**:
+> ï¿½ New tests may be added **only if**:
 > - Existing behavior is not fully covered
 > - New tests describe **existing behavior**, not new behavior
 

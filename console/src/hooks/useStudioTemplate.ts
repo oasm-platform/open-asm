@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { v4 } from 'uuid';
+import { v7 } from 'uuid';
 import createState from './createState';
 
 export type Template = {
@@ -11,7 +11,7 @@ export type Template = {
 };
 
 export const defaultTemplate: Template = {
-  id: v4(),
+  id: v7(),
   filename: `example-template.yaml`,
   isSaved: false,
   isCreate: true,
@@ -57,7 +57,7 @@ const useStudioTemplatesState = createState<{
       );
 
       if (updatedTemplates.length === 0) {
-        updatedTemplates = [{ ...defaultTemplate, id: v4() }];
+        updatedTemplates = [{ ...defaultTemplate, id: v7() }];
       }
 
       return {
@@ -118,7 +118,7 @@ export const useStudioTemplate = () => {
   );
 
   const addDefaultTemplate = useCallback(() => {
-    const template = { ...defaultTemplate, id: v4() };
+    const template = { ...defaultTemplate, id: v7() };
     add(template);
     setActiveId(template.id);
   }, [add, setActiveId]);
