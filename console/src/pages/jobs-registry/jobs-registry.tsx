@@ -1,6 +1,7 @@
 import Page from '@/components/common/page';
 import { DataTable } from '@/components/ui/data-table';
 import JobStatusBadge from '@/components/ui/job-status';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   type JobHistoryResponseDto,
   JobStatus,
@@ -10,16 +11,15 @@ import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { Calendar } from 'lucide-react';
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 dayjs.extend(duration);
 
 const JobsRegistryPage = () => {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const {
+    tableParams: { page, pageSize, sortBy, sortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
+  } = useServerDataTable();
 
   const {
     data: jobsData,
@@ -110,10 +110,8 @@ const JobsRegistryPage = () => {
         onPageSizeChange={setPageSize}
         sortBy={sortBy}
         sortOrder={sortOrder}
-        onSortChange={(newSortBy, newSortOrder) => {
-          setSortBy(newSortBy);
-          setSortOrder(newSortOrder);
-          setPage(1); // Reset to first page when sorting changes
+        onSortChange={(col, order) => {
+          setParams({ sortBy: col, sortOrder: order, page: 1 });
         }}
         showPagination={true}
         onRowClick={(row) => {

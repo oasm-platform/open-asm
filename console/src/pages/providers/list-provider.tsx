@@ -1,42 +1,42 @@
-import { type ColumnDef } from "@tanstack/react-table";
-import { useNavigate } from "react-router-dom";
+import { type ColumnDef } from '@tanstack/react-table';
+import { useNavigate } from 'react-router-dom';
 
-import { DataTable } from "@/components/ui/data-table";
-import { useProvidersControllerGetManyProviders } from "@/services/apis/gen/queries";
+import { DataTable } from '@/components/ui/data-table';
+import { useProvidersControllerGetManyProviders } from '@/services/apis/gen/queries';
 
-import { Badge } from "@/components/ui/badge";
-import { useServerDataTable } from "@/hooks/useServerDataTable";
-import type { ToolProvider } from "@/services/apis/gen/queries";
+import { Badge } from '@/components/ui/badge';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
+import type { ToolProvider } from '@/services/apis/gen/queries';
 
 const providerColumns: ColumnDef<ToolProvider>[] = [
   {
-    accessorKey: "name",
-    header: "Name",
+    accessorKey: 'name',
+    header: 'Name',
     cell: ({ row }) => (
-      <div className="font-medium">{row.getValue("name")}</div>
+      <div className="font-medium">{row.getValue('name')}</div>
     ),
   },
   {
-    accessorKey: "code",
-    header: "Code",
+    accessorKey: 'code',
+    header: 'Code',
     cell: ({ row }) => {
-      const value: string = row.getValue("code");
+      const value: string = row.getValue('code');
       return <div className="text-gray-500">{value}</div>;
     },
   },
   {
-    accessorKey: "company",
-    header: "Company",
+    accessorKey: 'company',
+    header: 'Company',
     cell: ({ row }) => {
-      const value: string = row.getValue("company");
-      return <div>{value || "-"}</div>;
+      const value: string = row.getValue('company');
+      return <div>{value || '-'}</div>;
     },
   },
   {
-    accessorKey: "websiteUrl",
-    header: "Website",
+    accessorKey: 'websiteUrl',
+    header: 'Website',
     cell: ({ row }) => {
-      const value: string = row.getValue("websiteUrl");
+      const value: string = row.getValue('websiteUrl');
       return (
         <div className="text-blue-500 hover:underline">
           {value ? (
@@ -44,24 +44,24 @@ const providerColumns: ColumnDef<ToolProvider>[] = [
               Visit
             </a>
           ) : (
-            "-"
+            '-'
           )}
         </div>
       );
     },
   },
   {
-    accessorKey: "isActive",
-    header: "Status",
+    accessorKey: 'isActive',
+    header: 'Status',
     cell: ({ row }) => {
-      const value: boolean = row.getValue("isActive");
+      const value: boolean = row.getValue('isActive');
       return (
         <div className="flex items-center">
           <Badge
-            variant={value ? "default" : "destructive"}
+            variant={value ? 'default' : 'destructive'}
             className="text-xs font-medium"
           >
-            {value ? "Active" : "Inactive"}
+            {value ? 'Active' : 'Inactive'}
           </Badge>
         </div>
       );
@@ -73,7 +73,7 @@ export function ListProviders() {
   const navigate = useNavigate();
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder, setFilter },
+    tableHandlers: { setPage, setPageSize, setFilter, setParams },
   } = useServerDataTable();
 
   const { data, isLoading } = useProvidersControllerGetManyProviders(
@@ -87,7 +87,7 @@ export function ListProviders() {
     {
       query: {
         queryKey: [
-          "providers",
+          'providers',
           pageSize,
           page,
           sortBy,
@@ -118,8 +118,7 @@ export function ListProviders() {
       onPageChange={setPage}
       onPageSizeChange={setPageSize}
       onSortChange={(col, order) => {
-        setSortBy(col);
-        setSortOrder(order);
+        setParams({ sortBy: col, sortOrder: order });
       }}
       filterColumnKey="name"
       filterValue={filter}
@@ -129,3 +128,4 @@ export function ListProviders() {
     />
   );
 }
+

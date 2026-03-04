@@ -17,6 +17,7 @@ export type AssetContextType = ReturnType<typeof useServerDataTable> & {
     ports?: string[];
     techs?: string[];
     statusCodes?: string[];
+    tlsHosts?: string[];
     hosts?: string[];
     page: number;
     sortBy: string;

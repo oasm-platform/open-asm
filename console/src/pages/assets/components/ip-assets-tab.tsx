@@ -7,7 +7,7 @@ import { AssetTable } from './asset-table';
 
 export default function IpAssetsTab() {
   const {
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
@@ -40,8 +40,7 @@ export default function IpAssetsTab() {
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           onSortChange={(col, order) => {
-            setSortBy(col);
-            setSortOrder(order);
+            setParams({ sortBy: col, sortOrder: order });
           }}
           totalItems={total}
           collapsibleElement={(row) => (

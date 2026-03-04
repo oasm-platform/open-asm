@@ -99,15 +99,15 @@ export function useServerDataTable({
       setParams,
       setPage: useCallback((v: number) => setParams({ page: v }), [setParams]),
       setPageSize: useCallback(
-        (v: number) => setParams({ pageSize: v }),
+        (v: number) => setParams({ pageSize: v, page: 1 }),
         [setParams],
       ),
       setSortBy: useCallback(
-        (v: string) => setParams({ sortBy: v }),
+        (v: string) => setParams({ sortBy: v, page: 1 }),
         [setParams],
       ),
       setSortOrder: useCallback(
-        (v: 'ASC' | 'DESC') => setParams({ sortOrder: v }),
+        (v: 'ASC' | 'DESC') => setParams({ sortOrder: v, page: 1 }),
         [setParams],
       ),
       setFilter: useCallback(

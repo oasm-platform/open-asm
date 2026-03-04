@@ -89,7 +89,7 @@ export function ListTargets() {
 
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder, setFilter },
+    tableHandlers: { setPage, setPageSize, setFilter, setParams },
   } = useServerDataTable();
 
   const { data, isLoading } = useTargetsControllerGetTargetsInWorkspace(
@@ -138,8 +138,7 @@ export function ListTargets() {
       onPageChange={setPage}
       onPageSizeChange={setPageSize}
       onSortChange={(col, order) => {
-        setSortBy(col);
-        setSortOrder(order);
+        setParams({ sortBy: col, sortOrder: order });
       }}
       filterColumnKey="value"
       filterValue={filter}
