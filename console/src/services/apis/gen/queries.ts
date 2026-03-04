@@ -1887,6 +1887,7 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetIpAssetsParams = {
@@ -1902,6 +1903,7 @@ export type AssetsControllerGetIpAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetHostAssetsParams = {
@@ -1917,6 +1919,7 @@ export type AssetsControllerGetHostAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetPortAssetsParams = {
@@ -1932,6 +1935,7 @@ export type AssetsControllerGetPortAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetTechnologyAssetsParams = {
@@ -1947,6 +1951,7 @@ export type AssetsControllerGetTechnologyAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetStatusCodeAssetsParams = {
@@ -1962,6 +1967,7 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetTlsAssetsParams = {

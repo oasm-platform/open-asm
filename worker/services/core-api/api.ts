@@ -3318,6 +3318,7 @@ export class Api<
       hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
+      tlsHosts?: string[];
     },
     params: RequestParams = {},
   ) =>
@@ -3355,6 +3356,7 @@ export class Api<
       hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
+      tlsHosts?: string[];
     },
     params: RequestParams = {},
   ) =>
@@ -3392,6 +3394,7 @@ export class Api<
       hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
+      tlsHosts?: string[];
     },
     params: RequestParams = {},
   ) =>
@@ -3429,6 +3432,7 @@ export class Api<
       hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
+      tlsHosts?: string[];
     },
     params: RequestParams = {},
   ) =>
@@ -3466,6 +3470,7 @@ export class Api<
       hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
+      tlsHosts?: string[];
     },
     params: RequestParams = {},
   ) =>
@@ -3503,6 +3508,7 @@ export class Api<
       hosts?: string[];
       techs?: string[];
       statusCodes?: string[];
+      tlsHosts?: string[];
     },
     params: RequestParams = {},
   ) =>
