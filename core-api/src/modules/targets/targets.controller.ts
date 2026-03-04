@@ -20,6 +20,8 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
+  BulkTargetResultDto,
+  CreateMultipleTargetsDto,
   CreateTargetDto,
   GetManyTargetResponseDto,
   GetManyWorkspaceQueryParamsDto,
@@ -47,6 +49,30 @@ export class TargetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.targetsService.createTarget(dto, workspaceId, userContext);
+  }
+
+  @Doc({
+    summary: 'Create multiple targets in bulk',
+    description:
+      'Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Returns detailed results including created targets and skipped values.',
+    response: {
+      serialization: BulkTargetResultDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('bulk')
+  createMultipleTargets(
+    @Body() dto: CreateMultipleTargetsDto,
+    @UserContext() userContext: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.targetsService.createMultipleTargets(
+      dto,
+      workspaceId,
+      userContext,
+    );
   }
 
   @Doc({
