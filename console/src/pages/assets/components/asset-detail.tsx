@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import AddTagDialog from './add-tag-dialog';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
+import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
 
@@ -63,7 +64,7 @@ export default function AssetDetail({ id }: { id: string }) {
   };
 
   return (
-    <ScrollArea className="flex-grow min-h-0 pr-2 sm:pr-4 mt-4 [&>div>div]:!block">
+    <ScrollArea className="grow min-h-0 pr-2 sm:pr-4 mt-4 [&>div>div]:block!">
       <div className="flex flex-col">
         <section>
           <h3 className="font-bold text-blue-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -71,11 +72,19 @@ export default function AssetDetail({ id }: { id: string }) {
             General
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
-            <div>
-              <span className="block mb-1">Domain</span>
-              <AssetValue httpResponse={httpResponses} value={value} />
+            <div className="space-y-4">
+              <div>
+                <span className="block mb-1">Domain</span>
+                <AssetValue httpResponse={httpResponses} value={value} />
+              </div>
+              {httpResponses?.status_code && (
+                <div>
+                  <span className="block mb-1">HTTP Status</span>
+                  <HTTPXStatusCode httpResponse={httpResponses} />
+                </div>
+              )}
             </div>
-
+            <ScreenshotCell asset={data} />
             {/* IP Addresses */}
             {ipAddresses && ipAddresses.length > 0 ? (
               <div>
@@ -88,14 +97,6 @@ export default function AssetDetail({ id }: { id: string }) {
                 <span className="italic">No IP addresses detected.</span>
               </div>
             )}
-
-            {httpResponses?.status_code && (
-              <div>
-                <span className="block mb-1">HTTP Status</span>
-                <HTTPXStatusCode httpResponse={httpResponses} />
-              </div>
-            )}
-
             {daysLeft !== undefined && (
               <div>
                 <span className="block mb-1">SSL Status</span>
@@ -123,11 +124,12 @@ export default function AssetDetail({ id }: { id: string }) {
             {httpResponses?.title && (
               <div className="md:col-span-2">
                 <span className="block mb-1">Page Title</span>
-                <p className="  break-words">{httpResponses.title}</p>
+                <p className="break-words">{httpResponses.title}</p>
               </div>
             )}
           </div>
         </section>
+
         <div className="flex flex-wrap gap-2 mt-4">
           {(tags ?? []).map((tag) => (
             <Badge
