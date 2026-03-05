@@ -1,5 +1,4 @@
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -10,7 +9,7 @@ import {
 import dayjs from 'dayjs';
 import {
   ChartNoAxesGantt,
-  Copy,
+  Code,
   Globe,
   Layers,
   Loader2Icon,
@@ -19,12 +18,13 @@ import {
   ShieldCheck,
   Tag,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import AddTagDialog from './add-tag-dialog';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
+import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
+import ViewCode from './view-code';
 
 export default function AssetDetail({ id }: { id: string }) {
   const { data, refetch } = useAssetsControllerGetAssetById(id, {});
@@ -57,13 +57,8 @@ export default function AssetDetail({ id }: { id: string }) {
     ? dayjs(certAgeStartDate).fromNow()
     : 'N/A';
 
-  const handleCopyHeader = async () => {
-    await navigator.clipboard.writeText(httpResponses?.raw_header ?? '');
-    toast.success('HTTP response copied to clipboard');
-  };
-
   return (
-    <ScrollArea className="flex-grow min-h-0 pr-2 sm:pr-4 mt-4 [&>div>div]:!block">
+    <ScrollArea className="grow min-h-0 pr-2 sm:pr-4 mt-4 [&>div>div]:block!">
       <div className="flex flex-col">
         <section>
           <h3 className="font-bold text-blue-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -71,11 +66,19 @@ export default function AssetDetail({ id }: { id: string }) {
             General
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
-            <div>
-              <span className="block mb-1">Domain</span>
-              <AssetValue httpResponse={httpResponses} value={value} />
+            <div className="space-y-4">
+              <div>
+                <span className="block mb-1">Domain</span>
+                <AssetValue httpResponse={httpResponses} value={value} />
+              </div>
+              {httpResponses?.status_code && (
+                <div>
+                  <span className="block mb-1">HTTP Status</span>
+                  <HTTPXStatusCode httpResponse={httpResponses} />
+                </div>
+              )}
             </div>
-
+            <ScreenshotCell asset={data} />
             {/* IP Addresses */}
             {ipAddresses && ipAddresses.length > 0 ? (
               <div>
@@ -88,14 +91,6 @@ export default function AssetDetail({ id }: { id: string }) {
                 <span className="italic">No IP addresses detected.</span>
               </div>
             )}
-
-            {httpResponses?.status_code && (
-              <div>
-                <span className="block mb-1">HTTP Status</span>
-                <HTTPXStatusCode httpResponse={httpResponses} />
-              </div>
-            )}
-
             {daysLeft !== undefined && (
               <div>
                 <span className="block mb-1">SSL Status</span>
@@ -123,11 +118,12 @@ export default function AssetDetail({ id }: { id: string }) {
             {httpResponses?.title && (
               <div className="md:col-span-2">
                 <span className="block mb-1">Page Title</span>
-                <p className="  break-words">{httpResponses.title}</p>
+                <p className="wrap-break-word">{httpResponses.title}</p>
               </div>
             )}
           </div>
         </section>
+
         <div className="flex flex-wrap gap-2 mt-4">
           {(tags ?? []).map((tag) => (
             <Badge
@@ -140,9 +136,10 @@ export default function AssetDetail({ id }: { id: string }) {
           ))}
           <AddTagDialog id={id} domain={value} tags={tags} refetch={refetch} />
         </div>
-        <Separator className="my-5" />
+
         {tls && (
           <section>
+            <Separator className="my-5" />
             <h3 className="font-bold text-indigo-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
               <Network size={20} className="text-indigo-500" /> Network
             </h3>
@@ -279,20 +276,18 @@ export default function AssetDetail({ id }: { id: string }) {
                 <ChartNoAxesGantt size={20} className="" />
                 HTTP Response
               </h3>
-              <div className="relative font-mono rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-stone-800 **w-full**">
-                <pre className="whitespace-pre-wrap leading-relaxed **overflow-x-auto**">
-                  {httpResponses.raw_header}
-                  {/* {http_probe?.body} */}
-                </pre>
-                <Button
-                  onClick={handleCopyHeader}
-                  size="icon"
-                  variant="ghost"
-                  className="absolute top-2 right-2 sm:top-3 sm:right-3 text-gray-400 hover:text-gray-50 hover:bg-gray-800 transition-colors duration-200 rounded-lg p-0.5 sm:p-1"
-                >
-                  <Copy size={14} />
-                </Button>
-              </div>
+              <ViewCode code={httpResponses.raw_header} />
+            </section>
+          </>
+        )}
+        {!!httpResponses?.body && (
+          <>
+            <section className="pb-4">
+              <h3 className="font-bold  flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                <Code size={20} className="" />
+                Body
+              </h3>
+              <ViewCode code={httpResponses.body} />
             </section>
           </>
         )}

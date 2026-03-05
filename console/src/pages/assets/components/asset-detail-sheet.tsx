@@ -40,7 +40,6 @@ export default function AssetDetailSheet({ open, setOpen, id }: Props) {
         <SheetTitle className="sr-only">Asset Detail</SheetTitle>
         <SheetDescription className="sr-only">Description</SheetDescription>
         <AssetDetail id={id} />
-
         {/* Footer with View Full Page button */}
         <div className="pt-4 border-t mt-auto">
           <Button

@@ -23,8 +23,6 @@ const ScreenshotCell: React.FC<ScreenshotCellProps> = ({ asset }) => {
     <Tooltip>
       <TooltipTrigger asChild>
         <div className="w-50 h-[112.5px] relative overflow-hidden rounded-lg">
-          {' '}
-          {/* 16:9 ratio: 200x112.5 */}
           <img
             className="w-full h-full object-cover cursor-pointer transition-transform duration-200 hover:scale-105"
             src={asset.screenshotPath}
