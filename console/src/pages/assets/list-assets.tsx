@@ -13,45 +13,45 @@ import TriggerList from './components/tab-trigger-list';
 import TechnologyAssetsTab from './components/technology-assets-tab';
 import TlsAssetsTab from './components/tls-assets-tab';
 
-const tabList = [
-  {
-    value: 'service',
-    text: 'All Services',
-    tab: <AssetTabContent />,
-  },
-  {
-    value: 'technology',
-    text: 'Technologies',
-    tab: <TechnologyAssetsTab />,
-  },
-  {
-    value: 'ip',
-    text: 'IP Addresses',
-    tab: <IpAssetsTab />,
-  },
-  {
-    value: 'port',
-    text: 'Ports',
-    tab: <PortAssetsTab />,
-  },
-  {
-    value: 'host',
-    text: 'Hosts',
-    tab: <HostAssetsTab />,
-  },
-  {
-    value: 'status-code',
-    text: 'Status Code',
-    tab: <StatusCodeAssetsTab />,
-  },
-  {
-    value: 'tls',
-    text: 'TLS',
-    tab: <TlsAssetsTab />,
-  },
-];
-
 export function ListAssets() {
+  const tabList = [
+    {
+      value: 'service',
+      text: 'All Services',
+      tab: <AssetTabContent />,
+    },
+    {
+      value: 'technology',
+      text: 'Technologies',
+      tab: <TechnologyAssetsTab />,
+    },
+    {
+      value: 'ip',
+      text: 'IP Addresses',
+      tab: <IpAssetsTab />,
+    },
+    {
+      value: 'port',
+      text: 'Ports',
+      tab: <PortAssetsTab />,
+    },
+    {
+      value: 'host',
+      text: 'Hosts',
+      tab: <HostAssetsTab />,
+    },
+    {
+      value: 'status-code',
+      text: 'Status Code',
+      tab: <StatusCodeAssetsTab />,
+    },
+    {
+      value: 'tls',
+      text: 'TLS',
+      tab: <TlsAssetsTab />,
+    },
+  ];
+
   const { workspaces } = useWorkspaceSelector();
   const [searchParams] = useSearchParams();
   const tab = searchParams.get('tab') || 'service';
