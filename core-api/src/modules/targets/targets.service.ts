@@ -7,10 +7,14 @@ import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job, Queue } from 'bullmq';
+import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
+import { Asset } from '../assets/entities/assets.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
+  BulkTargetResultDto,
+  CreateMultipleTargetsDto,
   CreateTargetDto,
   GetManyWorkspaceQueryParamsDto,
   UpdateTargetDto,
@@ -93,16 +97,17 @@ export class TargetsService implements OnModuleInit {
    */
   public async createTarget(
     dto: CreateTargetDto,
+    workspaceId: string,
     userContext: UserContextPayload,
   ): Promise<Target> {
-    const { workspaceId, value } = dto;
+    const { value } = dto;
     // Check if the workspace exists and the user is the owner
     await this.workspacesService.getWorkspaceByIdAndOwner(
       workspaceId,
       userContext,
     );
 
-    // Use transaction to ensure atomicity of target and workspace_target creation
+    // Use transaction to ensure atomicity of target, workspace_target, and primary asset creation
     const target = await this.repo.manager.transaction(
       async (transactionalEntityManager) => {
         // Check if target already exists in this workspace
@@ -147,28 +152,146 @@ export class TargetsService implements OnModuleInit {
           target: { id: target.id },
         });
 
+        // Create primary asset using UPSERT for atomic insert-or-ignore behavior
+        // Reduces database queries from 2 (SELECT + INSERT) to 1
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .insert()
+          .into(Asset)
+          .values({
+            id: randomUUID(),
+            target: { id: target.id },
+            value,
+            isPrimary: true,
+          })
+          .orIgnore()
+          .execute();
+
         return target;
       },
     );
 
-    // Create primary asset after transaction completes
-    await this.assetService.createPrimaryAsset({
-      target,
-      value,
-    });
+    this.eventEmitter.emit('target.create', target);
 
-    // Trigger workflow run assets discovery
-    const workspaceConfigs =
-      await this.workspacesService.getWorkspaceConfigValue(workspaceId);
+    return target;
+  }
 
-    if (workspaceConfigs.isAssetsDiscovery) {
+  /**
+   * Creates multiple targets in a single transaction, skipping duplicates.
+   *
+   * @param dto - The data transfer object containing array of target details.
+   * @param workspaceId - The ID of the workspace to associate targets with.
+   * @param userContext - The user's context data, which includes the user's ID.
+   * @returns A promise that resolves to bulk creation result with created targets and skipped values.
+   */
+  public async createMultipleTargets(
+    dto: CreateMultipleTargetsDto,
+    workspaceId: string,
+    userContext: UserContextPayload,
+  ): Promise<BulkTargetResultDto> {
+    const { targets } = dto;
+
+    // Check if the workspace exists and the user is the owner
+    await this.workspacesService.getWorkspaceByIdAndOwner(
+      workspaceId,
+      userContext,
+    );
+
+    const targetValues = targets.map((t) => t.value);
+
+    // Use transaction to ensure atomicity
+    const result = await this.repo.manager.transaction(
+      async (transactionalEntityManager) => {
+        // Query all existing workspace targets for the given values in one query
+        const existingWorkspaceTargets = await transactionalEntityManager
+          .getRepository(WorkspaceTarget)
+          .createQueryBuilder('wt')
+          .innerJoin('wt.target', 'target')
+          .where('wt.workspace = :workspaceId', { workspaceId })
+          .andWhere('target.value IN (:...values)', { values: targetValues })
+          .select('target.value', 'value')
+          .getRawMany<{ value: string }>();
+
+        const existingValues = new Set(
+          existingWorkspaceTargets.map((et) => et.value),
+        );
+
+        // Filter out duplicates
+        const newTargets = targets.filter((t) => !existingValues.has(t.value));
+        const skippedValues = targets
+          .filter((t) => existingValues.has(t.value))
+          .map((t) => t.value);
+
+        const createdTargets: Target[] = [];
+
+        if (newTargets.length === 0) {
+          return {
+            created: createdTargets,
+            skipped: skippedValues,
+            totalRequested: targets.length,
+            totalCreated: 0,
+            totalSkipped: skippedValues.length,
+          };
+        }
+
+        // Batch insert new targets
+        const insertResult = await transactionalEntityManager
+          .createQueryBuilder()
+          .insert()
+          .into(Target)
+          .values(newTargets.map((t) => ({ value: t.value })))
+          .execute();
+
+        // Get all created target IDs
+        const targetIds = insertResult.identifiers.map((id) => id.id as string);
+
+        // Fetch all created targets
+        const createdTargetEntities = await transactionalEntityManager
+          .getRepository(Target)
+          .findByIds(targetIds);
+
+        // Create workspace target associations in batch
+        const workspaceTargetValues = createdTargetEntities.map((target) => ({
+          workspace: { id: workspaceId },
+          target: { id: target.id },
+        }));
+
+        await transactionalEntityManager
+          .getRepository(WorkspaceTarget)
+          .save(workspaceTargetValues);
+
+        // Create primary assets for all new targets using batch UPSERT
+        const assetValues = createdTargetEntities.map((target) => ({
+          id: randomUUID(),
+          target: { id: target.id },
+          value: target.value,
+          isPrimary: true,
+        }));
+
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .insert()
+          .into(Asset)
+          .values(assetValues)
+          .orIgnore()
+          .execute();
+
+        return {
+          created: createdTargetEntities,
+          skipped: skippedValues,
+          totalRequested: targets.length,
+          totalCreated: createdTargetEntities.length,
+          totalSkipped: skippedValues.length,
+        };
+      },
+    );
+
+    // Emit events and update scan schedules for all created targets (outside transaction)
+    for (const target of result.created) {
       this.eventEmitter.emit('target.create', target);
     }
 
-    // trigger update schedule to schedule registry
-    await this.updateTarget(target.id, { scanSchedule: target.scanSchedule });
-
-    return target;
+    return result;
   }
 
   /**

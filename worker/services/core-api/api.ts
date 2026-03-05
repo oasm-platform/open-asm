@@ -53,11 +53,39 @@ export interface CreateTargetDto {
    * @example "example.com"
    */
   value: string;
+}
+
+export interface BulkTargetResultDto {
+  /** List of successfully created targets */
+  created: Target[];
   /**
-   * The id of the workspace
-   * @example "xxxxxxxx"
+   * List of target values that were skipped (already exist)
+   * @example ["existing.com","duplicate.com"]
    */
-  workspaceId: string;
+  skipped: string[];
+  /**
+   * Total number of targets requested to create
+   * @example 10
+   */
+  totalRequested: number;
+  /**
+   * Total number of targets successfully created
+   * @example 8
+   */
+  totalCreated: number;
+  /**
+   * Total number of targets skipped (duplicates)
+   * @example 2
+   */
+  totalSkipped: number;
+}
+
+export interface CreateMultipleTargetsDto {
+  /**
+   * Array of target values to create
+   * @example [{"value":"example.com"},{"value":"test.com"}]
+   */
+  targets: CreateTargetDto[];
 }
 
 export interface GetManyTargetResponseDto {
@@ -2216,6 +2244,27 @@ export class Api<
       path: `/api/targets`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Returns detailed results including created targets and skipped values.
+   *
+   * @tags Targets
+   * @name TargetsControllerCreateMultipleTargets
+   * @summary Create multiple targets in bulk
+   * @request POST:/api/targets/bulk
+   */
+  targetsControllerCreateMultipleTargets = (
+    data: CreateMultipleTargetsDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/targets/bulk`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
       format: "json",
       ...params,
     });
