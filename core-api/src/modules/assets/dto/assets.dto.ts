@@ -43,7 +43,7 @@ export class GetAssetsResponseDto {
   @ApiProperty()
   isEnabled?: boolean;
   @ApiProperty({ required: false })
-  screenshotPath?: string;
+  screenshotPath?: string | null;
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {

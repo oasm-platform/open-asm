@@ -348,7 +348,9 @@ export class AssetsService {
     asset.dnsRecords = item.asset?.dnsRecords;
     asset.isEnabled = item.asset?.isEnabled;
     asset.port = item.port;
-    asset.screenshotPath = `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
+    asset.screenshotPath = item.screenshotPath
+      ? `${STORAGE_BASE_PATH}/${item.screenshotPath}`
+      : null;
 
     // Load tags separately - tags belong to AssetService, not Asset
     const tagsResult = await this.dataSource
