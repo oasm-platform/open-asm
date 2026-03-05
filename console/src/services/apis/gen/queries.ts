@@ -66,8 +66,24 @@ export type AppResponseSerialization = { [key: string]: unknown };
 export type CreateTargetDto = {
   /** The target domain (with optional URL path, will be parsed to extract domain) */
   value: string;
-  /** The id of the workspace */
-  workspaceId: string;
+};
+
+export type BulkTargetResultDto = {
+  /** List of successfully created targets */
+  created: Target[];
+  /** List of target values that were skipped (already exist) */
+  skipped: string[];
+  /** Total number of targets requested to create */
+  totalRequested: number;
+  /** Total number of targets successfully created */
+  totalCreated: number;
+  /** Total number of targets skipped (duplicates) */
+  totalSkipped: number;
+};
+
+export type CreateMultipleTargetsDto = {
+  /** Array of target values to create */
+  targets: CreateTargetDto[];
 };
 
 export type GetManyTargetResponseDtoScanSchedule =
@@ -1887,6 +1903,7 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetIpAssetsParams = {
@@ -1902,6 +1919,7 @@ export type AssetsControllerGetIpAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetHostAssetsParams = {
@@ -1917,6 +1935,7 @@ export type AssetsControllerGetHostAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetPortAssetsParams = {
@@ -1932,6 +1951,7 @@ export type AssetsControllerGetPortAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetTechnologyAssetsParams = {
@@ -1947,6 +1967,7 @@ export type AssetsControllerGetTechnologyAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetStatusCodeAssetsParams = {
@@ -1962,6 +1983,7 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
   hosts?: string[];
   techs?: string[];
   statusCodes?: string[];
+  tlsHosts?: string[];
 };
 
 export type AssetsControllerGetTlsAssetsParams = {
@@ -2713,6 +2735,101 @@ export function useTargetsControllerGetTargetsInWorkspace<
 
   return query;
 }
+
+/**
+ * Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Returns detailed results including created targets and skipped values.
+ * @summary Create multiple targets in bulk
+ */
+export const targetsControllerCreateMultipleTargets = (
+  createMultipleTargetsDto: CreateMultipleTargetsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<BulkTargetResultDto>(
+    {
+      url: `/api/targets/bulk`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createMultipleTargetsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getTargetsControllerCreateMultipleTargetsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+    TError,
+    { data: CreateMultipleTargetsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+  TError,
+  { data: CreateMultipleTargetsDto },
+  TContext
+> => {
+  const mutationKey = ['targetsControllerCreateMultipleTargets'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+    { data: CreateMultipleTargetsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return targetsControllerCreateMultipleTargets(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TargetsControllerCreateMultipleTargetsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>
+>;
+export type TargetsControllerCreateMultipleTargetsMutationBody =
+  CreateMultipleTargetsDto;
+export type TargetsControllerCreateMultipleTargetsMutationError = unknown;
+
+/**
+ * @summary Create multiple targets in bulk
+ */
+export const useTargetsControllerCreateMultipleTargets = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+      TError,
+      { data: CreateMultipleTargetsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+  TError,
+  { data: CreateMultipleTargetsDto },
+  TContext
+> => {
+  const mutationOptions =
+    getTargetsControllerCreateMultipleTargetsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 
 /**
  * Exports all targets in a workspace to a CSV file containing value, last discovered date, and creation date for reporting and analysis purposes.
