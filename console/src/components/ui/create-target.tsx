@@ -12,7 +12,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { useTargetsControllerCreateTarget } from '@/services/apis/gen/queries';
+import {
+  useTargetsControllerCreateMultipleTargets,
+  type BulkTargetResultDto,
+} from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2Icon, Target } from 'lucide-react';
 import { useState } from 'react';
@@ -26,6 +29,55 @@ type FormValues = {
   value: string;
 };
 
+/**
+ * Parse comma-separated input into array of trimmed, non-empty domain strings
+ */
+const parseTargetsInput = (input: string): string[] => {
+  return input
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+};
+
+/**
+ * Find duplicate values in array (case-insensitive)
+ * Returns array of duplicate values in lowercase
+ */
+const findDuplicates = (values: string[]): string[] => {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+
+  for (const value of values) {
+    const lowerValue = value.toLowerCase();
+    if (seen.has(lowerValue)) {
+      duplicates.add(lowerValue);
+    } else {
+      seen.add(lowerValue);
+    }
+  }
+
+  return Array.from(duplicates);
+};
+
+/**
+ * Validate multiple domains using the same regex pattern
+ */
+const validateDomains = (input: string): string | true => {
+  const targets = parseTargetsInput(input);
+
+  if (targets.length === 0) {
+    return 'Please enter at least one domain.';
+  }
+
+  for (const target of targets) {
+    if (!domainRegex.test(target)) {
+      return `"${target}" is not a valid domain name.`;
+    }
+  }
+
+  return true;
+};
+
 export function CreateTarget() {
   const [open, setOpen] = useState(false);
   const { selectedWorkspace, workspaces } = useWorkspaceSelector();
@@ -37,34 +89,67 @@ export function CreateTarget() {
     formState: { errors },
     reset,
     setValue,
+    getValues,
+    setError,
+    clearErrors,
   } = useForm<FormValues>();
   const queryClient = useQueryClient();
-  const { mutate, isPending } = useTargetsControllerCreateTarget();
+  const { mutate, isPending } = useTargetsControllerCreateMultipleTargets();
   const navigate = useNavigate();
+
   function onSubmit(data: FormValues) {
-    if (selectedWorkspace)
-      mutate(
-        {
-          data: {
-            value: data.value,
-            workspaceId: selectedWorkspace,
-          },
+    if (!selectedWorkspace) return;
+
+    const targets = parseTargetsInput(data.value);
+    const duplicates = findDuplicates(targets);
+
+    if (duplicates.length > 0) {
+      setError('value', {
+        type: 'manual',
+        message: `Duplicate values detected: ${duplicates.join(', ')}`,
+      });
+      return;
+    }
+
+    // Clear any previous errors
+    clearErrors('value');
+
+    // Create unique targets array (deduplicated)
+    const uniqueTargets = Array.from(
+      new Set(targets.map((t) => t.toLowerCase())),
+    );
+
+    mutate(
+      {
+        data: {
+          targets: uniqueTargets.map((value) => ({ value })),
         },
-        {
-          onError: () => {
-            toast.error('Failed to create target');
-          },
-          onSuccess: (res) => {
-            navigate(`/targets/${res.id}?animation=true&page=1&pageSize=100`);
-            toast.success('Target created successfully');
+      },
+      {
+        onError: () => {
+          toast.error('Failed to create targets');
+        },
+        onSuccess: (res: BulkTargetResultDto) => {
+          if (res.totalCreated > 0) {
+            navigate(`/targets?page=1&pageSize=100`);
+            toast.success(
+              `Successfully created ${res.totalCreated} target${res.totalCreated > 1 ? 's' : ''}.`,
+            );
             setOpen(false);
             reset();
             queryClient.refetchQueries({
-              queryKey: ['targets', res.id],
+              queryKey: ['targets'],
             });
-          },
+          }
+
+          if (res.totalSkipped > 0) {
+            toast.info(
+              `${res.totalSkipped} target${res.totalSkipped > 1 ? 's' : ''} skipped (already exist).`,
+            );
+          }
         },
-      );
+      },
+    );
   }
 
   const title = isAssetsDiscovery ? 'Start discovery' : 'Create target';
@@ -81,41 +166,56 @@ export function CreateTarget() {
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Enter the domain you want to scan.
+            Enter one or more domains to scan, separated by commas.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-4 mb-3">
             <div className="grid gap-3">
-              <Label htmlFor="name-1">Target</Label>
+              <Label htmlFor="name-1">Targets</Label>
               <Input
                 id="name-1"
-                placeholder="e.g. example.com"
+                placeholder="e.g. example.com, test.com, demo.org"
                 autoComplete="off"
                 {...register('value', {
                   required: 'Domain is required.',
-                  validate: (value) =>
-                    domainRegex.test(value.trim()) ||
-                    'Please enter a valid domain name (no IP addresses).',
+                  validate: validateDomains,
                 })}
                 onPaste={(e) => {
                   e.preventDefault();
                   const pastedText = e.clipboardData?.getData('text') || '';
                   const trimmedText = pastedText.trim();
-                  let rootDomain = trimmedText;
-                  if (trimmedText) {
-                    try {
-                      const url = new URL(
-                        trimmedText.includes('://')
-                          ? trimmedText
-                          : `http://${trimmedText}`,
-                      );
-                      rootDomain = url.hostname || trimmedText;
-                    } catch {
-                      rootDomain = trimmedText;
-                    }
-                  }
-                  setValue('value', rootDomain);
+
+                  // Parse multiple domains from pasted text (comma or newline separated)
+                  const pastedDomains = trimmedText
+                    .split(/[,\n]+/)
+                    .map((t) => t.trim())
+                    .filter((t) => t.length > 0)
+                    .map((domain) => {
+                      // Extract root domain from URL if needed
+                      try {
+                        const url = new URL(
+                          domain.includes('://') ? domain : `http://${domain}`,
+                        );
+                        return url.hostname || domain;
+                      } catch {
+                        return domain;
+                      }
+                    });
+
+                  // Get current value and merge
+                  const currentValue = getValues('value') || '';
+                  const currentDomains = currentValue
+                    ? parseTargetsInput(currentValue)
+                    : [];
+                  const allDomains = [...currentDomains, ...pastedDomains];
+
+                  // Remove duplicates
+                  const uniqueDomains = Array.from(
+                    new Set(allDomains.map((d) => d.toLowerCase())),
+                  );
+
+                  setValue('value', uniqueDomains.join(', '));
                 }}
               />
               {errors.value && (
