@@ -120,7 +120,7 @@ export class AssetsService {
 
     const queryBuilder = this.assetServiceRepo
       .createQueryBuilder('asset_service')
-      .leftJoin('asset_service.asset', 'asset')
+      .leftJoinAndSelect('asset_service.asset', 'asset')
       .leftJoin('asset.target', 'targets')
       .leftJoinAndSelect(
         'asset_service.httpResponses',
@@ -128,7 +128,7 @@ export class AssetsService {
         'latest_http_response.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = asset_service.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
       .leftJoin('targets.workspaceTargets', 'workspaceTargets')
-      .leftJoin('asset.ipAssets', 'ipAssets')
+      .leftJoinAndSelect('asset.ipAssets', 'ipAssets')
       .leftJoin('asset_service.statusCodeAssets', 'statusCodeAssets')
       .leftJoin('asset_service.tlsAssets', 'tlsAssets')
       .where('asset_service."isErrorPage" = false')
@@ -199,7 +199,6 @@ export class AssetsService {
       asset.isEnabled = item.asset?.isEnabled;
       asset.screenshotPath =
         item.screenshotPath && `${STORAGE_BASE_PATH}/${item.screenshotPath}`;
-
       // asset.tags = item.asset.tags || [];
       asset.ipAddresses = item.asset?.ipAssets
         ? item.asset.ipAssets.map((e) => e.ipAddress)
