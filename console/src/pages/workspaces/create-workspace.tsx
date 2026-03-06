@@ -89,10 +89,21 @@ const CreateWorkspace = () => {
             </div>
             <div>
               <Textarea
-                {...register('description')}
+                {...register('description', {
+                  maxLength: {
+                    value: 120,
+                    message: 'Description must be 120 characters or less',
+                  },
+                })}
                 placeholder="Description (optional)"
-                rows={4}
+                className="h-32"
+                rows={8}
               />
+              {errors.description && (
+                <p className="text-red-600 text-sm mt-1">
+                  {errors.description.message}
+                </p>
+              )}
             </div>
             <Button type="submit" disabled={isPending} className="w-full">
               {isPending && <Loader2Icon className="animate-spin mr-2" />}

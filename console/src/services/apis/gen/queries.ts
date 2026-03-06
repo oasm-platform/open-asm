@@ -206,8 +206,51 @@ export type UpdateWorkspaceConfigsDto = {
   isAutoEnableAssetAfterDiscovered: boolean;
 };
 
-export type GetManyWorkspaceDto = {
-  data: Workspace[];
+/**
+ * Workspace description
+ * @nullable
+ */
+export type WorkspaceResponseDtoDescription = { [key: string]: unknown } | null;
+
+/**
+ * Archival timestamp
+ * @nullable
+ */
+export type WorkspaceResponseDtoArchivedAt = { [key: string]: unknown } | null;
+
+export type WorkspaceResponseDto = {
+  /** Workspace ID */
+  id: string;
+  /** Workspace name */
+  name: string;
+  /**
+   * Workspace description
+   * @nullable
+   */
+  description?: WorkspaceResponseDtoDescription;
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+  /**
+   * Archival timestamp
+   * @nullable
+   */
+  archivedAt?: WorkspaceResponseDtoArchivedAt;
+  /** Whether asset discovery is enabled */
+  isAssetsDiscovery: boolean;
+  /** Whether assets are auto-enabled after discovery */
+  isAutoEnableAssetAfterDiscovered: boolean;
+  /** Owner user ID */
+  ownerId: string;
+  /** Number of targets in the workspace */
+  targetCount: number;
+  /** Number of members in the workspace */
+  memberCount: number;
+};
+
+export type GetManyWorkspaceResponseDtoDto = {
+  data: WorkspaceResponseDto[];
   total: number;
   page: number;
   limit: number;
@@ -856,6 +899,8 @@ export type HttpResponseDTO = {
 
 export type GetAssetsResponseDtoDnsRecords = { [key: string]: unknown };
 
+export type GetAssetsResponseDtoScreenshotPath = { [key: string]: unknown };
+
 export type GetAssetsResponseDto = {
   id: string;
   value: string;
@@ -869,7 +914,7 @@ export type GetAssetsResponseDto = {
   httpResponses?: HttpResponseDTO;
   port?: number;
   isEnabled: boolean;
-  screenshotPath?: string;
+  screenshotPath?: GetAssetsResponseDtoScreenshotPath;
 };
 
 export type GetManyGetAssetsResponseDtoDto = {
@@ -3540,7 +3585,7 @@ export const workspacesControllerGetWorkspaces = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyWorkspaceDto>(
+  return orvalClient<GetManyWorkspaceResponseDtoDto>(
     { url: `/api/workspaces`, method: 'GET', params, signal },
     options,
   );

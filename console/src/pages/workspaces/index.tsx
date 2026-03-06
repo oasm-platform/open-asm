@@ -10,11 +10,11 @@ import {
 } from '@/components/ui/card';
 import {
   useWorkspacesControllerGetWorkspaces,
-  type Workspace,
+  type WorkspaceResponseDto,
 } from '@/services/apis/gen/queries';
 import { setGlobalWorkspaceId } from '@/utils/workspaceState';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, Target, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const PAGE_SIZE = 12;
@@ -71,7 +71,7 @@ export default function Workspaces() {
                   </CardContent>
                 </Card>
               ))
-            : data?.data.map((workspace: Workspace) => (
+            : data?.data.map((workspace: WorkspaceResponseDto) => (
                 <Card
                   key={workspace.id}
                   className="cursor-pointer transition-colors hover:bg-accent/50"
@@ -92,11 +92,30 @@ export default function Workspaces() {
                         {workspace.archivedAt ? 'Archived' : 'Active'}
                       </Badge>
                     </div>
-                    <CardDescription className="line-clamp-2">
-                      {workspace.description || 'No description'}
-                    </CardDescription>
+                    <div className="flex gap-4 pt-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <Users size={14} className="text-muted-foreground" />
+                        <span className="font-medium">
+                          {workspace.memberCount}
+                        </span>
+                        <span>members</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Target size={14} className="text-muted-foreground" />
+                        <span className="font-medium">
+                          {workspace.targetCount}
+                        </span>
+                        <span>targets</span>
+                      </div>
+                    </div>
                   </CardHeader>
-                  <CardContent></CardContent>
+                  <CardContent>
+                    <CardDescription className="line-clamp-2">
+                      {typeof workspace.description === 'string'
+                        ? workspace.description
+                        : 'No description'}
+                    </CardDescription>
+                  </CardContent>
                 </Card>
               ))}
         </div>
