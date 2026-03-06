@@ -1,11 +1,7 @@
 import { LIMIT_WORKSPACE_CREATE } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import {
-  ApiKeyType,
-  NotificationScope,
-  NotificationType,
-} from '@/common/enums/enum';
+import { ApiKeyType } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import getSwaggerMetadata, {
@@ -88,16 +84,6 @@ export class WorkspacesService implements OnModuleInit {
     await this.workspaceMembersRepository.save({
       workspace: newWorkspace,
       user: { id },
-    });
-
-    await this.notificationsService.createNotification({
-      recipients: [id],
-      scope: NotificationScope.USER,
-      workspaceId: newWorkspaceId,
-      type: NotificationType.WORKSPACE_CREATED,
-      metadata: {
-        name: newWorkspace.name,
-      },
     });
 
     await this.workflowsService.createDefaultWorkflows(newWorkspace.id);

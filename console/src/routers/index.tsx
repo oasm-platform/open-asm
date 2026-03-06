@@ -28,7 +28,7 @@ import DetailVulnerability from '@/pages/vulnerabilities/detail-vulnerability';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 import Workers from '@/pages/workers/workers';
 import Workspaces from '@/pages/workspaces';
-import CreateWorkspacePage from '@/pages/workspaces/create-workspace-page';
+import CreateWorkspace from '@/pages/workspaces/create-workspace';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
@@ -66,7 +66,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'workspaces/create',
-            element: <CreateWorkspacePage />,
+            element: <CreateWorkspace />,
           },
           {
             path: '',
