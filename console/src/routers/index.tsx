@@ -26,6 +26,7 @@ import Tools from '@/pages/tools/tools';
 import DetailVulnerability from '@/pages/vulnerabilities/detail-vulnerability';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 import Workers from '@/pages/workers/workers';
+import Workspaces from '@/pages/workspaces';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
@@ -57,12 +58,17 @@ export const router = createBrowserRouter([
           </GuestRoute>
         ),
       },
+
       {
         element: <ProtectedRoute />,
         children: [
           {
             path: '',
             element: <Dashboard />,
+          },
+          {
+            path: 'workspaces',
+            element: <Workspaces />,
           },
           {
             path: 'notifications',
