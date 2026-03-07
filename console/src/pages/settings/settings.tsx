@@ -1,5 +1,6 @@
 import { useEffect, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import CreateMcpPermission from './components/create-mcp-permission';
 import ListMcpPermissions from './components/list-mcp-permissions';
@@ -45,6 +46,16 @@ export const settingsTabGroups: SettingsTabGroup[] = [
           description: 'Manage your workspace settings',
         },
         component: <WorkspaceSettings />,
+      },
+      {
+        id: 'apikeys',
+        label: 'API Keys',
+        path: '/settings/apikeys',
+        content: {
+          title: 'API Keys',
+          description: 'Manage your workspace API keys',
+        },
+        component: <ApiKeysSettings />,
       },
     ],
   },
