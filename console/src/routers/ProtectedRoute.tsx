@@ -1,9 +1,17 @@
 import ProtectedLayout from '@/components/common/layout/protect-layout';
+import SettingsLayout from '@/components/common/layout/settings-layout';
 import { authClient } from '@/utils/authClient';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+
 const { useSession } = authClient;
 
-const ProtectedRoute = () => {
+type LayoutType = 'application' | 'settings';
+
+interface ProtectedRouteProps {
+  layout?: LayoutType;
+}
+
+const ProtectedRoute = ({ layout = 'application' }: ProtectedRouteProps) => {
   const { data, isPending } = useSession();
   const location = useLocation();
   const currentPath = location.pathname;
@@ -12,10 +20,13 @@ const ProtectedRoute = () => {
     return <Navigate to={`/login?redirect=${currentPath}`} />;
   }
 
+  const LayoutComponent =
+    layout === 'settings' ? SettingsLayout : ProtectedLayout;
+
   return (
-    <ProtectedLayout>
+    <LayoutComponent>
       <Outlet />
-    </ProtectedLayout>
+    </LayoutComponent>
   );
 };
 

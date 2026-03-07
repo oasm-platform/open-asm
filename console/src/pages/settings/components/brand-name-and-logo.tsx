@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Form,
@@ -37,7 +37,7 @@ type SystemConfigFormValues = z.infer<typeof systemConfigSchema>;
  * System Configuration Settings Component
  * Allows administrators to configure system-wide settings including the system name and logo
  */
-export default function SystemConfigSettings() {
+export default function BrandNameAndLogoSettings() {
   const {
     data: config,
     isLoading,
@@ -242,8 +242,7 @@ export default function SystemConfigSettings() {
   }
 
   return (
-    <Card className="space-y-4 p-4 w-full lg:w-3/4 xl:w-1/2 2xl:w-1/3">
-      <CardTitle>System</CardTitle>
+    <Card className="space-y-4 p-4">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField

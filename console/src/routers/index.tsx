@@ -62,7 +62,7 @@ export const router = createBrowserRouter([
       },
 
       {
-        element: <ProtectedRoute />,
+        element: <ProtectedRoute layout="application" />,
         children: [
           {
             path: 'workspaces/create',
@@ -100,6 +100,11 @@ export const router = createBrowserRouter([
           //   path: 'groups',
           //   children: [{ path: '', element: <Workflow /> }],
           // },
+        ],
+      },
+      {
+        element: <ProtectedRoute layout="settings" />,
+        children: [
           {
             path: 'settings',
             children: [
@@ -107,7 +112,7 @@ export const router = createBrowserRouter([
                 path: '',
                 element: (
                   <RequireWorkspace>
-                    <Settings defaultTab="account" />
+                    <Settings />
                   </RequireWorkspace>
                 ),
               },
@@ -121,6 +126,11 @@ export const router = createBrowserRouter([
               },
             ],
           },
+        ],
+      },
+      {
+        element: <ProtectedRoute layout="application" />,
+        children: [
           {
             path: 'targets',
             children: [
