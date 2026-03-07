@@ -8,12 +8,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerGetWorkspaces,
   type WorkspaceResponseDto,
 } from '@/services/apis/gen/queries';
-import { setGlobalWorkspaceId } from '@/utils/workspaceState';
-import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Target, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -21,7 +20,7 @@ const PAGE_SIZE = 12;
 
 export default function Workspaces() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const { handleSelectWorkspace } = useWorkspaceSelector();
 
   const { data, isLoading } = useWorkspacesControllerGetWorkspaces(
     {
@@ -35,11 +34,8 @@ export default function Workspaces() {
     },
   );
 
-  const handleSelectWorkspace = (workspaceId: string) => {
-    setGlobalWorkspaceId(workspaceId);
-    queryClient.invalidateQueries({
-      predicate: (query) => query.queryKey[0] !== 'global',
-    });
+  const onSelectWorkspace = (workspaceId: string) => {
+    handleSelectWorkspace(workspaceId);
     navigate('/');
   };
 
@@ -75,7 +71,7 @@ export default function Workspaces() {
                 <Card
                   key={workspace.id}
                   className="cursor-pointer transition-colors hover:bg-accent/50"
-                  onClick={() => handleSelectWorkspace(workspace.id)}
+                  onClick={() => onSelectWorkspace(workspace.id)}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between">
