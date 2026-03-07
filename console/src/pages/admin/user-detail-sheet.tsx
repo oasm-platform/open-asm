@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { type User } from '@/utils/authClient';
 import { Button } from '@/components/ui/button';
-import { Mail, CheckCircle2, Trash2, Ban } from 'lucide-react';
+import { Trash2, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Select,
@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+// import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
@@ -175,7 +175,7 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
               className="flex-1 overflow-y-auto mt-0 px-6 pb-6"
             >
               {/* Provider Information */}
-              <section className="py-4">
+              {/* <section className="py-4">
                 <p className="text-sm font-semibold mb-0.5">
                   Provider Information
                 </p>
@@ -202,10 +202,10 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
                 </div>
               </section>
 
-              <Separator />
+              <Separator /> */}
 
               {/* Action rows */}
-              <section>
+              {/* <section>
                 <ActionRow
                   label="Reset password"
                   description="Send a password recovery email to the user"
@@ -229,7 +229,7 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
                 />
               </section>
 
-              <Separator />
+              <Separator /> */}
 
               {/* Danger zone */}
               <section className="py-4">
@@ -274,16 +274,28 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
                       }
                       danger
                       action={
-                        <Button
-                          variant={aUser.banned ? 'outline' : 'destructive'}
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={() => toggleBan()}
-                          disabled={isBanning}
-                        >
-                          <Ban className="h-3.5 w-3.5" />
-                          {aUser.banned ? 'Unban user' : 'Ban user'}
-                        </Button>
+                        <ConfirmDialog
+                          title={aUser.banned ? 'Unban User' : 'Ban User'}
+                          description={
+                            aUser.banned
+                              ? `Restore access for ${aUser.name}? They will be able to sign in again.`
+                              : `Ban ${aUser.name}? They will lose access to the project.`
+                          }
+                          onConfirm={() => toggleBan()}
+                          confirmText={aUser.banned ? 'Unban' : 'Ban'}
+                          cancelText="Cancel"
+                          trigger={
+                            <Button
+                              variant={aUser.banned ? 'outline' : 'destructive'}
+                              size="sm"
+                              className="gap-1.5"
+                              disabled={isBanning}
+                            >
+                              <Ban className="h-3.5 w-3.5" />
+                              {aUser.banned ? 'Unban user' : 'Ban user'}
+                            </Button>
+                          }
+                        />
                       }
                     />
                   </div>
