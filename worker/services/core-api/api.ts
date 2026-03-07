@@ -201,8 +201,45 @@ export interface UpdateWorkspaceConfigsDto {
   isAutoEnableAssetAfterDiscovered: boolean;
 }
 
-export interface GetManyWorkspaceDto {
-  data: Workspace[];
+export interface WorkspaceResponseDto {
+  /** Workspace ID */
+  id: string;
+  /** Workspace name */
+  name: string;
+  /** Workspace description */
+  description?: object | null;
+  /**
+   * Creation timestamp
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * Last update timestamp
+   * @format date-time
+   */
+  updatedAt: string;
+  /** Archival timestamp */
+  archivedAt?: object | null;
+  /** Whether asset discovery is enabled */
+  isAssetsDiscovery: boolean;
+  /** Whether assets are auto-enabled after discovery */
+  isAutoEnableAssetAfterDiscovered: boolean;
+  /** Owner user ID */
+  ownerId: string;
+  /**
+   * Number of targets in the workspace
+   * @example 10
+   */
+  targetCount: number;
+  /**
+   * Number of members in the workspace
+   * @example 5
+   */
+  memberCount: number;
+}
+
+export interface GetManyWorkspaceResponseDtoDto {
+  data: WorkspaceResponseDto[];
   total: number;
   page: number;
   limit: number;
@@ -831,7 +868,7 @@ export interface GetAssetsResponseDto {
   httpResponses?: HttpResponseDTO;
   port?: number;
   isEnabled: boolean;
-  screenshotPath?: string;
+  screenshotPath?: object;
 }
 
 export interface GetManyGetAssetsResponseDtoDto {

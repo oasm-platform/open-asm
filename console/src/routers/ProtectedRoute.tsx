@@ -1,30 +1,32 @@
-import StudioLayout from '@/components/common/layout/studio-layout';
 import ProtectedLayout from '@/components/common/layout/protect-layout';
+import SettingsLayout from '@/components/common/layout/settings-layout';
 import { authClient } from '@/utils/authClient';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+
 const { useSession } = authClient;
 
-const ProtectedRoute = () => {
-  const { data, isPending: isLoadingSession } = useSession();
+type LayoutType = 'application' | 'settings';
+
+interface ProtectedRouteProps {
+  layout?: LayoutType;
+}
+
+const ProtectedRoute = ({ layout = 'application' }: ProtectedRouteProps) => {
+  const { data, isPending } = useSession();
   const location = useLocation();
   const currentPath = location.pathname;
 
-  if (!data && !isLoadingSession) {
+  if (!data && !isPending) {
     return <Navigate to={`/login?redirect=${currentPath}`} />;
   }
 
-  if (currentPath.startsWith('/studio')) {
-    return (
-      <StudioLayout>
-        <Outlet />
-      </StudioLayout>
-    );
-  }
+  const LayoutComponent =
+    layout === 'settings' ? SettingsLayout : ProtectedLayout;
 
   return (
-    <ProtectedLayout>
+    <LayoutComponent>
       <Outlet />
-    </ProtectedLayout>
+    </LayoutComponent>
   );
 };
 

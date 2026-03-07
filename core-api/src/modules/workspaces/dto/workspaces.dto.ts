@@ -8,9 +8,64 @@ export class CreateWorkspaceDto extends PickType(Workspace, [
   'name',
   'description',
   'archivedAt',
-] as const) { }
+] as const) {}
 
-export class UpdateWorkspaceDto extends PartialType(CreateWorkspaceDto) { }
+export class UpdateWorkspaceDto extends PartialType(CreateWorkspaceDto) {}
+
+/**
+ * Response DTO for workspace list items with target and member counts.
+ * Used for getWorkspaces API to include targetCount and memberCount.
+ */
+export class WorkspaceResponseDto {
+  @ApiProperty({ description: 'Workspace ID' })
+  id: string;
+
+  @ApiProperty({ description: 'Workspace name' })
+  name: string;
+
+  @ApiProperty({
+    description: 'Workspace description',
+    required: false,
+    nullable: true,
+  })
+  description?: string | null;
+
+  @ApiProperty({ description: 'Creation timestamp' })
+  createdAt: Date;
+
+  @ApiProperty({ description: 'Last update timestamp' })
+  updatedAt: Date;
+
+  @ApiProperty({
+    description: 'Archival timestamp',
+    required: false,
+    nullable: true,
+  })
+  archivedAt?: Date | null;
+
+  @ApiProperty({ description: 'Whether asset discovery is enabled' })
+  isAssetsDiscovery: boolean;
+
+  @ApiProperty({
+    description: 'Whether assets are auto-enabled after discovery',
+  })
+  isAutoEnableAssetAfterDiscovered: boolean;
+
+  @ApiProperty({ description: 'Owner user ID' })
+  ownerId: string;
+
+  @ApiProperty({
+    description: 'Number of targets in the workspace',
+    example: 10,
+  })
+  targetCount: number;
+
+  @ApiProperty({
+    description: 'Number of members in the workspace',
+    example: 5,
+  })
+  memberCount: number;
+}
 
 export class WorkspaceStatisticsResponseDto {
   totalTargets: number;
