@@ -25,7 +25,7 @@ const ScreenshotCell: React.FC<ScreenshotCellProps> = ({ asset }) => {
         <div className="w-50 h-[112.5px] relative overflow-hidden rounded-lg">
           <img
             className="w-full h-full object-cover cursor-pointer transition-transform duration-200 hover:scale-105"
-            src={asset.screenshotPath}
+            src={asset.screenshotPath as unknown as string}
             alt="Asset screenshot"
           />
         </div>
@@ -37,7 +37,7 @@ const ScreenshotCell: React.FC<ScreenshotCellProps> = ({ asset }) => {
       >
         <div className="w-160  rounded-lg overflow-hidden">
           <img
-            src={asset.screenshotPath}
+            src={asset.screenshotPath as unknown as string}
             alt="Zoomed asset screenshot"
             className="w-full h-full object-contain"
           />

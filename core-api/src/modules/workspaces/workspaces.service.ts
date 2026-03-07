@@ -1,11 +1,7 @@
 import { LIMIT_WORKSPACE_CREATE } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import {
-  ApiKeyType,
-  NotificationScope,
-  NotificationType,
-} from '@/common/enums/enum';
+import { SortOrder } from '@/common/dtos/get-many-base.dto';
+import { ApiKeyType } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import getSwaggerMetadata, {
@@ -90,16 +86,6 @@ export class WorkspacesService implements OnModuleInit {
       user: { id },
     });
 
-    await this.notificationsService.createNotification({
-      recipients: [id],
-      scope: NotificationScope.USER,
-      workspaceId: newWorkspaceId,
-      type: NotificationType.WORKSPACE_CREATED,
-      metadata: {
-        name: newWorkspace.name,
-      },
-    });
-
     await this.workflowsService.createDefaultWorkflows(newWorkspace.id);
 
     return newWorkspace;
@@ -129,7 +115,7 @@ export class WorkspacesService implements OnModuleInit {
   public async getWorkspaces(
     query: GetManyWorkspacesDto,
     userContextPayload: UserContextPayload,
-  ): Promise<GetManyBaseResponseDto<Workspace>> {
+  ) {
     const { limit, page, sortOrder, isArchived } = query;
     let { sortBy } = query;
     const { id } = userContextPayload;
@@ -138,24 +124,93 @@ export class WorkspacesService implements OnModuleInit {
       sortBy = 'createdAt';
     }
 
-    const queryBuilder = this.repo
-      .createQueryBuilder('workspace')
-      .where('workspace.ownerId = :id', { id });
-    if (isArchived !== undefined) {
-      if (isArchived) {
-        queryBuilder.andWhere('workspace.archivedAt IS NOT NULL');
-      } else {
-        queryBuilder.andWhere('workspace.archivedAt IS NULL');
-      }
+    // Validate sortBy to prevent SQL injection
+    const allowedSortFields = [
+      'id',
+      'name',
+      'createdAt',
+      'updatedAt',
+      'archivedAt',
+    ];
+    if (!allowedSortFields.includes(sortBy)) {
+      sortBy = 'createdAt';
     }
 
-    const [data, total] = await queryBuilder
-      .orderBy(`workspace.${sortBy}`, sortOrder)
-      .take(limit)
-      .skip((page - 1) * limit)
-      .getManyAndCount();
+    // Build WHERE clause based on isArchived
+    const archivedCondition =
+      isArchived === true
+        ? 'AND w."archivedAt" IS NOT NULL'
+        : isArchived === false
+          ? 'AND w."archivedAt" IS NULL'
+          : '';
 
-    return getManyResponse({ query, data, total });
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM workspaces w
+      WHERE w."ownerId" = $1 ${archivedCondition}
+    `;
+    const countResult: { total: string }[] = await this.repo.query(countQuery, [
+      id,
+    ]);
+    const total = parseInt(countResult[0]?.total || '0', 10);
+
+    // Get paginated data with target and member counts
+    const offset = (page - 1) * limit;
+    const validSortOrder: 'ASC' | 'DESC' =
+      sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
+
+    const dataQuery = `
+      SELECT
+        w."id" as workspace_id,
+        w."name" as workspace_name,
+        w."description" as workspace_description,
+        w."createdAt" as workspace_createdAt,
+        w."updatedAt" as workspace_updatedAt,
+        w."archivedAt" as workspace_archivedAt,
+        w."isAssetsDiscovery" as workspace_isAssetsDiscovery,
+        w."isAutoEnableAssetAfterDiscovered" as workspace_isAutoEnableAssetAfterDiscovered,
+        w."ownerId" as workspace_ownerId,
+        COALESCE(t.target_count, 0)::integer as targetcount,
+        COALESCE(m.member_count, 0)::integer as membercount
+      FROM workspaces w
+      LEFT JOIN (
+        SELECT "workspaceId", COUNT(*) as target_count
+        FROM workspace_targets
+        GROUP BY "workspaceId"
+      ) t ON t."workspaceId" = w."id"
+      LEFT JOIN (
+        SELECT "workspaceId", COUNT(*) as member_count
+        FROM workspace_members
+        GROUP BY "workspaceId"
+      ) m ON m."workspaceId" = w."id"
+      WHERE w."ownerId" = $1 ${archivedCondition}
+      ORDER BY w."${sortBy}" ${validSortOrder}
+      LIMIT $2 OFFSET $3
+    `;
+
+    const rawData: Record<string, unknown>[] = await this.repo.query(
+      dataQuery,
+      [id, limit, offset],
+    );
+
+    // Map raw data to expected format
+    const mappedData = rawData.map((row) => ({
+      id: row.workspace_id as string,
+      name: row.workspace_name as string,
+      description: row.workspace_description as string | null,
+      createdAt: row.workspace_createdAt as Date,
+      updatedAt: row.workspace_updatedAt as Date,
+      archivedAt: row.workspace_archivedAt as Date | null,
+      isAssetsDiscovery: row.workspace_isAssetsDiscovery as boolean,
+      isAutoEnableAssetAfterDiscovered:
+        row.workspace_isAutoEnableAssetAfterDiscovered as boolean,
+      ownerId: row.workspace_ownerId as string,
+      targetCount: Number(row.targetcount) || 0,
+      memberCount: Number(row.membercount) || 0,
+    }));
+
+    return getManyResponse({ query, data: mappedData, total });
   }
 
   /**
