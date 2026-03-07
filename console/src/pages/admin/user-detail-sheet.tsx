@@ -14,7 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-// import { Separator } from '@/components/ui/separator';
+import { Separator } from '@/components/ui/separator';
+import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
@@ -231,7 +232,90 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
 
               <Separator /> */}
 
+              {/* User Information */}
+              <section className="py-4">
+                <p className="text-sm font-semibold mb-3">User Information</p>
+                <div className="rounded-lg border divide-y text-sm">
+                  <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+                    <span className="text-xs text-muted-foreground shrink-0 w-28">
+                      User ID
+                    </span>
+                    <span className="text-xs font-mono truncate text-right">
+                      {aUser.id}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+                    <span className="text-xs text-muted-foreground shrink-0 w-28">
+                      Display name
+                    </span>
+                    <span className="text-xs truncate text-right">
+                      {aUser.name || '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+                    <span className="text-xs text-muted-foreground shrink-0 w-28">
+                      Email
+                    </span>
+                    <span className="text-xs truncate text-right">
+                      {aUser.email}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+                    <span className="text-xs text-muted-foreground shrink-0 w-28">
+                      Email verified
+                    </span>
+                    {aUser.emailVerified ? (
+                      <Badge
+                        variant="secondary"
+                        className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                      >
+                        Verified
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        Unverified
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+                    <span className="text-xs text-muted-foreground shrink-0 w-28">
+                      Role
+                    </span>
+                    <Badge variant="secondary" className="text-xs capitalize">
+                      {aUser.role}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+                    <span className="text-xs text-muted-foreground shrink-0 w-28">
+                      Status
+                    </span>
+                    {aUser.banned ? (
+                      <Badge variant="destructive" className="text-xs">
+                        Banned
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        Active
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+                    <span className="text-xs text-muted-foreground shrink-0 w-28">
+                      Joined
+                    </span>
+                    <span className="text-xs text-right">
+                      {aUser.createdAt
+                        ? format(new Date(aUser.createdAt), 'PPP')
+                        : '—'}
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              <Separator />
+
               {/* Danger zone */}
+
               <section className="py-4">
                 <p className="text-sm font-semibold text-destructive mb-0.5">
                   Danger zone
