@@ -94,30 +94,34 @@ export default function ApiKeysSettings() {
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2">
-                <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
-                  {apiKeyData?.apiKey || 'No API key available'}
-                </code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopy}
-                  disabled={!apiKeyData?.apiKey}
-                >
-                  <Copy className="mr-2 h-4 w-4" />
-                  {copied ? 'Copied!' : 'Copy'}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleRotate}
-                  disabled={isRotating || !selectedWorkspace}
-                >
-                  <RefreshCw
-                    className={`mr-2 h-4 w-4 ${isRotating ? 'animate-spin' : ''}`}
-                  />
-                  {isRotating ? 'Rotating...' : 'Rotate'}
-                </Button>
+              <div className="flex min-w-0 flex-col gap-2">
+                <div className="overflow-x-auto">
+                  <code className="whitespace-nowrap rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
+                    {apiKeyData?.apiKey || 'No API key available'}
+                  </code>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopy}
+                    disabled={!apiKeyData?.apiKey}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    {copied ? 'Copied!' : 'Copy'}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleRotate}
+                    disabled={isRotating || !selectedWorkspace}
+                  >
+                    <RefreshCw
+                      className={`mr-2 h-4 w-4 ${isRotating ? 'animate-spin' : ''}`}
+                    />
+                    {isRotating ? 'Rotating...' : 'Rotate'}
+                  </Button>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 Keep your API key secure. Do not share it publicly or commit it
