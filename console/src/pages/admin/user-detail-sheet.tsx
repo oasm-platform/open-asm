@@ -1,30 +1,11 @@
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader } from '@/components/ui/sheet';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authClient } from '@/utils/authClient';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { type User } from '@/utils/authClient';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  User as UserIcon,
-  ShieldOff,
-  ShieldCheck,
-  Calendar,
-  Info,
-} from 'lucide-react';
+import { Mail, CheckCircle2, Trash2, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Select,
@@ -33,20 +14,51 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { cn } from '@/lib/utils';
 
 interface UserDetailSheetProps {
   user: User | null;
   onOpenChange: (open: boolean) => void;
 }
+
+/** A row in the Overview tab with a label+description on the left and an action on the right. */
+function ActionRow({
+  label,
+  description,
+  action,
+  danger = false,
+}: {
+  label: string;
+  description: string;
+  action: React.ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-4">
+      <div className="grid gap-0.5 min-w-0">
+        <p className={cn('text-sm font-medium', danger && 'text-destructive')}>
+          {label}
+        </p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className="shrink-0">{action}</div>
+    </div>
+  );
+}
+
 /**
- * Renders a sheet to display user details and perform actions.
- * @param user - The user to display.
- * @param onOpenChange - Function to call when the sheet is opened or closed.
+ * User detail sheet component displaying a Supabase-style overview of a user,
+ * with provider information, management actions, and raw JSON data.
+ *
+ * @param user - The user whose details are displayed (null when sheet is closed).
+ * @param onOpenChange - Callback to close the sheet.
  */
 export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
   const queryClient = useQueryClient();
+
   const { data, isLoading } = useQuery({
     queryKey: ['user', user?.id],
     queryFn: () => authClient.admin.getUser({ query: { id: user!.id } }),
@@ -55,7 +67,7 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
 
   const aUser = data?.data as User | undefined;
 
-  const { mutate: toggleBan } = useMutation({
+  const { mutate: toggleBan, isPending: isBanning } = useMutation({
     mutationFn: async () => {
       if (!aUser) return;
       const action = aUser.banned
@@ -72,7 +84,7 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
     },
   });
 
-  const { mutate: setRole } = useMutation({
+  const { mutate: setRole, isPending: isSettingRole } = useMutation({
     mutationFn: async (role: 'admin' | 'user') => {
       if (!aUser) return;
       await authClient.admin.setRole({ userId: aUser.id, role });
@@ -86,123 +98,244 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
     },
   });
 
+  const { mutate: deleteUser, isPending: isDeleting } = useMutation({
+    mutationFn: async () => {
+      if (!aUser) return;
+      await authClient.admin.removeUser({ userId: aUser.id });
+    },
+    onSuccess: () => {
+      toast.success('User deleted successfully.');
+      onOpenChange(false);
+      return queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: () => {
+      toast.error('Failed to delete user.');
+    },
+  });
+
   return (
     <Sheet open={!!user} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-xl w-full p-0">
-        <SheetHeader className="p-6">
-          <SheetTitle>User Profile</SheetTitle>
-          <SheetDescription>
-            View and manage user details and actions.
-          </SheetDescription>
-        </SheetHeader>
-        {isLoading && <div className="p-6">Loading...</div>}
-        {aUser && (
-          <div className="grid gap-6 p-6">
-            <Card className="pt-6">
-              <div className="flex flex-col items-center text-center gap-4">
-                <Avatar className="h-24 w-24 border">
-                  <AvatarImage
-                    src={aUser.image ?? undefined}
-                    alt={aUser.name}
-                  />
-                  <AvatarFallback className="text-3xl">
-                    {aUser.name[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="grid gap-1">
-                  <CardTitle className="text-2xl">{aUser.name}</CardTitle>
-                  <CardDescription>{aUser.email}</CardDescription>
-                </div>
+      <SheetContent className="sm:max-w-xl w-full p-0 flex flex-col gap-0">
+        {/* Header */}
+        <SheetHeader className="px-6 pt-6 pb-4 border-b">
+          {isLoading && (
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+              <div className="grid gap-1.5">
+                <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+                <div className="h-3 w-48 bg-muted rounded animate-pulse" />
               </div>
-              <CardContent className="mt-6">
-                <Separator />
-                <div className="grid gap-4 mt-6">
-                  <div className="flex items-center gap-4">
-                    <UserIcon className="h-5 w-5 text-muted-foreground" />
-                    <p className="font-medium">Role</p>
-                    <Badge className="ml-auto">{aUser.role}</Badge>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {aUser.banned ? (
-                      <ShieldOff className="h-5 w-5 text-destructive" />
-                    ) : (
-                      <ShieldCheck className="h-5 w-5 text-green-500" />
-                    )}
-                    <p className="font-medium">Status</p>
-                    {aUser.banned ? (
-                      <Badge variant="destructive" className="ml-auto">
-                        Banned
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="ml-auto">
-                        Active
-                      </Badge>
-                    )}
-                  </div>
-                  {aUser.banned && (
-                    <>
-                      {aUser.banReason && (
-                        <div className="flex items-start gap-4">
-                          <Info className="h-5 w-5 text-muted-foreground mt-1" />
-                          <div className="grid gap-1">
-                            <p className="font-medium">Ban Reason</p>
-                            <p className="text-sm text-muted-foreground">
-                              {aUser.banReason}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      {aUser.banExpires && (
-                        <div className="flex items-center gap-4">
-                          <Calendar className="h-5 w-5 text-muted-foreground" />
-                          <div className="grid gap-1">
-                            <p className="font-medium">Ban Expires</p>
-                            <p className="text-sm text-muted-foreground">
-                              {format(new Date(aUser.banExpires), 'PPP p')}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </>
+            </div>
+          )}
+          {aUser && (
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10 border">
+                <AvatarImage src={aUser.image ?? undefined} alt={aUser.name} />
+                <AvatarFallback>
+                  {aUser.name?.[0]?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="grid gap-0.5 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm truncate">
+                    {aUser.name}
+                  </span>
+                  {aUser.banned ? (
+                    <Badge variant="destructive" className="text-xs">
+                      Banned
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs">
+                      Active
+                    </Badge>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+                <span className="text-xs text-muted-foreground truncate">
+                  {aUser.email}
+                </span>
+              </div>
+            </div>
+          )}
+        </SheetHeader>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-4">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium">Manage Access</p>
-                  <Button
-                    variant={aUser.banned ? 'outline' : 'destructive'}
-                    onClick={() => toggleBan()}
-                  >
-                    {aUser.banned ? 'Unban User' : 'Ban User'}
-                  </Button>
+        {/* Tabs */}
+        {aUser && (
+          <Tabs
+            defaultValue="overview"
+            className="flex flex-col flex-1 min-h-0"
+          >
+            <TabsList className="mx-6 mt-4 mb-1">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="raw-json">Raw JSON</TabsTrigger>
+            </TabsList>
+
+            {/* Overview Tab */}
+            <TabsContent
+              value="overview"
+              className="flex-1 overflow-y-auto mt-0 px-6 pb-6"
+            >
+              {/* Provider Information */}
+              <section className="py-4">
+                <p className="text-sm font-semibold mb-0.5">
+                  Provider Information
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  The user has the following providers
+                </p>
+                <div className="rounded-lg border p-4">
+                  <div className="flex items-start gap-3">
+                    <Mail className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="grid gap-0.5 flex-1 min-w-0">
+                      <p className="text-sm font-medium">Email</p>
+                      <p className="text-xs text-muted-foreground">
+                        Signed in with an email account via OAuth
+                      </p>
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-1 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      Enabled
+                    </Badge>
+                  </div>
                 </div>
+              </section>
+
+              <Separator />
+
+              {/* Action rows */}
+              <section>
+                <ActionRow
+                  label="Reset password"
+                  description="Send a password recovery email to the user"
+                  action={
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <Mail className="h-3.5 w-3.5" />
+                      Send password recovery
+                    </Button>
+                  }
+                />
                 <Separator />
-                <div className="flex items-center justify-between">
-                  <p className="font-medium">Change Role</p>
-                  <Select
-                    defaultValue={aUser.role}
-                    onValueChange={(value) =>
-                      setRole(value as 'admin' | 'user')
-                    }
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="user">User</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <ActionRow
+                  label="Send confirmation email"
+                  description="Send a confirmation email to the user"
+                  action={
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <Mail className="h-3.5 w-3.5" />
+                      Send confirmation email
+                    </Button>
+                  }
+                />
+              </section>
+
+              <Separator />
+
+              {/* Danger zone */}
+              <section className="py-4">
+                <p className="text-sm font-semibold text-destructive mb-0.5">
+                  Danger zone
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Be wary of the following features as they cannot be undone.
+                </p>
+                <div className="rounded-lg border border-destructive/30 divide-y divide-destructive/20">
+                  <div className="px-4">
+                    <ActionRow
+                      label="Change role"
+                      description="Set the user's access level"
+                      danger
+                      action={
+                        <Select
+                          defaultValue={aUser.role}
+                          onValueChange={(value) =>
+                            setRole(value as 'admin' | 'user')
+                          }
+                          disabled={isSettingRole}
+                        >
+                          <SelectTrigger className="w-[130px] h-8 text-sm">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="user">User</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      }
+                    />
+                  </div>
+                  <div className="px-4">
+                    <ActionRow
+                      label={aUser.banned ? 'Unban user' : 'Ban user'}
+                      description={
+                        aUser.banned
+                          ? 'Restore access to the project for this user'
+                          : 'Revoke access to the project for a set duration'
+                      }
+                      danger
+                      action={
+                        <Button
+                          variant={aUser.banned ? 'outline' : 'destructive'}
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => toggleBan()}
+                          disabled={isBanning}
+                        >
+                          <Ban className="h-3.5 w-3.5" />
+                          {aUser.banned ? 'Unban user' : 'Ban user'}
+                        </Button>
+                      }
+                    />
+                  </div>
+                  <div className="px-4">
+                    <ActionRow
+                      label="Delete user"
+                      description="User will no longer have access to the project"
+                      danger
+                      action={
+                        <ConfirmDialog
+                          title="Delete User"
+                          description={`Are you sure you want to delete ${aUser.name}? This action cannot be undone.`}
+                          onConfirm={() => deleteUser()}
+                          confirmText="Delete"
+                          cancelText="Cancel"
+                          trigger={
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="gap-1.5"
+                              disabled={isDeleting}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete user
+                            </Button>
+                          }
+                        />
+                      }
+                    />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </section>
+            </TabsContent>
+
+            {/* Raw JSON Tab */}
+            <TabsContent
+              value="raw-json"
+              className="flex-1 overflow-y-auto mt-0 px-6 pb-6 pt-4"
+            >
+              <div className="rounded-lg border bg-muted/40 p-4 overflow-auto">
+                <pre className="text-xs font-mono whitespace-pre-wrap break-all text-muted-foreground">
+                  {JSON.stringify(aUser, null, 2)}
+                </pre>
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
+
+        {/* Empty state while loading */}
+        {!aUser && !isLoading && (
+          <div className="flex-1 flex items-center justify-center p-6">
+            <p className="text-sm text-muted-foreground">No user selected.</p>
           </div>
         )}
       </SheetContent>
