@@ -133,15 +133,6 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute layout="application" />,
         children: [
           {
-            path: 'admin',
-            children: [
-              {
-                path: 'users',
-                element: <Users />,
-              },
-            ],
-          },
-          {
             path: 'targets',
             children: [
               {
