@@ -109,7 +109,7 @@ export class RootService {
 
     const currentVersion = isDeveloperMode
       ? latestVersion
-      : this.configService.get<string>('APP_VERSION') || null;
+      : this.configService.get<string>('APP_VERSION')?.replace('v', '') || null;
 
     return {
       currentVersion,
