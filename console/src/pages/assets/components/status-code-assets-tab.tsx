@@ -7,7 +7,7 @@ import { statusCodeAssetsColumn } from './status-code-assets-column';
 
 export default function StatusCodeAssetsTab() {
   const {
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
@@ -43,8 +43,7 @@ export default function StatusCodeAssetsTab() {
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           onSortChange={(col, order) => {
-            setSortBy(col);
-            setSortOrder(order);
+            setParams({ sortBy: col, sortOrder: order });
           }}
           totalItems={total}
           collapsibleElement={(row) => (

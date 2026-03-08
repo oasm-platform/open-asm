@@ -10,7 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Tool } from '@/services/apis/gen/queries';
 import {
@@ -27,17 +27,17 @@ import { toast } from 'sonner';
 // Define columns for tools table
 const toolColumns: ColumnDef<Tool>[] = [
   {
-    accessorKey: "logoUrl",
-    header: "",
+    accessorKey: 'logoUrl',
+    header: '',
     enableSorting: false,
     cell: ({ row }) => (
       <div className="flex items-center">
-        {row.getValue("logoUrl") ? (
+        {row.getValue('logoUrl') ? (
           <div className="w-30 p-1 h-12 bg-white rounded-lg flex items-center justify-center border border-gray-400">
             <div className="w-28 h-10 flex items-center justify-center">
               <img
-                src={row.getValue("logoUrl")}
-                alt={row.getValue("name")}
+                src={row.getValue('logoUrl')}
+                alt={row.getValue('name')}
                 className="object-contain max-h-8"
               />
             </div>
@@ -51,50 +51,47 @@ const toolColumns: ColumnDef<Tool>[] = [
     ),
   },
   {
-    accessorKey: "name",
-    header: "Name",
+    accessorKey: 'name',
+    header: 'Name',
     cell: ({ row }) => (
-      <div className="font-medium">{row.getValue("name")}</div>
+      <div className="font-medium">{row.getValue('name')}</div>
     ),
   },
   {
-    accessorKey: "category",
-    header: "Category",
+    accessorKey: 'category',
+    header: 'Category',
     cell: ({ row }) => {
-      const value: string = row.getValue("category");
+      const value: string = row.getValue('category');
       if (!value) return <div>-</div>;
 
       // Replace underscores with spaces and capitalize first letter
-      const formattedValue = value.replace(/_/g, ' ')
-        .replace(/\b\w/g, char => char.toUpperCase());
+      const formattedValue = value
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
 
-      return (
-        <Badge variant="secondary">
-          {formattedValue}
-        </Badge>
-      );
+      return <Badge variant="secondary">{formattedValue}</Badge>;
     },
   },
   {
-    accessorKey: "version",
-    header: "Version",
+    accessorKey: 'version',
+    header: 'Version',
     cell: ({ row }) => {
-      const value: string = row.getValue("version");
-      return <div>{value || "-"}</div>;
+      const value: string = row.getValue('version');
+      return <div>{value || '-'}</div>;
     },
   },
   {
-    id: "apiKey",
-    header: "API",
+    id: 'apiKey',
+    header: 'API',
     cell: ({ row }) => {
       if (row.original.type === ToolsControllerGetManyToolsType.built_in) {
-        return <Button variant="outline" disabled>Built-in</Button>
+        return (
+          <Button variant="outline" disabled>
+            Built-in
+          </Button>
+        );
       }
-      return (
-        <ToolApiKeyDialog
-          tool={row.original}
-        />
-      );
+      return <ToolApiKeyDialog tool={row.original} />;
     },
   },
 ];
@@ -105,7 +102,7 @@ export function DetailProvider() {
 
   const {
     tableParams: { page, pageSize, sortBy, sortOrder },
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
   } = useServerDataTable();
 
   const {
@@ -116,23 +113,22 @@ export function DetailProvider() {
     query: { enabled: !!id },
   });
 
-  const { mutate: deleteProvider, isPending: isDeleting } = useProvidersControllerDeleteProvider();
+  const { mutate: deleteProvider, isPending: isDeleting } =
+    useProvidersControllerDeleteProvider();
 
-  const {
-    data: toolsData,
-    isLoading: toolsLoading,
-  } = useToolsControllerGetManyTools(
-    {
-      providerId: id,
-      limit: pageSize,
-      page,
-      sortBy,
-      sortOrder,
-    },
-    {
-      query: { enabled: !!id },
-    },
-  );
+  const { data: toolsData, isLoading: toolsLoading } =
+    useToolsControllerGetManyTools(
+      {
+        providerId: id,
+        limit: pageSize,
+        page,
+        sortBy,
+        sortOrder,
+      },
+      {
+        query: { enabled: !!id },
+      },
+    );
 
   // Handle provider deletion
   const handleDeleteProvider = () => {
@@ -147,7 +143,7 @@ export function DetailProvider() {
           toast.error('Failed to delete provider');
           console.error('Error deleting provider:', error);
         },
-      }
+      },
     );
   };
 
@@ -318,8 +314,7 @@ export function DetailProvider() {
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           onSortChange={(col, order) => {
-            setSortBy(col);
-            setSortOrder(order);
+            setParams({ sortBy: col, sortOrder: order });
           }}
           totalItems={totalTools}
         />
@@ -329,3 +324,4 @@ export function DetailProvider() {
 }
 
 export default DetailProvider;
+
