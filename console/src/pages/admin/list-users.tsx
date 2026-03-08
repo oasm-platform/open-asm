@@ -5,6 +5,7 @@ import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { authClient, type User } from '@/utils/authClient';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { AddUserDialog } from './add-user-dialog';
 import { UserDetailSheet } from './user-detail-sheet';
 
 const userColumns: ColumnDef<User>[] = [
@@ -64,6 +65,9 @@ export function ListUsers() {
 
   return (
     <>
+      <div className="flex justify-end mb-4">
+        <AddUserDialog />
+      </div>
       <DataTable
         data={(data.data?.users as User[]) || []}
         columns={userColumns}
