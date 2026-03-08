@@ -22,6 +22,9 @@ RUN bun pm cache clean && rm -rf src test
 # Production stage
 FROM base
 
+ARG APP_VERSION
+ENV APP_VERSION=$APP_VERSION
+
 WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
