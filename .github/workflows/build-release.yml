@@ -2,10 +2,10 @@ name: Build OASM Release
 
 on:
   push:
-#    release:
-#      types: [published]
+    #    release:
+    #      types: [published]
     tags:
-      - "v*"
+      - 'v*'
   workflow_dispatch:
 
 concurrency:
@@ -17,7 +17,7 @@ env:
 
 jobs:
   build:
-#    runs-on: self-hosted
+    #    runs-on: self-hosted
     runs-on: ubuntu-latest
 
     permissions:
@@ -50,6 +50,7 @@ jobs:
             --push \
             --cache-from=type=registry,ref=${{ env.IMAGE_NAME }}-${{ matrix.service }}:buildcache \
             --cache-to=type=registry,ref=${{ env.IMAGE_NAME }}-${{ matrix.service }}:buildcache,mode=max \
+            --build-arg APP_VERSION=${{ github.ref_name }} \
             --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:latest \
             --tag ${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.ref_name }} \
             --file ./${{ matrix.service == 'api' && 'core-api' || matrix.service }}/Dockerfile \

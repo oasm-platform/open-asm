@@ -383,6 +383,21 @@ export interface GetMetadataDto {
   name: string;
   /** Path to system logo */
   logoPath: string | null;
+  /** Current system version */
+  currentVersion: object;
+}
+
+export interface GetVersionDto {
+  /** Current system version */
+  currentVersion: string | null;
+  /** Latest system version */
+  latestVersion: string | null;
+  /** Release date */
+  releaseDate: string | null;
+  /** Release notes */
+  notes: string | null;
+  /** Is latest version */
+  isLatest: boolean | null;
 }
 
 export interface GenerateTagsResponseDto {
@@ -2778,6 +2793,22 @@ export class Api<
   rootControllerGetMetadata = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/metadata`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Returns the latest version information stored in Redis.
+   *
+   * @tags Root
+   * @name RootControllerGetLatestVersion
+   * @summary Get the latest version.
+   * @request GET:/api/version/latest
+   */
+  rootControllerGetLatestVersion = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/version/latest`,
       method: "GET",
       format: "json",
       ...params,

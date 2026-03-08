@@ -6,6 +6,9 @@ RUN apk add --no-cache curl && npm install -g bun
 # Build stage
 FROM base AS builder
 
+ARG APP_VERSION
+ENV APP_VERSION=$APP_VERSION
+
 WORKDIR /app
 
 COPY . .

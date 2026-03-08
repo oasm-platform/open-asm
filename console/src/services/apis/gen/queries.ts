@@ -387,6 +387,11 @@ export type CreateFirstAdminDto = {
   password: string;
 };
 
+/**
+ * Current system version
+ */
+export type GetMetadataDtoCurrentVersion = { [key: string]: unknown };
+
 export type GetMetadataDto = {
   isInit: boolean;
   isAssistant: boolean;
@@ -397,6 +402,36 @@ export type GetMetadataDto = {
    * @nullable
    */
   logoPath: string | null;
+  /** Current system version */
+  currentVersion: GetMetadataDtoCurrentVersion;
+};
+
+export type GetVersionDto = {
+  /**
+   * Current system version
+   * @nullable
+   */
+  currentVersion: string | null;
+  /**
+   * Latest system version
+   * @nullable
+   */
+  latestVersion: string | null;
+  /**
+   * Release date
+   * @nullable
+   */
+  releaseDate: string | null;
+  /**
+   * Release notes
+   * @nullable
+   */
+  notes: string | null;
+  /**
+   * Is latest version
+   * @nullable
+   */
+  isLatest: boolean | null;
 };
 
 export type GenerateTagsResponseDto = {
@@ -6245,6 +6280,162 @@ export function useRootControllerGetMetadata<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getRootControllerGetMetadataQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Returns the latest version information stored in Redis.
+ * @summary Get the latest version.
+ */
+export const rootControllerGetLatestVersion = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetVersionDto>(
+    { url: `/api/version/latest`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getRootControllerGetLatestVersionQueryKey = () => {
+  return [`/api/version/latest`] as const;
+};
+
+export const getRootControllerGetLatestVersionQueryOptions = <
+  TData = Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getRootControllerGetLatestVersionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof rootControllerGetLatestVersion>>
+  > = ({ signal }) => rootControllerGetLatestVersion(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type RootControllerGetLatestVersionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof rootControllerGetLatestVersion>>
+>;
+export type RootControllerGetLatestVersionQueryError = unknown;
+
+export function useRootControllerGetLatestVersion<
+  TData = Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+          TError,
+          Awaited<ReturnType<typeof rootControllerGetLatestVersion>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useRootControllerGetLatestVersion<
+  TData = Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+          TError,
+          Awaited<ReturnType<typeof rootControllerGetLatestVersion>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useRootControllerGetLatestVersion<
+  TData = Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get the latest version.
+ */
+
+export function useRootControllerGetLatestVersion<
+  TData = Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof rootControllerGetLatestVersion>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getRootControllerGetLatestVersionQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
