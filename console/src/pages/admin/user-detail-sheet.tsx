@@ -5,8 +5,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { type User } from '@/utils/authClient';
 import { Button } from '@/components/ui/button';
-import { Trash2, Ban } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Trash2, Ban, Pencil, Check, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useState } from 'react';
 import {
   Select,
   SelectContent,
@@ -50,13 +52,95 @@ function ActionRow({
   );
 }
 
-/**
- * User detail sheet component displaying a Supabase-style overview of a user,
- * with provider information, management actions, and raw JSON data.
- *
- * @param user - The user whose details are displayed (null when sheet is closed).
- * @param onOpenChange - Callback to close the sheet.
- */
+/** Inline editable field: shows value with pencil button; on edit shows input + save/cancel. */
+function InlineEditField({
+  value,
+  type = 'text',
+  placeholder,
+  isPending,
+  onSave,
+}: {
+  value: string;
+  type?: 'text' | 'email' | 'password';
+  placeholder?: string;
+  isPending: boolean;
+  onSave: (next: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  function startEdit() {
+    setDraft(type === 'password' ? '' : value);
+    setEditing(true);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setDraft('');
+  }
+
+  function save() {
+    if (!draft.trim()) return;
+    onSave(draft.trim());
+    setEditing(false);
+    setDraft('');
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          type={type}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={placeholder}
+          className="h-7 text-xs w-36"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') cancel();
+          }}
+          autoFocus
+          disabled={isPending}
+        />
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6"
+          onClick={save}
+          disabled={isPending || !draft.trim()}
+        >
+          {isPending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Check className="h-3 w-3" />
+          )}
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6"
+          onClick={cancel}
+          disabled={isPending}
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="h-7 gap-1.5 text-xs px-2"
+      onClick={startEdit}
+    >
+      <Pencil className="h-3 w-3" />
+      Change
+    </Button>
+  );
+}
+
 export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
   const queryClient = useQueryClient();
 
@@ -67,6 +151,52 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
   });
 
   const aUser = data?.data as User | undefined;
+
+  const { mutate: updateName, isPending: isUpdatingName } = useMutation({
+    mutationFn: async (name: string) => {
+      if (!aUser) return;
+      await authClient.admin.updateUser({ userId: aUser.id, data: { name } });
+    },
+    onSuccess: () => {
+      toast.success('Name updated.');
+      return queryClient.invalidateQueries({ queryKey: ['user', aUser?.id] });
+    },
+    onError: () => {
+      toast.error('Failed to update name.');
+    },
+  });
+
+  const { mutate: updateEmail, isPending: isUpdatingEmail } = useMutation({
+    mutationFn: async (email: string) => {
+      if (!aUser) return;
+      await authClient.admin.updateUser({ userId: aUser.id, data: { email } });
+    },
+    onSuccess: () => {
+      toast.success('Email updated.');
+      return queryClient.invalidateQueries({ queryKey: ['user', aUser?.id] });
+    },
+    onError: () => {
+      toast.error('Failed to update email.');
+    },
+  });
+
+  const { mutate: resetPassword, isPending: isResettingPassword } = useMutation(
+    {
+      mutationFn: async (newPassword: string) => {
+        if (!aUser) return;
+        await authClient.admin.setUserPassword({
+          userId: aUser.id,
+          newPassword,
+        });
+      },
+      onSuccess: () => {
+        toast.success('Password reset successfully.');
+      },
+      onError: () => {
+        toast.error('Failed to reset password.');
+      },
+    },
+  );
 
   const { mutate: toggleBan, isPending: isBanning } = useMutation({
     mutationFn: async () => {
@@ -248,17 +378,32 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
                     <span className="text-xs text-muted-foreground shrink-0 w-28">
                       Display name
                     </span>
-                    <span className="text-xs truncate text-right">
-                      {aUser.name || '—'}
-                    </span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs truncate">
+                        {aUser.name || '—'}
+                      </span>
+                      <InlineEditField
+                        value={aUser.name ?? ''}
+                        placeholder="New name"
+                        isPending={isUpdatingName}
+                        onSave={(v) => updateName(v)}
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between px-4 py-2.5 gap-4">
                     <span className="text-xs text-muted-foreground shrink-0 w-28">
                       Email
                     </span>
-                    <span className="text-xs truncate text-right">
-                      {aUser.email}
-                    </span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs truncate">{aUser.email}</span>
+                      <InlineEditField
+                        value={aUser.email}
+                        type="email"
+                        placeholder="New email"
+                        isPending={isUpdatingEmail}
+                        onSave={(v) => updateEmail(v)}
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between px-4 py-2.5 gap-4">
                     <span className="text-xs text-muted-foreground shrink-0 w-28">
@@ -276,6 +421,18 @@ export function UserDetailSheet({ user, onOpenChange }: UserDetailSheetProps) {
                         Unverified
                       </Badge>
                     )}
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+                    <span className="text-xs text-muted-foreground shrink-0 w-28">
+                      Password
+                    </span>
+                    <InlineEditField
+                      value=""
+                      type="password"
+                      placeholder="New password"
+                      isPending={isResettingPassword}
+                      onSave={(v) => resetPassword(v)}
+                    />
                   </div>
                   <div className="flex items-center justify-between px-4 py-2.5 gap-4">
                     <span className="text-xs text-muted-foreground shrink-0 w-28">
