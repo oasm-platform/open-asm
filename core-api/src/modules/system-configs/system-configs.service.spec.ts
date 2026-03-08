@@ -1,3 +1,4 @@
+import { RedisService } from '@/services/redis/redis.service';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -22,6 +23,11 @@ describe('SystemConfigsService', () => {
       deleteFile: jest.fn(),
     };
 
+    const mockRedisService = {
+      get: jest.fn(),
+      set: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SystemConfigsService,
@@ -32,6 +38,10 @@ describe('SystemConfigsService', () => {
         {
           provide: StorageService,
           useValue: mockStorageService,
+        },
+        {
+          provide: RedisService,
+          useValue: mockRedisService,
         },
       ],
     }).compile();
