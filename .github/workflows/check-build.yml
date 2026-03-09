@@ -1,9 +1,14 @@
 name: Check Build
 
 on:
-  push:
+  pull_request:
     branches:
-      - '**'
+      - 'main'
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
 
 jobs:
   # Detect file changes
@@ -100,7 +105,10 @@ jobs:
     name: Check Build - All Services
     runs-on: ubuntu-latest
     needs: [build-console, build-core-api, build-worker]
-    if: needs.build-console.result == 'success' || needs.build-core-api.result == 'success' || needs.build-worker.result == 'success'
+    if: >-
+      (needs.build-console.result == 'success' || needs.build-console.result == 'skipped') &&
+      (needs.build-core-api.result == 'success' || needs.build-core-api.result == 'skipped') &&
+      (needs.build-worker.result == 'success' || needs.build-worker.result == 'skipped')
     steps:
       - name: Check if all builds passed
         run: |
