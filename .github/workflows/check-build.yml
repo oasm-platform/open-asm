@@ -6,9 +6,41 @@ on:
       - '**'
 
 jobs:
+  # Detect file changes
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      console: ${{ steps.filter.outputs.console }}
+      core-api: ${{ steps.filter.outputs.core-api }}
+      worker: ${{ steps.filter.outputs.worker }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Filter changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            console:
+              - 'console/**'
+              - 'console/.dockerignore'
+              - 'console/Dockerfile'
+            core-api:
+              - 'core-api/**'
+              - 'core-api/.dockerignore'
+              - 'core-api/Dockerfile'
+            worker:
+              - 'worker/**'
+              - 'worker/.dockerignore'
+              - 'worker/Dockerfile'
+
   build-console:
     name: Build Docker - Console
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.console == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -27,6 +59,8 @@ jobs:
   build-core-api:
     name: Build Docker - Core API
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.core-api == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -45,6 +79,8 @@ jobs:
   build-worker:
     name: Build Docker - Worker
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -64,13 +100,28 @@ jobs:
     name: Check Build - All Services
     runs-on: ubuntu-latest
     needs: [build-console, build-core-api, build-worker]
-    if: always()
+    if: needs.build-console.result == 'success' || needs.build-core-api.result == 'success' || needs.build-worker.result == 'success'
     steps:
       - name: Check if all builds passed
         run: |
-          if [ "${{ needs.build-console.result }}" != "success" ] || \
-             [ "${{ needs.build-core-api.result }}" != "success" ] || \
-             [ "${{ needs.build-worker.result }}" != "success" ]; then
+          FAILED=0
+
+          if [ "${{ needs.build-console.result }}" == "failure" ]; then
+            echo "Console build failed"
+            FAILED=1
+          fi
+
+          if [ "${{ needs.build-core-api.result }}" == "failure" ]; then
+            echo "Core API build failed"
+            FAILED=1
+          fi
+
+          if [ "${{ needs.build-worker.result }}" == "failure" ]; then
+            echo "Worker build failed"
+            FAILED=1
+          fi
+
+          if [ $FAILED -eq 1 ]; then
             echo "One or more Docker builds failed"
             exit 1
           fi
