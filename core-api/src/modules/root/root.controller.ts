@@ -3,13 +3,17 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { CreateFirstAdminDto, GetMetadataDto } from './dto/root.dto';
+import {
+  CreateFirstAdminDto,
+  GetMetadataDto,
+  GetVersionDto,
+} from './dto/root.dto';
 import { RootService } from './root.service';
 
 @ApiTags('Root')
 @Controller()
 export class RootController {
-  constructor(private readonly rootService: RootService) { }
+  constructor(private readonly rootService: RootService) {}
 
   @Public()
   @Get('health')
@@ -44,5 +48,18 @@ export class RootController {
   @Get('metadata')
   getMetadata() {
     return this.rootService.getMetadata();
+  }
+
+  @Public()
+  @Doc({
+    summary: 'Get the latest version.',
+    description: 'Returns the latest version information stored in Redis.',
+    response: {
+      serialization: GetVersionDto,
+    },
+  })
+  @Get('version/latest')
+  getLatestVersion(): Promise<GetVersionDto> {
+    return this.rootService.getLatestVersion();
   }
 }

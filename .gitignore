@@ -68,6 +68,5 @@ core-api/.storage/*
 .roo/*
 .open-api/*
 .agent/*
-.kilocode/*
 .windsurf/*
 .claude/*

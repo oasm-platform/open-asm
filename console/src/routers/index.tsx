@@ -1,5 +1,6 @@
 import Layout from '@/components/common/layout/layout';
 import Splash from '@/components/common/layout/splash';
+import { RequireWorkspace } from '@/components/common/require-workspace';
 import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
 import { AssetGroups } from '@/pages/asset-group/asset-groups';
 import Assets from '@/pages/assets/assets';
@@ -26,6 +27,8 @@ import Tools from '@/pages/tools/tools';
 import DetailVulnerability from '@/pages/vulnerabilities/detail-vulnerability';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 import Workers from '@/pages/workers/workers';
+import Workspaces from '@/pages/workspaces';
+import CreateWorkspace from '@/pages/workspaces/create-workspace';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
@@ -57,16 +60,37 @@ export const router = createBrowserRouter([
           </GuestRoute>
         ),
       },
+
       {
-        element: <ProtectedRoute />,
+        element: <ProtectedRoute layout="application" />,
         children: [
           {
+            path: 'workspaces/create',
+            element: <CreateWorkspace />,
+          },
+          {
             path: '',
-            element: <Dashboard />,
+            element: (
+              <RequireWorkspace>
+                <Dashboard />
+              </RequireWorkspace>
+            ),
+          },
+          {
+            path: 'workspaces',
+            element: (
+              <RequireWorkspace>
+                <Workspaces />
+              </RequireWorkspace>
+            ),
           },
           {
             path: 'notifications',
-            element: <NotificationsPage />,
+            element: (
+              <RequireWorkspace>
+                <NotificationsPage />
+              </RequireWorkspace>
+            ),
           },
           // {
           //   path: 'studio',
@@ -76,25 +100,47 @@ export const router = createBrowserRouter([
           //   path: 'groups',
           //   children: [{ path: '', element: <Workflow /> }],
           // },
+        ],
+      },
+      {
+        element: <ProtectedRoute layout="settings" />,
+        children: [
           {
             path: 'settings',
             children: [
               {
                 path: '',
-                element: <Settings defaultTab="account" />,
+                element: (
+                  <RequireWorkspace>
+                    <Settings />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: ':tab',
-                element: <Settings />,
+                element: (
+                  <RequireWorkspace>
+                    <Settings />
+                  </RequireWorkspace>
+                ),
               },
             ],
           },
+        ],
+      },
+      {
+        element: <ProtectedRoute layout="application" />,
+        children: [
           {
             path: 'targets',
             children: [
               {
                 path: '',
-                element: <Targets />,
+                element: (
+                  <RequireWorkspace>
+                    <Targets />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: ':id',
@@ -105,7 +151,11 @@ export const router = createBrowserRouter([
                   },
                   {
                     path: ':tab',
-                    element: <DetailTarget />,
+                    element: (
+                      <RequireWorkspace>
+                        <DetailTarget />
+                      </RequireWorkspace>
+                    ),
                   },
                 ],
               },
@@ -116,16 +166,28 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: '',
-                element: <Vulnerabilities />,
+                element: (
+                  <RequireWorkspace>
+                    <Vulnerabilities />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: ':id',
-                element: <DetailVulnerability />,
+                element: (
+                  <RequireWorkspace>
+                    <DetailVulnerability />
+                  </RequireWorkspace>
+                ),
               },
             ],
           },
           {
-            element: <Workers />,
+            element: (
+              <RequireWorkspace>
+                <Workers />
+              </RequireWorkspace>
+            ),
             path: 'workers',
           },
           {
@@ -133,16 +195,28 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: '',
-                element: <Tools />,
+                element: (
+                  <RequireWorkspace>
+                    <Tools />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: ':id',
-                element: <ToolDetail />,
+                element: (
+                  <RequireWorkspace>
+                    <ToolDetail />
+                  </RequireWorkspace>
+                ),
               },
             ],
           },
           {
-            element: <Search />,
+            element: (
+              <RequireWorkspace>
+                <Search />
+              </RequireWorkspace>
+            ),
             path: 'search',
           },
           {
@@ -150,11 +224,19 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: '',
-                element: <AssetGroups />,
+                element: (
+                  <RequireWorkspace>
+                    <AssetGroups />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: ':id',
-                element: <AssetGroupDetail />,
+                element: (
+                  <RequireWorkspace>
+                    <AssetGroupDetail />
+                  </RequireWorkspace>
+                ),
               },
             ],
           },
@@ -163,11 +245,19 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: '',
-                element: <Assets />,
+                element: (
+                  <RequireWorkspace>
+                    <Assets />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: ':id',
-                element: <DetailAsset />,
+                element: (
+                  <RequireWorkspace>
+                    <DetailAsset />
+                  </RequireWorkspace>
+                ),
               },
             ],
           },
@@ -176,19 +266,35 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: '',
-                element: <ProvidersPage />,
+                element: (
+                  <RequireWorkspace>
+                    <ProvidersPage />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: 'create',
-                element: <CreateProviderPage />,
+                element: (
+                  <RequireWorkspace>
+                    <CreateProviderPage />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: ':id',
-                element: <DetailProvider />,
+                element: (
+                  <RequireWorkspace>
+                    <DetailProvider />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: ':id/edit',
-                element: <EditProviderPage />,
+                element: (
+                  <RequireWorkspace>
+                    <EditProviderPage />
+                  </RequireWorkspace>
+                ),
               },
             ],
           },
@@ -197,15 +303,27 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: '',
-                element: <Issues />,
+                element: (
+                  <RequireWorkspace>
+                    <Issues />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: 'create',
-                element: <CreateIssue />,
+                element: (
+                  <RequireWorkspace>
+                    <CreateIssue />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: ':id',
-                element: <IssueDetail />,
+                element: (
+                  <RequireWorkspace>
+                    <IssueDetail />
+                  </RequireWorkspace>
+                ),
               },
             ],
           },
@@ -214,11 +332,19 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: '',
-                element: <JobsRegistryPage />,
+                element: (
+                  <RequireWorkspace>
+                    <JobsRegistryPage />
+                  </RequireWorkspace>
+                ),
               },
               {
                 path: 'runs/:id',
-                element: <Runs />,
+                element: (
+                  <RequireWorkspace>
+                    <Runs />
+                  </RequireWorkspace>
+                ),
               },
             ],
           },

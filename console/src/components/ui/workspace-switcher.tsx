@@ -12,8 +12,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import CreateWorkspace from '@/pages/workspaces/create-workspace-dialog';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Separator } from './separator';
 
@@ -23,7 +23,7 @@ export function WorkspaceSwitcher() {
   const isMobile = useIsMobile();
 
   const itemHeightClass = 'h-10';
-
+  const navigate = useNavigate();
   if (isLoading) {
     return (
       <SidebarMenu>
@@ -53,7 +53,7 @@ export function WorkspaceSwitcher() {
 
       <DropdownMenuContent
         align="start"
-        className="min-w-[var(--radix-dropdown-menu-trigger-width)] p-2"
+        className="min-w-(--radix-dropdown-menu-trigger-width) p-2"
       >
         {workspaces.length > 0 ? (
           <>
@@ -68,7 +68,7 @@ export function WorkspaceSwitcher() {
                   handleSelectWorkspace(workspace.id);
                   toast(`Switched to ${workspace.name}`);
                 }}
-                className="cursor-pointer px-2 py-1.5 rounded hover:bg-muted flex items-center justify-between"
+                className="px-2 py-1.5 rounded hover:bg-muted flex items-center justify-between"
               >
                 {workspace.name}
                 {workspace.id === selectedWorkspace && <Check size={16} />}
@@ -82,7 +82,13 @@ export function WorkspaceSwitcher() {
           </div>
         )}
 
-        <CreateWorkspace />
+        <DropdownMenuItem onClick={() => navigate('/workspaces')}>
+          All workspaces
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate('/workspaces/create')}>
+          <Plus size={16} className="mr-2" />
+          Create workspace
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

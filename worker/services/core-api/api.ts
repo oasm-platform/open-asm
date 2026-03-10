@@ -201,8 +201,45 @@ export interface UpdateWorkspaceConfigsDto {
   isAutoEnableAssetAfterDiscovered: boolean;
 }
 
-export interface GetManyWorkspaceDto {
-  data: Workspace[];
+export interface WorkspaceResponseDto {
+  /** Workspace ID */
+  id: string;
+  /** Workspace name */
+  name: string;
+  /** Workspace description */
+  description?: object | null;
+  /**
+   * Creation timestamp
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * Last update timestamp
+   * @format date-time
+   */
+  updatedAt: string;
+  /** Archival timestamp */
+  archivedAt?: object | null;
+  /** Whether asset discovery is enabled */
+  isAssetsDiscovery: boolean;
+  /** Whether assets are auto-enabled after discovery */
+  isAutoEnableAssetAfterDiscovered: boolean;
+  /** Owner user ID */
+  ownerId: string;
+  /**
+   * Number of targets in the workspace
+   * @example 10
+   */
+  targetCount: number;
+  /**
+   * Number of members in the workspace
+   * @example 5
+   */
+  memberCount: number;
+}
+
+export interface GetManyWorkspaceResponseDtoDto {
+  data: WorkspaceResponseDto[];
   total: number;
   page: number;
   limit: number;
@@ -346,6 +383,21 @@ export interface GetMetadataDto {
   name: string;
   /** Path to system logo */
   logoPath: string | null;
+  /** Current system version */
+  currentVersion: object;
+}
+
+export interface GetVersionDto {
+  /** Current system version */
+  currentVersion: string | null;
+  /** Latest system version */
+  latestVersion: string | null;
+  /** Release date */
+  releaseDate: string | null;
+  /** Release notes */
+  notes: string | null;
+  /** Is latest version */
+  isLatest: boolean | null;
 }
 
 export interface GenerateTagsResponseDto {
@@ -831,7 +883,7 @@ export interface GetAssetsResponseDto {
   httpResponses?: HttpResponseDTO;
   port?: number;
   isEnabled: boolean;
-  screenshotPath?: string;
+  screenshotPath?: object;
 }
 
 export interface GetManyGetAssetsResponseDtoDto {
@@ -2741,6 +2793,22 @@ export class Api<
   rootControllerGetMetadata = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/metadata`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Returns the latest version information stored in Redis.
+   *
+   * @tags Root
+   * @name RootControllerGetLatestVersion
+   * @summary Get the latest version.
+   * @request GET:/api/version/latest
+   */
+  rootControllerGetLatestVersion = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/version/latest`,
       method: "GET",
       format: "json",
       ...params,
