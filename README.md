@@ -13,21 +13,22 @@ Open-source platform for cybersecurity Attack Surface Management. Built to help 
   <a href="#features">Features</a> •
   <a href="#system-architecture">System Architecture</a> •
   <a href="#installation">Installation</a> •
+  <a href="https://docs.oasm.dev" target="_blank">Documentation</a> •
   <a href="#developer-guide">Developer Guide</a> •
   <a href="#screenshots">Screenshots</a>
 </p>
 
 ## Features
 
-- **Asset Discovery & Management**: Comprehensive discovery and cataloging of internet-facing assets including domains, subdomains, IP addresses, and web services. Supports asset grouping, real-time inventory updates, and multi-workspace organization for efficient asset lifecycle management.
-- **Vulnerability Assessment**: Continuous scanning for vulnerabilities, misconfigurations, and security exposures across the entire attack surface. Advanced issue tracking with detailed risk analysis, prioritization, and remediation guidance.
-- **Technology Detection**: Automated identification and cataloging of technologies, frameworks, and services running on discovered assets. Provides insights into technology stacks and potential security implications.
-- **Distributed Scanning Engine**: High-performance distributed workers with auto-scaling capabilities for parallel processing of scanning tasks. Job orchestration and registry system for managing complex scanning workflows.
-- **Tool Integration**: Extensible framework for integrating various security scanning tools and services. Supports custom tool configurations and automated execution pipelines.
-- **AI Assistant Integration**: Model Context Protocol (MCP) server integration enabling AI assistants to query asset data, generate insights, and assist with security analysis through natural language interfaces.
-- **Workflow Automation**: Configurable workflows for automated scanning schedules, alert responses, and remediation processes. Template-based approach for standardizing security operations.
-- **Real-time Monitoring & Notifications**: Continuous monitoring of asset changes with instant notifications for new discoveries, vulnerabilities, and configuration changes. Statistics dashboard with trend analysis and reporting.
-- **Advanced Search & Analytics**: Powerful search capabilities across all asset data with filtering and faceting. Comprehensive analytics for attack surface metrics, risk trends, and compliance reporting.
+- **Asset Discovery & Management**: Discover and manage internet-facing assets (domains, IPs, services) with grouping and multi-workspace support.
+- **Vulnerability Assessment**: Scan for vulnerabilities and misconfigurations with issue tracking, risk analysis, and remediation guidance.
+- **Technology Detection**: Identify technologies and services running on discovered assets.
+- **Distributed Scanning Engine**: High-performance distributed workers that can be easily scaled for parallel scanning tasks.
+- **Tool Integration**: Extensible framework for integrating security scanning tools.
+- **AI Assistant Integration**: MCP server integration for AI assistants to query asset data via natural language.
+- **Workflow Automation**: Automated scanning schedules, alerts, and remediation workflows.
+- **Real-time Monitoring**: Monitor asset changes with instant notifications and a statistics dashboard.
+- **Search & Analytics**: Search and filter asset data with analytics for risk trends and reporting.
 
 ## System Architecture
 

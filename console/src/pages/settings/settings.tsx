@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import CreateMcpPermission from './components/create-mcp-permission';
+import GetAboutProject from './components/get-about-project';
 import ListMcpPermissions from './components/list-mcp-permissions';
 import Preferences from './components/preferences';
 import SecuritySettings from './components/security-settings';
@@ -115,6 +116,17 @@ export const settingsTabGroups: SettingsTabGroup[] = [
           description: 'Customize your brand name and logo',
         },
         component: <BrandNameAndLogoSettings />,
+      },
+      {
+        id: 'about',
+        label: 'About',
+        path: '/settings/about',
+        content: {
+          title: 'About',
+          description:
+            'Open-source platform for cybersecurity Attack Surface Management.',
+        },
+        component: <GetAboutProject />,
       },
     ],
   },
