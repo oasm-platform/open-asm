@@ -106,7 +106,7 @@ const ListWorkers = () => {
                       >
                         <Avatar className="h-8 w-8 border-2 border-background">
                           <AvatarImage
-                            src={`api/${tool.logoUrl}`}
+                            src={`/api/${tool.logoUrl}`}
                             alt={tool.name ?? ''}
                           />
                           <AvatarFallback className="text-xs">
