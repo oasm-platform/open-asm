@@ -7,6 +7,10 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "typeorm": "typeorm-ts-node-commonjs -r tsconfig-paths/register",
+    "migration:generate": "npx ts-node --project tsconfig.json -r tsconfig-paths/register -- ../node_modules/typeorm/cli.js migration:generate -d src/database/database-config.ts src/database/migrations/migration",
+    "migration:run": "npx ts-node --project tsconfig.json -r tsconfig-paths/register -- ../node_modules/typeorm/cli.js migration:run -d src/database/database-config.ts",
+    "migration:revert": "npx ts-node --project tsconfig.json -r tsconfig-paths/register -- ../node_modules/typeorm/cli.js migration:revert -d src/database/database-config.ts",
     "proto:generate": "protoc --plugin=../node_modules/ts-proto/protoc-gen-ts_proto --ts_proto_out=./src/types --ts_proto_opt=nestJs=true,outputServices=grpc-js,env=node,esModuleInterop=true,useDate=false,oneof=unions --proto_path=./src/proto ./src/proto/assistant.proto",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

@@ -1,4 +1,7 @@
-import { Pool } from 'pg';
+import 'dotenv/config';
+import type { DataSourceOptions } from 'typeorm';
+import { DataSource } from 'typeorm';
+
 const {
   POSTGRES_HOST,
   POSTGRES_USERNAME,
@@ -13,10 +16,19 @@ export const databaseConnectionConfig = {
   user: POSTGRES_USERNAME,
   username: POSTGRES_USERNAME,
   password: POSTGRES_PASSWORD,
-  port: parseInt(POSTGRES_PORT || '5432', 5432),
+  port: parseInt(POSTGRES_PORT || '5432', 10),
   database: POSTGRES_DB,
-  ssl: Boolean(POSTGRES_SSL === 'true'),
+  ssl: POSTGRES_SSL === 'true',
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-export const database = new Pool(databaseConnectionConfig);
+export const dataSourceOptions: DataSourceOptions = {
+  type: 'postgres',
+  ...databaseConnectionConfig,
+  synchronize: false,
+  entities: [__dirname + '/../**/**/*.entity{.ts,.js}'],
+  migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
+  migrationsRun: true,
+  migrationsTableName: 'migrations',
+};
+
+export const AppDataSource = new DataSource(dataSourceOptions);
