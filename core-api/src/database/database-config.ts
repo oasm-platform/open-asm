@@ -9,6 +9,7 @@ const {
   POSTGRES_PORT,
   POSTGRES_DB,
   POSTGRES_SSL,
+  NODE_ENV,
 } = process.env;
 
 export const databaseConnectionConfig = {
@@ -27,7 +28,7 @@ export const dataSourceOptions: DataSourceOptions = {
   synchronize: false,
   entities: [__dirname + '/../**/**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
-  migrationsRun: true,
+  migrationsRun: NODE_ENV === 'development',
   migrationsTableName: 'migrations',
 };
 
