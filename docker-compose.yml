@@ -36,6 +36,8 @@ services:
       - OASM_CLOUD_APIKEY=change_me
     restart: 'always'
     depends_on:
+      migration:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -131,6 +133,26 @@ services:
     volumes:
       - geoip-data:/app/data:rw
 
+  migration:
+    container_name: oasm-migration
+    image: oasm/oasm-api:latest
+    networks:
+      - oasm
+    env_file:
+      - ./core-api/.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USERNAME=${POSTGRES_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-open_asm}
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "node node_modules/typeorm/cli.js migration:run -d dist/database/database-config.js"
+
   assistant:
     container_name: assistant
     image: oasm/oasm-assistant:dev
@@ -157,7 +179,7 @@ services:
     networks:
       - oasm
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'
     depends_on:
       - searxng
 
@@ -168,7 +190,7 @@ services:
     networks:
       - oasm
     ports:
-      - "8080:8080"
+      - '8080:8080'
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -179,10 +201,10 @@ services:
       - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME:-localhost}/
       - SEARXNG_PORT=8080
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "1m"
-        max-file: "1"
+        max-size: '1m'
+        max-file: '1'
 
 volumes:
   pgdata:
