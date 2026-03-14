@@ -763,6 +763,8 @@ export interface JobHistoryResponseDto {
   totalJobs: number;
   status: JobHistoryResponseDtoStatusEnum;
   workflowName: string;
+  jobHistoryName: string;
+  jobRunType: JobHistoryResponseDtoJobRunTypeEnum;
 }
 
 export interface GetManyJobHistoryResponseDtoDto {
@@ -1932,6 +1934,11 @@ export enum JobHistoryResponseDtoStatusEnum {
   Completed = "completed",
   Failed = "failed",
   Cancelled = "cancelled",
+}
+
+export enum JobHistoryResponseDtoJobRunTypeEnum {
+  Manual = "manual",
+  Scheduled = "scheduled",
 }
 
 export enum UserRoleEnum {

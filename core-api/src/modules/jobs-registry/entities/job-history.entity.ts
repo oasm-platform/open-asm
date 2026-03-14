@@ -1,4 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { JobRunType } from '@/common/enums/enum';
 import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import { Port } from '@/modules/assets/entities/ports.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
@@ -38,4 +39,14 @@ export class JobHistory extends BaseEntity {
     onDelete: 'CASCADE',
   })
   workflow: Workflow;
+
+  @Column({ nullable: true })
+  jobHistoryName?: string;
+
+  @Column({
+    type: 'enum',
+    enum: JobRunType,
+    default: JobRunType.MANUAL,
+  })
+  jobRunType: JobRunType;
 }
