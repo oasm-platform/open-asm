@@ -10,7 +10,7 @@ export const authClient = createAuthClient({
 export const { useSession } = authClient;
 export type User = BetterAuthUser & {
   role: string;
-  banned: boolean;
-  banReason: string;
-  banExpires: Date;
+  banned?: boolean | null;
+  banReason?: string | null;
+  banExpires?: Date | null;
 };

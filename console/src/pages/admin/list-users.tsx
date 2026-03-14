@@ -61,15 +61,13 @@ export function ListUsers() {
       }),
   });
 
-  if (!data) return null;
-
   return (
     <>
       <div className="flex justify-end mb-4">
         <AddUserDialog />
       </div>
       <DataTable
-        data={(data.data?.users as User[]) || []}
+        data={(data?.data?.users as User[]) || []}
         columns={userColumns}
         isLoading={isLoading}
         page={page}
@@ -84,7 +82,7 @@ export function ListUsers() {
         filterColumnKey="value"
         filterValue={filter}
         onFilterChange={setFilter}
-        totalItems={data.data?.total}
+        totalItems={data?.data?.total}
         onRowClick={setSelectedUser}
         rowClassName="cursor-pointer hover:bg-muted/50 transition-colors"
       />
