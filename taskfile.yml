@@ -98,3 +98,21 @@ tasks:
       - task: api:clean
       - task: console:clean
       - task: worker:clean
+
+  # Generate migration with custom name
+  # Usage: task migration:generate MIGRATION_NAME=AddUserType
+  migration:generate:
+    cmds:
+      - task: api:migration:generate
+
+  # Run all pending migrations
+  # Executes all pending database migrations
+  migration:run:
+    cmds:
+      - task: api:migration:run
+
+  # Revert the last migration
+  # Rolls back the most recently executed migration
+  migration:revert:
+    cmds:
+      - task: api:migration:revert
