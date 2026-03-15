@@ -657,6 +657,7 @@ export interface Tool {
   isOfficialSupport: boolean;
   type: string;
   providerId: string;
+  availableWorkersCount?: number;
 }
 
 export interface AssetService {
@@ -763,6 +764,8 @@ export interface JobHistoryResponseDto {
   totalJobs: number;
   status: JobHistoryResponseDtoStatusEnum;
   workflowName: string;
+  jobHistoryName: string;
+  jobRunType: JobHistoryResponseDtoJobRunTypeEnum;
 }
 
 export interface GetManyJobHistoryResponseDtoDto {
@@ -1053,6 +1056,47 @@ export interface WorkerJoinDto {
 
 export interface GetManyWorkerInstanceDto {
   data: WorkerInstance[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface CreateToolDto {
+  name: string;
+  description: string;
+  category: CreateToolDtoCategoryEnum;
+  version: string;
+  logoUrl?: string | null;
+  /** The ID of the provider */
+  providerId: string;
+}
+
+export interface WorkspaceTool {
+  id: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface AddToolToWorkspaceDto {
+  /** The ID of the workspace */
+  workspaceId: string;
+  /** The ID of the tool */
+  toolId: string;
+}
+
+export interface InstallToolDto {
+  /** The ID of the workspace */
+  workspaceId: string;
+  /** The ID of the tool */
+  toolId: string;
+}
+
+export interface GetManyToolDto {
+  data: Tool[];
   total: number;
   page: number;
   limit: number;
@@ -1439,47 +1483,6 @@ export interface BulkDismissVulnerabilitiesDto {
 
 export interface BulkReopenVulnerabilitiesDto {
   ids: string[];
-}
-
-export interface CreateToolDto {
-  name: string;
-  description: string;
-  category: CreateToolDtoCategoryEnum;
-  version: string;
-  logoUrl?: string | null;
-  /** The ID of the provider */
-  providerId: string;
-}
-
-export interface WorkspaceTool {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-}
-
-export interface AddToolToWorkspaceDto {
-  /** The ID of the workspace */
-  workspaceId: string;
-  /** The ID of the tool */
-  toolId: string;
-}
-
-export interface InstallToolDto {
-  /** The ID of the workspace */
-  workspaceId: string;
-  /** The ID of the tool */
-  toolId: string;
-}
-
-export interface GetManyToolDto {
-  data: Tool[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
 }
 
 export interface ToolProvider {
@@ -1934,6 +1937,21 @@ export enum JobHistoryResponseDtoStatusEnum {
   Cancelled = "cancelled",
 }
 
+export enum JobHistoryResponseDtoJobRunTypeEnum {
+  Manual = "manual",
+  Scheduled = "scheduled",
+}
+
+export enum CreateToolDtoCategoryEnum {
+  Subdomains = "subdomains",
+  HttpProbe = "http_probe",
+  PortsScanner = "ports_scanner",
+  Vulnerabilities = "vulnerabilities",
+  Screenshot = "screenshot",
+  Classifier = "classifier",
+  Assistant = "assistant",
+}
+
 export enum UserRoleEnum {
   Admin = "admin",
   User = "user",
@@ -1946,16 +1964,6 @@ export enum VulnerabilityStatisticsDtoSeverityEnum {
   Medium = "medium",
   High = "high",
   Critical = "critical",
-}
-
-export enum CreateToolDtoCategoryEnum {
-  Subdomains = "subdomains",
-  HttpProbe = "http_probe",
-  PortsScanner = "ports_scanner",
-  Vulnerabilities = "vulnerabilities",
-  Screenshot = "screenshot",
-  Classifier = "classifier",
-  Assistant = "assistant",
 }
 
 export enum AssetGroupWorkflowScheduleEnum {
@@ -2013,24 +2021,6 @@ export enum CreateNotificationDtoTypeEnum {
   WORKSPACE_CREATED = "WORKSPACE_CREATED",
 }
 
-/**
- * Filter by vulnerability status: open, dismissed, or all
- * @default "open"
- */
-export enum VulnerabilitiesControllerGetVulnerabilitiesParamsStatusEnum {
-  Open = "open",
-  Dismissed = "dismissed",
-  All = "all",
-}
-
-export enum VulnerabilitiesControllerGetVulnerabilitiesParamsSeverityEnum {
-  Info = "info",
-  Low = "low",
-  Medium = "medium",
-  High = "high",
-  Critical = "critical",
-}
-
 export enum ToolsControllerGetManyToolsParamsTypeEnum {
   BuiltIn = "built_in",
   Provider = "provider",
@@ -2054,6 +2044,24 @@ export enum ToolsControllerGetInstalledToolsParamsCategoryEnum {
   Screenshot = "screenshot",
   Classifier = "classifier",
   Assistant = "assistant",
+}
+
+/**
+ * Filter by vulnerability status: open, dismissed, or all
+ * @default "open"
+ */
+export enum VulnerabilitiesControllerGetVulnerabilitiesParamsStatusEnum {
+  Open = "open",
+  Dismissed = "dismissed",
+  All = "all",
+}
+
+export enum VulnerabilitiesControllerGetVulnerabilitiesParamsSeverityEnum {
+  Info = "info",
+  Low = "low",
+  Medium = "medium",
+  High = "high",
+  Critical = "critical",
 }
 
 export enum IssuesControllerGetManyParamsStatusEnum {
@@ -3812,6 +3820,210 @@ export class Api<
     });
 
   /**
+   * @description Registers a new security assessment tool in the system with specified configuration and capabilities.
+   *
+   * @tags Tools
+   * @name ToolsControllerCreateTool
+   * @summary Create a new tool
+   * @request POST:/api/tools
+   */
+  toolsControllerCreateTool = (
+    data: CreateToolDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Fetches a paginated list of available security assessment tools in the system.
+   *
+   * @tags Tools
+   * @name ToolsControllerGetManyTools
+   * @summary Get tools
+   * @request GET:/api/tools
+   */
+  toolsControllerGetManyTools = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+      type?: ToolsControllerGetManyToolsParamsTypeEnum;
+      category?: ToolsControllerGetManyToolsParamsCategoryEnum;
+      workspaceId?: string;
+      providerId?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Associates an existing security tool with a specific workspace for targeted assessments.
+   *
+   * @tags Tools
+   * @name ToolsControllerAddToolToWorkspace
+   * @summary Add tool to workspace
+   * @request POST:/api/tools/add-to-workspace
+   */
+  toolsControllerAddToolToWorkspace = (
+    data: AddToolToWorkspaceDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/add-to-workspace`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Installs a security tool to a specific workspace with duplicate checking to prevent conflicts.
+   *
+   * @tags Tools
+   * @name ToolsControllerInstallTool
+   * @summary Install tool
+   * @request POST:/api/tools/install
+   */
+  toolsControllerInstallTool = (
+    data: InstallToolDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/install`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Removes a security tool from a specific workspace by deleting its association record.
+   *
+   * @tags Tools
+   * @name ToolsControllerUninstallTool
+   * @summary Uninstall tool
+   * @request POST:/api/tools/uninstall
+   */
+  toolsControllerUninstallTool = (
+    data: InstallToolDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/uninstall`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * No description
+   *
+   * @tags Tools
+   * @name ToolsControllerGetBuiltInTools
+   * @summary Get built-in tools
+   * @request GET:/api/tools/built-in-tools
+   */
+  toolsControllerGetBuiltInTools = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/built-in-tools`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Fetches all security tools installed in a specific workspace, including built-in tools.
+   *
+   * @tags Tools
+   * @name ToolsControllerGetInstalledTools
+   * @summary Get installed tools for a workspace
+   * @request GET:/api/tools/installed
+   */
+  toolsControllerGetInstalledTools = (
+    query?: {
+      category?: ToolsControllerGetInstalledToolsParamsCategoryEnum;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/installed`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Fetches detailed information about a specific security tool using its unique identifier.
+   *
+   * @tags Tools
+   * @name ToolsControllerGetToolById
+   * @summary Get tool by ID
+   * @request GET:/api/tools/{id}
+   */
+  toolsControllerGetToolById = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/${id}`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves the authentication API key for accessing the specified security tool.
+   *
+   * @tags Tools
+   * @name ToolsControllerGetToolApiKey
+   * @summary Get tool API key
+   * @request GET:/api/tools/{id}/api-key
+   */
+  toolsControllerGetToolApiKey = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/${id}/api-key`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Regenerates a new API key for the specified security tool, invalidating the previous key.
+   *
+   * @tags Tools
+   * @name ToolsControllerRotateToolApiKey
+   * @summary Rotate tool API key
+   * @request POST:/api/tools/{id}/api-key/rotate
+   */
+  toolsControllerRotateToolApiKey = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/tools/${id}/api-key/rotate`,
+      method: "POST",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Search assets and targets
    *
    * @tags Search
@@ -4171,210 +4383,6 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Registers a new security assessment tool in the system with specified configuration and capabilities.
-   *
-   * @tags Tools
-   * @name ToolsControllerCreateTool
-   * @summary Create a new tool
-   * @request POST:/api/tools
-   */
-  toolsControllerCreateTool = (
-    data: CreateToolDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Fetches a paginated list of available security assessment tools in the system.
-   *
-   * @tags Tools
-   * @name ToolsControllerGetManyTools
-   * @summary Get tools
-   * @request GET:/api/tools
-   */
-  toolsControllerGetManyTools = (
-    query?: {
-      search?: string;
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-      type?: ToolsControllerGetManyToolsParamsTypeEnum;
-      category?: ToolsControllerGetManyToolsParamsCategoryEnum;
-      workspaceId?: string;
-      providerId?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Associates an existing security tool with a specific workspace for targeted assessments.
-   *
-   * @tags Tools
-   * @name ToolsControllerAddToolToWorkspace
-   * @summary Add tool to workspace
-   * @request POST:/api/tools/add-to-workspace
-   */
-  toolsControllerAddToolToWorkspace = (
-    data: AddToolToWorkspaceDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/add-to-workspace`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Installs a security tool to a specific workspace with duplicate checking to prevent conflicts.
-   *
-   * @tags Tools
-   * @name ToolsControllerInstallTool
-   * @summary Install tool
-   * @request POST:/api/tools/install
-   */
-  toolsControllerInstallTool = (
-    data: InstallToolDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/install`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Removes a security tool from a specific workspace by deleting its association record.
-   *
-   * @tags Tools
-   * @name ToolsControllerUninstallTool
-   * @summary Uninstall tool
-   * @request POST:/api/tools/uninstall
-   */
-  toolsControllerUninstallTool = (
-    data: InstallToolDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/uninstall`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * No description
-   *
-   * @tags Tools
-   * @name ToolsControllerGetBuiltInTools
-   * @summary Get built-in tools
-   * @request GET:/api/tools/built-in-tools
-   */
-  toolsControllerGetBuiltInTools = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/built-in-tools`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Fetches all security tools installed in a specific workspace, including built-in tools.
-   *
-   * @tags Tools
-   * @name ToolsControllerGetInstalledTools
-   * @summary Get installed tools for a workspace
-   * @request GET:/api/tools/installed
-   */
-  toolsControllerGetInstalledTools = (
-    query?: {
-      category?: ToolsControllerGetInstalledToolsParamsCategoryEnum;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/installed`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Fetches detailed information about a specific security tool using its unique identifier.
-   *
-   * @tags Tools
-   * @name ToolsControllerGetToolById
-   * @summary Get tool by ID
-   * @request GET:/api/tools/{id}
-   */
-  toolsControllerGetToolById = (id: string, params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/${id}`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves the authentication API key for accessing the specified security tool.
-   *
-   * @tags Tools
-   * @name ToolsControllerGetToolApiKey
-   * @summary Get tool API key
-   * @request GET:/api/tools/{id}/api-key
-   */
-  toolsControllerGetToolApiKey = (id: string, params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/${id}/api-key`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Regenerates a new API key for the specified security tool, invalidating the previous key.
-   *
-   * @tags Tools
-   * @name ToolsControllerRotateToolApiKey
-   * @summary Rotate tool API key
-   * @request POST:/api/tools/{id}/api-key/rotate
-   */
-  toolsControllerRotateToolApiKey = (id: string, params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/tools/${id}/api-key/rotate`,
-      method: "POST",
       format: "json",
       ...params,
     });

@@ -10,7 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
@@ -106,6 +106,9 @@ export class ToolsController {
     response: {
       serialization: GetManyResponseDto(Tool),
     },
+  })
+  @ApiOperation({
+    deprecated: true,
   })
   @Get('built-in-tools')
   async getBuiltInTools() {

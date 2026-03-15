@@ -173,3 +173,8 @@ export enum DismissReason {
   USED_IN_TEST = 'used_in_test',
   WONT_FIX = 'wont_fix',
 }
+
+export enum JobRunType {
+  MANUAL = 'manual',
+  SCHEDULED = 'scheduled',
+}

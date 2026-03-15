@@ -38,23 +38,25 @@ export default function AssetGroupDetail() {
   return (
     <Page
       isShowButtonGoBack
+      title={
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-xl">{data?.name}</span>
+          <div
+            className={`h-4 w-4 rounded-full`}
+            style={{ background: data?.hexColor }}
+          />
+        </div>
+      }
       header={
-        <div className="flex items-center gap-2 justify-between w-full">
-          <div className="flex items-center gap-2">
-            <div
-              className={`h-4 w-4 rounded-full`}
-              style={{ background: data?.hexColor }}
-            ></div>
-            <span className="font-bold capitalize text-2xl">{data?.name}</span>
-            <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
-          </div>
+        <div className="flex items-center gap-2 w-full">
+          <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
           <ConfirmDialog
             title="Delete asset group"
             description={`Are you sure you want to delete "${data?.name}"? This action cannot be undone.`}
             onConfirm={handleDelete}
             typeToConfirm="delete"
             trigger={
-              <Button variant="ghost">
+              <Button size="icon" variant="ghost">
                 <Trash color="red" />
               </Button>
             }

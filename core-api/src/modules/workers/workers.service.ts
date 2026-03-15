@@ -25,8 +25,8 @@ import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
-import { ToolsService } from '../tools/tools.service';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
+import { ToolsService } from '../tools/tools.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import {
   GetManyWorkersDto,
@@ -55,6 +55,7 @@ export class WorkersService {
 
     private configService: ConfigService,
 
+    @Inject(forwardRef(() => ToolsService))
     private toolsService: ToolsService,
   ) {}
 
