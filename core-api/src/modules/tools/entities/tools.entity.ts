@@ -128,4 +128,7 @@ export class Tool {
 
   @Column({ default: JobPriority.BACKGROUND })
   priority?: JobPriority;
+
+  @ApiProperty({ required: false })
+  availableWorkersCount?: number;
 }

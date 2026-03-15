@@ -1,34 +1,39 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import Image from '@/components/ui/image';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import type { Tool } from '@/services/apis/gen/queries';
 import { Verified } from 'lucide-react';
 import React from 'react';
 
 interface ToolCardProps {
-    tool: Tool;
-    button?: React.ReactNode;
+  tool: Tool;
+  button?: React.ReactNode;
 }
 
 const ToolCard = ({ tool, button }: ToolCardProps) => {
-    const navigateWithParams = useNavigateWithParams()
-    const handleCardClick = (e: React.MouseEvent) => {
-        // Don't navigate if clicking on the button
-        if ((e.target as HTMLElement).closest('button')) {
-            return;
-        }
-        navigateWithParams(`/tools/${tool.id}`);
-    };
+  const navigateWithParams = useNavigateWithParams();
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on the button
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    navigateWithParams(`/tools/${tool.id}`);
+  };
 
-    return (
-        <Card
-            key={tool.id}
-            className="flex flex-col overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-md"
-            onClick={handleCardClick}
-        >
-            {/* <div className="w-full bg-white p-4 flex justify-center items-center transition-colors duration-200 hover:bg-gray-100 min-h-[80px]">
+  return (
+    <Card
+      key={tool.id}
+      className="flex flex-col overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-md"
+      onClick={handleCardClick}
+    >
+      {/* <div className="w-full bg-white p-4 flex justify-center items-center transition-colors duration-200 hover:bg-gray-100 min-h-[80px]">
                 {tool.logoUrl ? (
                     <img
                         src={tool.logoUrl}
@@ -42,62 +47,80 @@ const ToolCard = ({ tool, button }: ToolCardProps) => {
                 )}
             </div> */}
 
-            <CardContent className="flex flex-col space-y-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-3">
-                            <Image url={tool?.logoUrl} width={70} height={70} className='rounded-2xl' />
-                            <div className='flex items-center gap-2'>
-                                <CardTitle className="text-left text-lg">{tool.name}</CardTitle>
-                                {tool.isOfficialSupport && (
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Verified className="w-4 h-4 text-blue-500" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Official Support</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex-shrink-0">
-                        {button}
-                    </div>
-                </div>
+      <CardContent className="flex flex-col space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-3">
+              <Image
+                url={tool?.logoUrl}
+                width={70}
+                height={70}
+                className="rounded-2xl"
+              />
+              <div>
                 <div className="flex items-center gap-2">
-                    {/* <Badge variant="secondary" className="text-xs font-normal px-2 py-1">
+                  <CardTitle className="text-left text-lg">
+                    {tool.name}
+                  </CardTitle>
+                  {tool.isOfficialSupport && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Verified className="w-4 h-4 text-blue-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Official Support</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+                <div className="font-semibold">
+                  {tool.availableWorkersCount !== undefined &&
+                  tool.availableWorkersCount > 0 ? (
+                    <span className="text-sm text-green-600">
+                      {tool.availableWorkersCount} worker
+                      {tool.availableWorkersCount === 1 ? '' : 's'}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-500">Offline</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0">{button}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* <Badge variant="secondary" className="text-xs font-normal px-2 py-1">
                         {tool.version || 'N/A'}
                     </Badge> */}
-                    <Badge variant="secondary" className="text-xs font-normal px-2 py-1">
-                        {tool.category
-                            ? tool.category
-                                .split('_')
-                                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                                .join(' ')
-                            : 'N/A'}
-                    </Badge>
-                </div>
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <p className="text-sm text-muted-foreground line-clamp-3">
-                                {tool.description || 'No description available.'}
-                            </p>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="w-full max-w-[300px] p-2">
-                            <p className="text-sm">
-                                {tool.description || 'No description available.'}
-                            </p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            </CardContent>
-        </Card>
-    );
+          <Badge variant="secondary" className="text-xs font-normal px-2 py-1">
+            {tool.category
+              ? tool.category
+                  .split('_')
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(' ')
+              : 'N/A'}
+          </Badge>
+        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="text-sm text-muted-foreground line-clamp-3">
+                {tool.description || 'No description available.'}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="w-full max-w-75 p-2">
+              <p className="text-sm">
+                {tool.description || 'No description available.'}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </CardContent>
+    </Card>
+  );
 };
 
 export default ToolCard;
