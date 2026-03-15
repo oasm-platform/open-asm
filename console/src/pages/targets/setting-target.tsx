@@ -21,7 +21,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
 import clsx from 'clsx';
-import { Clock, OctagonAlert, RefreshCw, Settings, Trash2 } from 'lucide-react';
+import { Clock, RefreshCw, Settings, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -33,9 +33,7 @@ const SettingTarget = ({
   target: Target;
   refetch: () => void;
 }) => {
-  const { selectedWorkspace, workspaces } = useWorkspaceSelector();
-  const workspaceData = workspaces.find((w) => w.id === selectedWorkspace);
-  const isAssetsDiscovery = workspaceData?.isAssetsDiscovery ?? false;
+  const { selectedWorkspace } = useWorkspaceSelector();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -101,22 +99,7 @@ const SettingTarget = ({
 
         <div className="flex flex-col h-full">
           <div className="flex-1 space-y-0.5 overflow-y-auto p-1">
-            {!isAssetsDiscovery && (
-              <div className="flex gap-2 mb-5 justify-center text-red-500">
-                <OctagonAlert />
-                <span className="">
-                  Assets discovery is disabled for this workspace
-                </span>
-              </div>
-            )}
-            <div
-              className={clsx(
-                'space-y-4',
-                isAssetsDiscovery
-                  ? ''
-                  : 'border-dashed border-2 border-red-500 opacity-50 py-3 px-3 space-y-4 rounded-xl',
-              )}
-            >
+            <div className={clsx('space-y-4')}>
               <div className="space-y-2">
                 <div>
                   <div className="flex items-center gap-3 p-2">

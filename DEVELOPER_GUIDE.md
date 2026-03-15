@@ -92,6 +92,82 @@ The `task init` command automatically starts a PostgreSQL container using Docker
 
 If you prefer to use your own PostgreSQL instance, update the `core-api/.env` file accordingly.
 
+## Database Migration
+
+This section explains how to manage database migrations using the taskfile.
+
+### Overview
+
+Database migrations are managed using TypeORM. The migration scripts are defined in `core-api/taskfile.yml` and can be executed using the task commands.
+
+### Running Migrations
+
+#### Run all pending migrations
+
+This command executes all pending database migrations:
+
+```bash
+task migration:run
+```
+
+This will:
+
+- Connect to the PostgreSQL database
+- Check for pending migrations in the `migrations` table
+- Run all new migrations that haven't been applied yet
+
+#### Generate a new migration
+
+To generate a new migration with a custom name:
+
+```bash
+task migration:generate MIGRATION_NAME=YourMigrationName
+```
+
+For example:
+
+```bash
+task migration:generate MIGRATION_NAME=AddUserTable
+```
+
+This will create a new migration file in `core-api/src/database/migrations/`.
+
+#### Revert the last migration
+
+To rollback the most recently executed migration:
+
+```bash
+task migration:revert
+```
+
+**Note:** This will only revert one migration at a time. Repeat if needed.
+
+### Using Docker Compose for Migrations
+
+If you prefer to run migrations using Docker (useful when not running PostgreSQL locally):
+
+```bash
+docker compose up migration
+```
+
+This will:
+
+1. Start the PostgreSQL container (if not running)
+2. Run the migration service
+3. Execute all pending migrations
+4. Automatically remove the migration container after completion
+5. Start the core-api service after migrations complete
+
+### Migration with Docker - Manual Run
+
+To run migration container manually and keep it for debugging:
+
+```bash
+docker compose run --rm migration
+```
+
+The `--rm` flag ensures the container is removed after it stops.
+
 ## Development Conventions
 
 ### Code Style

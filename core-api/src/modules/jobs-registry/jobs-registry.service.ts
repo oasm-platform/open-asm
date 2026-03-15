@@ -6,6 +6,7 @@ import {
 import {
   BullMQName,
   JobPriority,
+  JobRunType,
   JobStatus,
   ToolCategory,
   WorkerScope,
@@ -127,7 +128,9 @@ export class JobsRegistryService {
     jobHistory: existingJobHistory,
     priority,
     isSaveRawResult,
+    jobName,
     isPublishEvent,
+    jobRunType,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
@@ -153,6 +156,8 @@ export class JobsRegistryService {
     } else {
       jobHistory = this.jobHistoryRepo.create({
         workflow,
+        jobRunType,
+        jobHistoryName: jobName,
       });
       await this.jobHistoryRepo.save(jobHistory);
     }
@@ -765,6 +770,8 @@ export class JobsRegistryService {
       totalJobs: string; // COUNT returns string in some databases
       status: JobStatus;
       workflowName: string;
+      jobHistoryName: string;
+      jobRunType: JobRunType;
     }
 
     // Query job histories with calculated counts and statuses using subqueries
@@ -780,8 +787,10 @@ export class JobsRegistryService {
       .select([
         '"jobHistory".id as "id"',
         '"jobHistory"."createdAt" as "createdAt"',
+        '"jobHistory"."jobHistoryName" as "jobHistoryName"',
         '"jobHistory"."updatedAt" as "updatedAt"',
         '"workflow"."name" as "workflowName"',
+        '"jobHistory"."jobRunType" as "jobRunType"',
         // Subquery to count total jobs for this job history
         '(SELECT COUNT(*) FROM jobs WHERE "jobHistoryId" = "jobHistory".id) as "totalJobs"',
         // Subquery with CASE to calculate status based on job statuses
@@ -821,7 +830,9 @@ export class JobsRegistryService {
       updatedAt: raw.updatedAt,
       totalJobs: parseInt(raw.totalJobs),
       status: raw.status,
-      workflowName: raw.workflowName || 'Manual',
+      workflowName: raw.workflowName,
+      jobHistoryName: raw.jobHistoryName,
+      jobRunType: raw.jobRunType,
     }));
 
     return getManyResponse({ query, data: transformedData, total });

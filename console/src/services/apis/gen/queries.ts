@@ -823,6 +823,15 @@ export const JobHistoryResponseDtoStatus = {
   cancelled: 'cancelled',
 } as const;
 
+export type JobHistoryResponseDtoJobRunType =
+  (typeof JobHistoryResponseDtoJobRunType)[keyof typeof JobHistoryResponseDtoJobRunType];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const JobHistoryResponseDtoJobRunType = {
+  manual: 'manual',
+  scheduled: 'scheduled',
+} as const;
+
 export type JobHistoryResponseDto = {
   id: string;
   createdAt: string;
@@ -830,6 +839,8 @@ export type JobHistoryResponseDto = {
   totalJobs: number;
   status: JobHistoryResponseDtoStatus;
   workflowName: string;
+  jobHistoryName: string;
+  jobRunType: JobHistoryResponseDtoJobRunType;
 };
 
 export type GetManyJobHistoryResponseDtoDto = {
