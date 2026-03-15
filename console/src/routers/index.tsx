@@ -1,6 +1,7 @@
 import Layout from '@/components/common/layout/layout';
 import Splash from '@/components/common/layout/splash';
 import { RequireWorkspace } from '@/components/common/require-workspace';
+import Users from '@/pages/admin/users';
 import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
 import { AssetGroups } from '@/pages/asset-group/asset-groups';
 import Assets from '@/pages/assets/assets';
@@ -34,6 +35,7 @@ import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
 import ProtectedRoute from './ProtectedRoute';
 import RegisterRoute from './RegisterRoute';
+import AdminRoute from './AdminRoute';
 
 export const router = createBrowserRouter([
   {
@@ -131,6 +133,16 @@ export const router = createBrowserRouter([
       {
         element: <ProtectedRoute layout="application" />,
         children: [
+          {
+            path: 'admin',
+            element: <AdminRoute />,
+            children: [
+              {
+                path: 'users',
+                element: <Users />,
+              },
+            ],
+          },
           {
             path: 'targets',
             children: [

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { settingsTabGroups } from '@/pages/settings/settings';
+import { filterTabGroups, settingsTabGroups } from '@/pages/settings/settings';
+import { useSession } from '@/utils/authClient';
 import { ArrowLeft, Menu } from 'lucide-react';
 import type { JSX, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -13,6 +14,8 @@ export default function SettingsLayout({
   children,
 }: SettingsLayoutProps): JSX.Element {
   const location = useLocation();
+  const { data } = useSession();
+  const visibleGroups = filterTabGroups(settingsTabGroups, data?.user.role);
 
   // Determine if a tab is active based on current path
   const isActive = (path: string) => location.pathname.startsWith(path);
@@ -21,7 +24,7 @@ export default function SettingsLayout({
   const navMenu = (
     <nav className="flex-1 py-3">
       <ul className="space-y-1">
-        {settingsTabGroups.map((group, groupIndex) => (
+        {visibleGroups.map((group, groupIndex) => (
           <div>
             <li key={group.name} className="p-2">
               {/* Group header */}
@@ -44,7 +47,7 @@ export default function SettingsLayout({
               ))}
             </li>
             {/* Group divider - shown after group */}
-            {groupIndex < settingsTabGroups.length - 1 && (
+            {groupIndex < visibleGroups.length - 1 && (
               <div className="border-b my-2" />
             )}
           </div>

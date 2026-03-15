@@ -7,7 +7,7 @@ import { hostAssetsColumn } from './host-assets-column';
 
 export default function HostAssetsTab() {
   const {
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
@@ -40,8 +40,7 @@ export default function HostAssetsTab() {
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           onSortChange={(col, order) => {
-            setSortBy(col);
-            setSortOrder(order);
+            setParams({ sortBy: col, sortOrder: order });
           }}
           totalItems={total}
           collapsibleElement={(row) => (

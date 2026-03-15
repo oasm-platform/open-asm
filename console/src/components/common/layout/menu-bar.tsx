@@ -28,15 +28,32 @@ import {
   LayoutDashboard,
   SquareTerminal,
   Target,
+  User,
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
 import { NewBadge } from '../new-badge';
+import { useSession } from '@/utils/authClient';
+
+interface SubMenuItem {
+  title: string;
+  icon: React.ReactNode;
+  url: string;
+  isNew?: boolean;
+}
+
+interface NavGroup {
+  title: string;
+  url: string;
+  items: SubMenuItem[];
+  roles?: string[];
+}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
   const { state, isMobile, setOpenMobile } = useSidebar();
+  const { data } = useSession();
 
-  const menu = [
+  const menu: NavGroup[] = [
     {
       title: 'Overview',
       url: '#',
@@ -45,6 +62,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Dashboard',
           icon: <LayoutDashboard />,
           url: '/',
+        },
+      ],
+    },
+    {
+      title: 'Admin',
+      url: '#',
+      roles: ['admin'],
+      items: [
+        {
+          title: 'Users',
+          icon: <User />,
+          url: '/admin/users',
         },
       ],
     },
@@ -121,41 +150,49 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
       </SidebarHeader>
       <SidebarContent className="gap-1 md:gap-3">
-        {menu.map((item) => (
-          <SidebarGroup key={item.title} className="py-0">
-            <SidebarGroupContent>
-              <SidebarGroupLabel className="font-bold text-md">
-                {item.title}
-              </SidebarGroupLabel>
-              <SidebarMenu className="gap-0.5">
-                {item.items.map((item) => {
-                  // Ensure all URLs are absolute for comparison
-                  const toUrl = item.url;
-                  const isActive =
-                    `/${location.pathname.split('/')[1]}` === toUrl;
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        tooltip={item.title}
-                        className="hover:cursor-pointer"
-                      >
-                        <Link
-                          to={toUrl}
-                          onClick={() => setOpenMobile(false)}
-                          className="flex items-center justify-start w-full h-full text-base"
+        {menu
+          .filter(
+            (item) =>
+              !item.roles ||
+              item.roles.length === 0 ||
+              (data?.user.role != null && item.roles.includes(data.user.role)),
+          )
+          .map((item) => (
+            <SidebarGroup key={item.title} className="py-0">
+              <SidebarGroupContent>
+                <SidebarGroupLabel className="font-bold text-md">
+                  {item.title}
+                </SidebarGroupLabel>
+                <SidebarMenu className="gap-0.5">
+                  {item.items.map((item) => {
+                    // Ensure all URLs are absolute for comparison
+                    const toUrl = item.url;
+                    const isActive =
+                      `/${location.pathname.split('/')[1]}` === toUrl;
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive}
+                          tooltip={item.title}
+                          className="hover:cursor-pointer"
                         >
-                          {item.icon} {item.title} {item.isNew && <NewBadge />}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+                          <Link
+                            to={toUrl}
+                            onClick={() => setOpenMobile(false)}
+                            className="flex items-center justify-start w-full h-full text-base"
+                          >
+                            {item.icon} {item.title}{' '}
+                            {item.isNew && <NewBadge />}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
       </SidebarContent>
       <SidebarRail />
       <SidebarFooter>

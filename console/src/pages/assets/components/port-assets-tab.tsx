@@ -7,7 +7,7 @@ import { portAssetsColumn } from './port-assets-column';
 
 export default function PortAssetsTab() {
   const {
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
     queryParams,
     queryOptions,
@@ -40,8 +40,7 @@ export default function PortAssetsTab() {
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           onSortChange={(col, order) => {
-            setSortBy(col);
-            setSortOrder(order);
+            setParams({ sortBy: col, sortOrder: order });
           }}
           totalItems={total}
           collapsibleElement={(row) => (
