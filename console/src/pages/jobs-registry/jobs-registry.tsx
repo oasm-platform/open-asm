@@ -1,4 +1,5 @@
 import Page from '@/components/common/page';
+import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/data-table';
 import JobStatusBadge from '@/components/ui/job-status';
 import {
@@ -51,7 +52,11 @@ const JobsRegistryPage = () => {
               onlyIcon
               status={row.original.status as JobStatus}
             />
-            <pre>{row.original?.workflowName || 'Manual run'}</pre>
+            <pre>
+              {row.original?.jobHistoryName ||
+                row.original?.workflowName ||
+                'Manual run'}
+            </pre>
           </div>
         );
       },
@@ -80,6 +85,19 @@ const JobsRegistryPage = () => {
               {createdAt.toLocaleString()}
             </span>
           </div>
+        );
+      },
+    },
+    {
+      accessorKey: '',
+      header: 'Created At',
+      cell: ({ row }) => {
+        return (
+          <Badge variant="outline">
+            <span className="text-xs font-medium capitalize">
+              {row.original?.jobRunType || 'manual'}
+            </span>
+          </Badge>
         );
       },
     },

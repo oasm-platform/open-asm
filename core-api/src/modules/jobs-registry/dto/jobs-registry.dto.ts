@@ -1,5 +1,5 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { JobStatus, ToolCategory } from '@/common/enums/enum';
+import { JobRunType, JobStatus, ToolCategory } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Asset } from '@/modules/assets/entities/assets.entity';
@@ -188,4 +188,6 @@ export class CreateJobs extends PickType(Job, [
   workspaceId: string;
   workflow: Workflow;
   jobHistory?: JobHistory;
+  jobName?: string;
+  jobRunType?: JobRunType;
 }

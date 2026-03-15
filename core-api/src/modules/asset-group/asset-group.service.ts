@@ -1,6 +1,6 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { BullMQName, CronSchedule } from '@/common/enums/enum';
+import { BullMQName, CronSchedule, JobRunType } from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -827,13 +827,14 @@ export class AssetGroupService {
 
   public async runGroupWorkflowScheduler(
     assetGroupWorkflowId: string,
+    jobRunType: JobRunType,
   ): Promise<DefaultMessageResponseDto> {
-    // Get the asset group workflow to access the workflow
+    // Get the asset group workflow to access the workflow and asset group
     const assetGroupWorkflow = await this.assetGroupWorkflowRepo
       .createQueryBuilder('assetGroupWorkflow')
       .innerJoinAndSelect('assetGroupWorkflow.workflow', 'workflow')
       .leftJoinAndSelect('workflow.workspace', 'workspace')
-      .innerJoin('assetGroupWorkflow.assetGroup', 'assetGroup')
+      .innerJoinAndSelect('assetGroupWorkflow.assetGroup', 'assetGroup')
       .where('assetGroupWorkflow.id = :assetGroupWorkflowId', {
         assetGroupWorkflowId,
       })
@@ -846,6 +847,7 @@ export class AssetGroupService {
     }
 
     const workflow = assetGroupWorkflow.workflow;
+    const assetGroupName = assetGroupWorkflow.assetGroup.name;
 
     // Get all assets associated with the specific asset group workflow
     const assets = await this.assetRepo
@@ -890,6 +892,8 @@ export class AssetGroupService {
       workflow: workflow,
       priority: tool.priority,
       workspaceId: workflow.workspace.id,
+      jobName: assetGroupName,
+      jobRunType,
     });
     return {
       message: `Run scheduler for asset group workflow with ID ${assetGroupWorkflowId}`,

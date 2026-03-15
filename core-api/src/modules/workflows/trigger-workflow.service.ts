@@ -49,6 +49,7 @@ export class TriggerWorkflowService implements OnModuleInit {
               workflow: workflow,
               priority: tool.priority,
               workspaceId: workflow.workspace.id,
+              jobName: `${workflow.name} - ${payload.value}`,
             });
           }
         })
