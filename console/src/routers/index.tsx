@@ -35,6 +35,7 @@ import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
 import ProtectedRoute from './ProtectedRoute';
 import RegisterRoute from './RegisterRoute';
+import AdminRoute from './AdminRoute';
 
 export const router = createBrowserRouter([
   {
@@ -134,6 +135,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'admin',
+            element: <AdminRoute />,
             children: [
               {
                 path: 'users',
