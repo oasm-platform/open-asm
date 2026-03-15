@@ -1,5 +1,10 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { ApiKeyType, ToolCategory, WorkerType } from '@/common/enums/enum';
+import {
+  ApiKeyType,
+  ToolCategory,
+  WorkerScope,
+  WorkerType,
+} from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
@@ -15,8 +20,8 @@ import { randomUUID } from 'crypto';
 import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import { WorkersService } from '../workers/workers.service';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetApiKeyResponseDto } from './dto/get-apikey-response.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
@@ -44,9 +49,57 @@ export class ToolsService implements OnModuleInit {
 
     private readonly apiKeysService: ApiKeysService,
 
-    @Inject(forwardRef(() => JobsRegistryService))
-    private jobRegistryService: JobsRegistryService,
+    @Inject(forwardRef(() => WorkersService))
+    private readonly workersService: WorkersService,
   ) {}
+
+  /**
+   * Count available workers for a specific tool.
+   * Includes both workspace-scoped and cloud-scoped workers.
+   * @param toolId The tool ID to count workers for.
+   * @param workspaceId The workspace ID to filter workspace-scoped workers.
+   * @param toolType The type of the tool (BUILT_IN or PROVIDER).
+   * @returns The number of available workers for this tool.
+   */
+  private async countAvailableWorkers(
+    toolId: string,
+    workspaceId: string,
+    toolType?: WorkerType,
+  ): Promise<number> {
+    const queryBuilder = this.workersService.repo
+      .createQueryBuilder('w')
+      .where('1=1');
+
+    // Add workspace filter: workers with matching workspaceId OR cloud scope
+    queryBuilder.andWhere(
+      '(w."workspaceId" = :workspaceId OR w."scope" = :cloudScope)',
+      {
+        workspaceId,
+        cloudScope: WorkerScope.CLOUD,
+      },
+    );
+
+    // If toolType is not provided or is BUILT_IN, count BUILT_IN workers
+    if (!toolType || toolType === WorkerType.BUILT_IN) {
+      // For BUILT_IN type, count all BUILT_IN workers that are enabled for this workspace
+      queryBuilder.andWhere('w.type = :type', { type: WorkerType.BUILT_IN });
+    } else {
+      // For PROVIDER type, count workers with matching toolId
+      // and ensure they have workspace_tool record with isEnabled = true
+      queryBuilder.andWhere('w."toolId" = :toolId', { toolId });
+      queryBuilder.andWhere(
+        `(w.type != '${WorkerType.PROVIDER}' OR EXISTS (
+          SELECT 1 FROM workspace_tools wt
+          WHERE wt."workspaceId" = :workspaceId
+          AND wt."toolId" = w."toolId"
+          AND wt."isEnabled" = true
+        ))`,
+        { workspaceId },
+      );
+    }
+
+    return queryBuilder.getCount();
+  }
 
   async onModuleInit() {
     try {
@@ -211,6 +264,8 @@ export class ToolsService implements OnModuleInit {
 
     // If workspaceId is provided, we need to check which tools are installed
     if (query.workspaceId) {
+      const workspaceId = query.workspaceId;
+
       const [data, total] = await this.toolsRepository.findAndCount({
         where: Object.keys(where).length ? where : undefined,
         take: limit,
@@ -223,29 +278,49 @@ export class ToolsService implements OnModuleInit {
       // Get installed tools for this workspace
       const installedTools = await this.workspaceToolRepository.find({
         where: {
-          workspace: { id: query.workspaceId },
+          workspace: { id: workspaceId },
         },
         relations: ['tool'],
       });
 
-      // Add isInstalled flag to each tool
-      const toolsWithInstalledFlag = data.map((tool) => {
-        // Built-in tools are always considered installed
-        if (tool.type === WorkerType.BUILT_IN) {
+      // Add isInstalled flag and availableWorkersCount to each tool
+      const toolsWithInstalledFlag = await Promise.all(
+        data.map(async (tool) => {
+          // Skip tools without ID or type
+          if (!tool.id || !tool.type) {
+            return {
+              ...tool,
+              isInstalled: false,
+              availableWorkersCount: 0,
+            };
+          }
+
+          // Count available workers for this tool
+          const availableWorkersCount = await this.countAvailableWorkers(
+            tool.id,
+            workspaceId,
+            tool.type,
+          );
+
+          // Built-in tools are always considered installed
+          if (tool.type === WorkerType.BUILT_IN) {
+            return {
+              ...tool,
+              isInstalled: true,
+              availableWorkersCount,
+            };
+          }
+
+          const workspaceTool = installedTools.find(
+            (wt) => wt.tool.id === tool.id,
+          );
           return {
             ...tool,
-            isInstalled: true,
+            isInstalled: !!workspaceTool?.isEnabled,
+            availableWorkersCount,
           };
-        }
-
-        const workspaceTool = installedTools.find(
-          (wt) => wt.tool.id === tool.id,
-        );
-        return {
-          ...tool,
-          isInstalled: !!workspaceTool?.isEnabled,
-        };
-      });
+        }),
+      );
 
       return getManyResponse({ query, data: toolsWithInstalledFlag, total });
     } else {
