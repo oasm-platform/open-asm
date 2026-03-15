@@ -89,9 +89,9 @@ export function AddUserDialog() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-1.5">
-          <UserPlus className="h-4 w-4" />
-          Add User
+        <Button variant="outline" className="gap-2">
+          <UserPlus className="shrink-0" />
+          <span>Add User</span>
         </Button>
       </DialogTrigger>
       <DialogContent>
