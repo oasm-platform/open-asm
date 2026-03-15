@@ -45,7 +45,7 @@ interface NavGroup {
   title: string;
   url: string;
   items: SubMenuItem[];
-  isHidden?: boolean;
+  roles?: string[];
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -68,7 +68,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       title: 'Admin',
       url: '#',
-      isHidden: data?.user.role !== 'admin',
+      roles: ['admin'],
       items: [
         {
           title: 'Users',
@@ -151,7 +151,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent className="gap-1 md:gap-3">
         {menu
-          .filter((item) => !item.isHidden)
+          .filter(
+            (item) =>
+              !item.roles ||
+              item.roles.length === 0 ||
+              (data?.user.role != null && item.roles.includes(data.user.role)),
+          )
           .map((item) => (
             <SidebarGroup key={item.title} className="py-0">
               <SidebarGroupContent>

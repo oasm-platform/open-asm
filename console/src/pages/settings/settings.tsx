@@ -1,5 +1,6 @@
-import { useEffect, type JSX } from 'react';
+import { useEffect, useMemo, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSession } from '@/utils/authClient';
 import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import CreateMcpPermission from './components/create-mcp-permission';
@@ -27,6 +28,7 @@ interface SettingsTabItem {
 interface SettingsTabGroup {
   name: string;
   tabs: SettingsTabItem[];
+  roles?: string[];
 }
 
 interface SettingsProps {
@@ -106,6 +108,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
   // Group: System
   {
     name: 'System',
+    roles: ['admin'],
     tabs: [
       {
         id: 'brand',
@@ -132,10 +135,17 @@ export const settingsTabGroups: SettingsTabGroup[] = [
   },
 ];
 
-// Flattened settings tabs for easy lookup - generated from settingsTabGroups
-const flatSettingsTabs = settingsTabGroups.flatMap((group) =>
-  group.tabs.map((tab) => ({ ...tab, group: group.name })),
-);
+export function filterTabGroups(
+  groups: typeof settingsTabGroups,
+  userRole: string | null | undefined,
+): typeof settingsTabGroups {
+  return groups.filter(
+    (group) =>
+      !group.roles ||
+      group.roles.length === 0 ||
+      (userRole != null && group.roles.includes(userRole)),
+  );
+}
 
 // Backward compatibility - flattened array of all tabs
 export const settingsTabs = settingsTabGroups.flatMap((group) => group.tabs);
@@ -143,6 +153,15 @@ export const settingsTabs = settingsTabGroups.flatMap((group) => group.tabs);
 const Settings = ({ defaultTab = 'workspace' }: SettingsProps) => {
   const { tab } = useParams<{ tab?: string }>();
   const navigate = useNavigate();
+  const { data } = useSession();
+
+  const visibleTabs = useMemo(
+    () =>
+      filterTabGroups(settingsTabGroups, data?.user.role).flatMap((group) =>
+        group.tabs.map((t) => ({ ...t, group: group.name })),
+      ),
+    [data?.user.role],
+  );
 
   useEffect(() => {
     if (!tab && defaultTab) {
@@ -152,7 +171,7 @@ const Settings = ({ defaultTab = 'workspace' }: SettingsProps) => {
 
   const currentTab = tab || defaultTab;
   const activeTab =
-    flatSettingsTabs.find((t) => t.id === currentTab) || flatSettingsTabs[0];
+    visibleTabs.find((t) => t.id === currentTab) || visibleTabs[0];
 
   return (
     <div className="mx-auto w-full sm:w-3/4 xl:w-1/3">
