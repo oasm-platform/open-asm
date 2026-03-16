@@ -79,11 +79,7 @@ export function CreateAssetGroupDialog({
 
   return (
     <div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setCreateDialogOpen(true)}
-      >
+      <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
         <Plus />
         Create
       </Button>

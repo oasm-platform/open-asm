@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useTargetsControllerCreateMultipleTargets,
   type BulkTargetResultDto,
@@ -80,9 +79,6 @@ const validateDomains = (input: string): string | true => {
 
 export function CreateTarget() {
   const [open, setOpen] = useState(false);
-  const { selectedWorkspace, workspaces } = useWorkspaceSelector();
-  const workspaceData = workspaces.find((w) => w.id === selectedWorkspace);
-  const isAssetsDiscovery = workspaceData?.isAssetsDiscovery ?? false;
   const {
     register,
     handleSubmit,
@@ -98,8 +94,6 @@ export function CreateTarget() {
   const navigate = useNavigate();
 
   function onSubmit(data: FormValues) {
-    if (!selectedWorkspace) return;
-
     const targets = parseTargetsInput(data.value);
     const duplicates = findDuplicates(targets);
 
@@ -152,7 +146,7 @@ export function CreateTarget() {
     );
   }
 
-  const title = isAssetsDiscovery ? 'Start discovery' : 'Create target';
+  const title = 'Start discovery';
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -162,7 +156,7 @@ export function CreateTarget() {
           <span>{title}</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-full md:w-3/4 lg:w-[425px]">
+      <DialogContent className="w-full md:w-3/4 lg:w-106.25">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>

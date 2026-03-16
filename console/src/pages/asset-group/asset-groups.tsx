@@ -68,14 +68,7 @@ export function AssetGroups() {
   const total = data?.total ?? 0;
 
   return (
-    <Page
-      title="Groups"
-      header={
-        <div className="flex justify-end">
-          <CreateAssetGroupDialog />
-        </div>
-      }
-    >
+    <Page title="Groups">
       <DataTable
         data={assetGroups}
         columns={columns}
@@ -86,6 +79,7 @@ export function AssetGroups() {
         onPageSizeChange={setPageSize}
         totalItems={total}
         sortBy={sortBy}
+        toolbarComponents={[<CreateAssetGroupDialog />]}
         sortOrder={sortOrder}
         isShowBorder={true}
         onRowClick={(row) => navigate('/groups/' + row.id)}
