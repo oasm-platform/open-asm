@@ -1,14 +1,8 @@
-import { Sheet, SheetContent, SheetHeader } from '@/components/ui/sheet';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { authClient } from '@/utils/authClient';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { type User } from '@/utils/authClient';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
-import { Trash2, Ban, Pencil, Check, X, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { useState } from 'react';
 import {
   Select,
   SelectContent,
@@ -17,10 +11,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { format } from 'date-fns';
+import { Sheet, SheetContent, SheetHeader } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
+import { authClient, type User } from '@/utils/authClient';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { Ban, Check, Loader2, Pencil, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface UserDetailSheetProps {
   user: User | null;
@@ -94,6 +93,7 @@ function InlineEditField({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={placeholder}
+          autoComplete="new-password"
           className="h-7 text-xs w-36"
           onKeyDown={(e) => {
             if (e.key === 'Enter') save();
