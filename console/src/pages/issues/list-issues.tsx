@@ -82,7 +82,7 @@ export function ListIssues() {
 
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder, setFilter },
+    tableHandlers: { setPage, setPageSize, setFilter, setParams },
   } = useServerDataTable({
     // Enable URL parameter synchronization for search/filter functionality
     isUpdateSearchQueryParam: true,
@@ -145,8 +145,7 @@ export function ListIssues() {
       ]}
       isShowHeader={false}
       onSortChange={(col, order) => {
-        setSortBy(col);
-        setSortOrder(order);
+        setParams({ sortBy: col, sortOrder: order });
       }}
       // Use filterColumnKey to specify which column to filter on
       filterColumnKey="title"

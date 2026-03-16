@@ -33,7 +33,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
   // Queries for assets in the asset group
   const {
     tableParams: { page, pageSize, sortBy, sortOrder },
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
   } = useServerDataTable();
 
   const assetsInGroupQuery = useAssetGroupControllerGetAssetsByAssetGroupsId(
@@ -127,8 +127,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({ assetGroupId }) => {
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
         onSortChange={(col, order) => {
-          setSortBy(col);
-          setSortOrder(order);
+          setParams({ sortBy: col, sortOrder: order });
         }}
         totalItems={assetsInGroupQuery.data?.total ?? 0}
       />

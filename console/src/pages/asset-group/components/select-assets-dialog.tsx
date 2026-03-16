@@ -56,7 +56,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   // Queries for assets not in asset group
   const {
     tableParams: { page, pageSize, sortBy, sortOrder },
-    tableHandlers: { setPage, setPageSize, setSortBy, setSortOrder },
+    tableHandlers: { setPage, setPageSize, setParams },
   } = useServerDataTable({
     isUpdateSearchQueryParam: false,
     defaultPageSize: 10,
@@ -212,8 +212,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
             }}
             onPageSizeChange={setPageSize}
             onSortChange={(col, order) => {
-              setSortBy(col);
-              setSortOrder(order);
+              setParams({ sortBy: col, sortOrder: order });
             }}
             totalItems={assetsNotInGroupQuery.data?.total || 0}
             onRowClick={(row) => {
