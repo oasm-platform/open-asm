@@ -91,7 +91,7 @@ export function AddUserDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <UserPlus className="shrink-0" />
-          <span>Add User</span>
+          <span>Add</span>
         </Button>
       </DialogTrigger>
       <DialogContent>

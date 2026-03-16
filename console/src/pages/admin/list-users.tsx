@@ -1,9 +1,9 @@
 import { Badge } from '@/components/ui/badge';
-import { type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/components/ui/data-table';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { authClient, type User } from '@/utils/authClient';
 import { useQuery } from '@tanstack/react-query';
+import { type ColumnDef } from '@tanstack/react-table';
 import { useState } from 'react';
 import { AddUserDialog } from './add-user-dialog';
 import { UserDetailSheet } from './user-detail-sheet';
@@ -22,7 +22,11 @@ const userColumns: ColumnDef<User>[] = [
   {
     accessorKey: 'role',
     header: 'Role',
-    cell: ({ row }) => <Badge>{row.original.role}</Badge>,
+    cell: ({ row }) => (
+      <Badge variant="secondary" className="capitalize">
+        {row.original.role}
+      </Badge>
+    ),
   },
   {
     accessorKey: 'banned',
@@ -63,9 +67,6 @@ export function ListUsers() {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
-        <AddUserDialog />
-      </div>
       <DataTable
         data={(data?.data?.users as User[]) || []}
         columns={userColumns}
@@ -79,6 +80,7 @@ export function ListUsers() {
         onSortChange={(col, order) => {
           setParams({ sortBy: col, sortOrder: order });
         }}
+        toolbarComponents={[<AddUserDialog />]}
         filterColumnKey="value"
         filterValue={filter}
         onFilterChange={setFilter}
