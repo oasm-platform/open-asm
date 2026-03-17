@@ -34,10 +34,13 @@ Open-source platform for cybersecurity Attack Surface Management. Built to help 
 
 The system runs on a distributed architecture consisting of:
 
-- A web-based console for user interaction and monitoring.
-- A core API service handling business logic, data persistence, and job orchestration.
-- Distributed workers for high-performance scanning tasks with auto-scaling capabilities.
-- PostgreSQL database for data storage and Better Auth for authentication.
+* A web-based console for user interaction, asset management, and real-time monitoring.
+* A core API service responsible for business logic, data persistence, and job orchestration.
+* A Redis-based queue and caching layer enabling asynchronous job distribution, rate limiting, and system decoupling.
+* Distributed workers that execute high-performance scanning tasks, designed for horizontal auto-scaling and fault tolerance.
+* A PostgreSQL database for persistent storage of assets, scan results, and system state.
+* An MCP (Model Context Protocol) server that provides structured context to AI systems.
+* Integration with AI/LLM components to enable intelligent querying, analysis, and automation over collected asset data.
 
 ```mermaid
 graph TD
@@ -51,10 +54,13 @@ graph TD
         Console[Web Console]
         API[Core API Service]
         DB[(PostgreSQL)]
+        Redis[(Redis)]
         MCP[MCP Server]
 
         subgraph "Execution Plane"
-            Worker[Distributed Workers]
+            W1[Worker 1]
+            W2[Worker 2]
+            WN[Worker N]
         end
     end
 
@@ -63,16 +69,21 @@ graph TD
     Console <-->|REST API| API
 
     API <-->|Persist Data| DB
+    API <-->|Queue / Cache| Redis
 
-    %% Job Flow
-    API -->|Dispatch Scan Jobs| Worker
-    Worker -->|Report Results| API
-    Worker -->|Scan & Discovery| Internet
+    %% Job Flow (2-way)
+    API <-->|Job / Result| W1
+    API <-->|Job / Result| W2
+    API <-->|Job / Result| WN
+
+    %% Scan
+    W1 -->|Scan| Internet
+    W2 -->|Scan| Internet
+    WN -->|Scan| Internet
 
     %% AI Flow
     AI <-->|Query Context| MCP
     MCP <-->|Fetch Asset Data| API
-
 ```
 
 ## Screenshots
