@@ -218,6 +218,18 @@ export type WorkspaceResponseDtoDescription = { [key: string]: unknown } | null;
  */
 export type WorkspaceResponseDtoArchivedAt = { [key: string]: unknown } | null;
 
+/**
+ * Role of the current user in the workspace
+ */
+export type WorkspaceResponseDtoRole =
+  (typeof WorkspaceResponseDtoRole)[keyof typeof WorkspaceResponseDtoRole];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const WorkspaceResponseDtoRole = {
+  owner: 'owner',
+  member: 'member',
+} as const;
+
 export type WorkspaceResponseDto = {
   /** Workspace ID */
   id: string;
@@ -247,6 +259,8 @@ export type WorkspaceResponseDto = {
   targetCount: number;
   /** Number of members in the workspace */
   memberCount: number;
+  /** Role of the current user in the workspace */
+  role: WorkspaceResponseDtoRole;
 };
 
 export type GetManyWorkspaceResponseDtoDto = {
@@ -15149,6 +15163,7 @@ export const useToolsControllerUninstallTool = <
 };
 
 /**
+ * @deprecated
  * @summary Get built-in tools
  */
 export const toolsControllerGetBuiltInTools = (
@@ -15270,6 +15285,7 @@ export function useToolsControllerGetBuiltInTools<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
+ * @deprecated
  * @summary Get built-in tools
  */
 

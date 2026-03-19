@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { WorkspaceRole } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
-import { Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, ManyToOne } from 'typeorm';
 import { Workspace } from './workspace.entity';
 
 @Entity('workspace_members')
@@ -16,4 +17,7 @@ export class WorkspaceMembers extends BaseEntity {
     onDelete: 'CASCADE',
   })
   user: User;
+
+  @Column({ type: 'enum', enum: WorkspaceRole, default: WorkspaceRole.OWNER })
+  role: WorkspaceRole;
 }

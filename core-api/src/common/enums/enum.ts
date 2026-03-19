@@ -10,6 +10,11 @@ export enum Role {
   BOT = 'bot',
 }
 
+export enum WorkspaceRole {
+  OWNER = 'owner',
+  MEMBER = 'member',
+}
+
 /**
  * Enum representing tool categories used in the system
  */

@@ -1,11 +1,5 @@
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerGetWorkspaceApiKey,
@@ -78,12 +72,6 @@ export default function ApiKeysSettings() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Workspace API Key</CardTitle>
-          <CardDescription>
-            Use this API key to authenticate API requests for this workspace
-          </CardDescription>
-        </CardHeader>
         <CardContent className="space-y-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-4">
@@ -95,29 +83,27 @@ export default function ApiKeysSettings() {
           ) : (
             <>
               <div className="flex min-w-0 flex-col gap-2">
-                <div className="overflow-x-auto">
-                  <code className="whitespace-nowrap rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
-                    {apiKeyData?.apiKey || 'No API key available'}
-                  </code>
+                <div className="overflow-x-auto h-10 flex justify-center items-center  rounded border">
+                  <code>{apiKeyData?.apiKey || 'No API key available'}</code>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 justify-center">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleCopy}
                     disabled={!apiKeyData?.apiKey}
                   >
-                    <Copy className="mr-2 h-4 w-4" />
+                    <Copy className="h-4 w-4" />
                     {copied ? 'Copied!' : 'Copy'}
                   </Button>
                   <Button
-                    variant="destructive"
+                    variant="secondary"
                     size="sm"
                     onClick={handleRotate}
                     disabled={isRotating || !selectedWorkspace}
                   >
                     <RefreshCw
-                      className={`mr-2 h-4 w-4 ${isRotating ? 'animate-spin' : ''}`}
+                      className={`h-4 w-4 ${isRotating ? 'animate-spin' : ''}`}
                     />
                     {isRotating ? 'Rotating...' : 'Rotate'}
                   </Button>

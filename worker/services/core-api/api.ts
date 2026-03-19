@@ -236,6 +236,11 @@ export interface WorkspaceResponseDto {
    * @example 5
    */
   memberCount: number;
+  /**
+   * Role of the current user in the workspace
+   * @example "owner"
+   */
+  role: WorkspaceResponseDtoRoleEnum;
 }
 
 export interface GetManyWorkspaceResponseDtoDto {
@@ -1901,6 +1906,15 @@ export enum UpdateTargetDtoScanScheduleEnum {
   Value000 = "0 0 * * 0",
   Value0014 = "0 0 */14 * *",
   Value001 = "0 0 1 * *",
+}
+
+/**
+ * Role of the current user in the workspace
+ * @example "owner"
+ */
+export enum WorkspaceResponseDtoRoleEnum {
+  Owner = "owner",
+  Member = "member",
 }
 
 export enum OnScheduleEnum {
@@ -3944,6 +3958,7 @@ export class Api<
    * @name ToolsControllerGetBuiltInTools
    * @summary Get built-in tools
    * @request GET:/api/tools/built-in-tools
+   * @deprecated
    */
   toolsControllerGetBuiltInTools = (params: RequestParams = {}) =>
     this.request<AppResponseSerialization, any>({

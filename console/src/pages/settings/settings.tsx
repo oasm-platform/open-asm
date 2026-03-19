@@ -1,6 +1,6 @@
+import { useSession } from '@/utils/authClient';
 import { useEffect, useMemo, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useSession } from '@/utils/authClient';
 import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import CreateMcpPermission from './components/create-mcp-permission';
@@ -38,12 +38,12 @@ interface SettingsProps {
 // Settings tab groups with content and component - exported for SettingsLayout
 export const settingsTabGroups: SettingsTabGroup[] = [
   {
-    name: 'Configuration',
+    name: 'Workspace',
     tabs: [
       {
-        id: 'workspace',
-        label: 'Workspace',
-        path: '/settings/workspace',
+        id: 'general',
+        label: 'General',
+        path: '/settings/general',
         content: {
           title: 'Workspace settings',
           description: 'Manage your workspace settings',
@@ -52,7 +52,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
       },
       {
         id: 'apikeys',
-        label: 'API Keys',
+        label: 'API keys',
         path: '/settings/apikeys',
         content: {
           title: 'API Keys',
@@ -150,7 +150,7 @@ export function filterTabGroups(
 // Backward compatibility - flattened array of all tabs
 export const settingsTabs = settingsTabGroups.flatMap((group) => group.tabs);
 
-const Settings = ({ defaultTab = 'workspace' }: SettingsProps) => {
+const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
   const { tab } = useParams<{ tab?: string }>();
   const navigate = useNavigate();
   const { data } = useSession();

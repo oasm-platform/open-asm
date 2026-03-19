@@ -10,7 +10,6 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -135,9 +134,6 @@ export default function WorkspaceSettings() {
       <Card>
         <CardHeader>
           <CardTitle>Workspace Information</CardTitle>
-          <CardDescription>
-            Manage your workspace name and description
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -150,13 +146,10 @@ export default function WorkspaceSettings() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Workspace Name</FormLabel>
+                    <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Workspace name" {...field} />
+                      <Input {...field} />
                     </FormControl>
-                    <FormDescription>
-                      This is the display name of your workspace
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -168,7 +161,7 @@ export default function WorkspaceSettings() {
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Input placeholder="Workspace description" {...field} />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
