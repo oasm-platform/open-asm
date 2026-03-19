@@ -1,7 +1,7 @@
 import { LIMIT_WORKSPACE_CREATE } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { ApiKeyType } from '@/common/enums/enum';
+import { ApiKeyType, WorkspaceRole } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import getSwaggerMetadata, {
@@ -144,11 +144,12 @@ export class WorkspacesService implements OnModuleInit {
           ? 'AND w."archivedAt" IS NULL'
           : '';
 
-    // Get total count
+    // Get total count - count workspaces where user is a member
     const countQuery = `
       SELECT COUNT(*) as total
       FROM workspaces w
-      WHERE w."ownerId" = $1 ${archivedCondition}
+      INNER JOIN workspace_members wm ON wm."workspaceId" = w.id AND wm."userId" = $1
+      WHERE 1=1 ${archivedCondition}
     `;
     const countResult: { total: string }[] = await this.repo.query(countQuery, [
       id,
@@ -172,8 +173,10 @@ export class WorkspacesService implements OnModuleInit {
         w."isAutoEnableAssetAfterDiscovered" as workspace_isAutoEnableAssetAfterDiscovered,
         w."ownerId" as workspace_ownerId,
         COALESCE(t.target_count, 0)::integer as targetcount,
-        COALESCE(m.member_count, 0)::integer as membercount
+        COALESCE(m.member_count, 0)::integer as membercount,
+        wm.role as member_role
       FROM workspaces w
+      INNER JOIN workspace_members wm ON wm."workspaceId" = w.id AND wm."userId" = $1
       LEFT JOIN (
         SELECT "workspaceId", COUNT(*) as target_count
         FROM workspace_targets
@@ -184,7 +187,7 @@ export class WorkspacesService implements OnModuleInit {
         FROM workspace_members
         GROUP BY "workspaceId"
       ) m ON m."workspaceId" = w."id"
-      WHERE w."ownerId" = $1 ${archivedCondition}
+      WHERE 1=1 ${archivedCondition}
       ORDER BY w."${sortBy}" ${validSortOrder}
       LIMIT $2 OFFSET $3
     `;
@@ -208,6 +211,7 @@ export class WorkspacesService implements OnModuleInit {
       ownerId: row.workspace_ownerId as string,
       targetCount: Number(row.targetcount) || 0,
       memberCount: Number(row.membercount) || 0,
+      role: row.member_role as WorkspaceRole,
     }));
 
     return getManyResponse({ query, data: mappedData, total });

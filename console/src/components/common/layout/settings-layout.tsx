@@ -63,14 +63,14 @@ export default function SettingsLayout({
         {/* Back To App button - always visible on the left */}
         <Link to="/" className="mr-auto">
           <Button variant="outline" className="hidden md:flex">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back To App
+            <ArrowLeft className="h-4 w-4" />
+            Back
           </Button>
           <Button
             variant="outline"
             size="icon"
             className="md:hidden"
-            title="Back To App"
+            title="Back"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>

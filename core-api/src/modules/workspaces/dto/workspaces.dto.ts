@@ -1,4 +1,5 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { WorkspaceRole } from '@/common/enums/enum';
 import { ApiProperty, PartialType, PickType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional } from 'class-validator';
@@ -65,6 +66,13 @@ export class WorkspaceResponseDto {
     example: 5,
   })
   memberCount: number;
+
+  @ApiProperty({
+    description: 'Role of the current user in the workspace',
+    enum: WorkspaceRole,
+    example: 'owner',
+  })
+  role: WorkspaceRole;
 }
 
 export class WorkspaceStatisticsResponseDto {
