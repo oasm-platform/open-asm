@@ -892,11 +892,19 @@ export class JobsRegistryService {
       })
       .filter((tool) => tool !== undefined);
 
-    const { id: historyId, createdAt, updatedAt, jobs, workflow } = jobHistory;
+    const {
+      id: historyId,
+      createdAt,
+      updatedAt,
+      jobs,
+      workflow,
+      jobHistoryName,
+    } = jobHistory;
 
     return {
       id: historyId,
       workflowName: workflow.name,
+      jobHistoryName,
       createdAt,
       updatedAt,
       tools,

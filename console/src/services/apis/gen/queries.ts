@@ -874,6 +874,7 @@ export type JobHistoryDetailResponseDto = {
   tools: Tool[];
   jobs: Job[];
   workflowName: string;
+  jobHistoryName: string;
 };
 
 export type PickTypeClass = {

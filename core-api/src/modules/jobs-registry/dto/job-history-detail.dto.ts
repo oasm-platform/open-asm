@@ -79,4 +79,7 @@ export class JobHistoryDetailResponseDto {
 
   @ApiProperty()
   workflowName?: string;
+
+  @ApiProperty()
+  jobHistoryName?: string;
 }
