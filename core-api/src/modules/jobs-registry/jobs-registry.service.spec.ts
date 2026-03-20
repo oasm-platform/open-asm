@@ -418,10 +418,12 @@ describe('JobsRegistryService', () => {
       updatedAt: new Date(),
       jobs: mockJobs,
       workflow: {
+        name: 'test-workflow',
         content: {
           jobs: [{ run: 'test-tool' }],
         },
       },
+      jobHistoryName: 'test-job-history',
     };
 
     it('should return job history detail with jobs', async () => {
@@ -455,6 +457,8 @@ describe('JobsRegistryService', () => {
       });
       expect(result).toEqual({
         id: mockHistoryId,
+        workflowName: 'test-workflow',
+        jobHistoryName: 'test-job-history',
         createdAt: mockJobHistory.createdAt,
         updatedAt: mockJobHistory.updatedAt,
         tools: [{ name: 'test-tool' }],

@@ -330,11 +330,18 @@ export default function Runs() {
 
   const navigate = useNavigate();
   return (
-    <Page isShowButtonGoBack title={jobHistoryDetail?.workflowName}>
+    <Page
+      isShowButtonGoBack
+      title={
+        jobHistoryDetail?.jobHistoryName ||
+        jobHistoryDetail?.workflowName ||
+        'Job History Detail'
+      }
+    >
       {/* Tools Section */}
       {jobHistoryDetail?.tools && jobHistoryDetail.tools.length > 0 && (
         <div className="mb-6 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold mb-4">Workflow</h3>
+          <h3 className="text-lg font-semibold mb-4">Pipeline</h3>
           <div className="flex items-center gap-4 flex-wrap">
             {jobHistoryDetail.tools.map((tool, index) => {
               const status = getToolStatus(index);
