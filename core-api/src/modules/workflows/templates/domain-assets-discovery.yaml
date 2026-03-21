@@ -1,7 +1,7 @@
-name: assets_discovery
+name: domain_assets_discovery
 
 on:
-  target: [create, re-scan]
+  target: [domain.create, domain.re-scan]
 
 jobs:
   - name: Scan Subdomain

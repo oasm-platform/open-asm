@@ -171,7 +171,7 @@ export class TargetsService implements OnModuleInit {
       },
     );
 
-    this.eventEmitter.emit('target.create', target);
+    this.eventEmitter.emit('target.domain.create', target);
 
     return target;
   }
@@ -288,7 +288,7 @@ export class TargetsService implements OnModuleInit {
 
     // Emit events and update scan schedules for all created targets (outside transaction)
     for (const target of result.created) {
-      this.eventEmitter.emit('target.create', target);
+      this.eventEmitter.emit('target.domain.create', target);
     }
 
     return result;
