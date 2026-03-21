@@ -398,7 +398,7 @@ describe('TargetsService', () => {
       // Assert
       expect(mockEventEmitter.emit).toHaveBeenCalledTimes(2);
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        'target.create',
+        'target.domain.create',
         expect.any(Object),
       );
     });
