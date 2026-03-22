@@ -1,6 +1,7 @@
 import { STORAGE_BASE_PATH } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
@@ -58,6 +59,7 @@ export class AssetsService {
     private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
     private workspaceService: WorkspacesService,
+    private geoIpService: GeoIpService,
 
     private dataSource: DataSource,
   ) {}
@@ -442,10 +444,15 @@ export class AssetsService {
 
     const total = totalInDb?.count ?? 0;
 
-    const data = list.map((item: GetIpAssetsDTO) => {
+    const ips = list.map((item: { ip: string }) => item.ip);
+    const geoIps = ips.length > 0 ? await this.geoIpService.getGeoIp(ips) : [];
+    const geoIpMap = new Map(geoIps.map((geoIp) => [geoIp.query, geoIp]));
+
+    const data = list.map((item: { ip: string; assetCount: number }) => {
       const obj = new GetIpAssetsDTO();
       obj.ip = item.ip;
       obj.assetCount = item.assetCount;
+      obj.geoIp = geoIpMap.get(item.ip) ?? null;
       return obj;
     });
 
