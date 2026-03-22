@@ -26,6 +26,17 @@ import type {
 } from '@tanstack/react-query';
 
 import { orvalClient } from '../axios-client';
+/**
+ * The type of target (DOMAIN or CIDR)
+ */
+export type TargetType = (typeof TargetType)[keyof typeof TargetType];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const TargetType = {
+  DOMAIN: 'DOMAIN',
+  CIDR: 'CIDR',
+} as const;
+
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
@@ -53,19 +64,14 @@ export type Target = {
   id: string;
   createdAt: string;
   updatedAt: string;
-  /** The target domain (with optional URL path, will be parsed to extract domain) */
+  /** The target value (domain or CIDR notation) */
   value: string;
+  /** The type of target (DOMAIN or CIDR) */
+  type: TargetType;
   lastDiscoveredAt: string;
   totalAssets: number;
   status: JobStatus;
   scanSchedule: CronSchedule;
-};
-
-export type AppResponseSerialization = { [key: string]: unknown };
-
-export type CreateTargetDto = {
-  /** The target domain (with optional URL path, will be parsed to extract domain) */
-  value: string;
 };
 
 export type BulkTargetResultDto = {
@@ -81,8 +87,17 @@ export type BulkTargetResultDto = {
   totalSkipped: number;
 };
 
+export type AppResponseSerialization = { [key: string]: unknown };
+
+export type CreateTargetDto = {
+  /** The target value (domain or CIDR notation) */
+  value: string;
+  /** The type of target (DOMAIN or CIDR) */
+  type?: TargetType;
+};
+
 export type CreateMultipleTargetsDto = {
-  /** Array of target values to create */
+  /** Array of target values to create. Supports both DOMAIN (root domain) and CIDR (/24 range only) types. */
   targets: CreateTargetDto[];
 };
 
@@ -111,6 +126,7 @@ export const GetManyTargetResponseDtoStatus = {
 export type GetManyTargetResponseDto = {
   id: string;
   value: string;
+  type: TargetType;
   reScanCount: number;
   scanSchedule: GetManyTargetResponseDtoScanSchedule;
   status: GetManyTargetResponseDtoStatus;
@@ -2384,44 +2400,44 @@ export type McpControllerGetMcpPermissionsParams = {
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Registers a new security testing target such as a domain, IP address, or network range for vulnerability assessment and continuous monitoring.
- * @summary Create a target
+ * Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Supports both DOMAIN (root domain) and CIDR (/24 range only) types. Returns detailed results including created targets and skipped values.
+ * @summary Create multiple targets in bulk
  */
-export const targetsControllerCreateTarget = (
-  createTargetDto: CreateTargetDto,
+export const targetsControllerCreateMultipleTargets = (
+  createMultipleTargetsDto: CreateMultipleTargetsDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<Target>(
+  return orvalClient<BulkTargetResultDto>(
     {
-      url: `/api/targets`,
+      url: `/api/targets/bulk`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      data: createTargetDto,
+      data: createMultipleTargetsDto,
       signal,
     },
     options,
   );
 };
 
-export const getTargetsControllerCreateTargetMutationOptions = <
+export const getTargetsControllerCreateMultipleTargetsMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof targetsControllerCreateTarget>>,
+    Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
     TError,
-    { data: CreateTargetDto },
+    { data: CreateMultipleTargetsDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof targetsControllerCreateTarget>>,
+  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
   TError,
-  { data: CreateTargetDto },
+  { data: CreateMultipleTargetsDto },
   TContext
 > => {
-  const mutationKey = ['targetsControllerCreateTarget'];
+  const mutationKey = ['targetsControllerCreateMultipleTargets'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -2431,48 +2447,49 @@ export const getTargetsControllerCreateTargetMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof targetsControllerCreateTarget>>,
-    { data: CreateTargetDto }
+    Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
+    { data: CreateMultipleTargetsDto }
   > = (props) => {
     const { data } = props ?? {};
 
-    return targetsControllerCreateTarget(data, requestOptions);
+    return targetsControllerCreateMultipleTargets(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type TargetsControllerCreateTargetMutationResult = NonNullable<
-  Awaited<ReturnType<typeof targetsControllerCreateTarget>>
+export type TargetsControllerCreateMultipleTargetsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>
 >;
-export type TargetsControllerCreateTargetMutationBody = CreateTargetDto;
-export type TargetsControllerCreateTargetMutationError = unknown;
+export type TargetsControllerCreateMultipleTargetsMutationBody =
+  CreateMultipleTargetsDto;
+export type TargetsControllerCreateMultipleTargetsMutationError = unknown;
 
 /**
- * @summary Create a target
+ * @summary Create multiple targets in bulk
  */
-export const useTargetsControllerCreateTarget = <
+export const useTargetsControllerCreateMultipleTargets = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof targetsControllerCreateTarget>>,
+      Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
       TError,
-      { data: CreateTargetDto },
+      { data: CreateMultipleTargetsDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof targetsControllerCreateTarget>>,
+  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
   TError,
-  { data: CreateTargetDto },
+  { data: CreateMultipleTargetsDto },
   TContext
 > => {
   const mutationOptions =
-    getTargetsControllerCreateTargetMutationOptions(options);
+    getTargetsControllerCreateMultipleTargetsMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
@@ -2844,102 +2861,7 @@ export function useTargetsControllerGetTargetsInWorkspace<
 }
 
 /**
- * Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Returns detailed results including created targets and skipped values.
- * @summary Create multiple targets in bulk
- */
-export const targetsControllerCreateMultipleTargets = (
-  createMultipleTargetsDto: CreateMultipleTargetsDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<BulkTargetResultDto>(
-    {
-      url: `/api/targets/bulk`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createMultipleTargetsDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getTargetsControllerCreateMultipleTargetsMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-    TError,
-    { data: CreateMultipleTargetsDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-  TError,
-  { data: CreateMultipleTargetsDto },
-  TContext
-> => {
-  const mutationKey = ['targetsControllerCreateMultipleTargets'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-    { data: CreateMultipleTargetsDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return targetsControllerCreateMultipleTargets(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type TargetsControllerCreateMultipleTargetsMutationResult = NonNullable<
-  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>
->;
-export type TargetsControllerCreateMultipleTargetsMutationBody =
-  CreateMultipleTargetsDto;
-export type TargetsControllerCreateMultipleTargetsMutationError = unknown;
-
-/**
- * @summary Create multiple targets in bulk
- */
-export const useTargetsControllerCreateMultipleTargets = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-      TError,
-      { data: CreateMultipleTargetsDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof targetsControllerCreateMultipleTargets>>,
-  TError,
-  { data: CreateMultipleTargetsDto },
-  TContext
-> => {
-  const mutationOptions =
-    getTargetsControllerCreateMultipleTargetsMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Exports all targets in a workspace to a CSV file containing value, last discovered date, and creation date for reporting and analysis purposes.
+ * Exports all targets in a workspace to a CSV file containing value, type (DOMAIN or CIDR), last discovered date, and creation date for reporting and analysis purposes.
  * @summary Export targets to CSV
  */
 export const targetsControllerExportTargetsToCSV = (

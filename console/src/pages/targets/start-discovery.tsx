@@ -1,39 +1,34 @@
+import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
 import {
   useTargetsControllerCreateMultipleTargets,
   type BulkTargetResultDto,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2Icon, Target } from 'lucide-react';
+import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
+const cidr24Regex = /^(\d{1,3}\.){3}\d{1,3}\/24$/;
+
+type TargetType = 'DOMAIN' | 'CIDR';
 
 type FormValues = {
   value: string;
 };
 
 /**
- * Parse comma-separated input into array of trimmed, non-empty domain strings
+ * Parse newline or comma-separated input into array of trimmed, non-empty strings
  */
 const parseTargetsInput = (input: string): string[] => {
   return input
-    .split(',')
+    .split(/[,\n]+/)
     .map((t) => t.trim())
     .filter((t) => t.length > 0);
 };
@@ -77,8 +72,27 @@ const validateDomains = (input: string): string | true => {
   return true;
 };
 
-export function CreateTarget() {
-  const [open, setOpen] = useState(false);
+/**
+ * Validate multiple CIDR /24 ranges
+ */
+const validateCidr = (input: string): string | true => {
+  const targets = parseTargetsInput(input);
+
+  if (targets.length === 0) {
+    return 'Please enter at least one CIDR range.';
+  }
+
+  for (const target of targets) {
+    if (!cidr24Regex.test(target)) {
+      return `"${target}" is not a valid CIDR /24 range (e.g. 192.168.1.0/24).`;
+    }
+  }
+
+  return true;
+};
+
+export default function StartDiscovery() {
+  const [targetType, setTargetType] = useState<TargetType>('DOMAIN');
   const {
     register,
     handleSubmit,
@@ -92,6 +106,13 @@ export function CreateTarget() {
   const queryClient = useQueryClient();
   const { mutate, isPending } = useTargetsControllerCreateMultipleTargets();
   const navigate = useNavigate();
+
+  const validateTargets = (input: string): string | true => {
+    if (targetType === 'CIDR') {
+      return validateCidr(input);
+    }
+    return validateDomains(input);
+  };
 
   function onSubmit(data: FormValues) {
     const targets = parseTargetsInput(data.value);
@@ -116,7 +137,7 @@ export function CreateTarget() {
     mutate(
       {
         data: {
-          targets: uniqueTargets.map((value) => ({ value })),
+          targets: uniqueTargets.map((value) => ({ value, type: targetType })),
         },
       },
       {
@@ -125,15 +146,14 @@ export function CreateTarget() {
         },
         onSuccess: (res: BulkTargetResultDto) => {
           if (res.totalCreated > 0) {
-            navigate(`/targets?page=1&pageSize=100`);
             toast.success(
               `Successfully created ${res.totalCreated} target${res.totalCreated > 1 ? 's' : ''}.`,
             );
-            setOpen(false);
             reset();
             queryClient.refetchQueries({
               queryKey: ['targets'],
             });
+            navigate(`/targets?page=1&pageSize=100`);
           }
 
           if (res.totalSkipped > 0) {
@@ -146,70 +166,95 @@ export function CreateTarget() {
     );
   }
 
-  const title = 'Start discovery';
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Target className="shrink-0" />
-          <span>{title}</span>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="w-full md:w-3/4 lg:w-106.25">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
-            Enter one or more domains to scan, separated by commas.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="grid gap-4 mb-3">
-            <div className="grid gap-3">
-              <Label htmlFor="name-1">Targets</Label>
-              <Input
-                id="name-1"
-                placeholder="e.g. example.com, test.com, demo.org"
+    <Page title="Start discovery" isShowButtonGoBack>
+      <div className="max-w-4xl mx-auto py-6">
+        <div className="bg-card rounded-lg border p-4">
+          <div className="mb-6">
+            <p className="text-muted-foreground mt-2">
+              Enter one or more targets to scan, separated by commas or new
+              lines.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <RadioGroup
+                value={targetType}
+                onValueChange={(val) => {
+                  setTargetType(val as TargetType);
+                  setValue('value', '');
+                  clearErrors('value');
+                }}
+                className="flex gap-6"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="DOMAIN" id="type-domain" />
+                  <Label htmlFor="type-domain" className="font-normal">
+                    Root domain
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="CIDR" id="type-cidr" />
+                  <Label htmlFor="type-cidr" className="font-normal">
+                    CIDR /24
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-2">
+              <Textarea
+                id="targets"
+                rows={4}
+                placeholder={
+                  targetType === 'DOMAIN'
+                    ? 'e.g. example.com, test.com, demo.org'
+                    : 'e.g. 203.0.113.0/24, 198.51.100.0/24'
+                }
                 autoComplete="off"
                 {...register('value', {
-                  required: 'Domain is required.',
-                  validate: validateDomains,
+                  required: 'At least one target is required.',
+                  validate: validateTargets,
                 })}
                 onPaste={(e) => {
                   e.preventDefault();
                   const pastedText = e.clipboardData?.getData('text') || '';
                   const trimmedText = pastedText.trim();
 
-                  // Parse multiple domains from pasted text (comma or newline separated)
-                  const pastedDomains = trimmedText
+                  // Parse multiple targets from pasted text (comma or newline separated)
+                  const pastedTargets = trimmedText
                     .split(/[,\n]+/)
                     .map((t) => t.trim())
                     .filter((t) => t.length > 0)
-                    .map((domain) => {
+                    .map((target) => {
+                      if (targetType === 'CIDR') {
+                        return target;
+                      }
                       // Extract root domain from URL if needed
                       try {
                         const url = new URL(
-                          domain.includes('://') ? domain : `http://${domain}`,
+                          target.includes('://') ? target : `http://${target}`,
                         );
-                        return url.hostname || domain;
+                        return url.hostname || target;
                       } catch {
-                        return domain;
+                        return target;
                       }
                     });
 
                   // Get current value and merge
                   const currentValue = getValues('value') || '';
-                  const currentDomains = currentValue
+                  const currentTargets = currentValue
                     ? parseTargetsInput(currentValue)
                     : [];
-                  const allDomains = [...currentDomains, ...pastedDomains];
+                  const allTargets = [...currentTargets, ...pastedTargets];
 
                   // Remove duplicates
-                  const uniqueDomains = Array.from(
-                    new Set(allDomains.map((d) => d.toLowerCase())),
+                  const uniqueTargets = Array.from(
+                    new Set(allTargets.map((d) => d.toLowerCase())),
                   );
 
-                  setValue('value', uniqueDomains.join(', '));
+                  setValue('value', uniqueTargets.join('\n'));
                 }}
               />
               {errors.value && (
@@ -218,20 +263,23 @@ export function CreateTarget() {
                 </span>
               )}
             </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline" type="button">
+
+            <div className="pt-4 flex justify-between">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => navigate('/targets')}
+              >
                 Cancel
               </Button>
-            </DialogClose>
-            <Button disabled={isPending} type="submit">
-              {isPending && <Loader2Icon className="animate-spin" />}
-              Start
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+              <Button disabled={isPending} type="submit">
+                {isPending && <Loader2Icon className="animate-spin" />}
+                Start Discovery
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Page>
   );
 }

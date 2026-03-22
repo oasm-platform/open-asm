@@ -1,9 +1,12 @@
-name: cidr_assets_discovery
+name: vulnerability_scan_basic
 
 on:
-  target: [cidr.create, cidr.re-scan]
+  target: [domain.create, domain.re-scan]
 
 jobs:
+  - name: Scan Subdomain
+    run: subfinder
+
   - name: Port Scan
     run: naabu
 

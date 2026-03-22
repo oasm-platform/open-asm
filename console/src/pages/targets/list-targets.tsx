@@ -7,7 +7,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useTargetsControllerGetTargetsInWorkspace } from '@/services/apis/gen/queries';
 
-import { CreateTarget } from '@/components/ui/create-target';
+import { Button } from '@/components/ui/button';
 import ExportDataButton from '@/components/ui/export-button';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
@@ -15,6 +15,7 @@ import type {
   GetManyTargetResponseDto,
   JobStatus,
 } from '@/services/apis/gen/queries';
+import { Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import CreateWorkspace from '../workspaces/create-workspace';
 
@@ -146,7 +147,14 @@ export function ListTargets() {
       onFilterChange={setFilter}
       toolbarComponents={[
         <ExportDataButton api="api/targets/export" prefix="targets" />,
-        <CreateTarget />,
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => navigate('/targets/start-discovery')}
+        >
+          <Target className="shrink-0" />
+          <span>Start discovery</span>
+        </Button>,
       ]}
       totalItems={total}
       onRowClick={handleRowClick}

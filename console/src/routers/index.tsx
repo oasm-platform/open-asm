@@ -22,6 +22,7 @@ import Register from '@/pages/register/register';
 import Search from '@/pages/search/search';
 import Settings from '@/pages/settings/settings';
 import DetailTarget from '@/pages/targets/detail-target';
+import StartDiscovery from '@/pages/targets/start-discovery';
 import Targets from '@/pages/targets/targets';
 import ToolDetail from '@/pages/tools/components/tool-detail';
 import Tools from '@/pages/tools/tools';
@@ -151,6 +152,14 @@ export const router = createBrowserRouter([
                 element: (
                   <RequireWorkspace>
                     <Targets />
+                  </RequireWorkspace>
+                ),
+              },
+              {
+                path: 'start-discovery',
+                element: (
+                  <RequireWorkspace>
+                    <StartDiscovery />
                   </RequireWorkspace>
                 ),
               },

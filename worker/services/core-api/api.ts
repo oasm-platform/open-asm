@@ -27,6 +27,12 @@ export enum JobStatus {
   Cancelled = "cancelled",
 }
 
+/** The type of target (DOMAIN or CIDR) */
+export enum TargetType {
+  DOMAIN = "DOMAIN",
+  CIDR = "CIDR",
+}
+
 export interface Target {
   id: string;
   /** @format date-time */
@@ -34,25 +40,20 @@ export interface Target {
   /** @format date-time */
   updatedAt: string;
   /**
-   * The target domain (with optional URL path, will be parsed to extract domain)
+   * The target value (domain or CIDR notation)
    * @example "example.com"
    */
   value: string;
+  /**
+   * The type of target (DOMAIN or CIDR)
+   * @example "DOMAIN"
+   */
+  type: TargetType;
   /** @format date-time */
   lastDiscoveredAt: string;
   totalAssets: number;
   status: JobStatus;
   scanSchedule: CronSchedule;
-}
-
-export type AppResponseSerialization = object;
-
-export interface CreateTargetDto {
-  /**
-   * The target domain (with optional URL path, will be parsed to extract domain)
-   * @example "example.com"
-   */
-  value: string;
 }
 
 export interface BulkTargetResultDto {
@@ -80,10 +81,26 @@ export interface BulkTargetResultDto {
   totalSkipped: number;
 }
 
+export type AppResponseSerialization = object;
+
+export interface CreateTargetDto {
+  /**
+   * The target value (domain or CIDR notation)
+   * @example "example.com"
+   */
+  value: string;
+  /**
+   * The type of target (DOMAIN or CIDR)
+   * @default "DOMAIN"
+   * @example "DOMAIN"
+   */
+  type?: TargetType;
+}
+
 export interface CreateMultipleTargetsDto {
   /**
-   * Array of target values to create
-   * @example [{"value":"example.com"},{"value":"test.com"}]
+   * Array of target values to create. Supports both DOMAIN (root domain) and CIDR (/24 range only) types.
+   * @example [{"value":"example.com","type":"DOMAIN"},{"value":"192.168.1.0/24","type":"CIDR"}]
    */
   targets: CreateTargetDto[];
 }
@@ -91,6 +108,7 @@ export interface CreateMultipleTargetsDto {
 export interface GetManyTargetResponseDto {
   id: string;
   value: string;
+  type: TargetType;
   reScanCount: number;
   scanSchedule: GetManyTargetResponseDtoScanScheduleEnum;
   /** @example "DONE" */
@@ -2272,19 +2290,19 @@ export class Api<
   SecurityDataType extends unknown,
 > extends HttpClient<SecurityDataType> {
   /**
-   * @description Registers a new security testing target such as a domain, IP address, or network range for vulnerability assessment and continuous monitoring.
+   * @description Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Supports both DOMAIN (root domain) and CIDR (/24 range only) types. Returns detailed results including created targets and skipped values.
    *
    * @tags Targets
-   * @name TargetsControllerCreateTarget
-   * @summary Create a target
-   * @request POST:/api/targets
+   * @name TargetsControllerCreateMultipleTargets
+   * @summary Create multiple targets in bulk
+   * @request POST:/api/targets/bulk
    */
-  targetsControllerCreateTarget = (
-    data: CreateTargetDto,
+  targetsControllerCreateMultipleTargets = (
+    data: CreateMultipleTargetsDto,
     params: RequestParams = {},
   ) =>
     this.request<AppResponseSerialization, any>({
-      path: `/api/targets`,
+      path: `/api/targets/bulk`,
       method: "POST",
       body: data,
       type: ContentType.Json,
@@ -2324,28 +2342,7 @@ export class Api<
     });
 
   /**
-   * @description Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Returns detailed results including created targets and skipped values.
-   *
-   * @tags Targets
-   * @name TargetsControllerCreateMultipleTargets
-   * @summary Create multiple targets in bulk
-   * @request POST:/api/targets/bulk
-   */
-  targetsControllerCreateMultipleTargets = (
-    data: CreateMultipleTargetsDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/targets/bulk`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Exports all targets in a workspace to a CSV file containing value, last discovered date, and creation date for reporting and analysis purposes.
+   * @description Exports all targets in a workspace to a CSV file containing value, type (DOMAIN or CIDR), last discovered date, and creation date for reporting and analysis purposes.
    *
    * @tags Targets
    * @name TargetsControllerExportTargetsToCsv
