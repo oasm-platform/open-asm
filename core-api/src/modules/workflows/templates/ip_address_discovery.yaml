@@ -1,12 +1,9 @@
-name: assets_discovery
+name: ip_address_discovery
 
 on:
-  target: [create, re-scan]
+  target: [cidr.create, cidr.re-scan, ip.create, ip.re-scan]
 
 jobs:
-  - name: Scan Subdomain
-    run: subfinder
-
   - name: Port Scan
     run: naabu
 

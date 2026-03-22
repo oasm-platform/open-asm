@@ -1,6 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { CronSchedule, ScanStatus } from '@/common/enums/enum';
-import { ApiProperty, PickType } from '@nestjs/swagger';
+import { CronSchedule, JobStatus, ScanStatus } from '@/common/enums/enum';
+import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -11,18 +11,42 @@ import {
   IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { Target } from '../entities/target.entity';
+import { Target, TargetType } from '../entities/target.entity';
 
-export class CreateTargetDto extends PickType(Target, ['value'] as const) {}
+export class CreateTargetDto {
+  @ApiProperty({
+    example: 'example.com',
+    description: 'The target value (domain, IP address, or CIDR notation)',
+  })
+  @IsString()
+  value: string;
+
+  @ApiProperty({
+    enum: TargetType,
+    enumName: 'TargetType',
+    description: 'The type of target (DOMAIN, CIDR, or IP)',
+    example: TargetType.DOMAIN,
+    required: false,
+    default: TargetType.DOMAIN,
+  })
+  @IsEnum(TargetType)
+  @IsOptional()
+  type?: TargetType = TargetType.DOMAIN;
+}
 
 /**
  * DTO for creating multiple targets in a single request
  */
 export class CreateMultipleTargetsDto {
   @ApiProperty({
-    description: 'Array of target values to create',
+    description:
+      'Array of target values to create. Supports DOMAIN (root domain), CIDR (/24 range only), and IP (single IP address) types.',
     type: [CreateTargetDto],
-    example: [{ value: 'example.com' }, { value: 'test.com' }],
+    example: [
+      { value: 'example.com', type: 'DOMAIN' },
+      { value: '192.168.1.0/24', type: 'CIDR' },
+      { value: '8.8.8.8', type: 'IP' },
+    ],
   })
   @IsArray()
   @ValidateNested({ each: true })
@@ -76,6 +100,9 @@ export class GetManyTargetResponseDto {
   @ApiProperty()
   value: string;
 
+  @ApiProperty({ enum: TargetType, enumName: 'TargetType' })
+  type: TargetType;
+
   @ApiProperty()
   reScanCount: number;
 
@@ -86,7 +113,7 @@ export class GetManyTargetResponseDto {
   status?: ScanStatus;
 
   @ApiProperty({ example: 100 })
-  totalAssets: number;
+  totalAssetServices: number;
 
   @ApiProperty()
   duration: number;
@@ -100,6 +127,26 @@ export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
   @IsString()
   @IsOptional()
   value?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: TargetType,
+    enumName: 'TargetType',
+    description: 'Filter by target type (DOMAIN, CIDR, or IP)',
+  })
+  @IsEnum(TargetType)
+  @IsOptional()
+  type?: TargetType;
+
+  @ApiProperty({
+    required: false,
+    enum: JobStatus,
+    enumName: 'JobStatus',
+    description: 'Filter by scan status (pending, in_progress, completed, failed, cancelled)',
+  })
+  @IsEnum(JobStatus)
+  @IsOptional()
+  status?: JobStatus;
 }
 
 export class UpdateTargetDto {

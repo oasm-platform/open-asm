@@ -4,23 +4,41 @@ import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, Matches } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
+
+/**
+ * Enum representing the type of target
+ */
+export enum TargetType {
+  DOMAIN = 'DOMAIN',
+  CIDR = 'CIDR',
+  IP = 'IP',
+}
 
 @Entity('targets')
 export class Target extends BaseEntity {
   @ApiProperty({
     example: 'example.com',
-    description:
-      'The target domain (with optional URL path, will be parsed to extract domain)',
+    description: 'The target value (domain, IP address, or CIDR notation)',
   })
   @IsString()
-  @Matches(/^(?!\d+\.\d+\.\d+\.\d+)(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/, {
-    message: 'Target must be a valid domain (IP is not allowed)',
-  })
   @Transform(({ value }: { value: string }) => {
     try {
+      // Check if it's a CIDR notation (e.g., 192.168.1.0/24)
+      const cidrRegex = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
+      if (cidrRegex.test(value)) {
+        return value; // Return CIDR as-is
+      }
+
+      // Check if it's an IP address (e.g., 192.168.1.1)
+      const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+      if (ipRegex.test(value)) {
+        return value; // Return IP as-is
+      }
+
+      // Otherwise, treat as domain and extract hostname
       const hasProtocol = /^https?:\/\//.test(value);
       const url = new URL(hasProtocol ? value : `http://${value}`);
       return url.hostname;
@@ -31,6 +49,20 @@ export class Target extends BaseEntity {
   })
   @Column({ type: 'varchar' })
   value: string;
+
+  @ApiProperty({
+    enum: TargetType,
+    enumName: 'TargetType',
+    description: 'The type of target (DOMAIN, CIDR, or IP)',
+    example: TargetType.DOMAIN,
+  })
+  @IsEnum(TargetType)
+  @Column({
+    type: 'enum',
+    enum: TargetType,
+    default: TargetType.DOMAIN,
+  })
+  type: TargetType;
 
   @ApiProperty()
   @Column({
@@ -50,7 +82,7 @@ export class Target extends BaseEntity {
   assets: Asset[];
 
   @ApiProperty()
-  totalAssets: number;
+  totalAssetServices: number;
 
   @ApiProperty({ enum: JobStatus, enumName: 'JobStatus' })
   status: JobStatus;

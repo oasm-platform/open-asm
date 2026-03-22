@@ -183,3 +183,28 @@ export enum JobRunType {
   MANUAL = 'manual',
   SCHEDULED = 'scheduled',
 }
+
+/**
+ * Enum representing data sources for tools
+ * Determines which entity the tool operates on
+ */
+export enum DataSource {
+  /** Tool operates on assets (e.g., subdomain discovery, port scanning) */
+  ASSET = 'asset',
+  /** Tool operates on asset services (e.g., HTTP probe, screenshot) */
+  ASSET_SERVICE = 'asset_service',
+}
+
+/**
+ * Mapping between tool categories and their data sources
+ * Each category maps to exactly one data source
+ */
+export const CATEGORY_DATA_SOURCE_MAP: Record<ToolCategory, DataSource> = {
+  [ToolCategory.SUBDOMAINS]: DataSource.ASSET,
+  [ToolCategory.HTTP_PROBE]: DataSource.ASSET_SERVICE,
+  [ToolCategory.PORTS_SCANNER]: DataSource.ASSET,
+  [ToolCategory.VULNERABILITIES]: DataSource.ASSET,
+  [ToolCategory.SCREENSHOT]: DataSource.ASSET_SERVICE,
+  [ToolCategory.CLASSIFIER]: DataSource.ASSET,
+  [ToolCategory.ASSISTANT]: DataSource.ASSET,
+};

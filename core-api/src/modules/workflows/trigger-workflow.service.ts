@@ -66,7 +66,9 @@ export class TriggerWorkflowService implements OnModuleInit {
    * @returns Workflow object
    */
   private async getWorkflowByEvent(event: string, payload: Target) {
-    const [target, action] = event.split('.');
+    const dotIndex = event.indexOf('.');
+    const target = event.substring(0, dotIndex);
+    const action = event.substring(dotIndex + 1);
     const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(
       payload.id,
     );

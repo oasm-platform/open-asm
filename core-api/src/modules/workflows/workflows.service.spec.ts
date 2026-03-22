@@ -139,7 +139,7 @@ describe('WorkflowsService', () => {
       await service.createDefaultWorkflows('workspace-1');
 
       expect(workflowRepository.insert).toHaveBeenCalledWith({
-        name: '[Default] Test Workflow',
+        name: 'Test workflow',
         content: {
           name: 'Test Workflow',
           on: { event: ['test'] },
