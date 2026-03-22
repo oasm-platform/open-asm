@@ -24,6 +24,12 @@ const targetTypeColor: Record<string, string> = {
   IP: 'border-orange-500 text-orange-500',
 };
 
+const textareaBorderColor: Record<string, string> = {
+  DOMAIN: 'border-blue-500 focus-visible:ring-blue-500',
+  CIDR: 'border-green-500 focus-visible:ring-green-500',
+  IP: 'border-orange-500 focus-visible:ring-orange-500',
+};
+
 type TargetType = 'DOMAIN' | 'CIDR' | 'IP';
 
 type FormValues = {
@@ -229,9 +235,9 @@ export default function StartDiscovery() {
                   <RadioGroupItem
                     value="DOMAIN"
                     id="type-domain"
-                    className={targetType === 'DOMAIN' ? targetTypeColor.DOMAIN : ''}
+                    className={targetTypeColor.DOMAIN}
                   />
-                  <span className={`font-normal ${targetType === 'DOMAIN' ? targetTypeColor.DOMAIN : ''}`}>
+                  <span className={`${targetType === 'DOMAIN' ? 'font-bold' : 'font-normal'} ${targetTypeColor.DOMAIN}`}>
                     Root domain
                   </span>
                 </Label>
@@ -239,9 +245,9 @@ export default function StartDiscovery() {
                   <RadioGroupItem
                     value="IP"
                     id="type-ip"
-                    className={targetType === 'IP' ? targetTypeColor.IP : ''}
+                    className={targetTypeColor.IP}
                   />
-                  <span className={`font-normal ${targetType === 'IP' ? targetTypeColor.IP : ''}`}>
+                  <span className={`${targetType === 'IP' ? 'font-bold' : 'font-normal'} ${targetTypeColor.IP}`}>
                     IP address
                   </span>
                 </Label>
@@ -249,9 +255,9 @@ export default function StartDiscovery() {
                   <RadioGroupItem
                     value="CIDR"
                     id="type-cidr"
-                    className={targetType === 'CIDR' ? targetTypeColor.CIDR : ''}
+                    className={targetTypeColor.CIDR}
                   />
-                  <span className={`font-normal ${targetType === 'CIDR' ? targetTypeColor.CIDR : ''}`}>
+                  <span className={`${targetType === 'CIDR' ? 'font-bold' : 'font-normal'} ${targetTypeColor.CIDR}`}>
                     CIDR /24
                   </span>
                 </Label>
@@ -262,6 +268,7 @@ export default function StartDiscovery() {
               <Textarea
                 id="targets"
                 rows={4}
+                className={textareaBorderColor[targetType]}
                 placeholder={
                   targetType === 'DOMAIN'
                     ? 'e.g. example.com, test.com, demo.org'
