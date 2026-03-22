@@ -48,9 +48,10 @@ export class TargetsService implements OnModuleInit {
    * Validates a target value based on its type.
    * For DOMAIN: Must be a valid root domain (not an IP address).
    * For CIDR: Must be a valid CIDR notation with /24 prefix only and public IP.
+   * For IP: Must be a valid public IPv4 address.
    *
    * @param value - The target value to validate.
-   * @param type - The type of target (DOMAIN or CIDR).
+   * @param type - The type of target (DOMAIN, CIDR, or IP).
    * @throws BadRequestException if validation fails.
    */
   private validateTargetValue(value: string, type: TargetType): void {
@@ -59,7 +60,7 @@ export class TargetsService implements OnModuleInit {
       const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
       if (ipRegex.test(value)) {
         throw new BadRequestException(
-          `Invalid domain: "${value}" is an IP address. Use type CIDR for IP ranges.`,
+          `Invalid domain: "${value}" is an IP address. Use type IP for single IP addresses or CIDR for IP ranges.`,
         );
       }
 
@@ -109,6 +110,38 @@ export class TargetsService implements OnModuleInit {
       if (this.isPrivateIP(octets[0], octets[1])) {
         throw new BadRequestException(
           `Invalid CIDR: "${value}" is a private/reserved IP range. Only public IP ranges are allowed.`,
+        );
+      }
+    } else if (type === TargetType.IP) {
+      // Validate single IP address format: x.x.x.x
+      const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+      const match = value.match(ipRegex);
+
+      if (!match) {
+        throw new BadRequestException(
+          `Invalid IP: "${value}" is not a valid IPv4 address. Expected format: x.x.x.x`,
+        );
+      }
+
+      // Validate each octet is 0-255
+      const octets = [
+        parseInt(match[1]),
+        parseInt(match[2]),
+        parseInt(match[3]),
+        parseInt(match[4]),
+      ];
+      for (const octet of octets) {
+        if (octet < 0 || octet > 255) {
+          throw new BadRequestException(
+            `Invalid IP: "${value}" contains invalid IP octet. Each octet must be 0-255.`,
+          );
+        }
+      }
+
+      // Validate IP is public (not private/localhost/reserved)
+      if (this.isPrivateIP(octets[0], octets[1])) {
+        throw new BadRequestException(
+          `Invalid IP: "${value}" is a private/reserved IP address. Only public IP addresses are allowed.`,
         );
       }
     }
@@ -327,6 +360,14 @@ export class TargetsService implements OnModuleInit {
                 value: ip,
                 isPrimary: index === 0, // First IP is primary
               });
+            });
+          } else if (target.type === TargetType.IP) {
+            // For IP, create single asset record (similar to CIDR but only 1)
+            assetValues.push({
+              id: randomUUID(),
+              target: { id: target.id },
+              value: target.value,
+              isPrimary: true,
             });
           } else {
             // For DOMAIN, create single asset

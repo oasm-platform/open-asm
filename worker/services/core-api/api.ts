@@ -27,10 +27,11 @@ export enum JobStatus {
   Cancelled = "cancelled",
 }
 
-/** The type of target (DOMAIN or CIDR) */
+/** The type of target (DOMAIN, CIDR, or IP) */
 export enum TargetType {
   DOMAIN = "DOMAIN",
   CIDR = "CIDR",
+  IP = "IP",
 }
 
 export interface Target {
@@ -40,12 +41,12 @@ export interface Target {
   /** @format date-time */
   updatedAt: string;
   /**
-   * The target value (domain or CIDR notation)
+   * The target value (domain, IP address, or CIDR notation)
    * @example "example.com"
    */
   value: string;
   /**
-   * The type of target (DOMAIN or CIDR)
+   * The type of target (DOMAIN, CIDR, or IP)
    * @example "DOMAIN"
    */
   type: TargetType;
@@ -85,12 +86,12 @@ export type AppResponseSerialization = object;
 
 export interface CreateTargetDto {
   /**
-   * The target value (domain or CIDR notation)
+   * The target value (domain, IP address, or CIDR notation)
    * @example "example.com"
    */
   value: string;
   /**
-   * The type of target (DOMAIN or CIDR)
+   * The type of target (DOMAIN, CIDR, or IP)
    * @default "DOMAIN"
    * @example "DOMAIN"
    */
@@ -99,8 +100,8 @@ export interface CreateTargetDto {
 
 export interface CreateMultipleTargetsDto {
   /**
-   * Array of target values to create. Supports both DOMAIN (root domain) and CIDR (/24 range only) types.
-   * @example [{"value":"example.com","type":"DOMAIN"},{"value":"192.168.1.0/24","type":"CIDR"}]
+   * Array of target values to create. Supports DOMAIN (root domain), CIDR (/24 range only), and IP (single IP address) types.
+   * @example [{"value":"example.com","type":"DOMAIN"},{"value":"192.168.1.0/24","type":"CIDR"},{"value":"8.8.8.8","type":"IP"}]
    */
   targets: CreateTargetDto[];
 }

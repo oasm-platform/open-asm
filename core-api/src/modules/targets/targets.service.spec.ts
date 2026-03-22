@@ -413,7 +413,7 @@ describe('TargetsService', () => {
       await expect(
         service.createMultipleTargets(dto, workspaceId, userContext),
       ).rejects.toThrow(
-        'Invalid domain: "192.168.1.1" is an IP address. Use type CIDR for IP ranges.',
+        'Invalid domain: "192.168.1.1" is an IP address. Use type IP for single IP addresses or CIDR for IP ranges.',
       );
     });
 
@@ -563,7 +563,7 @@ describe('TargetsService', () => {
       await expect(
         service.createMultipleTargets(dto, workspaceId, userContext),
       ).rejects.toThrow(
-        'Invalid domain: "192.168.1.1" is an IP address. Use type CIDR for IP ranges.',
+        'Invalid domain: "192.168.1.1" is an IP address. Use type IP for single IP addresses or CIDR for IP ranges.',
       );
     });
 
@@ -682,6 +682,92 @@ describe('TargetsService', () => {
       // Assert
       expect(result.created).toHaveLength(1);
       expect(result.totalCreated).toBe(1);
+    });
+
+    it('should create valid IP target', async () => {
+      // Arrange
+      const dto = {
+        targets: [{ value: '8.8.8.8', type: TargetType.IP }],
+      };
+      const createdTargets = [
+        { id: randomUUID(), value: '8.8.8.8', type: TargetType.IP, scanSchedule: 'DISABLED' },
+      ] as unknown as Target[];
+
+      const mockManager = createMockEntityManager({
+        existingTargets: [],
+        createdTargets,
+      });
+
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(mockManager),
+        );
+
+      // Act
+      const result = await service.createMultipleTargets(
+        dto,
+        workspaceId,
+        userContext,
+      );
+
+      // Assert
+      expect(result.created).toHaveLength(1);
+      expect(result.totalCreated).toBe(1);
+      expect(mockEventEmitter.emit).toHaveBeenCalledTimes(1);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.ip.create',
+        expect.any(Object),
+      );
+    });
+
+    it('should throw BadRequestException for invalid IP format', async () => {
+      // Arrange
+      const dto = { targets: [{ value: 'invalid-ip', type: TargetType.IP }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid IP: "invalid-ip" is not a valid IPv4 address. Expected format: x.x.x.x',
+      );
+    });
+
+    it('should throw BadRequestException for IP with invalid octet', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '256.1.1.1', type: TargetType.IP }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid IP: "256.1.1.1" contains invalid IP octet. Each octet must be 0-255.',
+      );
+    });
+
+    it('should throw BadRequestException for private IP address', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '192.168.1.1', type: TargetType.IP }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid IP: "192.168.1.1" is a private/reserved IP address. Only public IP addresses are allowed.',
+      );
+    });
+
+    it('should throw BadRequestException for localhost IP address', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '127.0.0.1', type: TargetType.IP }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid IP: "127.0.0.1" is a private/reserved IP address. Only public IP addresses are allowed.',
+      );
     });
   });
 });

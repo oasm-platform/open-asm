@@ -27,7 +27,7 @@ import type {
 
 import { orvalClient } from '../axios-client';
 /**
- * The type of target (DOMAIN or CIDR)
+ * The type of target (DOMAIN, CIDR, or IP)
  */
 export type TargetType = (typeof TargetType)[keyof typeof TargetType];
 
@@ -35,6 +35,7 @@ export type TargetType = (typeof TargetType)[keyof typeof TargetType];
 export const TargetType = {
   DOMAIN: 'DOMAIN',
   CIDR: 'CIDR',
+  IP: 'IP',
 } as const;
 
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
@@ -64,9 +65,9 @@ export type Target = {
   id: string;
   createdAt: string;
   updatedAt: string;
-  /** The target value (domain or CIDR notation) */
+  /** The target value (domain, IP address, or CIDR notation) */
   value: string;
-  /** The type of target (DOMAIN or CIDR) */
+  /** The type of target (DOMAIN, CIDR, or IP) */
   type: TargetType;
   lastDiscoveredAt: string;
   totalAssets: number;
@@ -90,14 +91,14 @@ export type BulkTargetResultDto = {
 export type AppResponseSerialization = { [key: string]: unknown };
 
 export type CreateTargetDto = {
-  /** The target value (domain or CIDR notation) */
+  /** The target value (domain, IP address, or CIDR notation) */
   value: string;
-  /** The type of target (DOMAIN or CIDR) */
+  /** The type of target (DOMAIN, CIDR, or IP) */
   type?: TargetType;
 };
 
 export type CreateMultipleTargetsDto = {
-  /** Array of target values to create. Supports both DOMAIN (root domain) and CIDR (/24 range only) types. */
+  /** Array of target values to create. Supports DOMAIN (root domain), CIDR (/24 range only), and IP (single IP address) types. */
   targets: CreateTargetDto[];
 };
 

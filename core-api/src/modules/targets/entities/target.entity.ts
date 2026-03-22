@@ -14,13 +14,14 @@ import { WorkspaceTarget } from './workspace-target.entity';
 export enum TargetType {
   DOMAIN = 'DOMAIN',
   CIDR = 'CIDR',
+  IP = 'IP',
 }
 
 @Entity('targets')
 export class Target extends BaseEntity {
   @ApiProperty({
     example: 'example.com',
-    description: 'The target value (domain or CIDR notation)',
+    description: 'The target value (domain, IP address, or CIDR notation)',
   })
   @IsString()
   @Transform(({ value }: { value: string }) => {
@@ -29,6 +30,12 @@ export class Target extends BaseEntity {
       const cidrRegex = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
       if (cidrRegex.test(value)) {
         return value; // Return CIDR as-is
+      }
+
+      // Check if it's an IP address (e.g., 192.168.1.1)
+      const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+      if (ipRegex.test(value)) {
+        return value; // Return IP as-is
       }
 
       // Otherwise, treat as domain and extract hostname
@@ -46,7 +53,7 @@ export class Target extends BaseEntity {
   @ApiProperty({
     enum: TargetType,
     enumName: 'TargetType',
-    description: 'The type of target (DOMAIN or CIDR)',
+    description: 'The type of target (DOMAIN, CIDR, or IP)',
     example: TargetType.DOMAIN,
   })
   @IsEnum(TargetType)

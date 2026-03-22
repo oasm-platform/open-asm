@@ -16,8 +16,9 @@ import { toast } from 'sonner';
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
 const cidr24Regex = /^(\d{1,3}\.){3}\d{1,3}\/24$/;
+const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
 
-type TargetType = 'DOMAIN' | 'CIDR';
+type TargetType = 'DOMAIN' | 'CIDR' | 'IP';
 
 type FormValues = {
   value: string;
@@ -91,6 +92,25 @@ const validateCidr = (input: string): string | true => {
   return true;
 };
 
+/**
+ * Validate multiple IP addresses
+ */
+const validateIp = (input: string): string | true => {
+  const targets = parseTargetsInput(input);
+
+  if (targets.length === 0) {
+    return 'Please enter at least one IP address.';
+  }
+
+  for (const target of targets) {
+    if (!ipRegex.test(target)) {
+      return `"${target}" is not a valid IP address (e.g. 8.8.8.8).`;
+    }
+  }
+
+  return true;
+};
+
 export default function StartDiscovery() {
   const [targetType, setTargetType] = useState<TargetType>('DOMAIN');
   const {
@@ -110,6 +130,9 @@ export default function StartDiscovery() {
   const validateTargets = (input: string): string | true => {
     if (targetType === 'CIDR') {
       return validateCidr(input);
+    }
+    if (targetType === 'IP') {
+      return validateIp(input);
     }
     return validateDomains(input);
   };
@@ -141,8 +164,16 @@ export default function StartDiscovery() {
         },
       },
       {
-        onError: () => {
-          toast.error('Failed to create targets');
+        onError: (error: unknown) => {
+          const err = error as {
+            response?: { data?: { message?: string } };
+          };
+          const errorMessage =
+            err?.response?.data?.message || 'Failed to create targets';
+          setError('value', {
+            type: 'manual',
+            message: errorMessage,
+          });
         },
         onSuccess: (res: BulkTargetResultDto) => {
           if (res.totalCreated > 0) {
@@ -195,6 +226,12 @@ export default function StartDiscovery() {
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
+                  <RadioGroupItem value="IP" id="type-ip" />
+                  <Label htmlFor="type-ip" className="font-normal">
+                    IP address
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
                   <RadioGroupItem value="CIDR" id="type-cidr" />
                   <Label htmlFor="type-cidr" className="font-normal">
                     CIDR /24
@@ -210,7 +247,9 @@ export default function StartDiscovery() {
                 placeholder={
                   targetType === 'DOMAIN'
                     ? 'e.g. example.com, test.com, demo.org'
-                    : 'e.g. 203.0.113.0/24, 198.51.100.0/24'
+                    : targetType === 'IP'
+                      ? 'e.g. 8.8.8.8, 1.1.1.1'
+                      : 'e.g. 203.0.113.0/24, 198.51.100.0/24'
                 }
                 autoComplete="off"
                 {...register('value', {
@@ -228,7 +267,7 @@ export default function StartDiscovery() {
                     .map((t) => t.trim())
                     .filter((t) => t.length > 0)
                     .map((target) => {
-                      if (targetType === 'CIDR') {
+                      if (targetType === 'CIDR' || targetType === 'IP') {
                         return target;
                       }
                       // Extract root domain from URL if needed

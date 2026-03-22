@@ -16,7 +16,7 @@ import { Target, TargetType } from '../entities/target.entity';
 export class CreateTargetDto {
   @ApiProperty({
     example: 'example.com',
-    description: 'The target value (domain or CIDR notation)',
+    description: 'The target value (domain, IP address, or CIDR notation)',
   })
   @IsString()
   value: string;
@@ -24,7 +24,7 @@ export class CreateTargetDto {
   @ApiProperty({
     enum: TargetType,
     enumName: 'TargetType',
-    description: 'The type of target (DOMAIN or CIDR)',
+    description: 'The type of target (DOMAIN, CIDR, or IP)',
     example: TargetType.DOMAIN,
     required: false,
     default: TargetType.DOMAIN,
@@ -40,11 +40,12 @@ export class CreateTargetDto {
 export class CreateMultipleTargetsDto {
   @ApiProperty({
     description:
-      'Array of target values to create. Supports both DOMAIN (root domain) and CIDR (/24 range only) types.',
+      'Array of target values to create. Supports DOMAIN (root domain), CIDR (/24 range only), and IP (single IP address) types.',
     type: [CreateTargetDto],
     example: [
       { value: 'example.com', type: 'DOMAIN' },
       { value: '192.168.1.0/24', type: 'CIDR' },
+      { value: '8.8.8.8', type: 'IP' },
     ],
   })
   @IsArray()
