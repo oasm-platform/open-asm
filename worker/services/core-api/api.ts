@@ -923,9 +923,33 @@ export interface GetManyGetAssetsResponseDtoDto {
   pageCount: number;
 }
 
+export interface GeoIp {
+  query: string;
+  status: string;
+  continent: string;
+  continentCode: string;
+  country: string;
+  countryCode: string;
+  region: string;
+  regionName: string;
+  city: string;
+  district: string;
+  zip: string;
+  lat: number;
+  lon: number;
+  timezone: string;
+  offset: number;
+  currency: string;
+  isp: string;
+  org: string;
+  as: string;
+  asname: string;
+}
+
 export interface GetIpAssetsDTO {
   ip: string;
   assetCount: number;
+  geoIp: GeoIp | null;
 }
 
 export interface GetManyGetIpAssetsDTODto {
@@ -1346,29 +1370,6 @@ export interface TopTagAsset {
    * @example 10
    */
   count: number;
-}
-
-export interface GeoIp {
-  query: string;
-  status: string;
-  continent: string;
-  continentCode: string;
-  country: string;
-  countryCode: string;
-  region: string;
-  regionName: string;
-  city: string;
-  district: string;
-  zip: string;
-  lat: number;
-  lon: number;
-  timezone: string;
-  offset: number;
-  currency: string;
-  isp: string;
-  org: string;
-  as: string;
-  asname: string;
 }
 
 export interface TopAssetVulnerabilities {
@@ -2333,6 +2334,8 @@ export class Api<
       value?: string;
       /** Filter by target type (DOMAIN, CIDR, or IP) */
       type?: TargetType;
+      /** Filter by scan status (pending, in_progress, completed, failed, cancelled) */
+      status?: JobStatus;
     },
     params: RequestParams = {},
   ) =>

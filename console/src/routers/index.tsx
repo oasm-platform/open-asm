@@ -32,11 +32,11 @@ import Workers from '@/pages/workers/workers';
 import Workspaces from '@/pages/workspaces';
 import CreateWorkspace from '@/pages/workspaces/create-workspace';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import AdminRoute from './AdminRoute';
 import GuestRoute from './GuestRoute';
 import NotFound from './NotFound';
 import ProtectedRoute from './ProtectedRoute';
 import RegisterRoute from './RegisterRoute';
-import AdminRoute from './AdminRoute';
 
 export const router = createBrowserRouter([
   {
@@ -168,7 +168,7 @@ export const router = createBrowserRouter([
                 children: [
                   {
                     index: true,
-                    element: <Navigate to="asset-services" replace />,
+                    element: <Navigate to="inventory" replace />,
                   },
                   {
                     path: ':tab',

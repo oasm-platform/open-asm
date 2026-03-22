@@ -21,7 +21,7 @@ import SettingTarget from './setting-target';
 
 // Define tabs configuration
 const TABS = [
-  { value: 'asset-services', label: 'Asset Services' },
+  { value: 'inventory', label: 'Inventory' },
   { value: 'vulnerabilities', label: 'Vulnerabilities' },
 ];
 
@@ -43,7 +43,7 @@ export function DetailTarget() {
 
   const { mutate: scanVulnerabilities } = useVulnerabilitiesControllerScan();
 
-  const activeTab = TABS.some((t) => t.value === tab) ? tab : 'asset-services';
+  const activeTab = TABS.some((t) => t.value === tab) ? tab : 'inventory';
 
   const handleTabChange = (value: string) => {
     navigate(`/targets/${id}/${value}`);
@@ -142,7 +142,7 @@ export function DetailTarget() {
             />
           )}
         </div>
-        <TabsContent value="asset-services">
+        <TabsContent value="inventory">
           {animation &&
             (target.status === JobStatus.in_progress ||
               target.status === JobStatus.pending) && (

@@ -1005,9 +1005,39 @@ export type GetManyGetAssetsResponseDtoDto = {
   pageCount: number;
 };
 
+export type GeoIp = {
+  query: string;
+  status: string;
+  continent: string;
+  continentCode: string;
+  country: string;
+  countryCode: string;
+  region: string;
+  regionName: string;
+  city: string;
+  district: string;
+  zip: string;
+  lat: number;
+  lon: number;
+  timezone: string;
+  offset: number;
+  currency: string;
+  isp: string;
+  org: string;
+  as: string;
+  asname: string;
+};
+
+/**
+ * @nullable
+ */
+export type GetIpAssetsDTOGeoIp = GeoIp | null;
+
 export type GetIpAssetsDTO = {
   ip: string;
   assetCount: number;
+  /** @nullable */
+  geoIp: GetIpAssetsDTOGeoIp;
 };
 
 export type GetManyGetIpAssetsDTODto = {
@@ -1350,29 +1380,6 @@ export type TopTagAsset = {
   tag: string;
   /** The number of assets associated with the tag */
   count: number;
-};
-
-export type GeoIp = {
-  query: string;
-  status: string;
-  continent: string;
-  continentCode: string;
-  country: string;
-  countryCode: string;
-  region: string;
-  regionName: string;
-  city: string;
-  district: string;
-  zip: string;
-  lat: number;
-  lon: number;
-  timezone: string;
-  offset: number;
-  currency: string;
-  isp: string;
-  org: string;
-  as: string;
-  asname: string;
 };
 
 export type TopAssetVulnerabilities = {
