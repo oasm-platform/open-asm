@@ -5,6 +5,8 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import {
   BullMQName,
+  CATEGORY_DATA_SOURCE_MAP,
+  DataSource as ToolDataSource,
   JobPriority,
   JobRunType,
   JobStatus,
@@ -408,17 +410,22 @@ export class JobsRegistryService {
         queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
       }
 
-      // Only join assetService for HTTP_PROBE category jobs
-      if (
-        worker.tool?.category === ToolCategory.HTTP_PROBE ||
-        worker.tool?.category === ToolCategory.SCREENSHOT
-      ) {
+      // Determine data source from category mapping and configure query accordingly
+      const toolDataSource = worker.tool?.category
+        ? CATEGORY_DATA_SOURCE_MAP[worker.tool.category]
+        : ToolDataSource.ASSET;
+      
+      if (toolDataSource === ToolDataSource.ASSET_SERVICE) {
+        // For tools operating on asset services (e.g., HTTP_PROBE, SCREENSHOT)
+        // Join assetService and filter by category
         queryBuilder
           .leftJoinAndSelect('jobs.assetService', 'assetService')
           .andWhere('jobs.category = :category', {
             category: worker.tool?.category,
           });
       } else {
+        // For tools operating on assets (e.g., SUBDOMAINS, PORTS_SCANNER, VULNERABILITIES)
+        // Join assetService without category filter
         queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
       }
 
