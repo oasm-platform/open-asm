@@ -1,0 +1,14 @@
+name: cidr_assets_discovery
+
+on:
+  target: [cidr.create, cidr.re-scan]
+
+jobs:
+  - name: Port Scan
+    run: naabu
+
+  - name: HTTP Probe
+    run: httpx
+
+  - name: Take Screenshot
+    run: screenshot

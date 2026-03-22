@@ -22,7 +22,6 @@ import { Response } from 'express';
 import {
   BulkTargetResultDto,
   CreateMultipleTargetsDto,
-  CreateTargetDto,
   GetManyTargetResponseDto,
   GetManyWorkspaceQueryParamsDto,
   UpdateTargetDto,
@@ -35,26 +34,9 @@ export class TargetsController {
   constructor(private readonly targetsService: TargetsService) {}
 
   @Doc({
-    summary: 'Create a target',
-    description:
-      'Registers a new security testing target such as a domain, IP address, or network range for vulnerability assessment and continuous monitoring.',
-    response: {
-      serialization: Target,
-    },
-  })
-  @Post()
-  createTarget(
-    @Body() dto: CreateTargetDto,
-    @UserContext() userContext: UserContextPayload,
-    @WorkspaceId() workspaceId: string,
-  ) {
-    return this.targetsService.createTarget(dto, workspaceId, userContext);
-  }
-
-  @Doc({
     summary: 'Create multiple targets in bulk',
     description:
-      'Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Returns detailed results including created targets and skipped values.',
+      'Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Supports both DOMAIN (root domain) and CIDR (/24 range only) types. Returns detailed results including created targets and skipped values.',
     response: {
       serialization: BulkTargetResultDto,
     },
@@ -97,7 +79,7 @@ export class TargetsController {
   @Doc({
     summary: 'Export targets to CSV',
     description:
-      'Exports all targets in a workspace to a CSV file containing value, last discovered date, and creation date for reporting and analysis purposes.',
+      'Exports all targets in a workspace to a CSV file containing value, type (DOMAIN or CIDR), last discovered date, and creation date for reporting and analysis purposes.',
     response: {
       description: 'CSV file containing targets data',
     },
@@ -125,7 +107,7 @@ export class TargetsController {
     // Create CSV content
     const csvRows: string[] = [];
     // Add header row
-    csvRows.push('value,lastDiscoveredAt,createdAt');
+    csvRows.push('value,type,lastDiscoveredAt,createdAt');
 
     // Add data rows
     for (const target of targets) {
@@ -135,7 +117,7 @@ export class TargetsController {
       const createdAtFormatted = target.createdAt
         ? formatDate(target.createdAt)
         : '';
-      const row = `"${target.value.replace(/"/g, '""')}","${lastDiscoveredAtFormatted}","${createdAtFormatted}"`;
+      const row = `"${target.value.replace(/"/g, '""')}","${target.type}","${lastDiscoveredAtFormatted}","${createdAtFormatted}"`;
       csvRows.push(row);
     }
 

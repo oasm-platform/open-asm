@@ -9,7 +9,7 @@ import type { EntityManager, Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import type { Asset } from '../assets/entities/assets.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { Target } from './entities/target.entity';
+import { Target, TargetType } from './entities/target.entity';
 import { WorkspaceTarget } from './entities/workspace-target.entity';
 import { TargetsService } from './targets.service';
 
@@ -231,6 +231,7 @@ describe('TargetsService', () => {
       const createdTargets = targetValues.map((value) => ({
         id: randomUUID(),
         value,
+        type: TargetType.DOMAIN,
         scanSchedule: 'DISABLED',
       })) as unknown as Target[];
 
@@ -275,8 +276,8 @@ describe('TargetsService', () => {
       ];
       const dto = { targets: targetValues.map((value) => ({ value })) };
       const newTargets = [
-        { id: randomUUID(), value: 'new1.com', scanSchedule: 'DISABLED' },
-        { id: randomUUID(), value: 'new2.com', scanSchedule: 'DISABLED' },
+        { id: randomUUID(), value: 'new1.com', type: TargetType.DOMAIN, scanSchedule: 'DISABLED' },
+        { id: randomUUID(), value: 'new2.com', type: TargetType.DOMAIN, scanSchedule: 'DISABLED' },
       ] as unknown as Target[];
 
       const mockManager = createMockEntityManager({
@@ -377,6 +378,7 @@ describe('TargetsService', () => {
       const createdTargets = targetValues.map((value) => ({
         id: randomUUID(),
         value,
+        type: TargetType.DOMAIN,
         scanSchedule: 'DISABLED',
       })) as unknown as Target[];
 
@@ -401,6 +403,285 @@ describe('TargetsService', () => {
         'target.domain.create',
         expect.any(Object),
       );
+    });
+
+    it('should throw BadRequestException for IP address as domain', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '192.168.1.1', type: TargetType.DOMAIN }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid domain: "192.168.1.1" is an IP address. Use type CIDR for IP ranges.',
+      );
+    });
+
+    it('should throw BadRequestException for invalid domain format', async () => {
+      // Arrange
+      const dto = { targets: [{ value: 'invalid-domain', type: TargetType.DOMAIN }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid domain: "invalid-domain" is not a valid root domain.',
+      );
+    });
+
+    it('should throw BadRequestException for CIDR with invalid prefix', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '192.168.1.0/16', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "192.168.1.0/16" must use /24 prefix. Only /24 CIDR ranges are supported.',
+      );
+    });
+
+    it('should throw BadRequestException for invalid CIDR format', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '192.168.1.0/24/32', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "192.168.1.0/24/32" is not a valid CIDR notation. Expected format: x.x.x.x/y',
+      );
+    });
+
+    it('should throw BadRequestException for CIDR with invalid octet', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '256.168.1.0/24', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "256.168.1.0/24" contains invalid IP octet. Each octet must be 0-255.',
+      );
+    });
+
+    it('should throw BadRequestException for localhost CIDR (127.0.0.0/24)', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '127.0.0.0/24', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "127.0.0.0/24" is a private/reserved IP range. Only public IP ranges are allowed.',
+      );
+    });
+
+    it('should throw BadRequestException for private IP CIDR (10.0.0.0/24)', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '10.0.0.0/24', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "10.0.0.0/24" is a private/reserved IP range. Only public IP ranges are allowed.',
+      );
+    });
+
+    it('should throw BadRequestException for private IP CIDR (172.16.0.0/24)', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '172.16.0.0/24', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "172.16.0.0/24" is a private/reserved IP range. Only public IP ranges are allowed.',
+      );
+    });
+
+    it('should throw BadRequestException for private IP CIDR (192.168.0.0/24)', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '192.168.0.0/24', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "192.168.0.0/24" is a private/reserved IP range. Only public IP ranges are allowed.',
+      );
+    });
+
+    it('should throw BadRequestException for link-local CIDR (169.254.0.0/24)', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '169.254.0.0/24', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "169.254.0.0/24" is a private/reserved IP range. Only public IP ranges are allowed.',
+      );
+    });
+
+    it('should throw BadRequestException for multicast CIDR (224.0.0.0/24)', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '224.0.0.0/24', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "224.0.0.0/24" is a private/reserved IP range. Only public IP ranges are allowed.',
+      );
+    });
+
+    it('should throw BadRequestException for reserved CIDR (240.0.0.0/24)', async () => {
+      // Arrange
+      const dto = { targets: [{ value: '240.0.0.0/24', type: TargetType.CIDR }] };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid CIDR: "240.0.0.0/24" is a private/reserved IP range. Only public IP ranges are allowed.',
+      );
+    });
+
+    it('should validate all targets before processing', async () => {
+      // Arrange
+      const dto = {
+        targets: [
+          { value: 'valid.com', type: TargetType.DOMAIN },
+          { value: '8.8.8.0/24', type: TargetType.CIDR },
+          { value: '192.168.1.1', type: TargetType.DOMAIN }, // Invalid - IP as domain
+        ],
+      };
+
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow(
+        'Invalid domain: "192.168.1.1" is an IP address. Use type CIDR for IP ranges.',
+      );
+    });
+
+    it('should create valid domain and CIDR targets', async () => {
+      // Arrange
+      const dto = {
+        targets: [
+          { value: 'example.com', type: TargetType.DOMAIN },
+          { value: '8.8.8.0/24', type: TargetType.CIDR }, // Google DNS - public IP
+        ],
+      };
+      const createdTargets = [
+        { id: randomUUID(), value: 'example.com', type: TargetType.DOMAIN, scanSchedule: 'DISABLED' },
+        { id: randomUUID(), value: '8.8.8.0/24', type: TargetType.CIDR, scanSchedule: 'DISABLED' },
+      ] as unknown as Target[];
+
+      const mockManager = createMockEntityManager({
+        existingTargets: [],
+        createdTargets,
+      });
+
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(mockManager),
+        );
+
+      // Act
+      const result = await service.createMultipleTargets(
+        dto,
+        workspaceId,
+        userContext,
+      );
+
+      // Assert
+      expect(result.created).toHaveLength(2);
+      expect(result.totalCreated).toBe(2);
+      expect(result.totalSkipped).toBe(0);
+      expect(mockEventEmitter.emit).toHaveBeenCalledTimes(2);
+    });
+
+    it('should create 256 assets for CIDR target', async () => {
+      // Arrange
+      const dto = {
+        targets: [{ value: '8.8.8.0/24', type: TargetType.CIDR }],
+      };
+      const createdTargets = [
+        { id: randomUUID(), value: '8.8.8.0/24', type: TargetType.CIDR, scanSchedule: 'DISABLED' },
+      ] as unknown as Target[];
+
+      const mockManager = createMockEntityManager({
+        existingTargets: [],
+        createdTargets,
+      });
+
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(mockManager),
+        );
+
+      // Act
+      const result = await service.createMultipleTargets(
+        dto,
+        workspaceId,
+        userContext,
+      );
+
+      // Assert
+      expect(result.created).toHaveLength(1);
+      expect(result.totalCreated).toBe(1);
+    });
+
+    it('should expand CIDR to 256 IPs correctly', () => {
+      // Arrange
+      const cidr = '8.8.8.0/24';
+
+      // Act
+      const ips = (service as any).expandCIDRToIPs(cidr);
+
+      // Assert
+      expect(ips).toHaveLength(256);
+      expect(ips[0]).toBe('8.8.8.0');
+      expect(ips[1]).toBe('8.8.8.1');
+      expect(ips[255]).toBe('8.8.8.255');
+    });
+
+    it('should default to DOMAIN type when type is not specified', async () => {
+      // Arrange
+      const dto = { targets: [{ value: 'example.com' }] };
+      const createdTargets = [
+        { id: randomUUID(), value: 'example.com', type: TargetType.DOMAIN, scanSchedule: 'DISABLED' },
+      ] as unknown as Target[];
+
+      const mockManager = createMockEntityManager({
+        existingTargets: [],
+        createdTargets,
+      });
+
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(mockManager),
+        );
+
+      // Act
+      const result = await service.createMultipleTargets(
+        dto,
+        workspaceId,
+        userContext,
+      );
+
+      // Assert
+      expect(result.created).toHaveLength(1);
+      expect(result.totalCreated).toBe(1);
     });
   });
 });

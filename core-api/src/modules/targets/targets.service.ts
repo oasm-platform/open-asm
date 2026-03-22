@@ -3,7 +3,12 @@ import { BullMQName, CronSchedule, JobStatus } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job, Queue } from 'bullmq';
@@ -15,11 +20,10 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   BulkTargetResultDto,
   CreateMultipleTargetsDto,
-  CreateTargetDto,
   GetManyWorkspaceQueryParamsDto,
   UpdateTargetDto,
 } from './dto/targets.dto';
-import { Target } from './entities/target.entity';
+import { Target, TargetType } from './entities/target.entity';
 import { WorkspaceTarget } from './entities/workspace-target.entity';
 
 @Injectable()
@@ -41,6 +45,137 @@ export class TargetsService implements OnModuleInit {
   }
 
   /**
+   * Validates a target value based on its type.
+   * For DOMAIN: Must be a valid root domain (not an IP address).
+   * For CIDR: Must be a valid CIDR notation with /24 prefix only and public IP.
+   *
+   * @param value - The target value to validate.
+   * @param type - The type of target (DOMAIN or CIDR).
+   * @throws BadRequestException if validation fails.
+   */
+  private validateTargetValue(value: string, type: TargetType): void {
+    if (type === TargetType.DOMAIN) {
+      // Validate root domain: must not be an IP address
+      const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+      if (ipRegex.test(value)) {
+        throw new BadRequestException(
+          `Invalid domain: "${value}" is an IP address. Use type CIDR for IP ranges.`,
+        );
+      }
+
+      // Validate domain format: must be a valid root domain
+      const domainRegex = /^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
+      if (!domainRegex.test(value)) {
+        throw new BadRequestException(
+          `Invalid domain: "${value}" is not a valid root domain.`,
+        );
+      }
+    } else if (type === TargetType.CIDR) {
+      // Validate CIDR notation format: x.x.x.x/y
+      const cidrRegex =
+        /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/;
+      const match = value.match(cidrRegex);
+
+      if (!match) {
+        throw new BadRequestException(
+          `Invalid CIDR: "${value}" is not a valid CIDR notation. Expected format: x.x.x.x/y`,
+        );
+      }
+
+      // Validate each octet is 0-255
+      const octets = [
+        parseInt(match[1]),
+        parseInt(match[2]),
+        parseInt(match[3]),
+        parseInt(match[4]),
+      ];
+      for (const octet of octets) {
+        if (octet < 0 || octet > 255) {
+          throw new BadRequestException(
+            `Invalid CIDR: "${value}" contains invalid IP octet. Each octet must be 0-255.`,
+          );
+        }
+      }
+
+      // Validate prefix is exactly /24
+      const prefix = parseInt(match[5]);
+      if (prefix !== 24) {
+        throw new BadRequestException(
+          `Invalid CIDR: "${value}" must use /24 prefix. Only /24 CIDR ranges are supported.`,
+        );
+      }
+
+      // Validate IP is public (not private/localhost/reserved)
+      if (this.isPrivateIP(octets[0], octets[1])) {
+        throw new BadRequestException(
+          `Invalid CIDR: "${value}" is a private/reserved IP range. Only public IP ranges are allowed.`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Checks if an IP address is private, reserved, or localhost.
+   *
+   * @param firstOctet - First octet of IP address
+   * @param secondOctet - Second octet of IP address
+   * @returns true if IP is private/reserved/localhost
+   */
+  private isPrivateIP(firstOctet: number, secondOctet: number): boolean {
+    // 127.0.0.0/8 - Loopback (localhost)
+    if (firstOctet === 127) return true;
+
+    // 10.0.0.0/8 - Private
+    if (firstOctet === 10) return true;
+
+    // 172.16.0.0/12 - Private (172.16.0.0 - 172.31.255.255)
+    if (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) return true;
+
+    // 192.168.0.0/16 - Private
+    if (firstOctet === 192 && secondOctet === 168) return true;
+
+    // 169.254.0.0/16 - Link-local
+    if (firstOctet === 169 && secondOctet === 254) return true;
+
+    // 224.0.0.0/4 - Multicast
+    if (firstOctet >= 224 && firstOctet <= 239) return true;
+
+    // 240.0.0.0/4 - Reserved
+    if (firstOctet >= 240 && firstOctet <= 255) return true;
+
+    // 0.0.0.0/8 - "This" network
+    if (firstOctet === 0) return true;
+
+    return false;
+  }
+
+  /**
+   * Expands a CIDR /24 notation to an array of 256 IP addresses.
+   *
+   * @param cidr - CIDR notation (e.g., "192.168.1.0/24")
+   * @returns Array of 256 IP addresses
+   */
+  private expandCIDRToIPs(cidr: string): string[] {
+    const match = cidr.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/24$/);
+    if (!match) {
+      throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
+    }
+
+    const baseOctets = [
+      parseInt(match[1]),
+      parseInt(match[2]),
+      parseInt(match[3]),
+    ];
+
+    const ips: string[] = [];
+    for (let i = 0; i < 256; i++) {
+      ips.push(`${baseOctets[0]}.${baseOctets[1]}.${baseOctets[2]}.${i}`);
+    }
+
+    return ips;
+  }
+
+  /**
    * Retrieves a target entity by its ID.
    *
    * @param id - The ID of the target to retrieve.
@@ -59,6 +194,7 @@ export class TargetsService implements OnModuleInit {
       .select([
         'targets.id as id',
         'targets.value as value',
+        'targets.type as type',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'COALESCE(COUNT(DISTINCT asset.id), 0) AS "totalAssets"',
         'targets.scanSchedule as "scanSchedule"',
@@ -70,110 +206,11 @@ export class TargetsService implements OnModuleInit {
       END AS status`,
       ])
       .groupBy(
-        'targets.id, targets.value, targets.lastDiscoveredAt, targets.scanSchedule',
+        'targets.id, targets.value, targets.type, targets.lastDiscoveredAt, targets.scanSchedule',
       )
       .getRawOne()) as Target;
 
     return result;
-  }
-
-  /**
-   * Retrieves a target entity by its value.
-   *
-   * @param value - The unique value of the target to retrieve.
-   * @returns A promise that resolves to the target entity if found, otherwise null.
-   */
-  private async getTargetByValue(value: string): Promise<Target | null> {
-    return this.repo.findOneBy({ value });
-  }
-
-  /**
-   * Creates a target entity or associates an existing target with a workspace.
-   *
-   * @param dto - The data transfer object containing the target details.
-   * @param userContextPayload - The user's context data, which includes the user's ID.
-   * @returns A promise that resolves to the target entity if created, otherwise a BadRequestException is thrown.
-   * @throws BadRequestException if the target already exists in the workspace.
-   */
-  public async createTarget(
-    dto: CreateTargetDto,
-    workspaceId: string,
-    userContext: UserContextPayload,
-  ): Promise<Target> {
-    const { value } = dto;
-    // Check if the workspace exists and the user is the owner
-    await this.workspacesService.getWorkspaceByIdAndOwner(
-      workspaceId,
-      userContext,
-    );
-
-    // Use transaction to ensure atomicity of target, workspace_target, and primary asset creation
-    const target = await this.repo.manager.transaction(
-      async (transactionalEntityManager) => {
-        // Check if target already exists in this workspace
-        const existingWorkspaceTarget = await transactionalEntityManager
-          .getRepository(WorkspaceTarget)
-          .findOne({
-            where: {
-              workspace: { id: workspaceId },
-              target: { value },
-            },
-          });
-
-        if (existingWorkspaceTarget) {
-          throw new NotFoundException(
-            'Target already exists in this workspace',
-          );
-        }
-
-        // Create a new target record (don't reuse from other workspaces)
-        const insertResult = await transactionalEntityManager
-          .createQueryBuilder()
-          .insert()
-          .into(Target)
-          .values({ value })
-          .execute();
-
-        // Get the newly created target ID
-        const targetId = insertResult.identifiers[0].id as string;
-        const target = await transactionalEntityManager
-          .getRepository(Target)
-          .findOne({
-            where: { id: targetId },
-          });
-
-        if (!target) {
-          throw new NotFoundException('Target not found after creation');
-        }
-
-        // Create workspace target association
-        await transactionalEntityManager.getRepository(WorkspaceTarget).save({
-          workspace: { id: workspaceId },
-          target: { id: target.id },
-        });
-
-        // Create primary asset using UPSERT for atomic insert-or-ignore behavior
-        // Reduces database queries from 2 (SELECT + INSERT) to 1
-        await transactionalEntityManager
-          .createQueryBuilder()
-          .insert()
-          .into(Asset)
-          .values({
-            id: randomUUID(),
-            target: { id: target.id },
-            value,
-            isPrimary: true,
-          })
-          .orIgnore()
-          .execute();
-
-        return target;
-      },
-    );
-
-    this.eventEmitter.emit('target.domain.create', target);
-
-    return target;
   }
 
   /**
@@ -190,6 +227,12 @@ export class TargetsService implements OnModuleInit {
     userContext: UserContextPayload,
   ): Promise<BulkTargetResultDto> {
     const { targets } = dto;
+
+    // Validate all targets before processing
+    for (const target of targets) {
+      const type = target.type || TargetType.DOMAIN;
+      this.validateTargetValue(target.value, type);
+    }
 
     // Check if the workspace exists and the user is the owner
     await this.workspacesService.getWorkspaceByIdAndOwner(
@@ -239,7 +282,12 @@ export class TargetsService implements OnModuleInit {
           .createQueryBuilder()
           .insert()
           .into(Target)
-          .values(newTargets.map((t) => ({ value: t.value })))
+          .values(
+            newTargets.map((t) => ({
+              value: t.value,
+              type: t.type || TargetType.DOMAIN,
+            })),
+          )
           .execute();
 
         // Get all created target IDs
@@ -261,12 +309,35 @@ export class TargetsService implements OnModuleInit {
           .save(workspaceTargetValues);
 
         // Create primary assets for all new targets using batch UPSERT
-        const assetValues = createdTargetEntities.map((target) => ({
-          id: randomUUID(),
-          target: { id: target.id },
-          value: target.value,
-          isPrimary: true,
-        }));
+        const assetValues: Array<{
+          id: string;
+          target: { id: string };
+          value: string;
+          isPrimary: boolean;
+        }> = [];
+
+        for (const target of createdTargetEntities) {
+          if (target.type === TargetType.CIDR) {
+            // Generate 256 IPs for CIDR /24
+            const ips = this.expandCIDRToIPs(target.value);
+            ips.forEach((ip, index) => {
+              assetValues.push({
+                id: randomUUID(),
+                target: { id: target.id },
+                value: ip,
+                isPrimary: index === 0, // First IP is primary
+              });
+            });
+          } else {
+            // For DOMAIN, create single asset
+            assetValues.push({
+              id: randomUUID(),
+              target: { id: target.id },
+              value: target.value,
+              isPrimary: true,
+            });
+          }
+        }
 
         await transactionalEntityManager
           .createQueryBuilder()
@@ -288,7 +359,8 @@ export class TargetsService implements OnModuleInit {
 
     // Emit events and update scan schedules for all created targets (outside transaction)
     for (const target of result.created) {
-      this.eventEmitter.emit('target.domain.create', target);
+      const typeToEvent = target.type.toLocaleLowerCase(); // e.g. DOMAIN -> domain, CIDR -> cidr
+      this.eventEmitter.emit(`target.${typeToEvent}.create`, target);
     }
 
     return result;
@@ -324,6 +396,7 @@ export class TargetsService implements OnModuleInit {
       .select([
         'targets.id as id',
         'targets.value as value',
+        'targets.type as type',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'targets.reScanCount as "reScanCount"',
         'targets.scanSchedule as "scanSchedule"',
@@ -503,6 +576,7 @@ export class TargetsService implements OnModuleInit {
   public async exportTargetsForCSV(workspaceId: string): Promise<
     Array<{
       value: string;
+      type: string;
       lastDiscoveredAt: Date;
       createdAt: Date;
     }>
@@ -514,12 +588,14 @@ export class TargetsService implements OnModuleInit {
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([
         'targets.value as value',
+        'targets.type as type',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'targets.createdAt as "createdAt"',
       ])
       .orderBy('targets.createdAt', 'ASC')
       .getRawMany<{
         value: string;
+        type: string;
         lastDiscoveredAt: Date;
         createdAt: Date;
       }>();

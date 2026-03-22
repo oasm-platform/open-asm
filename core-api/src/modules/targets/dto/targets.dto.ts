@@ -1,6 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { CronSchedule, ScanStatus } from '@/common/enums/enum';
-import { ApiProperty, PickType } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -11,18 +11,41 @@ import {
   IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { Target } from '../entities/target.entity';
+import { Target, TargetType } from '../entities/target.entity';
 
-export class CreateTargetDto extends PickType(Target, ['value'] as const) {}
+export class CreateTargetDto {
+  @ApiProperty({
+    example: 'example.com',
+    description: 'The target value (domain or CIDR notation)',
+  })
+  @IsString()
+  value: string;
+
+  @ApiProperty({
+    enum: TargetType,
+    enumName: 'TargetType',
+    description: 'The type of target (DOMAIN or CIDR)',
+    example: TargetType.DOMAIN,
+    required: false,
+    default: TargetType.DOMAIN,
+  })
+  @IsEnum(TargetType)
+  @IsOptional()
+  type?: TargetType = TargetType.DOMAIN;
+}
 
 /**
  * DTO for creating multiple targets in a single request
  */
 export class CreateMultipleTargetsDto {
   @ApiProperty({
-    description: 'Array of target values to create',
+    description:
+      'Array of target values to create. Supports both DOMAIN (root domain) and CIDR (/24 range only) types.',
     type: [CreateTargetDto],
-    example: [{ value: 'example.com' }, { value: 'test.com' }],
+    example: [
+      { value: 'example.com', type: 'DOMAIN' },
+      { value: '192.168.1.0/24', type: 'CIDR' },
+    ],
   })
   @IsArray()
   @ValidateNested({ each: true })
@@ -75,6 +98,9 @@ export class GetManyTargetResponseDto {
 
   @ApiProperty()
   value: string;
+
+  @ApiProperty({ enum: TargetType, enumName: 'TargetType' })
+  type: TargetType;
 
   @ApiProperty()
   reScanCount: number;
