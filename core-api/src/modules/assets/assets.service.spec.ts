@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
+import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
@@ -20,6 +21,7 @@ describe('AssetsService', () => {
   let mockEventEmitter: Partial<EventEmitter2>;
   let mockTechnologyForwarderService: Partial<TechnologyForwarderService>;
   let mockWorkspacesService: Partial<WorkspacesService>;
+  let mockGeoIpService: Partial<GeoIpService>;
   let mockDataSource: Partial<DataSource>;
 
   beforeEach(async () => {
@@ -68,6 +70,10 @@ describe('AssetsService', () => {
       getWorkspaceConfigValue: jest.fn(),
     } as any;
 
+    mockGeoIpService = {
+      lookup: jest.fn(),
+    } as any;
+
     mockDataSource = {
       createQueryBuilder: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
@@ -112,6 +118,10 @@ describe('AssetsService', () => {
         {
           provide: WorkspacesService,
           useValue: mockWorkspacesService,
+        },
+        {
+          provide: GeoIpService,
+          useValue: mockGeoIpService,
         },
         {
           provide: DataSource,
