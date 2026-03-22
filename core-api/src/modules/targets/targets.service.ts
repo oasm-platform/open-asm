@@ -221,6 +221,7 @@ export class TargetsService implements OnModuleInit {
       .leftJoin('workspaceTarget.workspace', 'workspace')
       .leftJoin('workspace.workspaceMembers', 'workspaceMember')
       .leftJoin('targets.assets', 'asset')
+      .leftJoin('asset.assetServices', 'assetService')
       .leftJoin('asset.jobs', 'job')
       .where('targets.id = :id', { id })
       .andWhere('workspace.id = :workspaceId', { workspaceId })
@@ -229,7 +230,7 @@ export class TargetsService implements OnModuleInit {
         'targets.value as value',
         'targets.type as type',
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
-        'COALESCE(COUNT(DISTINCT asset.id), 0) AS "totalAssets"',
+        `COALESCE(COUNT(DISTINCT CASE WHEN "assetService"."isErrorPage" = false THEN "assetService"."id" END), 0) AS "totalAssetServices"`,
         'targets.scanSchedule as "scanSchedule"',
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -419,10 +420,10 @@ export class TargetsService implements OnModuleInit {
     workspaceId: string,
   ): Promise<
     GetManyBaseResponseDto<
-      Target & { totalAssets: number; status: string; duration: number }
+      Target & { totalAssetServices: number; status: string; duration: number }
     >
   > {
-    const { limit, page, sortBy, sortOrder, value } = query;
+    const { limit, page, sortBy, sortOrder, value, type, status } = query;
 
     const offset = (page - 1) * limit;
 
@@ -432,6 +433,7 @@ export class TargetsService implements OnModuleInit {
       .innerJoin('workspaceTarget.workspace', 'workspace')
       .innerJoin('workspace.workspaceMembers', 'workspaceMember')
       .leftJoin('targets.assets', 'asset')
+      .leftJoin('asset.assetServices', 'assetService')
       .leftJoin('asset.jobs', 'job')
       .where('workspace.id = :workspaceId', { workspaceId })
       .select([
@@ -441,7 +443,7 @@ export class TargetsService implements OnModuleInit {
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'targets.reScanCount as "reScanCount"',
         'targets.scanSchedule as "scanSchedule"',
-        'CAST(COUNT(DISTINCT asset.id) AS INTEGER) AS "totalAssets"',
+        `CAST(COUNT(DISTINCT CASE WHEN "assetService"."isErrorPage" = false THEN "assetService"."id" END) AS INTEGER) AS "totalAssetServices"`,
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
@@ -457,7 +459,31 @@ export class TargetsService implements OnModuleInit {
       });
     }
 
-    if (sortBy === 'totalAssets' || sortBy === 'duration') {
+    if (type) {
+      queryBuilder.andWhere('targets.type = :type', { type });
+    }
+
+    if (status) {
+      // Filter by computed status using HAVING clause
+      const statusCase = `CASE
+        WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
+        WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
+        WHEN COUNT(CASE WHEN job.status = '${JobStatus.COMPLETED}' THEN 1 END) > 0 THEN '${JobStatus.COMPLETED}'
+        ELSE '${JobStatus.COMPLETED}'
+      END`;
+
+      if (status === JobStatus.COMPLETED) {
+        // For completed status, match both explicit COMPLETED and default (no jobs)
+        queryBuilder.having(
+          `(${statusCase}) = :status OR (COUNT(job.id) = 0 AND :status = '${JobStatus.COMPLETED}')`,
+          { status },
+        );
+      } else {
+        queryBuilder.having(`(${statusCase}) = :status`, { status });
+      }
+    }
+
+    if (sortBy === 'totalAssetServices' || sortBy === 'duration') {
       queryBuilder.orderBy(`"${sortBy}"`, sortOrder);
     } else if (sortBy in Target) {
       queryBuilder.orderBy(`targets.${sortBy}`, sortOrder);

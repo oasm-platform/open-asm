@@ -82,7 +82,7 @@ export class Target extends BaseEntity {
   assets: Asset[];
 
   @ApiProperty()
-  totalAssets: number;
+  totalAssetServices: number;
 
   @ApiProperty({ enum: JobStatus, enumName: 'JobStatus' })
   status: JobStatus;

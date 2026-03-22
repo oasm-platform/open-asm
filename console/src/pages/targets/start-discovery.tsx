@@ -18,6 +18,12 @@ const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
 const cidr24Regex = /^(\d{1,3}\.){3}\d{1,3}\/24$/;
 const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
 
+const targetTypeColor: Record<string, string> = {
+  DOMAIN: 'border-blue-500 text-blue-500',
+  CIDR: 'border-green-500 text-green-500',
+  IP: 'border-orange-500 text-orange-500',
+};
+
 type TargetType = 'DOMAIN' | 'CIDR' | 'IP';
 
 type FormValues = {
@@ -217,26 +223,38 @@ export default function StartDiscovery() {
                   setValue('value', '');
                   clearErrors('value');
                 }}
-                className="flex gap-6"
+                className="flex flex-col sm:flex-row gap-4 sm:gap-6"
               >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="DOMAIN" id="type-domain" />
-                  <Label htmlFor="type-domain" className="font-normal">
+                <Label htmlFor="type-domain" className="flex items-center gap-2 cursor-pointer">
+                  <RadioGroupItem
+                    value="DOMAIN"
+                    id="type-domain"
+                    className={targetType === 'DOMAIN' ? targetTypeColor.DOMAIN : ''}
+                  />
+                  <span className={`font-normal ${targetType === 'DOMAIN' ? targetTypeColor.DOMAIN : ''}`}>
                     Root domain
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="IP" id="type-ip" />
-                  <Label htmlFor="type-ip" className="font-normal">
+                  </span>
+                </Label>
+                <Label htmlFor="type-ip" className="flex items-center gap-2 cursor-pointer">
+                  <RadioGroupItem
+                    value="IP"
+                    id="type-ip"
+                    className={targetType === 'IP' ? targetTypeColor.IP : ''}
+                  />
+                  <span className={`font-normal ${targetType === 'IP' ? targetTypeColor.IP : ''}`}>
                     IP address
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="CIDR" id="type-cidr" />
-                  <Label htmlFor="type-cidr" className="font-normal">
+                  </span>
+                </Label>
+                <Label htmlFor="type-cidr" className="flex items-center gap-2 cursor-pointer">
+                  <RadioGroupItem
+                    value="CIDR"
+                    id="type-cidr"
+                    className={targetType === 'CIDR' ? targetTypeColor.CIDR : ''}
+                  />
+                  <span className={`font-normal ${targetType === 'CIDR' ? targetTypeColor.CIDR : ''}`}>
                     CIDR /24
-                  </Label>
-                </div>
+                  </span>
+                </Label>
               </RadioGroup>
             </div>
 

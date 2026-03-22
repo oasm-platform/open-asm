@@ -1,5 +1,5 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { CronSchedule, ScanStatus } from '@/common/enums/enum';
+import { CronSchedule, JobStatus, ScanStatus } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -113,7 +113,7 @@ export class GetManyTargetResponseDto {
   status?: ScanStatus;
 
   @ApiProperty({ example: 100 })
-  totalAssets: number;
+  totalAssetServices: number;
 
   @ApiProperty()
   duration: number;
@@ -127,6 +127,26 @@ export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
   @IsString()
   @IsOptional()
   value?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: TargetType,
+    enumName: 'TargetType',
+    description: 'Filter by target type (DOMAIN, CIDR, or IP)',
+  })
+  @IsEnum(TargetType)
+  @IsOptional()
+  type?: TargetType;
+
+  @ApiProperty({
+    required: false,
+    enum: JobStatus,
+    enumName: 'JobStatus',
+    description: 'Filter by scan status (pending, in_progress, completed, failed, cancelled)',
+  })
+  @IsEnum(JobStatus)
+  @IsOptional()
+  status?: JobStatus;
 }
 
 export class UpdateTargetDto {

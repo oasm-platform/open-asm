@@ -52,7 +52,7 @@ export interface Target {
   type: TargetType;
   /** @format date-time */
   lastDiscoveredAt: string;
-  totalAssets: number;
+  totalAssetServices: number;
   status: JobStatus;
   scanSchedule: CronSchedule;
 }
@@ -115,7 +115,7 @@ export interface GetManyTargetResponseDto {
   /** @example "DONE" */
   status: GetManyTargetResponseDtoStatusEnum;
   /** @example 100 */
-  totalAssets: number;
+  totalAssetServices: number;
   duration: number;
   /** @format date-time */
   lastDiscoveredAt: string;
@@ -2331,6 +2331,8 @@ export class Api<
       /** @example "DESC" */
       sortOrder?: string;
       value?: string;
+      /** Filter by target type (DOMAIN, CIDR, or IP) */
+      type?: TargetType;
     },
     params: RequestParams = {},
   ) =>

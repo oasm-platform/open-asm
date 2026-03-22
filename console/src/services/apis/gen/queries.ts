@@ -70,7 +70,7 @@ export type Target = {
   /** The type of target (DOMAIN, CIDR, or IP) */
   type: TargetType;
   lastDiscoveredAt: string;
-  totalAssets: number;
+  totalAssetServices: number;
   status: JobStatus;
   scanSchedule: CronSchedule;
 };
@@ -131,7 +131,7 @@ export type GetManyTargetResponseDto = {
   reScanCount: number;
   scanSchedule: GetManyTargetResponseDtoScanSchedule;
   status: GetManyTargetResponseDtoStatus;
-  totalAssets: number;
+  totalAssetServices: number;
   duration: number;
   lastDiscoveredAt: string;
 };
@@ -1944,6 +1944,14 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
   sortBy?: string;
   sortOrder?: string;
   value?: string;
+  /**
+   * Filter by target type (DOMAIN, CIDR, or IP)
+   */
+  type?: TargetType;
+  /**
+   * Filter by scan status (pending, in_progress, completed, failed, cancelled)
+   */
+  status?: JobStatus;
 };
 
 export type WorkspacesControllerGetWorkspacesParams = {
