@@ -49,7 +49,7 @@ export class VulnerabilitiesService {
         workspace: {
           id: workspaceId,
         },
-        filePath: 'vuls-scan-basic.yaml',
+        filePath: 'vulnerability_scan_basic.yaml',
       },
     });
 
