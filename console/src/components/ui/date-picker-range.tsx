@@ -20,6 +20,7 @@ interface DatePickerWithRangeProps {
 }
 
 const PRESET_OPTIONS = [
+  { label: 'Today', days: 0 },
   { label: 'Last 7 days', days: 7 },
   { label: 'Last 30 days', days: 30 },
   { label: 'Last 60 days', days: 60 },
@@ -43,7 +44,7 @@ export function DatePickerWithRange({
 
   const handlePresetClick = (days: number) => {
     const to = new Date();
-    const from = addDays(to, -days);
+    const from = days === 0 ? new Date() : addDays(to, -days);
     onChange?.({ from, to });
   };
 

@@ -134,25 +134,6 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
     },
   },
   {
-    accessorKey: 'cvssScore',
-    header: 'CVSS Score',
-    size: 120,
-    cell: ({ row }) => {
-      const value: string = row.getValue('cvssScore');
-      return (
-        <div className="min-h-[60px] flex items-center">
-          {value ? (
-            <Badge variant="outline" className="font-medium">
-              {value}
-            </Badge>
-          ) : (
-            <div className="text-muted-foreground">Not matched</div>
-          )}
-        </div>
-      );
-    },
-  },
-  {
     accessorKey: 'tags',
     header: 'Tags',
     size: 150,
