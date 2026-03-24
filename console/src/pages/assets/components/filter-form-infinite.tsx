@@ -44,7 +44,7 @@ export default function FilterFormInfinite() {
           placeholder="Filter value"
           value={searchValue}
           onChange={(event) => setSearchValue(event.target.value)}
-          className="h-8 w-full md:w-[200px] lg:w-[300px]"
+          className="h-9 w-full md:w-[200px] lg:w-[300px]"
         />
         <div className="flex flex-wrap gap-x-2 gap-y-2 md:flex-nowrap md:gap-x-2">
           <IpFacetedFilter />

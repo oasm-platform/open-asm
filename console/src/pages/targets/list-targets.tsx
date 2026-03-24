@@ -7,6 +7,7 @@ dayjs.extend(relativeTime);
 
 import { useState } from 'react';
 import { DataTable } from '@/components/ui/data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   useTargetsControllerGetTargetsInWorkspace,
@@ -158,7 +159,7 @@ export function ListTargets() {
     tableHandlers: { setPage, setPageSize, setFilter, setParams },
   } = useServerDataTable();
 
-  const { data, isLoading } = useTargetsControllerGetTargetsInWorkspace(
+  const { data, isLoading, refetch } = useTargetsControllerGetTargetsInWorkspace(
     {
       limit: pageSize,
       page,
@@ -190,7 +191,8 @@ export function ListTargets() {
   const total = data?.total ?? 0;
 
   if (workspaces.length === 0) return <CreateWorkspace />;
-  if (!data && !isLoading) return <div>Error loading targets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load targets." onRetry={refetch} />;
 
   const handleRowClick = (target: GetManyTargetResponseDto) => {
     navigate(`/targets/${target.id}/asset-services`);
