@@ -21,6 +21,7 @@ import { VulnerabilitiesModule } from './vulnerabilities/vulnerabilities.module'
 import { WorkersModule } from './workers/workers.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
+import { AgentsModule } from './agents/agents.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     AiAssistantModule,
     IssuesModule,
     SystemConfigsModule,
+    AgentsModule,
   ],
 })
 export class CombineModule {}
