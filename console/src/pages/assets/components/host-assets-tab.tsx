@@ -1,4 +1,5 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetHostAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -14,7 +15,7 @@ export default function HostAssetsTab() {
     targetId,
   } = useAsset();
 
-  const { data, isLoading } = useAssetsControllerGetHostAssets(queryParams, {
+  const { data, isLoading, refetch } = useAssetsControllerGetHostAssets(queryParams, {
     query: {
       ...queryOptions.query,
       queryKey: ['hosts', ...queryOptions.query.queryKey],
@@ -24,7 +25,8 @@ export default function HostAssetsTab() {
   const hostAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading targets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load host assets." onRetry={refetch} />;
 
   return (
     <>

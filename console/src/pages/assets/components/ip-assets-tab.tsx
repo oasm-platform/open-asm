@@ -1,4 +1,5 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetIpAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -14,7 +15,7 @@ export default function IpAssetsTab() {
     targetId,
   } = useAsset();
 
-  const { data, isLoading } = useAssetsControllerGetIpAssets(queryParams, {
+  const { data, isLoading, refetch } = useAssetsControllerGetIpAssets(queryParams, {
     query: {
       ...queryOptions.query,
       queryKey: ['ipAssets', ...queryOptions.query.queryKey],
@@ -24,7 +25,8 @@ export default function IpAssetsTab() {
   const ipAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading targets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load IP assets." onRetry={refetch} />;
 
   return (
     <>

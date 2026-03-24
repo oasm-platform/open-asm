@@ -1,4 +1,5 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetStatusCodeAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -14,7 +15,7 @@ export default function StatusCodeAssetsTab() {
     targetId,
   } = useAsset();
 
-  const { data, isLoading } = useAssetsControllerGetStatusCodeAssets(
+  const { data, isLoading, refetch } = useAssetsControllerGetStatusCodeAssets(
     queryParams,
     {
       query: {
@@ -27,7 +28,8 @@ export default function StatusCodeAssetsTab() {
   const statusCodeAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading targets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load status code assets." onRetry={refetch} />;
 
   return (
     <>

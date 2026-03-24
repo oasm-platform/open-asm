@@ -1,4 +1,5 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
+import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetTlsAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -14,7 +15,7 @@ export default function TlsAssetsTab() {
     targetId,
   } = useAsset();
 
-  const { data, isLoading } = useAssetsControllerGetTlsAssets(
+  const { data, isLoading, refetch } = useAssetsControllerGetTlsAssets(
     {
       page: queryParams.page,
       limit: queryParams.limit,
@@ -34,7 +35,8 @@ export default function TlsAssetsTab() {
   const tlsAssets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (!data && !isLoading) return <div>Error loading TLS assets.</div>;
+  if (!data && !isLoading)
+    return <DataTableError message="Failed to load TLS assets." onRetry={refetch} />;
 
   return (
     <>

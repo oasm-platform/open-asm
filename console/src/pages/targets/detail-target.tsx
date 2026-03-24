@@ -93,7 +93,7 @@ export function DetailTarget() {
       <Tabs
         value={activeTab!}
         onValueChange={handleTabChange}
-        className="w-full my-6"
+        className="w-full"
       >
         <div className="flex justify-between items-center gap-5">
           <TabsList>

@@ -1,4 +1,3 @@
-import ExportDataButton from '@/components/ui/export-button';
 import { Tabs } from '@/components/ui/tabs';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -17,7 +16,7 @@ export function ListAssets() {
   const tabList = [
     {
       value: 'service',
-      text: 'All Services',
+      text: 'Services',
       tab: <AssetTabContent />,
     },
     {
@@ -67,15 +66,12 @@ export function ListAssets() {
   if (workspaces.length === 0) return <CreateWorkspace />;
 
   return (
-    <div className="w-full">
-      <div className="mb-4">
-        <div className="flex justify-between items-center">
-          <FilterFormInfinite />
-          <ExportDataButton api="api/assets/services/export" prefix="assets" />
-        </div>
+    <div className="w-full space-y-2">
+      <div className="flex justify-between items-center">
+        <FilterFormInfinite />
+        {/* <ExportDataButton api="api/assets/services/export" prefix="assets" /> */}
       </div>
-
-      <Tabs value={tab} onValueChange={handleTabChange} className="gap-0">
+      <Tabs value={tab} onValueChange={handleTabChange}>
         <TriggerList tabTriggerList={tabList} />
         {tabList.find((t) => t.value == tab)?.tab}
       </Tabs>
