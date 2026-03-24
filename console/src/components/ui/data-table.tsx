@@ -189,26 +189,28 @@ export function DataTable<TData, TValue>({
   const showSkeleton = isLoading && data.length === 0;
   return (
     <div className="w-full">
-      <div className="flex flex-col mb-2 gap-2 md:flex-row-reverse md:justify-between md:items-center">
-        <div className="flex gap-2 flex-col md:flex-row w-full justify-end md:w-auto">
-          {toolbarComponents.map((c, i) => (
-            <div key={i}>{c}</div>
-          ))}
+      {(toolbarComponents.length > 0 || filterColumnKey || filterComponents) && (
+        <div className="flex flex-col mb-2 gap-2 md:flex-row-reverse md:justify-between md:items-center">
+          <div className="flex gap-2 flex-col md:flex-row w-full justify-end md:w-auto">
+            {toolbarComponents.map((c, i) => (
+              <div key={i}>{c}</div>
+            ))}
+          </div>
+          <div className="flex items-center gap-4 w-full">
+            {filterColumnKey && (
+              <Input
+                placeholder={filterPlaceholder}
+                className="w-full lg:w-1/3 xl:w-1/4"
+                value={searchValue}
+                onChange={(e) => {
+                  setSearchValue(e.target.value);
+                }}
+              />
+            )}
+            {filterComponents}
+          </div>
         </div>
-        <div className="flex items-center gap-4 w-full">
-          {filterColumnKey && (
-            <Input
-              placeholder={filterPlaceholder}
-              className="w-full lg:w-1/3 xl:w-1/4"
-              value={searchValue}
-              onChange={(e) => {
-                setSearchValue(e.target.value);
-              }}
-            />
-          )}
-          {filterComponents}
-        </div>
-      </div>
+      )}
 
       {/* Table */}
       <div className={cn('rounded-md', isShowBorder && 'border')}>

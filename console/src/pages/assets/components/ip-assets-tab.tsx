@@ -30,7 +30,7 @@ export default function IpAssetsTab() {
 
   return (
     <>
-      <TabsContent value="ip" className="overflow-hidden">
+      <TabsContent value="ip">
         <CollapsibleDataTable
           data={ipAssets}
           columns={ipAssetsColumn}

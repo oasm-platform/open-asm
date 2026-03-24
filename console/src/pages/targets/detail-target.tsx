@@ -136,7 +136,7 @@ export function DetailTarget() {
                   title={`Start scan vulnerabilities for target ${target.value}`}
                 >
                   <Bug className="h-4 w-4" />
-                  Scan vulnerability
+                  Fast scan
                 </Button>
               }
             />

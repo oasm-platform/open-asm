@@ -30,7 +30,7 @@ export default function HostAssetsTab() {
 
   return (
     <>
-      <TabsContent value="host" className="overflow-hidden">
+      <TabsContent value="host">
         <CollapsibleDataTable
           data={hostAssets}
           columns={hostAssetsColumn}

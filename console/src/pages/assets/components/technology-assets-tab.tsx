@@ -38,7 +38,7 @@ export default function TechnologyAssetsTab() {
 
   return (
     <>
-      <TabsContent value="technology" className="overflow-hidden">
+      <TabsContent value="technology">
         <CollapsibleDataTable
           data={technologyAssets}
           columns={technologyAssetsColumn}

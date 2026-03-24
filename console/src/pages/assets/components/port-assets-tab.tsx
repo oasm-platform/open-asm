@@ -30,7 +30,7 @@ export default function PortAssetsTab() {
 
   return (
     <>
-      <TabsContent value="port" className="overflow-hidden">
+      <TabsContent value="port">
         <CollapsibleDataTable
           data={portAssets}
           columns={portAssetsColumn}

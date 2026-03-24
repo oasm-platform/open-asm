@@ -40,7 +40,7 @@ export default function TlsAssetsTab() {
 
   return (
     <>
-      <TabsContent value="tls" className="overflow-hidden">
+      <TabsContent value="tls">
         <CollapsibleDataTable
           data={tlsAssets}
           columns={tlsAssetsColumn}
