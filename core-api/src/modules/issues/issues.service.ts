@@ -21,7 +21,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
-import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 import { User } from '../auth/entities/user.entity';
 import { CreateIssueCommentDto } from './dto/create-issue-comment.dto';
 import { GetManyIssuesDto } from './dto/get-many-issues.dto';
@@ -49,7 +48,6 @@ export class IssuesService {
     @InjectQueue(BullMQName.ISSUE_CREATION)
     private issueCreationQueue: Queue,
     private readonly vulnerabilityHandler: VulnerabilitySourceHandler,
-    private readonly aiAssistantService: AiAssistantService,
   ) {
     this.sourceHandlers = new Map([
       [IssueSourceType.VULNERABILITY, this.vulnerabilityHandler],
@@ -480,32 +478,11 @@ export class IssuesService {
         issueCommentsHistory: commentsContext, // Add history here
       };
 
-      // Call AI assistant to resolve the issue
-      const response = await this.aiAssistantService.resolveIssue(
-        originalComment.content,
-        issueType,
-        metadata,
-        issue.workspaceId,
-        userId,
+      // AI assistant has been removed - skip processing
+      this.logger.warn(
+        `AI assistant is no longer available for issue ${issueId}. Skipping CAI request.`,
       );
-
-      // Create a new comment from the bot with the AI response
-      const botComment = this.issueCommentsRepository.create({
-        content: response.message,
-        issue: { id: issueId },
-        createdBy: {
-          id: BOT_ID,
-          name: BOT_NAME,
-          email: BOT_EMAIL,
-          role: Role.BOT,
-          emailVerified: true,
-        } as User,
-        isCanDelete: false,
-        isCanEdit: false,
-        repCommentId: originalComment.id,
-      });
-
-      await this.issueCommentsRepository.save(botComment);
+      return;
     } catch (error) {
       this.logger.error('Error in processCaiRequest:', error);
     }

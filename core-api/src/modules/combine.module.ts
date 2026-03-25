@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AiAssistantModule } from './ai-assistant/ai-assistant.module';
 import { ApiKeysModule } from './apikeys/apikeys.module';
 import { AssetGroupModule } from './asset-group/asset-group.module';
 import { AssetsModule } from './assets/assets.module';
@@ -46,7 +45,6 @@ import { AgentsModule } from './agents/agents.module';
     ProvidersModule,
     TemplatesModule,
     AssetGroupModule,
-    AiAssistantModule,
     IssuesModule,
     SystemConfigsModule,
     AgentsModule,

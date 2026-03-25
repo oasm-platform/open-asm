@@ -23,3 +23,4 @@ export const BOT_EMAIL = 'bot@oasm.local';
 export const BOT_NAME = 'Cai';
 export const STORAGE_BASE_PATH = '/api/storage';
 export const GITHUB_REPO = 'oasm-platform/open-asm';
+export const DEFAULT_ENCRYPTION_KEY = 'OASM_DEFAULT_ENCRYPTION_KEY';

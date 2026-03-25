@@ -8,7 +8,24 @@ describe('AgentsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AgentsController],
-      providers: [AgentsService],
+      providers: [
+        {
+          provide: AgentsService,
+          useValue: {
+            createLLMConfig: jest.fn(),
+            getLLMConfigs: jest.fn(),
+            updateLLMConfig: jest.fn(),
+            deleteLLMConfig: jest.fn(),
+            setPreferredLLMConfig: jest.fn(),
+            getConversations: jest.fn(),
+            updateConversation: jest.fn(),
+            deleteConversation: jest.fn(),
+            sendMessageStream: jest.fn(),
+            getMessages: jest.fn(),
+            deleteMessage: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     controller = module.get<AgentsController>(AgentsController);

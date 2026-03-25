@@ -4,7 +4,6 @@ import { ReleaseVersion } from '@/common/interfaces/app.interface';
 import { RedisService } from '@/services/redis/redis.service';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 import { SystemConfigsService } from '../system-configs/system-configs.service';
 import { UsersService } from '../users/users.service';
 import {
@@ -17,7 +16,6 @@ import {
 export class RootService {
   constructor(
     private readonly usersService: UsersService,
-    private readonly aiAssistantService: AiAssistantService,
     private readonly systemConfigsService: SystemConfigsService,
     private configService: ConfigService,
     private redisService: RedisService,
@@ -68,12 +66,6 @@ export class RootService {
       },
     });
     let isAssistant = false;
-    try {
-      const health = await this.aiAssistantService.healthCheck();
-      isAssistant = health.message === 'ok';
-    } catch {
-      isAssistant = false;
-    }
 
     const systemConfig = await this.systemConfigsService.getConfig();
 
