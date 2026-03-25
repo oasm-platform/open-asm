@@ -64,6 +64,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: <LayoutDashboard />,
           url: '/',
         },
+        {
+          title: 'Agents',
+          icon: <Bot />,
+          url: '/agents',
+        },
       ],
     },
     {
@@ -113,11 +118,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Issues',
           icon: <CircleDot />,
           url: '/issues',
-        },
-        {
-          title: 'Agents',
-          icon: <Bot />,
-          url: '/agents',
         },
       ],
     },

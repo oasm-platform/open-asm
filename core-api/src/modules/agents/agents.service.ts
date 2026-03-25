@@ -275,7 +275,7 @@ export class AgentsService {
     switch (config.provider) {
       case LLMProvider.OPENAI: {
         const openai = createOpenAI({ apiKey });
-        return openai(config.model);
+        return openai.chat(config.model);
       }
       case LLMProvider.ANTHROPIC: {
         const anthropic = createAnthropic({ apiKey });
@@ -286,7 +286,7 @@ export class AgentsService {
           apiKey,
           baseURL: config.apiUrl,
         });
-        return openai(config.model);
+        return openai.chat(config.model);
       }
     }
   }
@@ -317,6 +317,7 @@ export class AgentsService {
       conversation = this.conversationRepository.create({
         workspaceId,
         llmConfigId: llmConfig.id,
+        title: dto.question.slice(0, 500),
         createdBy: userId,
       });
       conversation = await this.conversationRepository.save(conversation);
@@ -370,7 +371,11 @@ export class AgentsService {
           for await (const chunk of result.textStream) {
             fullContent += chunk;
             subscriber.next({
-              data: JSON.stringify({ content: chunk, done: false }),
+              data: JSON.stringify({
+                content: chunk,
+                done: false,
+                conversationId: conversation.id,
+              }),
             } as MessageEvent);
           }
 
@@ -388,7 +393,11 @@ export class AgentsService {
           await this.messageRepository.save(assistantMessage);
 
           subscriber.next({
-            data: JSON.stringify({ content: '', done: true }),
+            data: JSON.stringify({
+              content: '',
+              done: true,
+              conversationId: conversation.id,
+            }),
           } as MessageEvent);
           subscriber.complete();
         } catch (error) {
@@ -398,6 +407,7 @@ export class AgentsService {
             data: JSON.stringify({
               content: '',
               done: true,
+              conversationId: conversation.id,
               error: errorMessage,
             }),
           } as MessageEvent);

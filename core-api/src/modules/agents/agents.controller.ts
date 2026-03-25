@@ -202,7 +202,8 @@ export class AgentsController {
     return this.agentsService.getMessages(id, workspaceId, query);
   }
 
-  @Sse('messages/stream')
+  @Post('messages/stream')
+  @Sse()
   @Doc({
     summary: 'Send message (streaming)',
     description:

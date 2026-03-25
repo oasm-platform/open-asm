@@ -2,8 +2,10 @@ import Layout from '@/components/common/layout/layout';
 import Splash from '@/components/common/layout/splash';
 import { RequireWorkspace } from '@/components/common/require-workspace';
 import Users from '@/pages/admin/users';
-import AgentsPage from '@/pages/agents/agents';
 import AgentDetail from '@/pages/agents/agent-detail';
+import AgentsChatPage from '@/pages/agents/agents';
+import AgentsLandingPage from '@/pages/agents/agents-landing';
+import AgentConversationsPage from '@/pages/agents/conversations';
 import CreateAgentPage from '@/pages/agents/create-agent';
 import EditAgentPage from '@/pages/agents/edit-agent';
 import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
@@ -359,7 +361,7 @@ export const router = createBrowserRouter([
                 path: '',
                 element: (
                   <RequireWorkspace>
-                    <AgentsPage />
+                    <AgentsLandingPage />
                   </RequireWorkspace>
                 ),
               },
@@ -372,20 +374,54 @@ export const router = createBrowserRouter([
                 ),
               },
               {
-                path: ':id',
-                element: (
-                  <RequireWorkspace>
-                    <AgentDetail />
-                  </RequireWorkspace>
-                ),
+                path: 'conversations',
+                children: [
+                  {
+                    path: '',
+                    element: (
+                      <RequireWorkspace>
+                        <AgentConversationsPage />
+                      </RequireWorkspace>
+                    ),
+                  },
+                  {
+                    path: 'new',
+                    element: (
+                      <RequireWorkspace>
+                        <AgentsChatPage />
+                      </RequireWorkspace>
+                    ),
+                  },
+                  {
+                    path: ':conversationId',
+                    element: (
+                      <RequireWorkspace>
+                        <AgentsChatPage />
+                      </RequireWorkspace>
+                    ),
+                  },
+                ],
               },
               {
-                path: ':id/edit',
-                element: (
-                  <RequireWorkspace>
-                    <EditAgentPage />
-                  </RequireWorkspace>
-                ),
+                path: ':id',
+                children: [
+                  {
+                    index: true,
+                    element: (
+                      <RequireWorkspace>
+                        <AgentDetail />
+                      </RequireWorkspace>
+                    ),
+                  },
+                  {
+                    path: 'edit',
+                    element: (
+                      <RequireWorkspace>
+                        <EditAgentPage />
+                      </RequireWorkspace>
+                    ),
+                  },
+                ],
               },
             ],
           },
