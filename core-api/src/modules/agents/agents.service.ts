@@ -1,39 +1,35 @@
-import { encrypt, decrypt } from '@/common/utils/encryption.util';
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Observable } from 'rxjs';
-import { Repository } from 'typeorm';
-import { streamText, generateText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { AgentConversation } from './entities/agent-conversation.entity';
-import { AgentLLMConfig } from './entities/agent-llm-config.entity';
-import { AgentMessage } from './entities/agent-message.entity';
-import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
-import {
-  CreateLLMConfigDto,
-  UpdateLLMConfigDto,
-  LLMConfigResponseDto,
-} from './dto/llm-config.dto';
-import {
-  CreateConversationDto,
-  UpdateConversationDto,
-  ConversationResponseDto,
-} from './dto/conversation.dto';
-import {
-  SendMessageDto,
-  MessageResponseDto,
-} from './dto/message.dto';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
+import { decrypt, encrypt } from '@/common/utils/encryption.util';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import type { LanguageModel } from 'ai';
+import { streamText } from 'ai';
+import { Observable } from 'rxjs';
+import { Repository } from 'typeorm';
+import {
+  ConversationResponseDto,
+  UpdateConversationDto,
+} from './dto/conversation.dto';
+import {
+  CreateLLMConfigDto,
+  LLMConfigResponseDto,
+  UpdateLLMConfigDto,
+} from './dto/llm-config.dto';
+import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
+import { AgentConversation } from './entities/agent-conversation.entity';
+import { AgentLLMConfig } from './entities/agent-llm-config.entity';
+import { AgentMessage } from './entities/agent-message.entity';
+import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
 
 @Injectable()
 export class AgentsService {
@@ -368,7 +364,7 @@ export class AgentsService {
 
     // 7. Stream response -> save assistant message
     return new Observable<MessageEvent>((subscriber) => {
-      (async () => {
+      void (async () => {
         try {
           let fullContent = '';
           for await (const chunk of result.textStream) {

@@ -23,10 +23,8 @@ import {
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import AddTagDialog from './components/add-tag-dialog';
 import HTTPXStatusCode from './components/status-code';
 import { TechnologyTooltip } from './components/technology-tooltip';
-import AssetProvider from './context/asset-context';
 
 dayjs.extend(relativeTime);
 
@@ -59,7 +57,7 @@ export default function DetailAsset() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data, isLoading, error, refetch } = useAssetsControllerGetAssetById(
+  const { data, isLoading, error } = useAssetsControllerGetAssetById(
     id ?? '',
     {},
   );
@@ -165,14 +163,6 @@ export default function DetailAsset() {
                     <Tag size={12} /> {tag.tag}
                   </Badge>
                 ))}
-                <AssetProvider>
-                  <AddTagDialog
-                    id={id}
-                    domain={value}
-                    tags={tags}
-                    refetch={refetch}
-                  />
-                </AssetProvider>
               </div>
             </CardContent>
           </Card>

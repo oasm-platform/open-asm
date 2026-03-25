@@ -1,7 +1,13 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
+import { Column, Entity } from 'typeorm';
 import { LLMProvider } from '../enums/agent.enums';
 
 @Entity('agent_llm_configs')

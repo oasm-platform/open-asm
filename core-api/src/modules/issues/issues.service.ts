@@ -1,4 +1,3 @@
-import { BOT_EMAIL, BOT_ID, BOT_NAME } from '@/common/constants/app.constants';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
@@ -8,7 +7,6 @@ import {
   IssueCommentType,
   IssueSourceType,
   IssueStatus,
-  Role,
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -21,7 +19,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
-import { User } from '../auth/entities/user.entity';
 import { CreateIssueCommentDto } from './dto/create-issue-comment.dto';
 import { GetManyIssuesDto } from './dto/get-many-issues.dto';
 import {
@@ -414,8 +411,7 @@ export class IssuesService {
     originalComment: IssueComment,
   ): Promise<void> {
     try {
-      const { issueId, createdBy } = originalComment;
-      const userId = createdBy.id;
+      const { issueId } = originalComment;
       // Get the issue to provide context to the AI assistant
       const issue = await this.issuesRepository.findOne({
         where: { id: issueId },
@@ -426,57 +422,6 @@ export class IssuesService {
         this.logger.error(`Issue with ID ${issueId} not found`);
         return;
       }
-
-      // Determine issue type based on source type
-      // Default to 0 (General) as requested, to avoid forcing vulnerability prompts on general content
-      const issueType = 0; // IssueType.ISSUE_TYPE_UNSPECIFIED
-
-      // if (issue.sourceType === IssueSourceType.VULNERABILITY) {
-      //   issueType = 2; // IssueType.ISSUE_TYPE_VULNERABILITY
-      // }
-
-      let commentsContext = '';
-
-      // If this comment is a reply, ONLY use the context of the replied comment
-      if (originalComment.repCommentId) {
-        const repliedComment = await this.issueCommentsRepository.findOne({
-          where: { id: originalComment.repCommentId },
-          relations: ['createdBy'],
-        });
-
-        if (repliedComment) {
-          commentsContext = `[${repliedComment.createdBy.name}]: ${repliedComment.content}`;
-        }
-      } else {
-        // Fetch recent comments to provide conversation context
-        const recentComments = await this.issueCommentsRepository.find({
-          where: { issue: { id: issueId } },
-          order: { createdAt: 'DESC' },
-          take: 10,
-          relations: ['createdBy'],
-        });
-
-        // Format comments for context (chronological order)
-        commentsContext = recentComments
-          .reverse()
-          .map((c) => `[${c.createdBy.name}]: ${c.content}`)
-          .join('\n');
-      }
-
-      // Prepare metadata with issue information
-      const metadata = {
-        issueId: issue.id,
-        issueTitle: issue.title,
-        issueDescription: issue.description,
-        issueStatus: issue.status,
-        issueSourceType: issue.sourceType,
-        issueSourceId: issue.sourceId,
-        workspaceId: issue.workspaceId,
-        commentId: originalComment.id,
-        commentContent: originalComment.content,
-        userId: userId,
-        issueCommentsHistory: commentsContext, // Add history here
-      };
 
       // AI assistant has been removed - skip processing
       this.logger.warn(

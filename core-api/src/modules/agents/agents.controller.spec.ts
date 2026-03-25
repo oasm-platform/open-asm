@@ -1,6 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
+
+jest.mock('@/common/guards/auth.guard', () => ({
+  AuthGuard: jest.fn().mockImplementation(() => ({
+    canActivate: jest.fn().mockReturnValue(true),
+  })),
+}));
 
 describe('AgentsController', () => {
   let controller: AgentsController;

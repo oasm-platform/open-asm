@@ -1,13 +1,14 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { encrypt } from '@/common/utils/encryption.util';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import type { Repository } from 'typeorm';
 import { AgentsService } from './agents.service';
-import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentConversation } from './entities/agent-conversation.entity';
+import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
-import { encrypt } from '@/common/utils/encryption.util';
 
 jest.mock('@/common/utils/encryption.util', () => ({
   encrypt: jest.fn((text: string) => `encrypted:${text}`),
@@ -17,6 +18,7 @@ jest.mock('@/common/utils/encryption.util', () => ({
 jest.mock('ai', () => ({
   streamText: jest.fn(() => ({
     textStream: (async function* () {
+      await Promise.resolve();
       yield 'Hello';
       yield ' ';
       yield 'world!';
@@ -26,11 +28,17 @@ jest.mock('ai', () => ({
 }));
 
 jest.mock('@ai-sdk/openai', () => ({
-  createOpenAI: jest.fn(() => (model: string) => ({ model, provider: 'openai' })),
+  createOpenAI: jest.fn(() => (model: string) => ({
+    model,
+    provider: 'openai',
+  })),
 }));
 
 jest.mock('@ai-sdk/anthropic', () => ({
-  createAnthropic: jest.fn(() => (model: string) => ({ model, provider: 'anthropic' })),
+  createAnthropic: jest.fn(() => (model: string) => ({
+    model,
+    provider: 'anthropic',
+  })),
 }));
 
 describe('AgentsService', () => {
@@ -155,7 +163,11 @@ describe('AgentsService', () => {
       jest.spyOn(llmConfigRepository, 'create').mockReturnValue(mockLlmConfig);
       jest.spyOn(llmConfigRepository, 'save').mockResolvedValue(mockLlmConfig);
 
-      const result = await service.createLLMConfig(dto, mockWorkspaceId, mockUserId);
+      const result = await service.createLLMConfig(
+        dto,
+        mockWorkspaceId,
+        mockUserId,
+      );
 
       expect(encrypt).toHaveBeenCalledWith('sk-test1234');
       expect(llmConfigRepository.create).toHaveBeenCalledWith(
@@ -174,7 +186,9 @@ describe('AgentsService', () => {
     it('should update an existing LLM config', async () => {
       const dto = { model: 'gpt-4o-mini' };
 
-      jest.spyOn(llmConfigRepository, 'findOne').mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(llmConfigRepository, 'findOne')
+        .mockResolvedValue(mockLlmConfig);
       jest.spyOn(llmConfigRepository, 'save').mockResolvedValue({
         ...mockLlmConfig,
         model: 'gpt-4o-mini',
@@ -200,8 +214,12 @@ describe('AgentsService', () => {
 
   describe('deleteLLMConfig', () => {
     it('should delete an LLM config', async () => {
-      jest.spyOn(llmConfigRepository, 'findOne').mockResolvedValue(mockLlmConfig);
-      jest.spyOn(llmConfigRepository, 'remove').mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(llmConfigRepository, 'findOne')
+        .mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(llmConfigRepository, 'remove')
+        .mockResolvedValue(mockLlmConfig);
 
       await service.deleteLLMConfig(mockLlmConfig.id, mockWorkspaceId);
 
@@ -219,7 +237,9 @@ describe('AgentsService', () => {
 
   describe('setPreferredLLMConfig', () => {
     it('should set a config as preferred and unset others', async () => {
-      jest.spyOn(llmConfigRepository, 'findOne').mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(llmConfigRepository, 'findOne')
+        .mockResolvedValue(mockLlmConfig);
       jest.spyOn(llmConfigRepository, 'update').mockResolvedValue({} as any);
       jest.spyOn(llmConfigRepository, 'save').mockResolvedValue({
         ...mockLlmConfig,
@@ -247,7 +267,9 @@ describe('AgentsService', () => {
     it('should update conversation title', async () => {
       const dto = { title: 'Updated title' };
 
-      jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'findOne')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(conversationRepository, 'save').mockResolvedValue({
         ...mockConversation,
         title: 'Updated title',
@@ -273,12 +295,18 @@ describe('AgentsService', () => {
 
   describe('deleteConversation', () => {
     it('should delete a conversation', async () => {
-      jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(mockConversation);
-      jest.spyOn(conversationRepository, 'remove').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'findOne')
+        .mockResolvedValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'remove')
+        .mockResolvedValue(mockConversation);
 
       await service.deleteConversation(mockConversation.id, mockWorkspaceId);
 
-      expect(conversationRepository.remove).toHaveBeenCalledWith(mockConversation);
+      expect(conversationRepository.remove).toHaveBeenCalledWith(
+        mockConversation,
+      );
     });
   });
 
@@ -288,10 +316,15 @@ describe('AgentsService', () => {
 
   describe('getMessages', () => {
     it('should return messages for a conversation', async () => {
-      jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'findOne')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'find').mockResolvedValue([mockMessage]);
 
-      const result = await service.getMessages(mockConversation.id, mockWorkspaceId);
+      const result = await service.getMessages(
+        mockConversation.id,
+        mockWorkspaceId,
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].content).toBe('Hello');
@@ -308,7 +341,9 @@ describe('AgentsService', () => {
 
   describe('deleteMessage', () => {
     it('should delete a message', async () => {
-      jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'findOne')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'findOne').mockResolvedValue(mockMessage);
       jest.spyOn(messageRepository, 'remove').mockResolvedValue(mockMessage);
 
@@ -322,11 +357,17 @@ describe('AgentsService', () => {
     });
 
     it('should throw NotFoundException when message not found', async () => {
-      jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'findOne')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'findOne').mockResolvedValue(null);
 
       await expect(
-        service.deleteMessage(mockConversation.id, 'non-existent', mockWorkspaceId),
+        service.deleteMessage(
+          mockConversation.id,
+          'non-existent',
+          mockWorkspaceId,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -345,13 +386,21 @@ describe('AgentsService', () => {
     });
 
     it('should create new conversation when conversationId not provided', async () => {
-      jest.spyOn(service, 'getPreferredLLMConfig').mockResolvedValue(mockLlmConfig);
-      jest.spyOn(conversationRepository, 'create').mockReturnValue(mockConversation);
-      jest.spyOn(conversationRepository, 'save').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(service, 'getPreferredLLMConfig')
+        .mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(conversationRepository, 'create')
+        .mockReturnValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'save')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
       jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
       jest.spyOn(messageRepository, 'find').mockResolvedValue([]);
-      jest.spyOn(llmConfigRepository, 'findOne').mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(llmConfigRepository, 'findOne')
+        .mockResolvedValue(mockLlmConfig);
 
       const observable = await service.sendMessageStream(
         { question: 'Hello' },
@@ -364,11 +413,15 @@ describe('AgentsService', () => {
     });
 
     it('should use existing conversation when conversationId provided', async () => {
-      jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'findOne')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
       jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
       jest.spyOn(messageRepository, 'find').mockResolvedValue([]);
-      jest.spyOn(llmConfigRepository, 'findOne').mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(llmConfigRepository, 'findOne')
+        .mockResolvedValue(mockLlmConfig);
 
       const observable = await service.sendMessageStream(
         { question: 'Hello', conversationId: mockConversation.id },

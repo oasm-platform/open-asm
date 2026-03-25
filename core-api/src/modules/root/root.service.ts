@@ -65,7 +65,7 @@ export class RootService {
           DAYS_PER_YEAR,
       },
     });
-    let isAssistant = false;
+    const isAssistant = false;
 
     const systemConfig = await this.systemConfigsService.getConfig();
 

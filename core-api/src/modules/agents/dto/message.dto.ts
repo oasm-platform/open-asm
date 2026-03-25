@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
-import { MessageType } from '../enums/agent.enums';
-import { MessageRole } from '../enums/agent.enums';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { MessageRole, MessageType } from '../enums/agent.enums';
 
 export class SendMessageDto {
   @ApiProperty({ example: 'Hello, how can you help me?' })
@@ -11,7 +10,8 @@ export class SendMessageDto {
   @ApiProperty({
     example: '550e8400-e29b-41d4-a716-446655440000',
     required: false,
-    description: 'Continue existing conversation. If not provided, a new conversation is created.',
+    description:
+      'Continue existing conversation. If not provided, a new conversation is created.',
   })
   @IsOptional()
   @IsUUID()
