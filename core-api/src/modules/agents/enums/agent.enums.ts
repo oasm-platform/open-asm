@@ -12,6 +12,7 @@ export enum MessageType {
 
 export enum LLMProvider {
   OPENAI = 'openai',
+  OPENROUTER = 'openrouter',
   ANTHROPIC = 'anthropic',
   CUSTOM = 'custom',
 }

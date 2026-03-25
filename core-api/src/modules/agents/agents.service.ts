@@ -281,12 +281,22 @@ export class AgentsService {
         const anthropic = createAnthropic({ apiKey });
         return anthropic(config.model);
       }
+      case LLMProvider.OPENROUTER: {
+        const openai = createOpenAI({
+          apiKey,
+          baseURL: 'https://openrouter.ai/api/v1',
+        });
+        return openai.chat(config.model);
+      }
       case LLMProvider.CUSTOM: {
         const openai = createOpenAI({
           apiKey,
           baseURL: config.apiUrl,
         });
         return openai.chat(config.model);
+      }
+      default: {
+        throw new BadRequestException(`Unsupported LLM provider: ${String(config.provider)}`);
       }
     }
   }

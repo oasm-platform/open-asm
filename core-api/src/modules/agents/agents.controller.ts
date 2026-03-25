@@ -24,7 +24,9 @@ import {
   CreateLLMConfigDto,
   UpdateLLMConfigDto,
   LLMConfigResponseDto,
+  LLMProviderSupportedDto,
 } from './dto/llm-config.dto';
+import { llmProviderSupported } from './llm-provider-supported';
 import {
   UpdateConversationDto,
   ConversationResponseDto,
@@ -43,6 +45,17 @@ export class AgentsController {
   // ==========================================
   // LLM Config Endpoints
   // ==========================================
+
+  @Get('llm-configs/providers')
+  @Doc({
+    summary: 'List supported LLM providers',
+    description:
+      'Get all supported LLM providers available for configuration',
+    response: { serialization: LLMProviderSupportedDto, isArray: true },
+  })
+  getLLMProvidersSupported(): LLMProviderSupportedDto[] {
+    return llmProviderSupported;
+  }
 
   @Post('llm-configs')
   @Doc({

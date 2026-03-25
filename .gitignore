@@ -71,3 +71,4 @@ core-api/.storage/*
 .windsurf/*
 .claude/*
 .kilocode/plans/*
+.clinerules/*
