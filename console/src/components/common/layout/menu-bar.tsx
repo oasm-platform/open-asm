@@ -18,7 +18,9 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
+import { useSession } from '@/utils/authClient';
 import {
+  Bot,
   Bug,
   CircleDot,
   CirclePlay,
@@ -32,7 +34,6 @@ import {
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
 import { NewBadge } from '../new-badge';
-import { useSession } from '@/utils/authClient';
 
 interface SubMenuItem {
   title: string;
@@ -112,6 +113,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Issues',
           icon: <CircleDot />,
           url: '/issues',
+        },
+        {
+          title: 'Agents',
+          icon: <Bot />,
+          url: '/agents',
         },
       ],
     },

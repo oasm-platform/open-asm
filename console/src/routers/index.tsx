@@ -2,6 +2,10 @@ import Layout from '@/components/common/layout/layout';
 import Splash from '@/components/common/layout/splash';
 import { RequireWorkspace } from '@/components/common/require-workspace';
 import Users from '@/pages/admin/users';
+import AgentsPage from '@/pages/agents/agents';
+import AgentDetail from '@/pages/agents/agent-detail';
+import CreateAgentPage from '@/pages/agents/create-agent';
+import EditAgentPage from '@/pages/agents/edit-agent';
 import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
 import { AssetGroups } from '@/pages/asset-group/asset-groups';
 import Assets from '@/pages/assets/assets';
@@ -343,6 +347,43 @@ export const router = createBrowserRouter([
                 element: (
                   <RequireWorkspace>
                     <IssueDetail />
+                  </RequireWorkspace>
+                ),
+              },
+            ],
+          },
+          {
+            path: 'agents',
+            children: [
+              {
+                path: '',
+                element: (
+                  <RequireWorkspace>
+                    <AgentsPage />
+                  </RequireWorkspace>
+                ),
+              },
+              {
+                path: 'create',
+                element: (
+                  <RequireWorkspace>
+                    <CreateAgentPage />
+                  </RequireWorkspace>
+                ),
+              },
+              {
+                path: ':id',
+                element: (
+                  <RequireWorkspace>
+                    <AgentDetail />
+                  </RequireWorkspace>
+                ),
+              },
+              {
+                path: ':id/edit',
+                element: (
+                  <RequireWorkspace>
+                    <EditAgentPage />
                   </RequireWorkspace>
                 ),
               },
