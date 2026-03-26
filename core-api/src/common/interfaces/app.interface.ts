@@ -1,4 +1,3 @@
-import type { McpPermission } from '@/mcp/entities/mcp-permission.entity';
 import type { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { IsString } from 'class-validator';
 import type { Request } from 'express';
@@ -53,9 +52,6 @@ export interface RequestWithMetadata extends Request {
     name: string;
     image?: string | null | undefined;
     role: Role;
-  };
-  mcp?: {
-    permissions: McpPermission;
   };
 }
 

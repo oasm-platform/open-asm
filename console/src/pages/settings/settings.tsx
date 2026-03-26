@@ -3,9 +3,8 @@ import { useEffect, useMemo, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
-import CreateMcpPermission from './components/create-mcp-permission';
 import GetAboutProject from './components/get-about-project';
-import ListMcpPermissions from './components/list-mcp-permissions';
+import McpConnect from './components/mcp-connect';
 import Preferences from './components/preferences';
 import SecuritySettings from './components/security-settings';
 import WorkspaceSettings from './components/workspace-settings';
@@ -88,20 +87,19 @@ export const settingsTabGroups: SettingsTabGroup[] = [
       },
     ],
   },
-  // Group: Security Agents
+  // Group: Integration
   {
-    name: 'AI Agents',
+    name: 'Integration',
     tabs: [
       {
         id: 'mcp',
-        label: 'MCP connect',
+        label: 'MCP Connect',
         path: '/settings/mcp',
         content: {
-          title: 'MCP Permissions',
-          description: 'Manage your MCP permissions',
-          action: <CreateMcpPermission />,
+          title: 'MCP Connect',
+          description: 'Connect to OASM server via MCP protocol',
         },
-        component: <ListMcpPermissions />,
+        component: <McpConnect />,
       },
     ],
   },
