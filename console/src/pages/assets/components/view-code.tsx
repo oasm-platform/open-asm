@@ -11,8 +11,8 @@ export default function ViewCode({ code }: ViewCodeProps) {
     toast.success('Copied to clipboard');
   };
   return (
-    <div className="relative font-mono rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-stone-800 **w-full**">
-      <pre className="whitespace-pre-wrap leading-relaxed **overflow-x-auto**">
+    <div className="relative font-mono rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-stone-800 w-full max-w-full overflow-x-auto">
+      <pre className="whitespace-pre leading-relaxed overflow-x-auto max-w-full min-w-0">
         {code}
       </pre>
       <Button
