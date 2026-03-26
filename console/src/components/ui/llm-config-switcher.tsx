@@ -16,9 +16,10 @@ import {
   useAgentsControllerGetLLMConfigs,
   useAgentsControllerSetPreferredLLMConfig,
 } from '@/services/apis/gen/queries';
-import { Bot, Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { Check, ChevronsUpDown, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import Image from './image';
 import { Separator } from './separator';
 
 export function LlmConfigSwitcher() {
@@ -26,8 +27,11 @@ export function LlmConfigSwitcher() {
   const navigate = useNavigate();
   const itemHeightClass = 'h-10';
 
-  const { data: providers, isLoading } =
-    useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
+  const {
+    data: providers,
+    isLoading,
+    refetch,
+  } = useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
 
   const { mutate: setPreferred } = useAgentsControllerSetPreferredLLMConfig();
 
@@ -41,6 +45,7 @@ export function LlmConfigSwitcher() {
       {
         onSuccess: () => {
           toast.success(`Switched to ${configName}`);
+          void refetch();
         },
         onError: (error) => {
           toast.error('Failed to switch provider');
@@ -71,13 +76,17 @@ export function LlmConfigSwitcher() {
           size="lg"
           className={`${itemHeightClass} data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground`}
         >
-          <Bot className="h-5 w-5" />
-          <div className="flex flex-col gap-0.5 leading-none ml-2">
-            <span className="font-semibold">
+          <Image
+            url={selectedProvider?.logo}
+            height={20}
+            className="dark:bg-white bg-gray-500 rounded-full p-1"
+          />
+          <div className="flex gap-0.5 leading-none">
+            <span className="font-semibold mr-2">
               {selectedProvider ? selectedProvider.providerName : 'No provider'}
             </span>
             {selectedProvider?.model && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground">
                 {selectedProvider.model}
               </span>
             )}
@@ -106,17 +115,24 @@ export function LlmConfigSwitcher() {
                     );
                   }
                 }}
-                className="px-2 py-1.5 rounded hover:bg-muted flex items-center justify-between"
+                className="py-1.5 rounded hover:bg-muted flex justify-between items-center"
               >
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium">
-                    {provider.providerName}
-                  </span>
-                  {provider.model && (
-                    <span className="text-xs text-muted-foreground">
-                      {provider.model}
+                <div className="flex items-center gap-2">
+                  <Image
+                    url={provider?.logo}
+                    height={30}
+                    className="dark:bg-white bg-gray-500 rounded p-1"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">
+                      {provider.providerName}
                     </span>
-                  )}
+                    {provider.model && (
+                      <span className="text-xs text-muted-foreground">
+                        {provider.model}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {provider.isPreferred && <Check size={16} />}
               </DropdownMenuItem>
@@ -130,8 +146,8 @@ export function LlmConfigSwitcher() {
         )}
 
         <DropdownMenuItem onClick={handleConnect}>
-          <Plus size={16} className="mr-2" />
-          Connect
+          <Settings size={16} className="mr-2" />
+          Settings
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

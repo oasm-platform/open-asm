@@ -17,4 +17,9 @@ export const llmProviderSupported: LLMProviderSupported[] = [
     name: 'OpenAI',
     logo: '/static/images/openai.svg',
   },
+  {
+    id: LLMProvider.GEMINI,
+    name: 'Google Gemini',
+    logo: '/static/images/gemini.svg',
+  },
 ];
