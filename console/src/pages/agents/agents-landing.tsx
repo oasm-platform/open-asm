@@ -22,7 +22,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AgentIcon from './agent-icon';
+// import AgentIcon from './agent-icon';
 
 interface LLMProviderStatus {
   id: string;
