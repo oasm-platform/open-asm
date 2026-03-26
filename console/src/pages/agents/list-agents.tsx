@@ -2,11 +2,13 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { useNavigate } from 'react-router-dom';
 
 import { DataTable } from '@/components/ui/data-table';
-import { useAgentsControllerGetLLMConfigs } from '@/services/apis/gen/queries';
+import {
+  useAgentsControllerGetLLMConfigs,
+  type LLMConfigWithProviderDto,
+} from '@/services/apis/gen/queries';
 
 import { Badge } from '@/components/ui/badge';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import type { LLMConfigResponseDto } from '@/services/apis/gen/queries';
 import { format } from 'date-fns';
 
 const providerLabels: Record<string, string> = {
@@ -21,12 +23,12 @@ const providerColors: Record<string, 'default' | 'secondary' | 'outline'> = {
   custom: 'outline',
 };
 
-const agentColumns: ColumnDef<LLMConfigResponseDto>[] = [
+const agentColumns: ColumnDef<LLMConfigWithProviderDto>[] = [
   {
-    accessorKey: 'provider',
+    accessorKey: 'providerId',
     header: 'Provider',
     cell: ({ row }) => {
-      const value: string = row.getValue('provider');
+      const value: string = row.getValue('providerId');
       const label = providerLabels[value] ?? value;
       return (
         <Badge variant={providerColors[value] ?? 'outline'}>{label}</Badge>
@@ -73,25 +75,19 @@ export function ListAgents() {
     tableHandlers: { setPage, setPageSize, setParams },
   } = useServerDataTable();
 
-  const { data, isLoading } = useAgentsControllerGetLLMConfigs(
-    {
-      limit: pageSize,
-      page,
-      sortBy,
-      sortOrder,
+  const { data, isLoading } = useAgentsControllerGetLLMConfigs({
+    query: {
+      queryKey: ['agents'],
     },
-    {
-      query: {
-        queryKey: ['agents', pageSize, page, sortBy, sortOrder],
-      },
-    },
-  );
+  });
 
   const agents = data?.data ?? [];
-  const total = data?.total ?? 0;
+  const total = agents.length;
 
-  const handleRowClick = (row: LLMConfigResponseDto) => {
-    navigate(`/agents/${row.id}`);
+  const handleRowClick = (row: LLMConfigWithProviderDto) => {
+    if (row.configId) {
+      navigate(`/agents/${row.configId}`);
+    }
   };
 
   return (

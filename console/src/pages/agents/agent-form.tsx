@@ -70,7 +70,7 @@ export function AgentForm({
     const filteredData = Object.entries(data).reduce<Partial<AgentFormData>>(
       (acc, [key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
-          acc[key as keyof AgentFormData] = value;
+          (acc as Record<string, unknown>)[key] = value;
         }
         return acc;
       },

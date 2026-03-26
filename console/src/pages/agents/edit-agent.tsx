@@ -13,17 +13,16 @@ export default function EditAgentPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data, isLoading } = useAgentsControllerGetLLMConfigs(undefined, {
+  const { data, isLoading } = useAgentsControllerGetLLMConfigs({
     query: { enabled: !!id },
   });
 
   const { mutate, isPending } = useAgentsControllerUpdateLLMConfig();
 
-  const agent = data?.data.find((a) => a.id === id);
+  const agent = data?.data?.find((a) => a.configId === id);
 
   const onSubmit = (formData: AgentFormData) => {
     const updateData: UpdateLLMConfigDto = {
-      provider: formData.provider,
       model: formData.model,
     };
 
@@ -94,8 +93,8 @@ export default function EditAgentPage() {
             onSubmit={onSubmit}
             isPending={isPending}
             initialData={{
-              provider: agent.provider,
-              model: agent.model,
+              provider: agent.providerId,
+              model: agent.model ?? '',
               apiUrl: agent.apiUrl,
             }}
             submitButtonText="Update Provider"

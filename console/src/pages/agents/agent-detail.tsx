@@ -28,7 +28,7 @@ export function AgentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data, isLoading } = useAgentsControllerGetLLMConfigs(undefined, {
+  const { data, isLoading } = useAgentsControllerGetLLMConfigs({
     query: { enabled: !!id },
   });
 
@@ -38,7 +38,7 @@ export function AgentDetail() {
   const { mutate: setPreferred, isPending: isSettingPreferred } =
     useAgentsControllerSetPreferredLLMConfig();
 
-  const agent = data?.data.find((a) => a.id === id);
+  const agent = data?.data?.find((a) => a.configId === id);
 
   const handleDelete = () => {
     deleteConfig(
@@ -130,7 +130,7 @@ export function AgentDetail() {
               </DropdownMenuItem>
               <ConfirmDialog
                 title="Delete Provider"
-                description={`Are you sure you want to delete this ${providerLabels[agent.provider] ?? agent.provider} configuration? This action cannot be undone.`}
+                description={`Are you sure you want to delete this ${providerLabels[agent.providerId] ?? agent.providerId} configuration? This action cannot be undone.`}
                 onConfirm={handleDelete}
                 trigger={
                   <DropdownMenuItem
@@ -160,7 +160,7 @@ export function AgentDetail() {
           <div className="flex items-center gap-4 mb-6">
             <div>
               <h1 className="text-2xl font-bold">
-                {providerLabels[agent.provider] ?? agent.provider}
+                {providerLabels[agent.providerId] ?? agent.providerId}
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <Badge
@@ -182,7 +182,7 @@ export function AgentDetail() {
                   Provider Type
                 </h3>
                 <p className="mt-1">
-                  {providerLabels[agent.provider] ?? agent.provider}
+                  {providerLabels[agent.providerId] ?? agent.providerId}
                 </p>
               </div>
               <div>
@@ -212,7 +212,9 @@ export function AgentDetail() {
                   Connected
                 </h3>
                 <p className="mt-1">
-                  {format(new Date(agent.createdAt), 'MMM dd, yyyy HH:mm')}
+                {agent.createdAt
+                  ? format(new Date(agent.createdAt), 'MMM dd, yyyy HH:mm')
+                  : 'N/A'}
                 </p>
               </div>
               <div>
@@ -220,7 +222,9 @@ export function AgentDetail() {
                   Last Updated
                 </h3>
                 <p className="mt-1">
-                  {format(new Date(agent.updatedAt), 'MMM dd, yyyy HH:mm')}
+                {agent.updatedAt
+                  ? format(new Date(agent.updatedAt), 'MMM dd, yyyy HH:mm')
+                  : 'N/A'}
                 </p>
               </div>
               <div>

@@ -7,7 +7,6 @@ import CreateMcpPermission from './components/create-mcp-permission';
 import GetAboutProject from './components/get-about-project';
 import ListMcpPermissions from './components/list-mcp-permissions';
 import Preferences from './components/preferences';
-import ProvidersSettings from './components/providers-settings';
 import SecuritySettings from './components/security-settings';
 import WorkspaceSettings from './components/workspace-settings';
 
@@ -93,16 +92,6 @@ export const settingsTabGroups: SettingsTabGroup[] = [
   {
     name: 'AI Agents',
     tabs: [
-      {
-        id: 'providers',
-        label: 'Providers',
-        path: '/settings/providers',
-        content: {
-          title: 'AI Providers',
-          description: 'Manage your AI provider configurations',
-        },
-        component: <ProvidersSettings />,
-      },
       {
         id: 'mcp',
         label: 'MCP connect',
