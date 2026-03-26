@@ -67,7 +67,7 @@ export function ChatConversation({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6.5rem)]">
+    <div className="flex flex-col h-[calc(100vh-7rem)]">
       <div
         ref={scrollRef}
         className="flex-1 flex flex-col overflow-y-auto scrollbar-thin"

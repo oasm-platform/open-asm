@@ -213,7 +213,7 @@ export default function AgentsChatPage() {
   }, [isStreaming, streamingContent, messages]);
 
   return (
-    <Page className="w-full h-full md:w-2/3 lg:w-1/2 mx-auto">
+    <Page className="w-full h-full lg:w-2/3 xl:w-1/2 mx-auto">
       <ChatConversation
         messages={displayMessages}
         onSendMessage={handleSendMessage}

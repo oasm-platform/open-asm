@@ -9,7 +9,7 @@ interface LLMProviderSupported {
 export const llmProviderSupported: LLMProviderSupported[] = [
   {
     id: LLMProvider.OPENROUTER,
-    name: 'OpenRouter',
+    name: 'Open Router',
     logo: '/static/images/openrouter.svg',
   },
   {
@@ -21,5 +21,10 @@ export const llmProviderSupported: LLMProviderSupported[] = [
     id: LLMProvider.GEMINI,
     name: 'Google Gemini',
     logo: '/static/images/gemini.svg',
+  },
+  {
+    id: LLMProvider.KILO_CODE,
+    name: 'Kilo Gateway',
+    logo: '/static/images/kilocode.svg',
   },
 ];

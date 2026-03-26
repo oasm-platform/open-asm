@@ -5,12 +5,12 @@ import {
   useAgentsControllerDeleteConversation,
   useAgentsControllerGetConversationsInfinite,
 } from '@/services/apis/gen/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { MessageSquare, Trash2 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 
 dayjs.extend(relativeTime);
 

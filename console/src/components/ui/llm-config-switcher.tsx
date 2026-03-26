@@ -79,7 +79,7 @@ export function LlmConfigSwitcher() {
           <Image
             url={selectedProvider?.logo}
             height={20}
-            className="dark:bg-white bg-gray-500 rounded-full p-1"
+            className="dark:bg-white bg-gray-500 rounded p-1"
           />
           <div className="flex gap-0.5 leading-none">
             <span className="hidden md:inline font-semibold mr-2">

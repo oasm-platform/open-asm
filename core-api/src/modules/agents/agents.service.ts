@@ -5,6 +5,7 @@ import {
 import { decrypt, encrypt } from '@/common/utils/encryption.util';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import {
   BadRequestException,
@@ -361,12 +362,23 @@ export class AgentsService {
         const anthropic = createAnthropic({ apiKey });
         return anthropic(config.model);
       }
+      case LLMProvider.GEMINI: {
+        const google = createGoogleGenerativeAI({ apiKey });
+        return google.chat(config.model);
+      }
       case LLMProvider.OPENROUTER: {
         const openai = createOpenAI({
           apiKey,
           baseURL: 'https://openrouter.ai/api/v1',
         });
         return openai.chat(config.model);
+      }
+      case LLMProvider.KILO_CODE: {
+        const kilo = createOpenAI({
+          apiKey,
+          baseURL: 'https://api.kilo.ai/api/gateway',
+        });
+        return kilo.chat(config.model);
       }
       case LLMProvider.CUSTOM: {
         const openai = createOpenAI({
