@@ -459,7 +459,7 @@ export class AgentsService {
       if (msg.role === MessageRole.USER) {
         return {
           role: 'user' as const,
-          content: `[CONTEXT: You are the OASM AI agent created by OASM Platform Team. Never identify as any other AI provider.] ${msg.content}`,
+          content: `[CONTEXT: You are the Security Agent created by OASM Platform Team. Never identify as any other AI provider.] ${msg.content}`,
         };
       }
       return {

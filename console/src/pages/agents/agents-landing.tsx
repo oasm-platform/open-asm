@@ -9,9 +9,10 @@ import type {
 } from '@/services/apis/gen/queries';
 import { useAgentsControllerGetConversations } from '@/services/apis/gen/queries';
 import { useQuery } from '@tanstack/react-query';
-import { MessageSquare, Send, Sparkles } from 'lucide-react';
+import { MessageSquare, Send } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AgentIcon from './agent-icon';
 
 interface LLMProviderStatus {
   id: string;
@@ -123,16 +124,14 @@ export default function AgentsLandingPage() {
       <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto">
         <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-6 p-4">
           <div className="flex flex-col items-center gap-4 text-center">
-            <div className="rounded-full bg-muted p-4">
-              <Sparkles className="h-8 w-8 animate-bounce text-muted-foreground" />
-            </div>
+            <AgentIcon />
             <div className="space-y-2">
               <h2 className="text-xl font-semibold text-foreground">
-                Welcome to the AI Agent
+                Welcome to the Security Agent
               </h2>
               <p className="text-sm text-muted-foreground max-w-md">
-                To use the AI agent, you need to connect an LLM provider first.
-                Select a provider below to configure.
+                To use the Security Agent, you need to connect an LLM provider
+                first. Select a provider below to configure.
               </p>
             </div>
             <div className="w-full max-w-md mt-4">
@@ -148,7 +147,7 @@ export default function AgentsLandingPage() {
     <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto">
       <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-6 p-4">
         <div className="flex flex-col items-center gap-4 text-center">
-          <Sparkles className="h-10 w-10" />
+          <AgentIcon />
           <TypewriterText
             texts={CONVERSATION_STARTERS}
             className="hidden sm:inline text-xl font-medium text-foreground"

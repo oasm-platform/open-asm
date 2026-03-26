@@ -88,7 +88,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
       },
     ],
   },
-  // Group: AI Agents
+  // Group: Security Agents
   {
     name: 'AI Agents',
     tabs: [

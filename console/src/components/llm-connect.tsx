@@ -150,7 +150,7 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
             key={provider.providerId}
             className="rounded-lg border bg-card overflow-hidden"
           >
-            <div className="flex items-center justify-between p-4">
+            <div className="flex items-center justify-between p-3">
               <div className="flex items-center gap-2">
                 <div className="flex items-center justify-center w-9 h-9 rounded-md dark:bg-white bg-gray-500">
                   <Image width={24} height={24} url={provider.logo} />
