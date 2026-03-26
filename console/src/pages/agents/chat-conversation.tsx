@@ -140,7 +140,7 @@ export function ChatConversation({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type your message..."
+              placeholder="Ask anythink about security..."
               rows={1}
               disabled={isStreaming}
               className="flex-1 resize-none bg-transparent px-5 py-4 text-base placeholder:text-muted-foreground outline-none min-h-[48px] max-h-[33vh] disabled:opacity-50 overflow-y-auto"

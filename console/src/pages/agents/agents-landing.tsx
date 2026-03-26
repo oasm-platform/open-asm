@@ -1,5 +1,6 @@
 import Page from '@/components/common/page';
 import LlmConnect from '@/components/llm-connect';
+import TypewriterText from '@/components/typewriter-text';
 import { LlmConfigSwitcher } from '@/components/ui/llm-config-switcher';
 import { axiosInstance } from '@/services/apis/axios-client';
 import type {
@@ -42,6 +43,14 @@ const CONVERSATION_STARTERS = [
   'Your AI security assistant is ready.',
   'Need help with a security issue?',
   "What's your security concern today?",
+  "I'm listening. Tell me about your security needs.",
+  'Your security matters. I am here to help.',
+  'Share your security concerns. I am all ears.',
+  'I am ready to assist with your security questions.',
+  'Tell me what is on your mind regarding security.',
+  'I am here and attentive to your security needs.',
+  'Your security questions are important to me.',
+  'I am tuned in. What security topics interest you?',
 ];
 
 export default function AgentsLandingPage() {
@@ -65,14 +74,6 @@ export default function AgentsLandingPage() {
   const hasProviderConnected = useMemo(
     () => (llmProviders ?? []).some((p) => p.isConnected),
     [llmProviders],
-  );
-
-  const starter = useMemo(
-    () =>
-      CONVERSATION_STARTERS[
-        Math.floor(Math.random() * CONVERSATION_STARTERS.length)
-      ],
-    [],
   );
 
   // Auto-resize textarea
@@ -123,7 +124,7 @@ export default function AgentsLandingPage() {
         <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-6 p-4">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="rounded-full bg-muted p-4">
-              <Sparkles className="h-8 w-8 text-muted-foreground" />
+              <Sparkles className="h-8 w-8 animate-bounce text-muted-foreground" />
             </div>
             <div className="space-y-2">
               <h2 className="text-xl font-semibold text-foreground">
@@ -146,8 +147,13 @@ export default function AgentsLandingPage() {
   return (
     <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto">
       <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-6 p-4">
-        <p className="text-xl font-medium text-foreground">{starter}</p>
-
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Sparkles className="h-10 w-10" />
+          <TypewriterText
+            texts={CONVERSATION_STARTERS}
+            className="hidden sm:inline text-xl font-medium text-foreground"
+          />
+        </div>
         <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
           <div className="bg-muted flex items-center rounded-2xl">
             <textarea
@@ -155,7 +161,7 @@ export default function AgentsLandingPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type your message..."
+              placeholder="Ask anythink about security..."
               rows={1}
               disabled={isSending}
               className="flex-1 resize-none bg-transparent px-5 py-4 text-base placeholder:text-muted-foreground outline-none min-h-[48px] max-h-[33vh] disabled:opacity-50 overflow-y-auto"
@@ -172,7 +178,7 @@ export default function AgentsLandingPage() {
           </div>
         </form>
 
-        <div className="w-full max-w-2xl mt-4 flex justify-center">
+        <div className="w-full max-w-2xl flex justify-center">
           <LlmConfigSwitcher />
         </div>
 
