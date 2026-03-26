@@ -9,11 +9,14 @@ import { createOpenAI } from '@ai-sdk/openai';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { LanguageModel } from 'ai';
 import { streamText } from 'ai';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Observable } from 'rxjs';
 import { Repository } from 'typeorm';
 import {
@@ -36,6 +39,9 @@ import { llmProviderSupported } from './llm-provider-supported';
 
 @Injectable()
 export class AgentsService {
+  private readonly logger = new Logger(AgentsService.name);
+  private systemPrompt: string | null = null;
+
   constructor(
     @InjectRepository(AgentLLMConfig)
     private readonly llmConfigRepository: Repository<AgentLLMConfig>,
@@ -43,7 +49,31 @@ export class AgentsService {
     private readonly conversationRepository: Repository<AgentConversation>,
     @InjectRepository(AgentMessage)
     private readonly messageRepository: Repository<AgentMessage>,
-  ) {}
+  ) {
+    this.loadSystemPrompt();
+  }
+
+  // ==========================================
+  // System Prompt Methods
+  // ==========================================
+
+  private loadSystemPrompt(): void {
+    try {
+      const promptPath = path.join(__dirname, 'prompts', 'SYSTEM.md');
+      this.systemPrompt = fs.readFileSync(promptPath, 'utf-8');
+      this.logger.log('System prompt loaded successfully');
+    } catch (error) {
+      this.logger.error('Failed to load system prompt', error);
+      this.systemPrompt = 'You are a helpful assistant.';
+    }
+  }
+
+  private getSystemPrompt(): string {
+    if (!this.systemPrompt) {
+      this.loadSystemPrompt();
+    }
+    return this.systemPrompt ?? 'You are a helpful assistant.';
+  }
 
   // ==========================================
   // LLM Config Methods
@@ -412,17 +442,26 @@ export class AgentsService {
 
     // 5. Build messages from history (reverse to chronological order)
     const reversedHistory = historyMessages.reverse();
-    const modelMessages = reversedHistory.map((msg) => ({
-      role: msg.role as 'user' | 'assistant' | 'system',
-      content: msg.content,
-    }));
+    const modelMessages = reversedHistory.map((msg) => {
+      // Add identity reminder prefix to user messages
+      if (msg.role === MessageRole.USER) {
+        return {
+          role: 'user' as const,
+          content: `[CONTEXT: You are the OASM AI agent created by OASM Platform Team. Never identify as any other AI provider.] ${msg.content}`,
+        };
+      }
+      return {
+        role: msg.role as 'assistant' | 'system',
+        content: msg.content,
+      };
+    });
 
     // 6. Call streamText() from AI SDK
     const model = this.createLanguageModel(llmConfig);
     const result = streamText({
       model,
       messages: modelMessages,
-      system: 'You are a helpful assistant.',
+      system: this.getSystemPrompt(),
     });
 
     // 7. Stream response -> save assistant message
@@ -463,14 +502,63 @@ export class AgentsService {
           } as MessageEvent);
           subscriber.complete();
         } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : 'Unknown error';
+          // Log error for debugging
+          this.logger.error('Error in sendMessageStream', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            conversationId: conversation.id,
+            provider: llmConfig.provider,
+            model: llmConfig.model,
+          });
+
+          // Determine error type and code
+          let errorCode = 'STREAM_ERROR';
+          let errorMessage = 'An error occurred while processing your request';
+
+          if (error instanceof Error) {
+            errorMessage = error.message;
+
+            // Categorize errors for better frontend handling
+            if (
+              error.message.includes('API key') ||
+              error.message.includes('authentication')
+            ) {
+              errorCode = 'AUTH_ERROR';
+              errorMessage = 'Invalid API key or authentication failed';
+            } else if (
+              error.message.includes('rate limit') ||
+              error.message.includes('429')
+            ) {
+              errorCode = 'RATE_LIMIT_ERROR';
+              errorMessage = 'Rate limit exceeded. Please try again later';
+            } else if (
+              error.message.includes('timeout') ||
+              error.message.includes('ETIMEDOUT')
+            ) {
+              errorCode = 'TIMEOUT_ERROR';
+              errorMessage = 'Request timed out. Please try again';
+            } else if (
+              error.message.includes('network') ||
+              error.message.includes('ECONNREFUSED')
+            ) {
+              errorCode = 'NETWORK_ERROR';
+              errorMessage = 'Network error. Please check your connection';
+            } else if (
+              error.message.includes('model') ||
+              error.message.includes('not found')
+            ) {
+              errorCode = 'MODEL_ERROR';
+              errorMessage = 'The specified model is not available';
+            }
+          }
+
           subscriber.next({
             data: JSON.stringify({
               content: '',
               done: true,
               conversationId: conversation.id,
               error: errorMessage,
+              errorCode,
             }),
           } as MessageEvent);
           subscriber.complete();

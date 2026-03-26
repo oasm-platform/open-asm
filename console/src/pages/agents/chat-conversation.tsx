@@ -1,7 +1,7 @@
 import { Markdown } from '@/components/common/markdown';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Bot, Send } from 'lucide-react';
+import { AlertCircle, Bot, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 interface UIMessage {
@@ -9,6 +9,8 @@ interface UIMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  error?: string;
+  errorCode?: string;
 }
 
 interface ChatConversationProps {
@@ -89,7 +91,22 @@ export function ChatConversation({
             >
               {message.role === 'assistant' ? (
                 <div className="max-w-[80%] text-base">
-                  <Markdown content={message.content} />
+                  {message.error ? (
+                    <div className="flex items-start gap-2 rounded-2xl px-4 py-3 bg-destructive/10 text-destructive">
+                      <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-1">
+                        <p className="font-medium">Error</p>
+                        <p className="text-sm">{message.error}</p>
+                        {message.errorCode && (
+                          <p className="text-xs text-muted-foreground">
+                            Code: {message.errorCode}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <Markdown content={message.content} />
+                  )}
                 </div>
               ) : (
                 <div className="max-w-[80%] rounded-2xl px-4 py-2.5 text-base bg-muted text-foreground">

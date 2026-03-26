@@ -13,6 +13,8 @@ interface UIMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  error?: string;
+  errorCode?: string;
 }
 
 interface LocationState {
@@ -28,6 +30,10 @@ export default function AgentsChatPage() {
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(
     null,
   );
+  const [streamError, setStreamError] = useState<{
+    message: string;
+    code?: string;
+  } | null>(null);
   const conversationIdRef = useRef<string | null>(conversationId ?? null);
   const queryClient = useQueryClient();
   const hasAutoSentRef = useRef(false);
@@ -63,7 +69,7 @@ export default function AgentsChatPage() {
     }));
   }, [messagesData]);
 
-  // Append pending user message and streaming content to messages during SSE
+  // Append pending user message, streaming content, and errors to messages during SSE
   const displayMessages = useMemo(() => {
     if (isLoadingMessages && messages.length === 0) {
       return [];
@@ -94,6 +100,18 @@ export default function AgentsChatPage() {
       });
     }
 
+    // Show error message if stream failed
+    if (streamError && !isStreaming) {
+      result.push({
+        id: 'error',
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        error: streamError.message,
+        errorCode: streamError.code,
+      });
+    }
+
     return result;
   }, [
     messages,
@@ -101,6 +119,7 @@ export default function AgentsChatPage() {
     streamingContent,
     pendingUserMessage,
     isLoadingMessages,
+    streamError,
   ]);
 
   const handleSendMessage = useCallback(
@@ -108,6 +127,7 @@ export default function AgentsChatPage() {
       setPendingUserMessage(content);
       setIsStreaming(true);
       setStreamingContent('');
+      setStreamError(null);
 
       try {
         const stream = createMessageStream({
@@ -121,6 +141,10 @@ export default function AgentsChatPage() {
         for await (const event of stream) {
           if (event.type === 'error') {
             console.error('Stream error:', event.data);
+            setStreamError({
+              message: event.data.error?.message || 'An error occurred',
+              code: event.data.error?.code,
+            });
             break;
           }
 
@@ -154,6 +178,11 @@ export default function AgentsChatPage() {
         }
       } catch (error) {
         console.error('Failed to send message:', error);
+        setStreamError({
+          message:
+            error instanceof Error ? error.message : 'Failed to send message',
+          code: 'NETWORK_ERROR',
+        });
       } finally {
         setIsStreaming(false);
         setPendingUserMessage(null);
