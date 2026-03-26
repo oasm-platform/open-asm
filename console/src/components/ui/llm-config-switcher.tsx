@@ -82,7 +82,7 @@ export function LlmConfigSwitcher() {
             className="dark:bg-white bg-gray-500 rounded-full p-1"
           />
           <div className="flex gap-0.5 leading-none">
-            <span className="font-semibold mr-2">
+            <span className="hidden md:inline font-semibold mr-2">
               {selectedProvider ? selectedProvider.providerName : 'No provider'}
             </span>
             {selectedProvider?.model && (

@@ -20,7 +20,6 @@ import {
 import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
 import { useSession } from '@/utils/authClient';
 import {
-  Bot,
   Bug,
   CircleDot,
   CirclePlay,
@@ -28,6 +27,7 @@ import {
   Cpu,
   Group,
   LayoutDashboard,
+  Sparkles,
   SquareTerminal,
   Target,
   User,
@@ -66,7 +66,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         },
         {
           title: 'Agents',
-          icon: <Bot />,
+          icon: <Sparkles />,
           url: '/agents',
         },
       ],

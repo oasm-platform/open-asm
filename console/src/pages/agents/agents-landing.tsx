@@ -8,7 +8,7 @@ import type {
 } from '@/services/apis/gen/queries';
 import { useAgentsControllerGetConversations } from '@/services/apis/gen/queries';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, MessageSquare, Send } from 'lucide-react';
+import { MessageSquare, Send, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -123,15 +123,15 @@ export default function AgentsLandingPage() {
         <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-6 p-4">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="rounded-full bg-muted p-4">
-              <AlertCircle className="h-8 w-8 text-muted-foreground" />
+              <Sparkles className="h-8 w-8 text-muted-foreground" />
             </div>
             <div className="space-y-2">
               <h2 className="text-xl font-semibold text-foreground">
-                No provider connected
+                Welcome to the AI Agent
               </h2>
               <p className="text-sm text-muted-foreground max-w-md">
-                To use the AI assistant, you need to connect an LLM provider
-                first. Select a provider below to configure.
+                To use the AI agent, you need to connect an LLM provider first.
+                Select a provider below to configure.
               </p>
             </div>
             <div className="w-full max-w-md mt-4">

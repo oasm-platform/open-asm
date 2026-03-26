@@ -35,17 +35,29 @@ export function ThemeProvider({
 
     root.classList.remove('light', 'dark');
 
+    let activeTheme: 'light' | 'dark';
+
     if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
-        .matches
+      activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
         ? 'dark'
         : 'light';
-
-      root.classList.add(systemTheme);
-      return;
+    } else {
+      activeTheme = theme;
     }
 
-    root.classList.add(theme);
+    root.classList.add(activeTheme);
+
+    // Update meta theme-color for mobile status bar
+    const themeColor = activeTheme === 'dark' ? '#0a0a0a' : '#ffffff';
+    let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaThemeColor);
+    }
+
+    metaThemeColor.setAttribute('content', themeColor);
   }, [theme]);
 
   const value = {

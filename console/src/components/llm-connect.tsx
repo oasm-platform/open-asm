@@ -206,9 +206,6 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
                 className="border-t p-4 flex flex-col gap-3 bg-muted/30"
               >
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-foreground">
-                    API Key
-                  </label>
                   <input
                     type="password"
                     value={formData[provider.providerId]?.apiKey || ''}
@@ -227,9 +224,6 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-foreground">
-                    Model ID
-                  </label>
                   <input
                     type="text"
                     defaultValue={hasConfig ? provider.model : ''}
@@ -241,7 +235,7 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
                         e.target.value,
                       )
                     }
-                    placeholder="e.g., gpt-4, claude-3-opus"
+                    placeholder="Enter your model ID"
                     autoComplete="off"
                     className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring"
                     required
