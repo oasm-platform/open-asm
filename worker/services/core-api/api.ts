@@ -1627,33 +1627,49 @@ export interface LLMConfigResponseDto {
 }
 
 export interface CreateLLMConfigDto {
-  /** @example "openai" */
+  /** @example "openrouter" */
   provider: CreateLlmConfigDtoProviderEnum;
-  /** @example "sk-..." */
   apiKey: string;
-  /** @example "gpt-4o" */
   model: string;
-  /** @example "https://api.example.com/v1" */
   apiUrl?: string;
 }
 
-export interface GetManyLLMConfigResponseDtoDto {
-  data: LLMConfigResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
+export interface LLMConfigWithProviderDto {
+  /** Provider identifier */
+  providerId: LlmConfigWithProviderDtoProviderIdEnum;
+  /** Provider display name */
+  providerName: string;
+  /** Provider logo path */
+  logo?: string;
+  /** Connection status */
+  isConnected: boolean;
+  /** LLM config ID if connected */
+  configId?: string;
+  /** Model name if connected */
+  model?: string;
+  /** API URL if connected */
+  apiUrl?: string;
+  /** Is preferred config if connected */
+  isPreferred?: boolean;
+  /** Masked API key if connected */
+  apiKeyMasked?: string;
+  /**
+   * Created at if connected
+   * @format date-time
+   */
+  createdAt?: string;
+  /**
+   * Updated at if connected
+   * @format date-time
+   */
+  updatedAt?: string;
 }
 
 export interface UpdateLLMConfigDto {
-  /** @example "openai" */
+  /** @example "openrouter" */
   provider?: UpdateLlmConfigDtoProviderEnum;
-  /** @example "sk-..." */
   apiKey?: string;
-  /** @example "gpt-4o" */
   model?: string;
-  /** @example "https://api.example.com/v1" */
   apiUrl?: string;
   /** @example true */
   isPreferred?: boolean;
@@ -1909,20 +1925,31 @@ export enum IssueCommentTypeEnum {
 
 export enum LlmConfigResponseDtoProviderEnum {
   Openai = "openai",
+  Openrouter = "openrouter",
   Anthropic = "anthropic",
   Custom = "custom",
 }
 
-/** @example "openai" */
+/** @example "openrouter" */
 export enum CreateLlmConfigDtoProviderEnum {
   Openai = "openai",
+  Openrouter = "openrouter",
   Anthropic = "anthropic",
   Custom = "custom",
 }
 
-/** @example "openai" */
+/** Provider identifier */
+export enum LlmConfigWithProviderDtoProviderIdEnum {
+  Openai = "openai",
+  Openrouter = "openrouter",
+  Anthropic = "anthropic",
+  Custom = "custom",
+}
+
+/** @example "openrouter" */
 export enum UpdateLlmConfigDtoProviderEnum {
   Openai = "openai",
+  Openrouter = "openrouter",
   Anthropic = "anthropic",
   Custom = "custom",
 }
@@ -4784,31 +4811,22 @@ export class Api<
     });
 
   /**
-   * @description Get all LLM configurations for the workspace
+   * @description Get all LLM providers with their configuration status for the workspace
    *
    * @tags Agents
    * @name AgentsControllerGetLlmConfigs
-   * @summary List LLM configs
+   * @summary List LLM configs with provider info
    * @request GET:/api/agents/llm-configs
    */
-  agentsControllerGetLlmConfigs = (
-    query?: {
-      search?: string;
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
+  agentsControllerGetLlmConfigs = (params: RequestParams = {}) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: LLMConfigWithProviderDto[];
+      },
+      any
+    >({
       path: `/api/agents/llm-configs`,
       method: "GET",
-      query: query,
       format: "json",
       ...params,
     });
@@ -4983,7 +5001,7 @@ export class Api<
    * @tags Agents
    * @name AgentsControllerSendMessageStream
    * @summary Send message (streaming)
-   * @request GET:/api/agents/messages/stream
+   * @request POST:/api/agents/messages/stream
    */
   agentsControllerSendMessageStream = (
     data: SendMessageDto,
@@ -4991,7 +5009,7 @@ export class Api<
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/agents/messages/stream`,
-      method: "GET",
+      method: "POST",
       body: data,
       type: ContentType.Json,
       format: "json",

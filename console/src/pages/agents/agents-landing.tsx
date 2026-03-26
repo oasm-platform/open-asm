@@ -1,9 +1,37 @@
 import Page from '@/components/common/page';
-import type { ConversationResponseDto } from '@/services/apis/gen/queries';
+import LlmConnect from '@/components/llm-connect';
+import { LlmConfigSwitcher } from '@/components/ui/llm-config-switcher';
+import { axiosInstance } from '@/services/apis/axios-client';
+import type {
+  ConversationResponseDto,
+  LLMConfigResponseDto,
+} from '@/services/apis/gen/queries';
 import { useAgentsControllerGetConversations } from '@/services/apis/gen/queries';
-import { MessageSquare, Send } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { AlertCircle, MessageSquare, Send } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+interface LLMProviderStatus {
+  id: string;
+  name: string;
+  logo: string;
+  isConnected: boolean;
+  config: LLMConfigResponseDto | null;
+}
+
+function useGetLLMProvidersStatus() {
+  return useQuery<LLMProviderStatus[]>({
+    queryKey: ['/api/agents/llm-configs'],
+    queryFn: async ({ signal }) => {
+      const response = await axiosInstance.get<LLMProviderStatus[]>(
+        '/api/agents/llm-configs',
+        { signal },
+      );
+      return response.data;
+    },
+  });
+}
 
 const CONVERSATION_STARTERS = [
   'How can I help secure your application today?',
@@ -27,9 +55,16 @@ export default function AgentsLandingPage() {
     { query: { queryKey: ['/api/agents/conversations'] } },
   );
 
+  const { data: llmProviders } = useGetLLMProvidersStatus();
+
   const conversations: ConversationResponseDto[] = useMemo(
     () => conversationsData?.data ?? [],
     [conversationsData],
+  );
+
+  const hasProviderConnected = useMemo(
+    () => (llmProviders ?? []).some((p) => p.isConnected),
+    [llmProviders],
   );
 
   const starter = useMemo(
@@ -82,6 +117,32 @@ export default function AgentsLandingPage() {
     [navigate],
   );
 
+  if (!hasProviderConnected) {
+    return (
+      <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto">
+        <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-6 p-4">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="rounded-full bg-muted p-4">
+              <AlertCircle className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-foreground">
+                No provider connected
+              </h2>
+              <p className="text-sm text-muted-foreground max-w-md">
+                To use the AI assistant, you need to connect an LLM provider
+                first. Select a provider below to configure.
+              </p>
+            </div>
+            <div className="w-full max-w-md mt-4">
+              <LlmConnect />
+            </div>
+          </div>
+        </div>
+      </Page>
+    );
+  }
+
   return (
     <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto">
       <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-6 p-4">
@@ -110,6 +171,10 @@ export default function AgentsLandingPage() {
             )}
           </div>
         </form>
+
+        <div className="w-full max-w-2xl mt-4 flex justify-center">
+          <LlmConfigSwitcher />
+        </div>
 
         {conversations.length > 0 && (
           <div className="w-full max-w-2xl mt-4 flex flex-col items-center">

@@ -8,6 +8,7 @@ import AgentsLandingPage from '@/pages/agents/agents-landing';
 import AgentConversationsPage from '@/pages/agents/conversations';
 import CreateAgentPage from '@/pages/agents/create-agent';
 import EditAgentPage from '@/pages/agents/edit-agent';
+import ProvidersConnectPage from '@/pages/agents/providers-connect';
 import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
 import { AssetGroups } from '@/pages/asset-group/asset-groups';
 import Assets from '@/pages/assets/assets';
@@ -362,6 +363,14 @@ export const router = createBrowserRouter([
                 element: (
                   <RequireWorkspace>
                     <AgentsLandingPage />
+                  </RequireWorkspace>
+                ),
+              },
+              {
+                path: 'providers/connect',
+                element: (
+                  <RequireWorkspace>
+                    <ProvidersConnectPage />
                   </RequireWorkspace>
                 ),
               },

@@ -23,6 +23,8 @@ import {
 import {
   CreateLLMConfigDto,
   LLMConfigResponseDto,
+  LLMConfigWithProviderDto,
+  LLMProviderStatusDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
 import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
@@ -30,6 +32,7 @@ import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
+import { llmProviderSupported } from './llm-provider-supported';
 
 @Injectable()
 export class AgentsService {
@@ -70,6 +73,24 @@ export class AgentsService {
     workspaceId: string,
     userId: string,
   ): Promise<LLMConfigResponseDto> {
+    // Check if provider already exists in workspace
+    const existingConfig = await this.llmConfigRepository.findOne({
+      where: { workspaceId, provider: dto.provider },
+    });
+
+    if (existingConfig) {
+      throw new BadRequestException(
+        `Provider ${dto.provider} is already configured. Please update or delete the existing configuration first.`,
+      );
+    }
+
+    // Check if this is the first LLM config in workspace
+    const totalConfigs = await this.llmConfigRepository.count({
+      where: { workspaceId },
+    });
+
+    const isPreferred = totalConfigs === 0;
+
     const config = this.llmConfigRepository.create({
       workspaceId,
       provider: dto.provider,
@@ -77,43 +98,72 @@ export class AgentsService {
       model: dto.model,
       apiUrl: dto.apiUrl,
       createdBy: userId,
+      isPreferred,
     });
 
     const saved = await this.llmConfigRepository.save(config);
     return this.toLLMConfigResponse(saved);
   }
 
-  async getLLMConfigs(
+  async getLLMProvidersStatus(
     workspaceId: string,
-    query?: GetManyBaseQueryParams,
-  ): Promise<GetManyBaseResponseDto<LLMConfigResponseDto>> {
-    const qb = this.llmConfigRepository
-      .createQueryBuilder('config')
-      .where('config.workspaceId = :workspaceId', { workspaceId });
-
-    if (query?.search) {
-      qb.andWhere(
-        '(config.model ILIKE :search OR config.provider::text ILIKE :search)',
-        { search: `%${query.search}%` },
-      );
-    }
-
-    const sortBy = query?.sortBy || 'createdAt';
-    const sortOrder = query?.sortOrder || 'DESC';
-    const page = query?.page || 1;
-    const limit = query?.limit || 10;
-
-    qb.orderBy(`config.${sortBy}`, sortOrder as 'ASC' | 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
-
-    const [configs, total] = await qb.getManyAndCount();
-
-    return getManyResponse({
-      query: { ...query, page, limit } as GetManyBaseQueryParams,
-      data: configs.map((c) => this.toLLMConfigResponse(c)),
-      total,
+  ): Promise<LLMProviderStatusDto[]> {
+    const configs = await this.llmConfigRepository.find({
+      where: { workspaceId },
     });
+
+    const configMap = new Map(
+      configs.map((c) => [c.provider, this.toLLMConfigResponse(c)]),
+    );
+
+    return llmProviderSupported.map((provider) => ({
+      id: provider.id,
+      name: provider.name,
+      logo: provider.logo,
+      isConnected: configMap.has(provider.id),
+      config: configMap.get(provider.id) ?? null,
+    }));
+  }
+
+  async getLLMConfigsWithProviders(
+    workspaceId: string,
+  ): Promise<LLMConfigWithProviderDto[]> {
+    // Get all configs for workspace
+    const configs = await this.llmConfigRepository.find({
+      where: { workspaceId },
+      order: { createdAt: 'DESC' },
+    });
+
+    // Map providers with their config status
+    const result = llmProviderSupported.map((provider) => {
+      const config = configs.find((c) => c.provider === provider.id);
+
+      if (config) {
+        const decryptedKey = decrypt(config.apiKey);
+        return {
+          providerId: provider.id,
+          providerName: provider.name,
+          logo: provider.logo,
+          isConnected: true,
+          configId: config.id,
+          model: config.model,
+          apiUrl: config.apiUrl,
+          isPreferred: config.isPreferred,
+          apiKeyMasked: this.maskApiKey(decryptedKey),
+          createdAt: config.createdAt,
+          updatedAt: config.updatedAt,
+        };
+      }
+
+      return {
+        providerId: provider.id,
+        providerName: provider.name,
+        logo: provider.logo,
+        isConnected: false,
+      };
+    });
+
+    return result as LLMConfigWithProviderDto[];
   }
 
   async updateLLMConfig(
@@ -296,7 +346,9 @@ export class AgentsService {
         return openai.chat(config.model);
       }
       default: {
-        throw new BadRequestException(`Unsupported LLM provider: ${String(config.provider)}`);
+        throw new BadRequestException(
+          `Unsupported LLM provider: ${String(config.provider)}`,
+        );
       }
     }
   }

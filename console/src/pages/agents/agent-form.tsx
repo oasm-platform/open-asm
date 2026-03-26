@@ -7,10 +7,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import type { CreateLLMConfigDtoProvider } from '@/services/apis/gen/queries';
 import { Loader2Icon } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import type { CreateLLMConfigDtoProvider } from '@/services/apis/gen/queries';
 
 export type AgentFormData = {
   provider: CreateLLMConfigDtoProvider;
@@ -27,11 +27,12 @@ interface AgentFormProps {
   isEdit?: boolean;
 }
 
-const providerOptions: { value: CreateLLMConfigDtoProvider; label: string }[] = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'custom', label: 'Custom' },
-];
+const providerOptions: { value: CreateLLMConfigDtoProvider; label: string }[] =
+  [
+    { value: 'openai', label: 'OpenAI' },
+    { value: 'anthropic', label: 'Anthropic' },
+    { value: 'custom', label: 'Custom' },
+  ];
 
 const defaultModels: Record<string, string> = {
   openai: 'gpt-4o',
@@ -66,14 +67,15 @@ export function AgentForm({
   const isCustomProvider = selectedProvider === 'custom';
 
   const handleFormSubmit = (data: AgentFormData) => {
-    const filteredData = Object.entries(data).reduce<
-      Partial<AgentFormData>
-    >((acc, [key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        acc[key as keyof AgentFormData] = value;
-      }
-      return acc;
-    }, {});
+    const filteredData = Object.entries(data).reduce<Partial<AgentFormData>>(
+      (acc, [key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          acc[key as keyof AgentFormData] = value;
+        }
+        return acc;
+      },
+      {},
+    );
 
     onSubmit(filteredData as AgentFormData);
   };

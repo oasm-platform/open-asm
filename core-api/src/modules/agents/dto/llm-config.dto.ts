@@ -8,6 +8,30 @@ export class LLMProviderSupportedDto {
 
   @ApiProperty({ description: 'Provider display name' })
   name: string;
+
+  @ApiProperty({ description: 'Provider logo path' })
+  logo: string;
+}
+
+export class LLMProviderStatusDto {
+  @ApiProperty({ enum: LLMProvider, description: 'Provider identifier' })
+  id: LLMProvider;
+
+  @ApiProperty({ description: 'Provider display name' })
+  name: string;
+
+  @ApiProperty({ description: 'Provider logo path' })
+  logo: string;
+
+  @ApiProperty({ description: 'Whether provider has a configured LLM config' })
+  isConnected: boolean;
+
+  @ApiProperty({
+    description: 'LLM config if connected, null otherwise',
+    nullable: true,
+    type: () => LLMConfigResponseDto,
+  })
+  config: LLMConfigResponseDto | null;
 }
 
 export class CreateLLMConfigDto {
@@ -60,4 +84,42 @@ export class LLMConfigResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+}
+
+export class LLMConfigWithProviderDto {
+  @ApiProperty({ enum: LLMProvider, description: 'Provider identifier' })
+  providerId: LLMProvider;
+
+  @ApiProperty({ description: 'Provider display name' })
+  providerName: string;
+
+  @ApiProperty({ description: 'Provider logo path', required: false })
+  logo?: string;
+
+  @ApiProperty({ description: 'Connection status' })
+  isConnected: boolean;
+
+  @ApiProperty({ description: 'LLM config ID if connected', required: false })
+  configId?: string;
+
+  @ApiProperty({ description: 'Model name if connected', required: false })
+  model?: string;
+
+  @ApiProperty({ description: 'API URL if connected', required: false })
+  apiUrl?: string;
+
+  @ApiProperty({
+    description: 'Is preferred config if connected',
+    required: false,
+  })
+  isPreferred?: boolean;
+
+  @ApiProperty({ description: 'Masked API key if connected', required: false })
+  apiKeyMasked?: string;
+
+  @ApiProperty({ description: 'Created at if connected', required: false })
+  createdAt?: Date;
+
+  @ApiProperty({ description: 'Updated at if connected', required: false })
+  updatedAt?: Date;
 }

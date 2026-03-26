@@ -1,3 +1,10 @@
+import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
+import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { AuthGuard } from '@/common/guards/auth.guard';
+import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
   Controller,
@@ -12,29 +19,18 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
-import { AuthGuard } from '@/common/guards/auth.guard';
-import { Doc } from '@/common/doc/doc.decorator';
-import { WorkspaceId, UserId } from '@/common/decorators/app.decorator';
-import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { AgentsService } from './agents.service';
 import {
-  CreateLLMConfigDto,
-  UpdateLLMConfigDto,
-  LLMConfigResponseDto,
-  LLMProviderSupportedDto,
-} from './dto/llm-config.dto';
-import { llmProviderSupported } from './llm-provider-supported';
-import {
-  UpdateConversationDto,
   ConversationResponseDto,
+  UpdateConversationDto,
 } from './dto/conversation.dto';
 import {
-  SendMessageDto,
-  MessageResponseDto,
-} from './dto/message.dto';
+  CreateLLMConfigDto,
+  LLMConfigResponseDto,
+  LLMConfigWithProviderDto,
+  UpdateLLMConfigDto,
+} from './dto/llm-config.dto';
+import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
 
 @ApiTags('Agents')
 @Controller('agents')
@@ -45,17 +41,6 @@ export class AgentsController {
   // ==========================================
   // LLM Config Endpoints
   // ==========================================
-
-  @Get('llm-configs/providers')
-  @Doc({
-    summary: 'List supported LLM providers',
-    description:
-      'Get all supported LLM providers available for configuration',
-    response: { serialization: LLMProviderSupportedDto, isArray: true },
-  })
-  getLLMProvidersSupported(): LLMProviderSupportedDto[] {
-    return llmProviderSupported;
-  }
 
   @Post('llm-configs')
   @Doc({
@@ -74,16 +59,16 @@ export class AgentsController {
 
   @Get('llm-configs')
   @Doc({
-    summary: 'List LLM configs',
-    description: 'Get all LLM configurations for the workspace',
+    summary: 'List LLM configs with provider info',
+    description:
+      'Get all LLM providers with their configuration status for the workspace',
     request: { getWorkspaceId: true },
-    response: { serialization: GetManyResponseDto(LLMConfigResponseDto) },
+    response: { serialization: LLMConfigWithProviderDto, isArray: true },
   })
-  async getLLMConfigs(
-    @Query() query: GetManyBaseQueryParams,
+  getLLMConfigs(
     @WorkspaceId() workspaceId: string,
-  ) {
-    return this.agentsService.getLLMConfigs(workspaceId, query);
+  ): Promise<LLMConfigWithProviderDto[]> {
+    return this.agentsService.getLLMConfigsWithProviders(workspaceId);
   }
 
   @Patch('llm-configs/:id')
