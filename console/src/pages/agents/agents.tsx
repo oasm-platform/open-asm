@@ -1,10 +1,11 @@
-import Page from '@/components/common/page';
 import { createMessageStream } from '@/services/apis/ai-assistant-sse';
 import type { MessageResponseDto } from '@/services/apis/gen/queries';
 import { useAgentsControllerGetMessages } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { ChatConversation } from './chat-conversation';
 
 /** Local message type for UI rendering */
@@ -34,6 +35,7 @@ export default function AgentsChatPage() {
     message: string;
     code?: string;
   } | null>(null);
+  const [ignoredMessageIds, setIgnoredMessageIds] = useState<Set<string>>(new Set());
   const conversationIdRef = useRef<string | null>(conversationId ?? null);
   const queryClient = useQueryClient();
   const hasAutoSentRef = useRef(false);
@@ -75,10 +77,10 @@ export default function AgentsChatPage() {
       return [];
     }
 
-    const result: UIMessage[] = [...messages];
+    const result: UIMessage[] = messages.filter(m => !ignoredMessageIds.has(m.id));
 
     if (pendingUserMessage) {
-      const confirmedFromApi = messages.some(
+      const confirmedFromApi = result.some(
         (m) => m.role === 'user' && m.content === pendingUserMessage,
       );
       if (!confirmedFromApi) {
@@ -120,6 +122,7 @@ export default function AgentsChatPage() {
     pendingUserMessage,
     isLoadingMessages,
     streamError,
+    ignoredMessageIds,
   ]);
 
   const handleSendMessage = useCallback(
@@ -212,14 +215,47 @@ export default function AgentsChatPage() {
     }
   }, [isStreaming, streamingContent, messages]);
 
+  // Escape ProtectedLayout's p-4 so the chat fills the full available area
   return (
-    <Page className="w-full h-full lg:w-2/3 xl:w-1/2 mx-auto">
+    <div className="-m-4 flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 4rem)' }}>
+      {/* Header bar for conversation with back button */}
+      <div className="flex h-12 shrink-0 items-center px-4 border-b bg-background/95 backdrop-blur z-10 w-full">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/agents')} className="mr-3">
+          <ArrowLeft className="size-4" />
+        </Button>
+        <span className="font-semibold text-sm">Conversation</span>
+      </div>
       <ChatConversation
         messages={displayMessages}
         onSendMessage={handleSendMessage}
+        onRetry={() => {
+          // Find the last assistant message and its matching user message
+          const reversedMessages = [...messages].reverse();
+          const lastAsstRevIdx = reversedMessages.findIndex((m) => m.role === 'assistant');
+          const lastAsstIdx = lastAsstRevIdx !== -1 ? messages.length - 1 - lastAsstRevIdx : -1;
+          const lastUserMsg = reversedMessages.find((m) => m.role === 'user');
+          if (lastAsstIdx !== -1) {
+            setIgnoredMessageIds(prev => {
+              const next = new Set(prev);
+              next.add(messages[lastAsstIdx].id);
+              return next;
+            });
+          }
+          if (lastUserMsg) {
+            setIgnoredMessageIds(prev => {
+              const next = new Set(prev);
+              next.add(lastUserMsg.id); // Also hide the user message so we don't duplicate it visually
+              return next;
+            });
+            void handleSendMessage(lastUserMsg.content);
+          } else {
+            // If somehow no user message, just resend last pending or empty trigger
+            void handleSendMessage("Retry");
+          }
+        }}
         isStreaming={isStreaming}
         isLoadingMessages={isLoadingMessages}
       />
-    </Page>
+    </div>
   );
 }
