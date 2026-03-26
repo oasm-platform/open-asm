@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import GetAboutProject from './components/get-about-project';
+import McpConnect from './components/mcp-connect';
 import Preferences from './components/preferences';
 import SecuritySettings from './components/security-settings';
 import WorkspaceSettings from './components/workspace-settings';
@@ -83,6 +84,22 @@ export const settingsTabGroups: SettingsTabGroup[] = [
           description: 'Manage your account security settings',
         },
         component: <SecuritySettings />,
+      },
+    ],
+  },
+  // Group: Integration
+  {
+    name: 'Integration',
+    tabs: [
+      {
+        id: 'mcp',
+        label: 'MCP Connect',
+        path: '/settings/mcp',
+        content: {
+          title: 'MCP Connect',
+          description: 'Connect to OASM server via MCP protocol',
+        },
+        component: <McpConnect />,
       },
     ],
   },

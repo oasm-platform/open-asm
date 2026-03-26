@@ -1,34 +1,26 @@
 import z from 'zod';
 
-export const workspaceParamSchema = z.object({
-  workspaceId: z
-    .string()
-    .describe('The unique identifier of the workspace to query data from.'),
-});
-
 /**
  * The base request schema for get many resources.
  */
-export const getManyBaseRequestSchema = z
-  .object({
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .default(100)
-      .describe(
-        'Maximum number of items to return in a single page (pagination).',
-      ),
-    page: z
-      .number()
-      .int()
-      .nonnegative()
-      .optional()
-      .default(1)
-      .describe('The page number to retrieve for paginated results.'),
-  })
-  .extend(workspaceParamSchema.shape);
+export const getManyBaseRequestSchema = z.object({
+  limit: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .default(100)
+    .describe(
+      'Maximum number of items to return in a single page (pagination).',
+    ),
+  page: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .default(1)
+    .describe('The page number to retrieve for paginated results.'),
+});
 
 /**
  * The base response schema for get many resources.
@@ -117,15 +109,13 @@ export const getStatisticOutPutSchema = z.object({
     ),
 });
 
-export const detailAssetSchema = z
-  .object({
-    assetId: z
-      .string()
-      .describe(
-        'The unique identifier (ID) of the asset to retrieve detailed information for.',
-      ),
-  })
-  .extend(workspaceParamSchema.shape);
+export const detailAssetSchema = z.object({
+  assetId: z
+    .string()
+    .describe(
+      'The unique identifier (ID) of the asset to retrieve detailed information for.',
+    ),
+});
 
 export const listAssetsInTargetSchema = z
   .object({
@@ -143,15 +133,13 @@ export const listAssetsInTargetSchema = z
   })
   .extend(getManyBaseRequestSchema.shape);
 
-export const detailVulnSchema = z
-  .object({
-    vulnId: z
-      .string()
-      .describe(
-        'The unique identifier (ID) of the vulnerability to retrieve technical details for.',
-      ),
-  })
-  .extend(workspaceParamSchema.shape);
+export const detailVulnSchema = z.object({
+  vulnId: z
+    .string()
+    .describe(
+      'The unique identifier (ID) of the vulnerability to retrieve technical details for.',
+    ),
+});
 
 export const listIssuesSchema = z
   .object({
@@ -168,15 +156,13 @@ export const listIssuesSchema = z
   })
   .extend(getManyBaseRequestSchema.shape);
 
-export const detailIssueSchema = z
-  .object({
-    issueId: z
-      .string()
-      .describe(
-        'The unique identifier (ID) of the issue to retrieve full details for.',
-      ),
-  })
-  .extend(workspaceParamSchema.shape);
+export const detailIssueSchema = z.object({
+  issueId: z
+    .string()
+    .describe(
+      'The unique identifier (ID) of the issue to retrieve full details for.',
+    ),
+});
 
 export const listToolsSchema = z
   .object({

@@ -10,6 +10,7 @@ import { WorkspacesModule } from '@/modules/workspaces/workspaces.module';
 import { Global, Module } from '@nestjs/common';
 import { McpModule, McpTransportType } from '@rekog/mcp-nest';
 import { McpController } from './mcp.controller';
+import { McpGuard } from './mcp.guard';
 import { McpPrompts } from './mcp.prompt';
 import { McpResources } from './mcp.resource';
 import { McpService } from './mcp.service';
@@ -33,7 +34,7 @@ import { McpTools } from './mcp.tools';
       sseEndpoint: '/mcp',
       version: '1.0.0',
       transport: McpTransportType.SSE,
-      guards: [],
+      guards: [McpGuard],
     }),
   ],
   providers: [McpTools, McpService, McpResources, McpPrompts],

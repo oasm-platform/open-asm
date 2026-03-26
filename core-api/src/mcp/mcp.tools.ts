@@ -1,20 +1,16 @@
-import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
-import { IssueStatus } from '@/common/enums/enum';
+import { MCP_API_KEY_HEADER } from '@/common/constants/app.constants';
 import { AssetsService } from '@/modules/assets/assets.service';
 import { IssuesService } from '@/modules/issues/issues.service';
-import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import { WorkersService } from '@/modules/workers/workers.service';
-import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { Injectable } from '@nestjs/common';
-import { Tool } from '@rekog/mcp-nest';
+import { Context, Tool } from '@rekog/mcp-nest';
 import z from 'zod';
 import {
   detailAssetSchema,
-  detailIssueSchema,
   detailVulnSchema,
   getAssetsSchema,
   getManyBaseResponseSchema,
@@ -22,26 +18,24 @@ import {
   getTargetsSchema,
   getVulnerabilitiesSchema,
   listAssetsInTargetSchema,
-  listIssuesSchema,
-  listJobsSchema,
-  listToolsSchema,
-  listWorkersSchema,
-  workspaceParamSchema,
 } from './mcp.schema';
 
 @Injectable()
 export class McpTools {
   constructor(
     private assetsService: AssetsService,
-    private workspaceService: WorkspacesService,
     private targetsService: TargetsService,
     private statisticService: StatisticService,
     private vulnerabilitiesService: VulnerabilitiesService,
     private issuesService: IssuesService,
     private toolsService: ToolsService,
     private workersService: WorkersService,
-    private jobsRegistryService: JobsRegistryService,
   ) {}
+
+  private getWorkspaceId(request: Request) {
+    const mcpApiKey = request.headers[MCP_API_KEY_HEADER] as string;
+    return request.headers[mcpApiKey] as string;
+  }
 
   @Tool({
     name: 'get_assets',
@@ -59,8 +53,13 @@ export class McpTools {
       }),
     ),
   })
-  async getAssets(params: z.infer<typeof getAssetsSchema>) {
-    const { workspaceId, page, limit, value } = params;
+  async getAssets(
+    params: z.infer<typeof getAssetsSchema>,
+    _: Context,
+    request: Request,
+  ) {
+    const { page, limit, value } = params;
+    const workspaceId = this.getWorkspaceId(request);
     const response = await this.assetsService.getManyAsssetServices(
       {
         limit: limit || 100,
@@ -94,8 +93,13 @@ export class McpTools {
       }),
     ),
   })
-  async getVulnerabilities(params: z.infer<typeof getVulnerabilitiesSchema>) {
-    const { workspaceId, page, limit, q } = params;
+  async getVulnerabilities(
+    params: z.infer<typeof getVulnerabilitiesSchema>,
+    _: Context,
+    request: Request,
+  ) {
+    const { page, limit, q } = params;
+    const workspaceId = this.getWorkspaceId(request);
     const response = await this.vulnerabilitiesService.getVulnerabilities(
       {
         limit,
@@ -131,8 +135,13 @@ export class McpTools {
       }),
     ),
   })
-  async getTargets(params: z.infer<typeof getTargetsSchema>) {
-    const { workspaceId, page, limit, value } = params;
+  async getTargets(
+    params: z.infer<typeof getTargetsSchema>,
+    _: Context,
+    request: Request,
+  ) {
+    const { page, limit, value } = params;
+    const workspaceId = this.getWorkspaceId(request);
     const response = await this.targetsService.getTargetsInWorkspace(
       {
         limit: limit || 100,
@@ -155,10 +164,14 @@ export class McpTools {
     name: 'get_statistics',
     description:
       'Provides high-level security metrics and workspace statistics, including total counts of assets, targets, and vulnerabilities by severity. Also includes the overall security score and technology counts. Use this for summaries or "how many" questions. Keywords: statistics, summary, count, score, metrics.',
-    parameters: workspaceParamSchema,
     outputSchema: getStatisticOutPutSchema,
   })
-  getStatistics({ workspaceId }: z.infer<typeof workspaceParamSchema>) {
+  async getStatistics(
+    params: z.infer<typeof getStatisticOutPutSchema>,
+    _: Context,
+    request: Request,
+  ) {
+    const workspaceId = this.getWorkspaceId(request);
     return this.statisticService.getStatistics({ workspaceId });
   }
 
@@ -195,8 +208,13 @@ export class McpTools {
         ),
     }),
   })
-  async getAssetDetails(params: z.infer<typeof detailAssetSchema>) {
-    const { workspaceId, assetId } = params;
+  async getAssetDetails(
+    params: z.infer<typeof detailAssetSchema>,
+    _: Context,
+    request: Request,
+  ) {
+    const { assetId } = params;
+    const workspaceId = this.getWorkspaceId(request);
     return this.assetsService.getAssetById(assetId, workspaceId);
   }
 
@@ -218,8 +236,13 @@ export class McpTools {
       }),
     ),
   })
-  async getAssetsInTarget(params: z.infer<typeof listAssetsInTargetSchema>) {
-    const { workspaceId, targetId, limit, page, value } = params;
+  async getAssetsInTarget(
+    params: z.infer<typeof listAssetsInTargetSchema>,
+    _: Context,
+    request: Request,
+  ) {
+    const { targetId, limit, page, value } = params;
+    const workspaceId = this.getWorkspaceId(request);
     return this.assetsService.getManyAsssetServices(
       {
         limit: limit || 100,
@@ -263,259 +286,154 @@ export class McpTools {
         .describe('The timestamp when the vulnerability was reported.'),
     }),
   })
-  async getVulnerabilityDetails(params: z.infer<typeof detailVulnSchema>) {
-    const { workspaceId, vulnId } = params;
+  async getVulnerabilityDetails(
+    params: z.infer<typeof detailVulnSchema>,
+    _: Context,
+    request: Request,
+  ) {
+    const { vulnId } = params;
+    const workspaceId = this.getWorkspaceId(request);
     return await this.vulnerabilitiesService.getVulnerability(
       vulnId,
       workspaceId,
     );
   }
 
-  @Tool({
-    name: 'list_issues',
-    description:
-      'Lists operational issues or security tasks tracked within the system (e.g., tickets, manual review tasks). Provides title, status, and creation date. Use this when the user asks about "tasks", "tickets", or "system problems". Keywords: issues, tasks, tickets, status.',
-    parameters: listIssuesSchema,
-    outputSchema: getManyBaseResponseSchema(
-      z.object({
-        id: z.string().describe('The unique identifier of the issue.'),
-        title: z.string().describe('The title or summary of the issue.'),
-        status: z
-          .string()
-          .describe('The current status of the issue (e.g., OPEN, CLOSED).'),
-        createdAt: z
-          .date()
-          .or(z.string())
-          .describe('The timestamp when the issue was created.'),
-      }),
-    ),
-  })
-  async getIssues(params: z.infer<typeof listIssuesSchema>) {
-    const { workspaceId, limit, page, search, status } = params;
-    const response = await this.issuesService.getMany(
-      {
-        limit: limit || 100,
-        page: page || 1,
-        search,
-        status: status as unknown as IssueStatus[],
-        sortBy: 'createdAt',
-      },
-      workspaceId,
-    );
+  // @Tool({
+  //   name: 'list_issues',
+  //   description:
+  //     'Lists operational issues or security tasks tracked within the system (e.g., tickets, manual review tasks). Provides title, status, and creation date. Use this when the user asks about "tasks", "tickets", or "system problems". Keywords: issues, tasks, tickets, status.',
+  //   parameters: listIssuesSchema,
+  //   outputSchema: getManyBaseResponseSchema(
+  //     z.object({
+  //       id: z.string().describe('The unique identifier of the issue.'),
+  //       title: z.string().describe('The title or summary of the issue.'),
+  //       status: z
+  //         .string()
+  //         .describe('The current status of the issue (e.g., OPEN, CLOSED).'),
+  //       createdAt: z
+  //         .date()
+  //         .or(z.string())
+  //         .describe('The timestamp when the issue was created.'),
+  //     }),
+  //   ),
+  // })
+  // async getIssues(
+  //   params: z.infer<typeof listIssuesSchema>,
+  //   _: Context,
+  //   request: Request,
+  // ) {
+  //   const { limit, page, search, status } = params;
+  //   const workspaceId = this.getWorkspaceId(request);
+  //   const response = await this.issuesService.getMany(
+  //     {
+  //       limit: limit || 100,
+  //       page: page || 1,
+  //       search,
+  //       status: status as unknown as IssueStatus[],
+  //       sortBy: 'createdAt',
+  //     },
+  //     workspaceId,
+  //   );
 
-    return {
-      ...response,
-      data: response.data.map((i) => ({
-        id: i.id,
-        title: i.title,
-        status: i.status,
-        createdAt: i.createdAt,
-      })),
-    };
-  }
+  //   return {
+  //     ...response,
+  //     data: response.data.map((i) => ({
+  //       id: i.id,
+  //       title: i.title,
+  //       status: i.status,
+  //       createdAt: i.createdAt,
+  //     })),
+  //   };
+  // }
 
-  @Tool({
-    name: 'detail_issue',
-    description:
-      'Retrieves detailed information for a specific issue by its ID, including full description, comments, and history. Use this to get the context or progress of a particular ticket. Keywords: issue details, comments, history.',
-    parameters: detailIssueSchema,
-    outputSchema: z.object({
-      id: z.string().describe('The unique identifier of the issue.'),
-      title: z.string().describe('The issue title.'),
-      description: z
-        .string()
-        .optional()
-        .describe('Full textual description of the issue.'),
-      status: z.string().describe('The current status.'),
-      workspaceId: z
-        .string()
-        .describe('The ID of the workspace this issue belongs to.'),
-      comments: z
-        .array(z.any())
-        .optional()
-        .describe(
-          'List of comments or activity logs associated with the issue.',
-        ),
-    }),
-  })
-  async getIssueDetails(params: z.infer<typeof detailIssueSchema>) {
-    const { workspaceId, issueId } = params;
-    return this.issuesService.getById(issueId, workspaceId);
-  }
+  // @Tool({
+  //   name: 'detail_issue',
+  //   description:
+  //     'Retrieves detailed information for a specific issue by its ID, including full description, comments, and history. Use this to get the context or progress of a particular ticket. Keywords: issue details, comments, history.',
+  //   parameters: detailIssueSchema,
+  //   outputSchema: z.object({
+  //     id: z.string().describe('The unique identifier of the issue.'),
+  //     title: z.string().describe('The issue title.'),
+  //     description: z
+  //       .string()
+  //       .optional()
+  //       .describe('Full textual description of the issue.'),
+  //     status: z.string().describe('The current status.'),
+  //     workspaceId: z
+  //       .string()
+  //       .describe('The ID of the workspace this issue belongs to.'),
+  //     comments: z
+  //       .array(z.any())
+  //       .optional()
+  //       .describe(
+  //         'List of comments or activity logs associated with the issue.',
+  //       ),
+  //   }),
+  // })
+  // async getIssueDetails(
+  //   params: z.infer<typeof detailIssueSchema>,
+  //   _: Context,
+  //   request: Request,
+  // ) {
+  //   const { issueId } = params;
+  //   const workspaceId = this.getWorkspaceId(request);
+  //   return this.issuesService.getById(issueId, workspaceId);
+  // }
 
-  @Tool({
-    name: 'list_tools',
-    description:
-      'Provides a catalog of available security software, scanning engines, and tool definitions (e.g., Nuclei, Nmap, Subfinder). Use this when the user asks what scanners are supported or the "software list". Keywords: tools list, scanner catalog, engine types.',
-    parameters: listToolsSchema,
-    outputSchema: getManyBaseResponseSchema(
-      z.object({
-        id: z.string().describe('The unique identifier of the tool.'),
-        name: z.string().describe('The name of the tool (e.g., "Nuclei").'),
-        description: z
-          .string()
-          .optional()
-          .describe('A brief summary of what the tool does.'),
-        version: z
-          .string()
-          .optional()
-          .describe('The installed version of the tool.'),
-        isInstalled: z
-          .boolean()
-          .optional()
-          .describe('Whether the tool is currently active and installed.'),
-        type: z
-          .string()
-          .optional()
-          .describe('The type of the tool (built_in or provider).'),
-      }),
-    ),
-  })
-  async getTools(params: z.infer<typeof listToolsSchema>) {
-    const { workspaceId, limit, page } = params;
-    // q param is not supported by service yet
-    const response = await this.toolsService.getManyTools({
-      limit: limit || 100,
-      page: page || 1,
-      workspaceId,
-      sortBy: 'createdAt',
-    });
+  // @Tool({
+  //   name: 'list_tools',
+  //   description:
+  //     'Provides a catalog of available security software, scanning engines, and tool definitions (e.g., Nuclei, Nmap, Subfinder). Use this when the user asks what scanners are supported or the "software list". Keywords: tools list, scanner catalog, engine types.',
+  //   parameters: listToolsSchema,
+  //   outputSchema: getManyBaseResponseSchema(
+  //     z.object({
+  //       id: z.string().describe('The unique identifier of the tool.'),
+  //       name: z.string().describe('The name of the tool (e.g., "Nuclei").'),
+  //       description: z
+  //         .string()
+  //         .optional()
+  //         .describe('A brief summary of what the tool does.'),
+  //       version: z
+  //         .string()
+  //         .optional()
+  //         .describe('The installed version of the tool.'),
+  //       isInstalled: z
+  //         .boolean()
+  //         .optional()
+  //         .describe('Whether the tool is currently active and installed.'),
+  //       type: z
+  //         .string()
+  //         .optional()
+  //         .describe('The type of the tool (built_in or provider).'),
+  //     }),
+  //   ),
+  // })
+  // async getTools(
+  //   params: z.infer<typeof listToolsSchema>,
+  //   _: Context,
+  //   request: Request,
+  // ) {
+  //   const { limit, page } = params;
+  //   const workspaceId = this.getWorkspaceId(request);
+  //   // q param is not supported by service yet
+  //   const response = await this.toolsService.getManyTools({
+  //     limit: limit || 100,
+  //     page: page || 1,
+  //     workspaceId,
+  //     sortBy: 'createdAt',
+  //   });
 
-    return {
-      ...response,
-      data: response.data.map((t) => ({
-        id: t.id,
-        name: t.name,
-        description: t.description,
-        type: t.type,
-        version: t.version,
-        isInstalled: t.isInstalled,
-      })),
-    };
-  }
-
-  @Tool({
-    name: 'list_workers',
-    description:
-      'Lists the physical/virtual worker nodes and infrastructure machines (scanners) that are currently online and executing jobs. Use this when the user asks about system health, node status, workload, or "where are my scans running". Keywords: workers, nodes, infrared status, machines.',
-    parameters: listWorkersSchema,
-    outputSchema: getManyBaseResponseSchema(
-      z.object({
-        id: z.string().describe('Unique identifier of the worker.'),
-        name: z.string().describe('Readable name or ID fragment.'),
-        status: z.string().describe('Current status: online or offline.'),
-        type: z.string().describe('Worker type (e.g., BUILT_IN, PROVIDER).'),
-        scope: z.string().describe('Worker scope (e.g., WORKSPACE, CLOUD).'),
-        currentJobsCount: z
-          .number()
-          .describe('Number of active jobs currently running on this worker.'),
-        toolName: z
-          .string()
-          .optional()
-          .describe(
-            'The specific security tool this worker is dedicated to, if any.',
-          ),
-        lastSeenAt: z
-          .string()
-          .describe('Timestamp of the last signal received from this worker.'),
-      }),
-    ),
-  })
-  async getWorkers(params: z.infer<typeof listWorkersSchema>) {
-    const { workspaceId, limit, page } = params;
-    const response = await this.workersService.getWorkers({
-      limit: limit || 100,
-      page: page || 1,
-      workspaceId,
-      sortBy: 'createdAt',
-    });
-
-    return {
-      ...response,
-      data: response.data.map((w) => {
-        const isOnline =
-          w.lastSeenAt &&
-          Date.now() - new Date(w.lastSeenAt).getTime() < WORKER_TIMEOUT;
-        return {
-          id: w.id,
-          name: `Worker-${w.id.slice(0, 8)}`,
-          status: isOnline ? 'online' : 'offline',
-          type: w.type,
-          scope: w.scope,
-          currentJobsCount: w.currentJobsCount || 0,
-          toolName: w.tool?.name || 'General Purpose',
-          lastSeenAt: w.lastSeenAt?.toISOString(),
-        };
-      }),
-    };
-  }
-
-  @Tool({
-    name: 'job_manager',
-    description:
-      'Lists background jobs and scan activities. Provides status, timing, priority, and technical context (tool, target). Use this when the user asks about "scans running", "job progress", or "what is the system doing". Keywords: jobs, scan progress, active tasks, failed scans.',
-    parameters: listJobsSchema,
-    outputSchema: getManyBaseResponseSchema(
-      z.object({
-        id: z.string().describe('The unique identifier of the job.'),
-        toolName: z
-          .string()
-          .describe('The name of the security tool being executed.'),
-        status: z
-          .string()
-          .describe(
-            'Execution status (e.g., pending, in_progress, completed, failed).',
-          ),
-        priority: z
-          .string()
-          .describe('Job priority level (CRITICAL to BACKGROUND).'),
-        targetValue: z
-          .string()
-          .optional()
-          .describe('The asset value being scanned (e.g., domain or IP).'),
-        retryCount: z
-          .number()
-          .describe('Number of times the job has been retried after failure.'),
-        errorCount: z
-          .number()
-          .describe('Number of error logs recorded for this job.'),
-        startedAt: z.string().optional().describe('When the job was created.'),
-        finishedAt: z
-          .string()
-          .optional()
-          .describe('When the job reached a terminal state.'),
-        jobHistoryId: z
-          .string()
-          .optional()
-          .describe('ID of the associated scan run history.'),
-      }),
-    ),
-  })
-  async listJobs(params: z.infer<typeof listJobsSchema>) {
-    const { workspaceId, limit, page, jobHistoryId, jobStatus } = params;
-    const response = await this.jobsRegistryService.getManyJobs({
-      limit: limit || 100,
-      page: page || 1,
-      jobHistoryId: jobHistoryId,
-      jobStatus,
-      workspaceId,
-      sortBy: 'createdAt',
-    });
-
-    return {
-      ...response,
-      data: response.data.map((j) => ({
-        id: j.id,
-        toolName: j.tool?.name || j.category,
-        status: j.status,
-        priority: j.priority,
-        targetValue: j.asset?.value,
-        retryCount: j.retryCount,
-        errorCount: j.errorLogs?.length || 0,
-        startedAt: j.createdAt?.toISOString(),
-        finishedAt: j.completedAt?.toISOString() || j.updatedAt?.toISOString(),
-        jobHistoryId: j.jobHistory?.id,
-      })),
-    };
-  }
+  //   return {
+  //     ...response,
+  //     data: response.data.map((t) => ({
+  //       id: t.id,
+  //       name: t.name,
+  //       description: t.description,
+  //       type: t.type,
+  //       version: t.version,
+  //       isInstalled: t.isInstalled,
+  //     })),
+  //   };
+  // }
 }
