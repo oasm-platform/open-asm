@@ -28,9 +28,11 @@ jest.mock('ai', () => ({
 }));
 
 jest.mock('@ai-sdk/openai', () => ({
-  createOpenAI: jest.fn(() => (model: string) => ({
-    model,
-    provider: 'openai',
+  createOpenAI: jest.fn(() => ({
+    chat: jest.fn((model: string) => ({
+      model,
+      provider: 'openai',
+    })),
   })),
 }));
 
@@ -97,6 +99,7 @@ describe('AgentsService', () => {
             find: jest.fn(),
             remove: jest.fn(),
             update: jest.fn(),
+            count: jest.fn(),
             createQueryBuilder: jest.fn(() => ({
               where: jest.fn().mockReturnThis(),
               andWhere: jest.fn().mockReturnThis(),
@@ -160,6 +163,7 @@ describe('AgentsService', () => {
         model: 'gpt-4o',
       };
 
+      jest.spyOn(llmConfigRepository, 'count').mockResolvedValue(0);
       jest.spyOn(llmConfigRepository, 'create').mockReturnValue(mockLlmConfig);
       jest.spyOn(llmConfigRepository, 'save').mockResolvedValue(mockLlmConfig);
 
