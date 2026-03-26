@@ -1,9 +1,5 @@
-import {
-  GET_WORKSPACE_MCP_TOOL_NAME,
-  WORKER_TIMEOUT,
-} from '@/common/constants/app.constants';
+import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
 import { IssueStatus } from '@/common/enums/enum';
-import { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import { AssetsService } from '@/modules/assets/assets.service';
 import { IssuesService } from '@/modules/issues/issues.service';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
@@ -14,7 +10,7 @@ import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilitie
 import { WorkersService } from '@/modules/workers/workers.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { Injectable } from '@nestjs/common';
-import { Context, Tool } from '@rekog/mcp-nest';
+import { Tool } from '@rekog/mcp-nest';
 import z from 'zod';
 import {
   detailAssetSchema,
@@ -46,42 +42,6 @@ export class McpTools {
     private workersService: WorkersService,
     private jobsRegistryService: JobsRegistryService,
   ) {}
-
-  @Tool({
-    name: GET_WORKSPACE_MCP_TOOL_NAME,
-    description:
-      'Retrieves a list of workspaces accessible to the user. This is typically the first tool to call to obtain the "workspaceId" required for almost all other operations.',
-    outputSchema: z.object({
-      workspaces: z
-        .array(
-          z.object({
-            id: z.string().describe('The unique identifier of the workspace.'),
-            name: z
-              .string()
-              .describe('The human-readable name of the workspace.'),
-          }),
-        )
-        .describe('A list of workspaces the user has permission to access.'),
-    }),
-  })
-  async getWorkspaces(_, context: Context, req: RequestWithMetadata) {
-    const workspaceIds = req.mcp?.permissions?.value.map((p) => p.workspaceId);
-
-    if (!workspaceIds || workspaceIds.length === 0) {
-      return { workspaces: [] };
-    }
-
-    const workspaces = await this.workspaceService
-      .getWorkspacesByIds(workspaceIds)
-      .then((res) =>
-        res.map((i) => ({
-          id: i.id,
-          name: i.name,
-        })),
-      );
-
-    return { workspaces };
-  }
 
   @Tool({
     name: 'get_assets',

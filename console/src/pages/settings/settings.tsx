@@ -3,9 +3,7 @@ import { useEffect, useMemo, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
-import CreateMcpPermission from './components/create-mcp-permission';
 import GetAboutProject from './components/get-about-project';
-import ListMcpPermissions from './components/list-mcp-permissions';
 import Preferences from './components/preferences';
 import SecuritySettings from './components/security-settings';
 import WorkspaceSettings from './components/workspace-settings';
@@ -85,23 +83,6 @@ export const settingsTabGroups: SettingsTabGroup[] = [
           description: 'Manage your account security settings',
         },
         component: <SecuritySettings />,
-      },
-    ],
-  },
-  // Group: Security Agents
-  {
-    name: 'AI Agents',
-    tabs: [
-      {
-        id: 'mcp',
-        label: 'MCP connect',
-        path: '/settings/mcp',
-        content: {
-          title: 'MCP Permissions',
-          description: 'Manage your MCP permissions',
-          action: <CreateMcpPermission />,
-        },
-        component: <ListMcpPermissions />,
       },
     ],
   },
