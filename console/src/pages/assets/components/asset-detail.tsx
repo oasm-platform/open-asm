@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   Tag,
 } from 'lucide-react';
-import AddTagDialog from './add-tag-dialog';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
 import ScreenshotCell from './screenshot-cell';
@@ -27,7 +26,7 @@ import { TechnologyTooltip } from './technology-tooltip';
 import ViewCode from './view-code';
 
 export default function AssetDetail({ id }: { id: string }) {
-  const { data, refetch } = useAssetsControllerGetAssetById(id, {});
+  const { data } = useAssetsControllerGetAssetById(id, {});
 
   if (!data) {
     return (
@@ -134,7 +133,7 @@ export default function AssetDetail({ id }: { id: string }) {
               <Tag size={16} /> {tag.tag}
             </Badge>
           ))}
-          <AddTagDialog id={id} domain={value} tags={tags} refetch={refetch} />
+          {/* <AddTagDialog id={id} domain={value} tags={tags} refetch={refetch} /> */}
         </div>
 
         {tls && (

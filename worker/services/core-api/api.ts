@@ -424,219 +424,6 @@ export interface GetVersionDto {
   isLatest: boolean | null;
 }
 
-export interface GenerateTagsResponseDto {
-  /**
-   * Domain that tags were generated for
-   * @example "example.com"
-   */
-  domain: string;
-  /**
-   * Generated tags
-   * @example ["web","technology","blog"]
-   */
-  tags: string[];
-}
-
-export interface GenerateTagsDto {
-  /**
-   * Domain to generate tags for
-   * @example "example.com"
-   */
-  domain: string;
-}
-
-export interface GetMcpServersResponseDto {
-  /**
-   * MCP servers configuration with embedded status
-   * @example {"mcpServers":{"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"..."},"disabled":false,"active":true,"status":"active"},"searxng":{"command":"npx","args":["-y","mcp-searxng"],"disabled":false,"active":false,"status":"error","error":"Connection failed"}}}
-   */
-  mcpServers: object;
-}
-
-export interface AddMcpServersResponseDto {
-  /** Config ID */
-  id?: string;
-  /** Workspace ID */
-  workspace_id?: string;
-  /** User ID */
-  user_id?: string;
-  /** Created timestamp */
-  created_at?: string;
-  /** Updated timestamp */
-  updated_at?: string;
-  /** MCP servers configuration with status */
-  mcpServers: object;
-  /** Whether the operation succeeded */
-  success: boolean;
-  /** Error message if operation failed */
-  error?: string;
-}
-
-export interface AddMcpServersDto {
-  /**
-   * MCP servers configuration object
-   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"5cN3KVQ9..."},"disabled":false},"searxng":{"command":"npx","args":["-y","mcp-searxng"],"env":{"SEARXNG_URL":"http://localhost:8081"},"disabled":false}}
-   */
-  mcpServers: object;
-}
-
-export interface UpdateMcpServersResponseDto {
-  /** Config ID */
-  id?: string;
-  /** Workspace ID */
-  workspace_id?: string;
-  /** User ID */
-  user_id?: string;
-  /** Created timestamp */
-  created_at?: string;
-  /** Updated timestamp */
-  updated_at?: string;
-  /** Updated MCP servers configuration with status */
-  mcpServers: object;
-  /** Whether the operation succeeded */
-  success: boolean;
-}
-
-export interface UpdateMcpServersDto {
-  /**
-   * MCP servers configuration object
-   * @example {"oasm-platform":{"url":"http://localhost:5173/api/mcp","headers":{"api-key":"updated-key"},"disabled":false}}
-   */
-  mcpServers: object;
-}
-
-export interface DeleteMcpServersResponseDto {
-  /** Whether the operation succeeded */
-  success: boolean;
-  /** Response message */
-  message?: string;
-}
-
-export interface GetMcpServerHealthResponseDto {
-  /** Whether the server is active and operational */
-  isActive: boolean;
-  /** Server status: active, disabled, or error */
-  status: GetMcpServerHealthResponseDtoStatusEnum;
-  /** Error message if status is error */
-  error?: string;
-}
-
-export interface GetConversationsResponseDto {
-  /** List of conversations */
-  conversations: {
-    conversationId?: string;
-    title?: string;
-    description?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  }[];
-  /** Total count of conversations */
-  totalCount: number;
-}
-
-export interface UpdateConversationResponseDto {
-  /** Updated conversation */
-  conversation: {
-    conversationId?: string;
-    title?: string;
-    description?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  };
-}
-
-export interface UpdateConversationDto {
-  /**
-   * New title for the conversation
-   * @example "Updated Conversation Title"
-   */
-  title?: string;
-  /**
-   * New description for the conversation
-   * @example "Updated description"
-   */
-  description?: string;
-}
-
-export interface DeleteConversationResponseDto {
-  /**
-   * Success status
-   * @example true
-   */
-  success: boolean;
-  /**
-   * Response message
-   * @example "Conversation deleted successfully"
-   */
-  message: string;
-}
-
-export interface DeleteConversationsResponseDto {
-  /**
-   * Success status
-   * @example true
-   */
-  success: boolean;
-  /**
-   * Response message
-   * @example "All conversations deleted successfully"
-   */
-  message: string;
-}
-
-export interface GetMessagesResponseDto {
-  /** List of messages in the conversation */
-  messages: {
-    messageId?: string;
-    question?: string;
-    type?: string;
-    content?: string;
-    conversationId?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  }[];
-}
-
-export interface DeleteMessageResponseDto {
-  /**
-   * Success status
-   * @example true
-   */
-  success: boolean;
-  /**
-   * Response message
-   * @example "Message deleted successfully"
-   */
-  message: string;
-}
-
-export interface ModelInfoResponseDto {
-  id: string;
-  name: string;
-  provider: string;
-  description: string;
-  isActive: boolean;
-  isRecommended: boolean;
-}
-
-export interface LLMConfigResponseDto {
-  id: string;
-  provider: string;
-  apiKey: string;
-  model: string;
-  apiUrl: string;
-  isPreferred: boolean;
-  isEditable: boolean;
-}
-
-export interface UpdateLLMConfigDto {
-  id?: string;
-  provider: string;
-  apiKey: string;
-  model?: string;
-  apiUrl?: string;
-}
-
 export interface SystemConfigResponseDto {
   /** System name */
   name: string;
@@ -1825,6 +1612,114 @@ export interface UpdateIssueCommentDto {
 
 export type Object = object;
 
+export interface LLMConfigResponseDto {
+  id: string;
+  provider: LlmConfigResponseDtoProviderEnum;
+  model: string;
+  apiUrl?: string;
+  isPreferred: boolean;
+  /** Masked API key (shows last 4 chars) */
+  apiKeyMasked: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface CreateLLMConfigDto {
+  /** @example "openrouter" */
+  provider: CreateLlmConfigDtoProviderEnum;
+  apiKey: string;
+  model: string;
+  apiUrl?: string;
+}
+
+export interface LLMConfigWithProviderDto {
+  /** Provider identifier */
+  providerId: LlmConfigWithProviderDtoProviderIdEnum;
+  /** Provider display name */
+  providerName: string;
+  /** Provider logo path */
+  logo?: string;
+  /** Connection status */
+  isConnected: boolean;
+  /** LLM config ID if connected */
+  configId?: string;
+  /** Model name if connected */
+  model?: string;
+  /** API URL if connected */
+  apiUrl?: string;
+  /** Is preferred config if connected */
+  isPreferred?: boolean;
+  /** Masked API key if connected */
+  apiKeyMasked?: string;
+  /**
+   * Created at if connected
+   * @format date-time
+   */
+  createdAt?: string;
+  /**
+   * Updated at if connected
+   * @format date-time
+   */
+  updatedAt?: string;
+}
+
+export interface UpdateLLMConfigDto {
+  /** @example "openrouter" */
+  provider?: UpdateLlmConfigDtoProviderEnum;
+  apiKey?: string;
+  model?: string;
+  apiUrl?: string;
+  /** @example true */
+  isPreferred?: boolean;
+}
+
+export interface ConversationResponseDto {
+  id: string;
+  llmConfigId: string;
+  title?: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface GetManyConversationResponseDtoDto {
+  data: ConversationResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface UpdateConversationDto {
+  /** @example "Updated title" */
+  title?: string;
+}
+
+export interface MessageResponseDto {
+  id: string;
+  conversationId: string;
+  role: MessageResponseDtoRoleEnum;
+  content: string;
+  messageType: MessageResponseDtoMessageTypeEnum;
+  metadata?: object;
+  /** @format date-time */
+  createdAt: string;
+}
+
+export interface SendMessageDto {
+  /** @example "Hello, how can you help me?" */
+  question: string;
+  /**
+   * Continue existing conversation. If not provided, a new conversation is created.
+   * @example "550e8400-e29b-41d4-a716-446655440000"
+   */
+  conversationId?: string;
+}
+
 export interface NotificationResponseDto {
   id: string;
   status: NotificationResponseDtoStatusEnum;
@@ -1947,13 +1842,6 @@ export enum OnScheduleEnum {
   Value001 = "0 0 1 * *",
 }
 
-/** Server status: active, disabled, or error */
-export enum GetMcpServerHealthResponseDtoStatusEnum {
-  Active = "active",
-  Disabled = "disabled",
-  Error = "error",
-}
-
 export enum ToolCategoryEnum {
   Subdomains = "subdomains",
   HttpProbe = "http_probe",
@@ -2033,6 +1921,49 @@ export enum IssueCommentTypeEnum {
   Content = "content",
   Open = "open",
   Closed = "closed",
+}
+
+export enum LlmConfigResponseDtoProviderEnum {
+  Openai = "openai",
+  Openrouter = "openrouter",
+  Anthropic = "anthropic",
+  Custom = "custom",
+}
+
+/** @example "openrouter" */
+export enum CreateLlmConfigDtoProviderEnum {
+  Openai = "openai",
+  Openrouter = "openrouter",
+  Anthropic = "anthropic",
+  Custom = "custom",
+}
+
+/** Provider identifier */
+export enum LlmConfigWithProviderDtoProviderIdEnum {
+  Openai = "openai",
+  Openrouter = "openrouter",
+  Anthropic = "anthropic",
+  Custom = "custom",
+}
+
+/** @example "openrouter" */
+export enum UpdateLlmConfigDtoProviderEnum {
+  Openai = "openai",
+  Openrouter = "openrouter",
+  Anthropic = "anthropic",
+  Custom = "custom",
+}
+
+export enum MessageResponseDtoRoleEnum {
+  User = "user",
+  Assistant = "assistant",
+  System = "system",
+}
+
+export enum MessageResponseDtoMessageTypeEnum {
+  Text = "text",
+  Thinking = "thinking",
+  Error = "error",
 }
 
 export enum NotificationResponseDtoStatusEnum {
@@ -2836,361 +2767,6 @@ export class Api<
     this.request<AppResponseSerialization, any>({
       path: `/api/version/latest`,
       method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Analyzes a domain and generates relevant tags using AI classification. Requires AI Assistant tool to be installed in the workspace.
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGenerateTags
-   * @summary Generate tags for a domain using AI
-   * @request POST:/api/ai-assistant/generate-tags
-   */
-  aiAssistantControllerGenerateTags = (
-    data: GenerateTagsDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/generate-tags`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves all MCP servers for the current workspace and user
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetMcpServers
-   * @summary Get all MCP servers
-   * @request GET:/api/ai-assistant/mcp-servers
-   */
-  aiAssistantControllerGetMcpServers = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Adds one or more MCP servers to the workspace
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerAddMcpServers
-   * @summary Add MCP servers
-   * @request POST:/api/ai-assistant/mcp-servers
-   */
-  aiAssistantControllerAddMcpServers = (
-    data: AddMcpServersDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Updates one or more MCP servers
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerUpdateMcpServers
-   * @summary Update MCP servers
-   * @request PATCH:/api/ai-assistant/mcp-servers
-   */
-  aiAssistantControllerUpdateMcpServers = (
-    data: UpdateMcpServersDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers`,
-      method: "PATCH",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes MCP config by ID
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerDeleteMcpServers
-   * @summary Delete MCP config
-   * @request DELETE:/api/ai-assistant/mcp-servers/{id}
-   */
-  aiAssistantControllerDeleteMcpServers = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers/${id}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Gets the health status of a specific MCP server
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetMcpServerHealth
-   * @summary Get MCP server health
-   * @request GET:/api/ai-assistant/mcp-servers/{serverName}/health
-   */
-  aiAssistantControllerGetMcpServerHealth = (
-    serverName: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/mcp-servers/${serverName}/health`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves all conversations for the current workspace and user
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetConversations
-   * @summary Get all conversations
-   * @request GET:/api/ai-assistant/conversations
-   */
-  aiAssistantControllerGetConversations = (
-    query?: {
-      search?: string;
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes all conversations for the current workspace and user
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerDeleteConversations
-   * @summary Delete all conversations
-   * @request DELETE:/api/ai-assistant/conversations
-   */
-  aiAssistantControllerDeleteConversations = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Updates the title and/or description of a conversation
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerUpdateConversation
-   * @summary Update a conversation
-   * @request PATCH:/api/ai-assistant/conversations/{id}
-   */
-  aiAssistantControllerUpdateConversation = (
-    id: string,
-    data: UpdateConversationDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations/${id}`,
-      method: "PATCH",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes a specific conversation by ID
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerDeleteConversation
-   * @summary Delete a conversation
-   * @request DELETE:/api/ai-assistant/conversations/{id}
-   */
-  aiAssistantControllerDeleteConversation = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations/${id}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves all messages in a specific conversation
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetMessages
-   * @summary Get messages in a conversation
-   * @request GET:/api/ai-assistant/conversations/{id}/messages
-   */
-  aiAssistantControllerGetMessages = (id: string, params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations/${id}/messages`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes a specific message by ID
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerDeleteMessage
-   * @summary Delete a message
-   * @request DELETE:/api/ai-assistant/conversations/{conversationId}/messages/{messageId}
-   */
-  aiAssistantControllerDeleteMessage = (
-    conversationId: string,
-    messageId: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/conversations/${conversationId}/messages/${messageId}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves all available models (internal + configured external)
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetAvailableModels
-   * @summary Get available models
-   * @request GET:/api/ai-assistant/models
-   */
-  aiAssistantControllerGetAvailableModels = (params: RequestParams = {}) =>
-    this.request<
-      AppResponseSerialization & {
-        data?: ModelInfoResponseDto[];
-      },
-      any
-    >({
-      path: `/api/ai-assistant/models`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Retrieves LLM configurations/keys (masked)
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerGetLlmConfigs
-   * @summary Get LLM Configs
-   * @request GET:/api/ai-assistant/configs
-   */
-  aiAssistantControllerGetLlmConfigs = (
-    query?: {
-      search?: string;
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<
-      AppResponseSerialization & {
-        data?: LLMConfigResponseDto[];
-      },
-      any
-    >({
-      path: `/api/ai-assistant/configs`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Updates or creates LLM configuration for a provider (BYOK)
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerUpdateLlmConfig
-   * @summary Update LLM Config
-   * @request POST:/api/ai-assistant/configs
-   */
-  aiAssistantControllerUpdateLlmConfig = (
-    data: UpdateLLMConfigDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/configs`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes LLM configuration by ID
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerDeleteLlmConfig
-   * @summary Delete LLM Config
-   * @request DELETE:/api/ai-assistant/configs/{id}
-   */
-  aiAssistantControllerDeleteLlmConfig = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/configs/${id}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Sets a specific LLM configuration as preferred
-   *
-   * @tags AI Assistant
-   * @name AiAssistantControllerSetPreferredLlmConfig
-   * @summary Set Preferred LLM Config
-   * @request PATCH:/api/ai-assistant/configs/{id}/set-preferred
-   */
-  aiAssistantControllerSetPreferredLlmConfig = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/ai-assistant/configs/${id}/set-preferred`,
-      method: "PATCH",
       format: "json",
       ...params,
     });
@@ -5208,6 +4784,253 @@ export class Api<
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/comments/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Create a new LLM provider configuration
+   *
+   * @tags Agents
+   * @name AgentsControllerCreateLlmConfig
+   * @summary Create LLM config
+   * @request POST:/api/agents/llm-configs
+   */
+  agentsControllerCreateLlmConfig = (
+    data: CreateLLMConfigDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/llm-configs`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get all LLM providers with their configuration status for the workspace
+   *
+   * @tags Agents
+   * @name AgentsControllerGetLlmConfigs
+   * @summary List LLM configs with provider info
+   * @request GET:/api/agents/llm-configs
+   */
+  agentsControllerGetLlmConfigs = (params: RequestParams = {}) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: LLMConfigWithProviderDto[];
+      },
+      any
+    >({
+      path: `/api/agents/llm-configs`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Update an existing LLM configuration
+   *
+   * @tags Agents
+   * @name AgentsControllerUpdateLlmConfig
+   * @summary Update LLM config
+   * @request PATCH:/api/agents/llm-configs/{id}
+   */
+  agentsControllerUpdateLlmConfig = (
+    id: string,
+    data: UpdateLLMConfigDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/llm-configs/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete an LLM configuration
+   *
+   * @tags Agents
+   * @name AgentsControllerDeleteLlmConfig
+   * @summary Delete LLM config
+   * @request DELETE:/api/agents/llm-configs/{id}
+   */
+  agentsControllerDeleteLlmConfig = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/llm-configs/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Set an LLM config as the preferred one for the workspace
+   *
+   * @tags Agents
+   * @name AgentsControllerSetPreferredLlmConfig
+   * @summary Set preferred LLM config
+   * @request PATCH:/api/agents/llm-configs/{id}/set-preferred
+   */
+  agentsControllerSetPreferredLlmConfig = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/llm-configs/${id}/set-preferred`,
+      method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get all conversations for the workspace
+   *
+   * @tags Agents
+   * @name AgentsControllerGetConversations
+   * @summary List conversations
+   * @request GET:/api/agents/conversations
+   */
+  agentsControllerGetConversations = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Update a conversation title
+   *
+   * @tags Agents
+   * @name AgentsControllerUpdateConversation
+   * @summary Update conversation
+   * @request PATCH:/api/agents/conversations/{id}
+   */
+  agentsControllerUpdateConversation = (
+    id: string,
+    data: UpdateConversationDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete a conversation and all its messages
+   *
+   * @tags Agents
+   * @name AgentsControllerDeleteConversation
+   * @summary Delete conversation
+   * @request DELETE:/api/agents/conversations/{id}
+   */
+  agentsControllerDeleteConversation = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get all messages in a conversation
+   *
+   * @tags Agents
+   * @name AgentsControllerGetMessages
+   * @summary Get messages
+   * @request GET:/api/agents/conversations/{id}/messages
+   */
+  agentsControllerGetMessages = (
+    id: string,
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: MessageResponseDto[];
+      },
+      any
+    >({
+      path: `/api/agents/conversations/${id}/messages`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Send a message and receive a streaming response via SSE. If conversationId is not provided, a new conversation is created using the preferred LLM config.
+   *
+   * @tags Agents
+   * @name AgentsControllerSendMessageStream
+   * @summary Send message (streaming)
+   * @request POST:/api/agents/messages/stream
+   */
+  agentsControllerSendMessageStream = (
+    data: SendMessageDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/messages/stream`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete a specific message in a conversation
+   *
+   * @tags Agents
+   * @name AgentsControllerDeleteMessage
+   * @summary Delete message
+   * @request DELETE:/api/agents/conversations/{cid}/messages/{mid}
+   */
+  agentsControllerDeleteMessage = (
+    cid: string,
+    mid: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations/${cid}/messages/${mid}`,
       method: "DELETE",
       format: "json",
       ...params,

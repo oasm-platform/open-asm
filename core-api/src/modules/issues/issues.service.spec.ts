@@ -6,7 +6,6 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AiAssistantService } from '../ai-assistant/ai-assistant.service';
 import { IssueComment } from './entities/issue-comment.entity';
 import { Issue } from './entities/issue.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
@@ -75,13 +74,6 @@ describe('IssuesService', () => {
             onStatusChange: jest.fn(),
           },
         },
-        {
-          provide: AiAssistantService,
-          useValue: {
-            resolveIssue: jest.fn(),
-            getMessages: jest.fn(),
-          },
-        },
       ],
     })
       .overrideProvider(getRepositoryToken(Issue))
@@ -120,11 +112,6 @@ describe('IssuesService', () => {
       .overrideProvider(VulnerabilitySourceHandler)
       .useValue({
         onStatusChange: jest.fn(),
-      })
-      .overrideProvider(AiAssistantService)
-      .useValue({
-        resolveIssue: jest.fn(),
-        getMessages: jest.fn(),
       })
       .compile();
 

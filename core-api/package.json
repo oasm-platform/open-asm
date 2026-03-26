@@ -22,6 +22,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.64",
+    "@ai-sdk/google": "^3.0.53",
+    "@ai-sdk/openai": "^3.0.48",
     "@grpc/grpc-js": "^1.14.2",
     "@grpc/proto-loader": "^0.8.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
@@ -41,6 +44,7 @@
     "@rekog/mcp-nest": "^1.8.4",
     "@types/cookie-parser": "^1.4.10",
     "@types/multer": "^2.0.0",
+    "ai": "^6.0.137",
     "axios": "^1.13.5",
     "better-auth": "^1.4.7",
     "bullmq": "^5.65.1",
@@ -118,6 +122,9 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"
-    }
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(better-auth)/)"
+    ]
   }
 }

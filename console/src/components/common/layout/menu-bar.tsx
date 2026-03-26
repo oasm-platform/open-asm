@@ -18,6 +18,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
+import { useSession } from '@/utils/authClient';
 import {
   Bug,
   CircleDot,
@@ -26,13 +27,13 @@ import {
   Cpu,
   Group,
   LayoutDashboard,
+  Sparkles,
   SquareTerminal,
   Target,
   User,
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
 import { NewBadge } from '../new-badge';
-import { useSession } from '@/utils/authClient';
 
 interface SubMenuItem {
   title: string;
@@ -62,6 +63,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Dashboard',
           icon: <LayoutDashboard />,
           url: '/',
+        },
+        {
+          title: 'Agents',
+          icon: <Sparkles />,
+          url: '/agents',
         },
       ],
     },

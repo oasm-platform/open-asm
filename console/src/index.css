@@ -190,3 +190,54 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Custom bounce animation - realistic bouncing ball effect */
+@keyframes bounce-slow-high {
+  0%, 70% {
+    transform: translateY(0);
+    animation-timing-function: ease-out;
+  }
+  72% {
+    transform: translateY(-50%);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  76% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  78% {
+    transform: translateY(-30%);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  82% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  84% {
+    transform: translateY(-18%);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  88% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  90% {
+    transform: translateY(-10%);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  94% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  96% {
+    transform: translateY(-5%);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-bounce-slow-high {
+  animation: bounce-slow-high 4s infinite;
+}
