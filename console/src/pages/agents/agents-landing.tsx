@@ -64,11 +64,22 @@ const CONVERSATION_STARTERS = [
   'I am tuned in. What security topics interest you?',
 ];
 
-const QUICK_SUGGESTIONS = [
-  'Find SQL injection vulnerabilities',
-  'Review my API for auth issues',
-  'How to implement JWT securely?',
-  'Explain OWASP Top 10',
+const ALL_QUICK_SUGGESTIONS = [
+  'What is the attack surface of my current workspace?',
+  'Are there any exposed services or ports in my project?',
+  'What security risks exist in my current environment?',
+  'How can I reduce the attack surface of my application?',
+  'What entry points need security hardening in my workspace?',
+  'Which network services are publicly accessible in my setup?',
+  'What APIs are exposed without proper authentication?',
+  'Are there unnecessary ports open in my infrastructure?',
+  'What cloud resources are vulnerable to external attacks?',
+  'How can I identify shadow IT in my organization?',
+  'What third-party integrations increase my attack surface?',
+  'Are there misconfigured security groups in my environment?',
+  'What endpoints lack proper rate limiting?',
+  'How can I discover undocumented API endpoints?',
+  'What services are running with excessive permissions?',
 ];
 
 export default function AgentsLandingPage() {
@@ -92,6 +103,12 @@ export default function AgentsLandingPage() {
     () => (llmProviders ?? []).some((p) => p.isConnected),
     [llmProviders],
   );
+
+  // Randomly select 5 suggestions from the pool and shuffle them
+  const quickSuggestions = useMemo(() => {
+    const shuffled = [...ALL_QUICK_SUGGESTIONS].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 5);
+  }, []);
 
   const handleSendMessage = useCallback(
     (content: string) => {
@@ -188,7 +205,7 @@ export default function AgentsLandingPage() {
 
           {/* Quick suggestions */}
           <Suggestions>
-            {QUICK_SUGGESTIONS.map((suggestion) => (
+            {quickSuggestions.map((suggestion) => (
               <Suggestion
                 key={suggestion}
                 onClick={handleSuggestionClick}
