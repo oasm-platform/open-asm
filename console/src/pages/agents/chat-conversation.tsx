@@ -9,7 +9,6 @@ import {
   MessageAction,
   MessageActions,
   MessageContent,
-  MessageResponse,
 } from '@/components/ai-elements/message';
 import {
   PromptInput,
@@ -20,6 +19,7 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
+import { Markdown } from '@/components/common/markdown';
 import {
   AlertCircle,
   Bot,
@@ -143,9 +143,7 @@ export function ChatConversation({
                       </div>
                     </div>
                   ) : (
-                    <MessageResponse className="text-[15px] leading-relaxed">
-                      {message.content}
-                    </MessageResponse>
+                    <Markdown content={message.content} preview={false} />
                   )}
                 </MessageContent>
 
