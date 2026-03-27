@@ -111,7 +111,7 @@ export function ChatConversation({
     // This div must have a definite height set by the parent (agents.tsx uses calc(100vh - 4rem))
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Scrollable messages ── */}
-      <Conversation className="flex-1 overflow-y-auto min-h-0">
+      <Conversation className="flex-1 min-h-0">
         <ConversationContent className="max-w-3xl mx-auto w-full px-4 py-6 gap-6">
           {isLoadingMessages ? (
             <ConversationEmptyState
