@@ -69,7 +69,7 @@
     "swagger-typescript-api": "^13.2.16",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.28",
-    "zod": "^3.25.76"
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
