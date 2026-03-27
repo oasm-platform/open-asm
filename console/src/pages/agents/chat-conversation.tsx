@@ -20,7 +20,6 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
-import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 import {
   AlertCircle,
   Bot,
@@ -47,15 +46,6 @@ interface ChatConversationProps {
   isStreaming?: boolean;
   isLoadingMessages?: boolean;
 }
-
-const QUICK_SUGGESTIONS = [
-  'Find SQL injection vulnerabilities',
-  'Review my API authentication',
-  'Explain XSS attacks',
-  'How to implement rate limiting?',
-  'Check for CORS misconfiguration',
-  'OWASP Top 10 overview',
-];
 
 /** Check if the last message is a streaming assistant message */
 function hasStreamingMessage(messages: UIMessage[]): boolean {
@@ -111,12 +101,6 @@ export function ChatConversation({
     }
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    if (!isStreaming) {
-      onSendMessage(suggestion);
-    }
-  };
-
   const isEmpty = !isLoadingMessages && messages.length === 0;
   const lastAssistantIdx = messages.reduce(
     (acc, m, i) => (m.role === 'assistant' ? i : acc),
@@ -159,7 +143,9 @@ export function ChatConversation({
                       </div>
                     </div>
                   ) : (
-                    <MessageResponse className="text-[15px] leading-relaxed">{message.content}</MessageResponse>
+                    <MessageResponse className="text-[15px] leading-relaxed">
+                      {message.content}
+                    </MessageResponse>
                   )}
                 </MessageContent>
 
@@ -200,20 +186,8 @@ export function ChatConversation({
       </Conversation>
 
       {/* ── Sticky input bar ── */}
-      <div className="shrink-0 border-t bg-background/90 backdrop-blur-sm px-4 pt-3 pb-4">
+      <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pt-3 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
-          {/* Horizontal suggestions — always scrollable */}
-          <Suggestions className="pb-1">
-            {QUICK_SUGGESTIONS.map((suggestion) => (
-              <Suggestion
-                key={suggestion}
-                onClick={handleSuggestionClick}
-                suggestion={suggestion}
-                disabled={isStreaming}
-              />
-            ))}
-          </Suggestions>
-
           <PromptInput onSubmit={handleSubmit} className="w-full shadow-sm">
             <PromptInputBody>
               {/* Grows from min 52px up to 33vh before scrolling */}

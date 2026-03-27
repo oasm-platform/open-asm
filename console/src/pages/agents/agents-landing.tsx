@@ -1,7 +1,3 @@
-import Page from '@/components/common/page';
-import LlmConnect from '@/components/llm-connect';
-import TypewriterText from '@/components/typewriter-text';
-import { LlmConfigSwitcher } from '@/components/ui/llm-config-switcher';
 import {
   PromptInput,
   PromptInputBody,
@@ -12,6 +8,10 @@ import {
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
+import Page from '@/components/common/page';
+import LlmConnect from '@/components/llm-connect';
+import TypewriterText from '@/components/typewriter-text';
+import { LlmConfigSwitcher } from '@/components/ui/llm-config-switcher';
 import { axiosInstance } from '@/services/apis/axios-client';
 import type {
   ConversationResponseDto,
@@ -170,7 +170,7 @@ export default function AgentsLandingPage() {
             <PromptInputBody>
               <PromptInputTextarea
                 value={input}
-                placeholder="Ask anything about application security..."
+                placeholder="Ask anything about security..."
                 onChange={(e) => setInput(e.currentTarget.value)}
                 disabled={isSending}
               />
