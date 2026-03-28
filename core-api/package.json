@@ -41,7 +41,6 @@
     "@nestjs/serve-static": "^5.0.4",
     "@nestjs/swagger": "^11.2.3",
     "@nestjs/typeorm": "^11.0.0",
-    "@rekog/mcp-nest": "^1.8.4",
     "@types/cookie-parser": "^1.4.10",
     "@types/multer": "^2.0.0",
     "ai": "^6.0.137",
