@@ -23976,6 +23976,90 @@ export const useAgentsControllerDeleteConversation = <
 };
 
 /**
+ * Delete all conversations for the workspace
+ * @summary Delete all conversations
+ */
+export const agentsControllerDeleteAllConversations = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/conversations`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteAllConversationsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteAllConversations'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+    void
+  > = () => {
+    return agentsControllerDeleteAllConversations(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteAllConversationsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>
+>;
+
+export type AgentsControllerDeleteAllConversationsMutationError = unknown;
+
+/**
+ * @summary Delete all conversations
+ */
+export const useAgentsControllerDeleteAllConversations = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerDeleteAllConversationsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Get all messages in a conversation
  * @summary Get messages
  */

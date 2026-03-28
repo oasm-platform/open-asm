@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { MessageSquarePlus, Search, Trash2 } from 'lucide-react';
-import { useState } from 'react';
 import type { ConversationResponseDto } from '@/services/apis/gen/queries';
+import { MessageSquarePlus, Pencil, Search, Trash2 } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 
 interface ChatHistoryProps {
   conversations: ConversationResponseDto[];
@@ -12,11 +13,13 @@ interface ChatHistoryProps {
   onSelectConversation: (conversationId: string) => void;
   onNewChat: () => void;
   onDeleteConversation: (conversationId: string) => void;
+  onDeleteAllConversations?: () => void;
+  onRenameConversation?: (conversationId: string, newTitle: string) => void;
 }
 
 /**
  * Chat history sidebar component displaying conversation list
- * Groups conversations by date and supports search and delete
+ * Groups conversations by date and supports search, rename, and delete
  */
 export function ChatHistory({
   conversations,
@@ -25,8 +28,13 @@ export function ChatHistory({
   onSelectConversation,
   onNewChat,
   onDeleteConversation,
+  onDeleteAllConversations,
+  onRenameConversation,
 }: ChatHistoryProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filteredConversations = conversations.filter((conv) =>
     (conv.title ?? 'New conversation')
@@ -36,17 +44,59 @@ export function ChatHistory({
 
   const groupedConversations = groupConversationsByDate(filteredConversations);
 
+  const startEditing = useCallback(
+    (e: React.MouseEvent, conv: ConversationResponseDto) => {
+      e.stopPropagation();
+      setEditingId(conv.id);
+      setEditingTitle(conv.title ?? 'New conversation');
+      setTimeout(() => inputRef.current?.select(), 0);
+    },
+    [],
+  );
+
+  const commitRename = useCallback(() => {
+    if (editingId && editingTitle.trim() && onRenameConversation) {
+      onRenameConversation(editingId, editingTitle.trim());
+    }
+    setEditingId(null);
+  }, [editingId, editingTitle, onRenameConversation]);
+
+  const handleRenameKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') commitRename();
+      if (e.key === 'Escape') setEditingId(null);
+    },
+    [commitRename],
+  );
+
   return (
     <div className="flex flex-col h-full w-full bg-muted/30">
       <div className="p-3 space-y-2">
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2"
-          onClick={onNewChat}
-        >
-          <MessageSquarePlus className="h-4 w-4" />
-          New Chat
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1 justify-start gap-2"
+            onClick={onNewChat}
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            New Chat
+          </Button>
+
+          {conversations.length > 0 && onDeleteAllConversations && (
+            <ConfirmDialog
+              title="Delete all conversations"
+              description="Are you sure you want to delete all conversations? This action cannot be undone."
+              onConfirm={onDeleteAllConversations}
+              confirmText="Delete all"
+              trigger={
+                <Button variant="outline" size="icon" className="shrink-0" title="Clear all history">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              }
+            />
+          )}
+        </div>
+        
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
@@ -83,28 +133,62 @@ export function ChatHistory({
                             : 'hover:bg-accent/50',
                         )}
                       >
-                        <button
-                          onClick={() => onSelectConversation(conv.id)}
-                          className={cn(
-                            'flex-1 text-left px-3 py-2 text-sm truncate',
-                            activeConversationId === conv.id
-                              ? 'text-accent-foreground'
-                              : 'text-muted-foreground',
-                          )}
-                          title={conv.title ?? 'New conversation'}
-                        >
-                          {conv.title ?? 'New conversation'}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteConversation(conv.id);
-                          }}
-                          className="p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
-                          aria-label={`Delete conversation: ${conv.title ?? 'New conversation'}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {editingId === conv.id ? (
+                          <div className="flex-1 px-2 py-1.5 flex items-center">
+                            <input
+                              ref={inputRef}
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onBlur={commitRename}
+                              onKeyDown={handleRenameKeyDown}
+                              className="w-full bg-background border border-input rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => onSelectConversation(conv.id)}
+                              className={cn(
+                                'flex-1 text-left px-3 py-2 text-sm truncate',
+                                activeConversationId === conv.id
+                                  ? 'text-accent-foreground'
+                                  : 'text-muted-foreground',
+                              )}
+                              title={conv.title ?? 'New conversation'}
+                            >
+                              {conv.title ?? 'New conversation'}
+                            </button>
+                            
+                            <div className="opacity-0 group-hover:opacity-100 flex items-center shrink-0 pr-1 transition-all">
+                              {onRenameConversation && (
+                                <button
+                                  onClick={(e) => startEditing(e, conv)}
+                                  className="p-1.5 rounded hover:bg-muted text-muted-foreground transition-colors"
+                                  title="Rename conversation"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              
+                              <ConfirmDialog
+                                title="Delete conversation"
+                                description="Are you sure you want to delete this conversation? This action cannot be undone."
+                                onConfirm={() => onDeleteConversation(conv.id)}
+                                confirmText="Delete"
+                                trigger={
+                                  <button
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-1.5 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                    title="Delete conversation"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                }
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -160,6 +160,20 @@ export class AgentsController {
     return this.agentsService.updateConversation(id, dto, workspaceId);
   }
 
+  @Delete('conversations')
+  @Doc({
+    summary: 'Delete all conversations',
+    description: 'Delete all conversations and their messages for the workspace',
+    request: { getWorkspaceId: true },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteAllConversations(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsService.deleteAllConversations(workspaceId);
+    return { message: 'All conversations deleted successfully' };
+  }
+
   @Delete('conversations/:id')
   @Doc({
     summary: 'Delete conversation',

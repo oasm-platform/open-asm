@@ -346,6 +346,10 @@ export class AgentsService {
     await this.conversationRepository.remove(conversation);
   }
 
+  async deleteAllConversations(workspaceId: string): Promise<void> {
+    await this.conversationRepository.delete({ workspaceId });
+  }
+
   // ==========================================
   // Message / Chat Methods
   // ==========================================
