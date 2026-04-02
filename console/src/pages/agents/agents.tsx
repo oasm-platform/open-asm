@@ -6,6 +6,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChatConversation } from './chat-conversation';
 
+/** Tool call state for UI rendering */
+interface ToolCallState {
+  toolCallId: string;
+  toolName: string;
+  status: 'pending' | 'executing' | 'completed' | 'error';
+  input?: Record<string, unknown>;
+  output?: unknown;
+  argsTextDelta?: string;
+}
+
 /** Local message type for UI rendering */
 interface UIMessage {
   id: string;
@@ -14,6 +24,7 @@ interface UIMessage {
   timestamp: Date;
   error?: string;
   errorCode?: string;
+  toolCalls?: ToolCallState[];
 }
 
 interface LocationState {
@@ -26,6 +37,7 @@ export default function AgentsChatPage() {
   const navigate = useNavigate();
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [streamingToolCalls, setStreamingToolCalls] = useState<ToolCallState[]>([]);
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(
     null,
   );
@@ -95,12 +107,13 @@ export default function AgentsChatPage() {
       }
     }
 
-    if (isStreaming && streamingContent) {
+    if (isStreaming && (streamingContent || streamingToolCalls.length > 0)) {
       result.push({
         id: 'streaming',
         role: 'assistant',
         content: streamingContent,
         timestamp: new Date(),
+        toolCalls: streamingToolCalls.length > 0 ? streamingToolCalls : undefined,
       });
     }
 
@@ -121,6 +134,7 @@ export default function AgentsChatPage() {
     messages,
     isStreaming,
     streamingContent,
+    streamingToolCalls,
     pendingUserMessage,
     isLoadingMessages,
     streamError,
@@ -132,6 +146,7 @@ export default function AgentsChatPage() {
       setPendingUserMessage(content);
       setIsStreaming(true);
       setStreamingContent('');
+      setStreamingToolCalls([]);
       setStreamError(null);
 
       try {
@@ -142,20 +157,86 @@ export default function AgentsChatPage() {
 
         let fullContent = '';
         let newConversationId: string | null = null;
+        const toolCallsMap = new Map<string, ToolCallState>();
 
         for await (const event of stream) {
           if (event.type === 'error') {
             console.error('Stream error:', event.data);
             setStreamError({
-              message: event.data.error?.message || 'An error occurred',
-              code: event.data.error?.code,
+              message: event.data.error || 'An error occurred',
+              code: event.data.errorCode,
             });
             break;
           }
 
-          if (event.data.content) {
-            fullContent += event.data.content;
-            setStreamingContent(fullContent);
+          const eventType = event.data.type;
+
+          switch (eventType) {
+            case 'text':
+              if (event.data.content) {
+                fullContent += event.data.content;
+                setStreamingContent(fullContent);
+              }
+              break;
+
+            case 'tool-call-start':
+              if (event.data.toolCallId && event.data.toolName) {
+                toolCallsMap.set(event.data.toolCallId, {
+                  toolCallId: event.data.toolCallId,
+                  toolName: event.data.toolName,
+                  status: 'pending',
+                });
+                setStreamingToolCalls(Array.from(toolCallsMap.values()));
+              }
+              break;
+
+            case 'tool-call-delta':
+              if (event.data.toolCallId && event.data.argsTextDelta) {
+                const existing = toolCallsMap.get(event.data.toolCallId);
+                if (existing) {
+                  toolCallsMap.set(event.data.toolCallId, {
+                    ...existing,
+                    argsTextDelta: (existing.argsTextDelta || '') + event.data.argsTextDelta,
+                    status: 'executing',
+                  });
+                  setStreamingToolCalls(Array.from(toolCallsMap.values()));
+                }
+              }
+              break;
+
+            case 'tool-call':
+              if (event.data.toolCallId && event.data.toolName) {
+                toolCallsMap.set(event.data.toolCallId, {
+                  toolCallId: event.data.toolCallId,
+                  toolName: event.data.toolName,
+                  status: 'executing',
+                  input: event.data.input,
+                });
+                setStreamingToolCalls(Array.from(toolCallsMap.values()));
+              }
+              break;
+
+            case 'tool-result':
+              if (event.data.toolCallId) {
+                const existing = toolCallsMap.get(event.data.toolCallId);
+                if (existing) {
+                  toolCallsMap.set(event.data.toolCallId, {
+                    ...existing,
+                    status: 'completed',
+                    output: event.data.output,
+                  });
+                  setStreamingToolCalls(Array.from(toolCallsMap.values()));
+                }
+              }
+              break;
+
+            default:
+              // Handle legacy format where content is sent without type
+              if (event.data.content && !eventType) {
+                fullContent += event.data.content;
+                setStreamingContent(fullContent);
+              }
+              break;
           }
 
           if (event.data.conversationId) {
@@ -209,13 +290,14 @@ export default function AgentsChatPage() {
 
   // Clear streaming content after API messages have been refreshed
   useEffect(() => {
-    if (!isStreaming && streamingContent && messages.length > 0) {
+    if (!isStreaming && (streamingContent || streamingToolCalls.length > 0) && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.role === 'assistant') {
         setStreamingContent('');
+        setStreamingToolCalls([]);
       }
     }
-  }, [isStreaming, streamingContent, messages]);
+  }, [isStreaming, streamingContent, streamingToolCalls, messages]);
 
   // Escape ProtectedLayout's p-4 so the chat fills the full available area
   return (

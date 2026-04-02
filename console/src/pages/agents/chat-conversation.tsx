@@ -27,8 +27,20 @@ import {
   CopyIcon,
   RefreshCcwIcon,
   ShieldAlert,
+  Wrench,
+  Loader2,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+
+/** Tool call state for UI rendering */
+interface ToolCallState {
+  toolCallId: string;
+  toolName: string;
+  status: 'pending' | 'executing' | 'completed' | 'error';
+  input?: Record<string, unknown>;
+  output?: unknown;
+  argsTextDelta?: string;
+}
 
 interface UIMessage {
   id: string;
@@ -37,6 +49,7 @@ interface UIMessage {
   timestamp: Date;
   error?: string;
   errorCode?: string;
+  toolCalls?: ToolCallState[];
 }
 
 interface ChatConversationProps {
@@ -77,6 +90,78 @@ function CopyButton({ text }: { text: string }) {
         <CopyIcon className="size-3.5" />
       )}
     </MessageAction>
+  );
+}
+
+/** Format tool name for display */
+function formatToolName(name: string): string {
+  return name
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Display a single tool call with its status and result */
+function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const statusIcon = {
+    pending: <Loader2 className="size-3.5 animate-spin text-muted-foreground" />,
+    executing: <Loader2 className="size-3.5 animate-spin text-blue-500" />,
+    completed: <CheckIcon className="size-3.5 text-green-500" />,
+    error: <AlertCircle className="size-3.5 text-destructive" />,
+  }[toolCall.status];
+
+  const statusText = {
+    pending: 'Waiting…',
+    executing: 'Executing…',
+    completed: 'Completed',
+    error: 'Failed',
+  }[toolCall.status];
+
+  return (
+    <div className="rounded-md border border-border/60 bg-muted/30 text-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+      >
+        <Wrench className="size-3.5 text-muted-foreground shrink-0" />
+        <span className="font-medium truncate">
+          {formatToolName(toolCall.toolName)}
+        </span>
+        <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+          {statusIcon}
+          {statusText}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-border/60 px-3 py-2 space-y-2">
+          {toolCall.input && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                Input
+              </p>
+              <pre className="text-xs bg-background/50 rounded p-2 overflow-x-auto">
+                {JSON.stringify(toolCall.input, null, 2)}
+              </pre>
+            </div>
+          )}
+          {toolCall.output !== undefined && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                Output
+              </p>
+              <pre className="text-xs bg-background/50 rounded p-2 overflow-x-auto max-h-48">
+                {typeof toolCall.output === 'string'
+                  ? toolCall.output
+                  : JSON.stringify(toolCall.output, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -130,28 +215,42 @@ export function ChatConversation({
               <Message key={message.id} from={message.role}>
                 <MessageContent>
                   {message.error ? (
-                    <div className="flex items-start gap-2 rounded-lg px-4 py-3 bg-destructive/10 text-destructive text-sm">
+                    <div className="flex items-start gap-2 rounded-lg px-4 py-3 bg-destructive/10 text-destructive text-sm [&_*]:text-destructive">
                       <AlertCircle className="size-4 shrink-0 mt-0.5" />
                       <div className="flex flex-col gap-0.5">
                         <p className="font-semibold">Error</p>
-                        <p>{message.error}</p>
+                        <p className="break-words">{message.error}</p>
                         {message.errorCode && (
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-destructive/70">
                             Code: {message.errorCode}
                           </p>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <Markdown content={message.content} preview={false} />
+                    <div className="space-y-3">
+                      {message.toolCalls && message.toolCalls.length > 0 && (
+                        <div className="space-y-2">
+                          {message.toolCalls.map((toolCall) => (
+                            <ToolCallDisplay
+                              key={toolCall.toolCallId}
+                              toolCall={toolCall}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {message.content && (
+                        <Markdown content={message.content} preview={false} />
+                      )}
+                    </div>
                   )}
                 </MessageContent>
 
                 {message.role === 'assistant' &&
-                  message.content &&
+                  (message.content || (message.toolCalls && message.toolCalls.length > 0)) &&
                   message.id !== 'streaming' && (
                     <MessageActions>
-                      {!message.error && <CopyButton text={message.content} />}
+                      {!message.error && message.content && <CopyButton text={message.content} />}
                       {idx === lastAssistantIdx && onRetry && !isStreaming && (
                         <MessageAction
                           onClick={onRetry}

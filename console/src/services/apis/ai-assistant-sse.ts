@@ -25,13 +25,29 @@ export interface ErrorEventData {
 }
 
 // SSE Event data types
+export interface ToolCallEventData {
+  toolCallId: string;
+  toolName: string;
+  input?: Record<string, unknown>;
+  output?: unknown;
+  argsTextDelta?: string;
+}
+
 export interface MessageStreamEventData {
   messageId?: string;
   conversationId?: string;
   content?: string;
   type?: string;
   createdAt?: string;
-  error?: ErrorEventData;
+  error?: string;
+  errorCode?: string;
+  done?: boolean;
+  // Tool call fields
+  toolCallId?: string;
+  toolName?: string;
+  input?: Record<string, unknown>;
+  output?: unknown;
+  argsTextDelta?: string;
 }
 
 export interface MessageStreamEvent {
