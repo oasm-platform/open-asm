@@ -20,6 +20,7 @@ import {
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
 import { Markdown } from '@/components/common/markdown';
+import type { UIMessage, TextUIPart } from 'ai';
 import {
   AlertCircle,
   Bot,
@@ -29,27 +30,16 @@ import {
   ShieldAlert,
   Wrench,
   Loader2,
+  X,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-/** Tool call state for UI rendering */
 interface ToolCallState {
   toolCallId: string;
   toolName: string;
   status: 'pending' | 'executing' | 'completed' | 'error';
   input?: Record<string, unknown>;
   output?: unknown;
-  argsTextDelta?: string;
-}
-
-interface UIMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  error?: string;
-  errorCode?: string;
-  toolCalls?: ToolCallState[];
 }
 
 interface ChatConversationProps {
@@ -58,25 +48,59 @@ interface ChatConversationProps {
   onRetry?: () => void;
   isStreaming?: boolean;
   isLoadingMessages?: boolean;
+  streamError?: string | null;
+  onDismissError?: () => void;
 }
 
-/** Check if the last message is a streaming assistant message */
-function hasStreamingMessage(messages: UIMessage[]): boolean {
-  if (messages.length === 0) return false;
-  const last = messages[messages.length - 1];
-  return last.id === 'streaming' && last.role === 'assistant';
-}
+const getTextContent = (message: UIMessage): string => {
+  const parts = message.parts;
+  if (!parts || parts.length === 0) return '';
+  
+  return parts
+    .filter((part): part is TextUIPart => part.type === 'text')
+    .map((part) => part.text)
+    .join('');
+};
 
-/** Copy button — shows checkmark for 2s after copying */
+const getToolCallsFromParts = (message: UIMessage): ToolCallState[] => {
+  const parts = message.parts;
+  if (!parts || parts.length === 0) return [];
+
+  const toolCalls: ToolCallState[] = [];
+
+  for (const part of parts) {
+    if (part.type === 'dynamic-tool') {
+      toolCalls.push({
+        toolCallId: part.toolCallId,
+        toolName: part.toolName,
+        status: part.state === 'output-available' ? 'completed' as const : 'pending' as const,
+        input: part.input as Record<string, unknown>,
+        output: part.output as unknown,
+      });
+    } else if (part.type.startsWith('tool-')) {
+      const toolPart = part as { toolCallId: string; state?: string; input?: unknown; output?: unknown };
+      toolCalls.push({
+        toolCallId: toolPart.toolCallId,
+        toolName: part.type.replace('tool-', ''),
+        status: toolPart.state === 'output-available' ? 'completed' as const : 'pending' as const,
+        input: toolPart.input as Record<string, unknown>,
+        output: toolPart.output,
+      });
+    }
+  }
+
+  return toolCalls;
+};
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = () => {
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  }, [text]);
+  };
 
   return (
     <MessageAction
@@ -93,14 +117,12 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/** Format tool name for display */
 function formatToolName(name: string): string {
   return name
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Display a single tool call with its status and result */
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -165,19 +187,40 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
   );
 }
 
-/**
- * Chat conversation component.
- * Layout: scrollable message area (flex-1) + sticky input bar at bottom.
- * The outer container must be `overflow-hidden` with a fixed height.
- */
 export function ChatConversation({
   messages,
   onSendMessage,
   onRetry,
   isStreaming = false,
   isLoadingMessages = false,
+  streamError,
+  onDismissError,
 }: ChatConversationProps) {
   const [input, setInput] = useState('');
+  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevStreamingRef = useRef(false);
+
+  // Track last user message for retry context
+  useEffect(() => {
+    const userMessages = messages.filter((m) => m.role === 'user');
+    if (userMessages.length > 0) {
+      const lastUser = userMessages[userMessages.length - 1];
+      setLastUserMessage(getTextContent(lastUser));
+    }
+  }, [messages]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0 || isStreaming) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length, isStreaming]);
+
+  // Track streaming state transitions to prevent flicker
+  useEffect(() => {
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming]);
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (message.text.trim() && !isStreaming) {
@@ -186,17 +229,24 @@ export function ChatConversation({
     }
   };
 
+  const handleRetry = useCallback(() => {
+    if (onRetry) {
+      onRetry();
+    }
+  }, [onRetry]);
+
   const isEmpty = !isLoadingMessages && messages.length === 0;
   const lastAssistantIdx = messages.reduce(
     (acc, m, i) => (m.role === 'assistant' ? i : acc),
     -1,
   );
 
+  // Check if we're in a new conversation with no assistant response yet
+  const hasOnlyUserMessages = messages.length > 0 && messages.every((m) => m.role === 'user');
+
   return (
-    // This div must have a definite height set by the parent (agents.tsx uses calc(100vh - 4rem))
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* ── Scrollable messages ── */}
-      <Conversation className="flex-1 min-h-0">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      <Conversation className="flex-1 min-h-0 h-0">
         <ConversationContent className="max-w-3xl mx-auto w-full px-4 py-6 gap-6">
           {isLoadingMessages ? (
             <ConversationEmptyState
@@ -211,87 +261,122 @@ export function ChatConversation({
               description="Ask anything about vulnerabilities, secure coding, and best practices."
             />
           ) : (
-            messages.map((message, idx) => (
-              <Message key={message.id} from={message.role}>
-                <MessageContent>
-                  {message.error ? (
-                    <div className="flex items-start gap-2 rounded-lg px-4 py-3 bg-destructive/10 text-destructive text-sm [&_*]:text-destructive">
-                      <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                      <div className="flex flex-col gap-0.5">
-                        <p className="font-semibold">Error</p>
-                        <p className="break-words">{message.error}</p>
-                        {message.errorCode && (
-                          <p className="text-xs text-destructive/70">
-                            Code: {message.errorCode}
-                          </p>
+            <>
+              {messages.map((message, idx) => {
+                const textContent = getTextContent(message);
+                const toolCalls = getToolCallsFromParts(message);
+                const hasContent = textContent.length > 0 || toolCalls.length > 0;
+                const isLastMessage = idx === messages.length - 1;
+                const isStreamingMessage = isLastMessage && isStreaming && message.role === 'user';
+
+                return (
+                  <Message key={message.id} from={message.role}>
+                    <MessageContent>
+                      <div className="space-y-3">
+                        {toolCalls.length > 0 && (
+                          <div className="space-y-2">
+                            {toolCalls.map((toolCall) => (
+                              <ToolCallDisplay
+                                key={toolCall.toolCallId}
+                                toolCall={toolCall}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {textContent && (
+                          <Markdown content={textContent} preview={false} />
+                        )}
+                        {isStreamingMessage && (
+                          <div className="flex items-center gap-1 py-1" data-testid="streaming-indicator">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.15s]" />
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.3s]" />
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {message.toolCalls && message.toolCalls.length > 0 && (
-                        <div className="space-y-2">
-                          {message.toolCalls.map((toolCall) => (
-                            <ToolCallDisplay
-                              key={toolCall.toolCallId}
-                              toolCall={toolCall}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      {message.content && (
-                        <Markdown content={message.content} preview={false} />
-                      )}
-                    </div>
-                  )}
-                </MessageContent>
+                    </MessageContent>
 
-                {message.role === 'assistant' &&
-                  (message.content || (message.toolCalls && message.toolCalls.length > 0)) &&
-                  message.id !== 'streaming' && (
-                    <MessageActions>
-                      {!message.error && message.content && <CopyButton text={message.content} />}
-                      {idx === lastAssistantIdx && onRetry && !isStreaming && (
-                        <MessageAction
-                          onClick={onRetry}
-                          label="Try again"
-                          tooltip="Try again"
-                        >
-                          <RefreshCcwIcon className="size-3.5" />
-                        </MessageAction>
+                    {message.role === 'assistant' &&
+                      hasContent &&
+                      message.id !== 'streaming' && (
+                        <MessageActions>
+                          {textContent && <CopyButton text={textContent} />}
+                          {idx === lastAssistantIdx && onRetry && !isStreaming && (
+                            <MessageAction
+                              onClick={handleRetry}
+                              label="Try again"
+                              tooltip="Try again"
+                            >
+                              <RefreshCcwIcon className="size-3.5" />
+                            </MessageAction>
+                          )}
+                        </MessageActions>
                       )}
-                    </MessageActions>
-                  )}
-              </Message>
-            ))
+                  </Message>
+                );
+              })}
+
+              {/* Show typing indicator when streaming but no assistant message yet */}
+              {isStreaming && hasOnlyUserMessages && (
+                <Message from="assistant" data-testid="assistant-typing">
+                  <MessageContent>
+                    <div className="flex items-center gap-1 py-1">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.15s]" />
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.3s]" />
+                    </div>
+                  </MessageContent>
+                </Message>
+              )}
+            </>
           )}
 
-          {/* Typing indicator */}
-          {isStreaming && !hasStreamingMessage(messages) && (
-            <Message from="assistant">
-              <MessageContent>
-                <div className="flex items-center gap-1 py-1">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.15s]" />
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.3s]" />
+          {/* Stream error banner */}
+          {streamError && (
+            <div className="mx-auto max-w-3xl w-full px-4">
+              <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm">
+                <AlertCircle className="size-5 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-destructive">Streaming error</p>
+                  <p className="text-muted-foreground mt-1">{streamError}</p>
                 </div>
-              </MessageContent>
-            </Message>
+                <div className="flex items-center gap-2 shrink-0">
+                  {lastUserMessage && (
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+                    >
+                      <RefreshCcwIcon className="size-3.5" />
+                      Retry
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onDismissError}
+                    className="rounded-md p-1 hover:bg-accent transition-colors"
+                    aria-label="Dismiss error"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
+
+          <div ref={messagesEndRef} />
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
 
-      {/* ── Sticky input bar ── */}
       <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pt-3 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
           <PromptInput onSubmit={handleSubmit} className="w-full shadow-sm">
             <PromptInputBody>
-              {/* Grows from min 52px up to 33vh before scrolling */}
               <PromptInputTextarea
                 value={input}
                 onChange={(e) => setInput(e.currentTarget.value)}
-                placeholder="Ask anything about security…"
+                placeholder={isStreaming ? 'Waiting for response…' : 'Ask anything about security…'}
                 disabled={isStreaming}
                 className="min-h-[52px] max-h-[33vh]"
               />

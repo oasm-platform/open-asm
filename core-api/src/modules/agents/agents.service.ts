@@ -14,11 +14,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { LanguageModel, TextStreamPart, ToolSet } from 'ai';
+import type { LanguageModel, UIMessageChunk } from 'ai';
 import { streamText } from 'ai';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Observable } from 'rxjs';
 import { Repository } from 'typeorm';
 import { AgentTool } from './agents.tools';
 import {
@@ -401,11 +400,11 @@ export class AgentsService {
     }
   }
 
-  async sendMessageStream(
+  async streamMessage(
     dto: SendMessageDto,
     workspaceId: string,
     userId: string,
-  ): Promise<Observable<MessageEvent>> {
+  ): Promise<{ stream: ReadableStream<UIMessageChunk>; conversationId: string }> {
     // 1. Find or create conversation
     let conversation: AgentConversation;
     if (dto.conversationId) {
@@ -489,252 +488,80 @@ export class AgentsService {
         status: 'streaming',
       },
     });
-    const savedAssistantMessage = await this.messageRepository.save(assistantMessage);
-    const assistantMessageId = savedAssistantMessage.id;
+    await this.messageRepository.save(assistantMessage);
 
-    // 8. Stream response -> update assistant message
-    return new Observable<MessageEvent>((subscriber) => {
-      // Send conversationId and messageId first
-      subscriber.next({
-        data: JSON.stringify({
-          type: 'init',
-          conversationId: conversation.id,
-          messageId: assistantMessageId,
-          done: false,
-        }),
-      } as MessageEvent);
-
-      void (async () => {
-        let fullContent = '';
-        const toolCalls: Array<{id: string; name: string; input: unknown}> = [];
-
-        try {
-          let streamError: unknown = null;
-
-          const result = streamText({
-            model,
-            messages: modelMessages,
-            system: this.getSystemPrompt(),
-            tools: this.agentTool.getTools(workspaceId),
-            onError: (error) => {
-              streamError = error.error;
-            },
-          });
-
-          for await (const chunk of result.fullStream) {
-            const typedChunk = chunk as TextStreamPart<ToolSet>;
-
-            switch (typedChunk.type) {
-              case 'text-delta':
-                fullContent += typedChunk.text;
-                subscriber.next({
-                  data: JSON.stringify({
-                    type: 'text',
-                    content: typedChunk.text,
-                    done: false,
-                    conversationId: conversation.id,
-                  }),
-                } as MessageEvent);
-                break;
-
-              case 'tool-input-start':
-                subscriber.next({
-                  data: JSON.stringify({
-                    type: 'tool-call-start',
-                    toolCallId: typedChunk.id,
-                    toolName: typedChunk.toolName,
-                    done: false,
-                    conversationId: conversation.id,
-                  }),
-                } as MessageEvent);
-                break;
-
-              case 'tool-input-delta':
-                subscriber.next({
-                  data: JSON.stringify({
-                    type: 'tool-call-delta',
-                    toolCallId: typedChunk.id,
-                    argsTextDelta: typedChunk.delta,
-                    done: false,
-                    conversationId: conversation.id,
-                  }),
-                } as MessageEvent);
-                break;
-
-              case 'tool-call':
-                toolCalls.push({
-                  id: typedChunk.toolCallId,
-                  name: typedChunk.toolName,
-                  input: typedChunk.input as Record<string, unknown>,
-                });
-                subscriber.next({
-                  data: JSON.stringify({
-                    type: 'tool-call',
-                    toolCallId: typedChunk.toolCallId,
-                    toolName: typedChunk.toolName,
-                    input: typedChunk.input as Record<string, unknown>,
-                    done: false,
-                    conversationId: conversation.id,
-                  }),
-                } as MessageEvent);
-                break;
-
-              case 'error': {
-                const chunkError = typedChunk as unknown as Record<string, unknown>;
-                const errorObj = chunkError.error;
-
-                // Extract full API response body if available
-                let fullApiError: Record<string, unknown> | null = null;
-                if (errorObj && typeof errorObj === 'object') {
-                  const apiError = errorObj as Record<string, unknown>;
-                  if (apiError.responseBody && typeof apiError.responseBody === 'string') {
-                    try {
-                      fullApiError = JSON.parse(apiError.responseBody) as Record<string, unknown>;
-                    } catch {
-                      // responseBody is not valid JSON
-                    }
-                  }
-                }
-
-                const errorMsg = fullApiError
-                  ? JSON.stringify(fullApiError)
-                  : ((errorObj as Error)?.message ?? (typeof errorObj === 'string' ? errorObj : 'Unknown stream error'));
-
-                throw new Error(errorMsg);
-              }
-
-              default:
-                this.logger.debug(`Unknown stream chunk type: ${typedChunk.type}`, JSON.stringify(typedChunk).slice(0, 200));
-                break;
-            }
-          }
-
-          // Check if onError captured an error
-          if (streamError) {
-            throw new Error(typeof streamError === 'string' ? streamError : (streamError as Error)?.message ?? 'Unknown error');
-          }
-
-          // Build content with tool calls included
-          const messageContent = toolCalls.length > 0
-            ? JSON.stringify({ text: fullContent, toolCalls })
-            : fullContent;
-
-          // Update assistant message with final content
-          await this.messageRepository.update(assistantMessageId, {
-            content: messageContent,
-            metadata: {
-              model: llmConfig.model,
-              provider: llmConfig.provider,
-              toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-              status: 'completed',
-            },
-          });
-
-          subscriber.next({
-            data: JSON.stringify({
-              type: 'finish',
-              content: messageContent,
-              done: true,
-              conversationId: conversation.id,
-              messageId: assistantMessageId,
-            }),
-          } as MessageEvent);
-          subscriber.complete();
-        } catch (error) {
-          // Log error for debugging
-          this.logger.error('Error in sendMessageStream', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined,
-            conversationId: conversation.id,
-            provider: llmConfig.provider,
-            model: llmConfig.model,
-          });
-
-          // Determine error type and code
-          let errorCode = 'STREAM_ERROR';
-          let errorMessage = 'An error occurred while processing your request';
-          let rawApiResponse: Record<string, unknown> | null = null;
-
-          if (error instanceof Error) {
-            const apiError = error as unknown as Record<string, unknown>;
-
-            // Try to extract full API response body first
-            if (apiError.responseBody && typeof apiError.responseBody === 'string') {
-              try {
-                rawApiResponse = JSON.parse(apiError.responseBody) as Record<string, unknown>;
-                // Use the full raw API response as error message
-                errorMessage = JSON.stringify(rawApiResponse, null, 2);
-              } catch {
-                // responseBody is not valid JSON, fall back to error.message
-                errorMessage = error.message;
-              }
-            } else {
-              errorMessage = error.message;
-            }
-
-            // Categorize errors for better frontend handling
-            if (
-              error.message.includes('API key') ||
-              error.message.includes('authentication')
-            ) {
-              errorCode = 'AUTH_ERROR';
-            } else if (
-              error.message.includes('rate limit') ||
-              error.message.includes('429')
-            ) {
-              errorCode = 'RATE_LIMIT_ERROR';
-            } else if (
-              error.message.includes('timeout') ||
-              error.message.includes('ETIMEDOUT')
-            ) {
-              errorCode = 'TIMEOUT_ERROR';
-            } else if (
-              error.message.includes('network') ||
-              error.message.includes('ECONNREFUSED')
-            ) {
-              errorCode = 'NETWORK_ERROR';
-            } else if (
-              error.message.includes('model') ||
-              error.message.includes('not found') ||
-              apiError.statusCode === 404
-            ) {
-              errorCode = 'MODEL_ERROR';
-            }
-          }
-
-          // Build error content - use API error message directly
-          const errorMessageContent = toolCalls.length > 0
-            ? JSON.stringify({ text: fullContent, toolCalls, error: errorMessage })
-            : errorMessage;
-
-          // Update assistant message with error (always saved)
-          await this.messageRepository.update(assistantMessageId, {
-            content: errorMessageContent,
-            metadata: {
-              model: llmConfig.model,
-              provider: llmConfig.provider,
-              toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-              status: 'error',
-              error: errorMessage,
-              errorCode,
-            },
-          });
-
-          subscriber.next({
-            data: JSON.stringify({
-              type: 'error',
-              content: errorMessageContent,
-              done: true,
-              conversationId: conversation.id,
-              messageId: assistantMessageId,
-              error: errorMessage,
-              errorCode,
-            }),
-          } as MessageEvent);
-          subscriber.complete();
-        }
-      })();
+    // 8. Stream response using AI SDK
+    const result = streamText({
+      model,
+      messages: modelMessages,
+      system: this.getSystemPrompt(),
+      tools: this.agentTool.getTools(workspaceId),
     });
+
+    // Wrap stream to prepend conversation-created event
+    // and accumulate text to save when done
+    const originalStream = result.toUIMessageStream();
+    const conversationIdStr = conversation.id;
+    let conversationEventSent = false;
+    let reader: ReadableStreamDefaultReader<UIMessageChunk> | null = null;
+    let accumulatedText = '';
+    const messageRepo = this.messageRepository;
+    const assistantMsgId = assistantMessage.id;
+    const assistantMsgMetadata = assistantMessage.metadata;
+
+    const wrappedStream = new ReadableStream<UIMessageChunk>({
+      start() {
+        reader = originalStream.getReader();
+      },
+      async pull(controller) {
+        if (!conversationEventSent) {
+          conversationEventSent = true;
+          controller.enqueue({
+            type: 'data-conversation-created',
+            data: {
+              conversationId: conversationIdStr,
+            },
+          } as UIMessageChunk);
+          return;
+        }
+
+        if (!reader) return;
+
+        const { done, value } = await reader.read();
+        if (done) {
+          // Save accumulated text to assistant message
+          if (accumulatedText) {
+            await messageRepo.update(
+              { id: assistantMsgId },
+              {
+                content: accumulatedText,
+                metadata: {
+                  ...assistantMsgMetadata,
+                  status: 'completed',
+                },
+              },
+            );
+          }
+          controller.close();
+          return;
+        }
+
+        // Accumulate text from chunk
+        if (value?.type === 'text-delta' && 'delta' in value && typeof value.delta === 'string') {
+          accumulatedText += value.delta;
+        }
+
+        controller.enqueue(value);
+      },
+      cancel() {
+        reader?.releaseLock();
+      },
+    });
+
+    return {
+      stream: wrappedStream,
+      conversationId: conversation.id,
+    };
   }
 
   async getMessages(

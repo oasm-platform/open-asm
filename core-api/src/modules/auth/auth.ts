@@ -8,7 +8,7 @@ import 'dotenv/config';
 import { Pool } from 'pg';
 
 export const auth = betterAuth({
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   database: new Pool(databaseConnectionConfig),
   plugins: [
     admin({
