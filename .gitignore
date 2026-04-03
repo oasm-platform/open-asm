@@ -72,3 +72,4 @@ core-api/.storage/*
 .claude/*
 .kilocode/plans/*
 .clinerules/*
+docs/superpowers/*
