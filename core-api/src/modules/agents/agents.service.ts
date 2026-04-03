@@ -30,6 +30,7 @@ import {
   LLMConfigResponseDto,
   LLMConfigWithProviderDto,
   LLMProviderStatusDto,
+  ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
 import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
@@ -267,6 +268,142 @@ export class AgentsService {
     });
   }
 
+  async getModelsForProvider(
+    configId: string,
+    workspaceId: string,
+  ): Promise<ProviderModelDto[]> {
+    const config = await this.llmConfigRepository.findOne({
+      where: { id: configId, workspaceId },
+    });
+
+    if (!config) {
+      throw new NotFoundException('LLM config not found');
+    }
+
+    const apiKey = decrypt(config.apiKey);
+
+    switch (config.provider) {
+      case LLMProvider.OPENAI:
+        return this.fetchOpenAIModels(apiKey);
+      case LLMProvider.ANTHROPIC:
+        return this.getAnthropicModels();
+      case LLMProvider.OPENROUTER:
+        return this.fetchOpenRouterModels();
+      case LLMProvider.GEMINI:
+        return this.fetchGeminiModels(apiKey);
+      case LLMProvider.CUSTOM:
+        return [];
+      default:
+        return [];
+    }
+  }
+
+  private async fetchOpenAIModels(
+    apiKey: string,
+  ): Promise<ProviderModelDto[]> {
+    try {
+      const response = await fetch('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+
+      if (!response.ok) {
+        this.logger.warn(
+          `OpenAI models fetch failed: ${response.status}`,
+        );
+        return [];
+      }
+
+      const data = (await response.json()) as {
+        data: Array<{ id: string }>;
+      };
+
+      return data.data
+        .filter(
+          (m) =>
+            m.id.startsWith('gpt-') ||
+            m.id.startsWith('o1') ||
+            m.id.startsWith('o3') ||
+            m.id.startsWith('o4'),
+        )
+        .map((m) => ({ id: m.id, name: m.id }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    } catch (error) {
+      this.logger.error('Failed to fetch OpenAI models', error);
+      return [];
+    }
+  }
+
+  private getAnthropicModels(): ProviderModelDto[] {
+    const models = [
+      'claude-opus-4-20250514',
+      'claude-sonnet-4-20250514',
+      'claude-haiku-4-5-20251001',
+      'claude-3-7-sonnet-20250219',
+      'claude-3-5-sonnet-20241022',
+      'claude-3-5-haiku-20241022',
+      'claude-3-opus-20240229',
+      'claude-3-sonnet-20240229',
+      'claude-3-haiku-20240307',
+    ];
+    return models.map((id) => ({ id, name: id }));
+  }
+
+  private async fetchOpenRouterModels(): Promise<ProviderModelDto[]> {
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/models');
+
+      if (!response.ok) {
+        this.logger.warn(
+          `OpenRouter models fetch failed: ${response.status}`,
+        );
+        return [];
+      }
+
+      const data = (await response.json()) as {
+        data: Array<{ id: string; name?: string }>;
+      };
+
+      return data.data
+        .map((m) => ({ id: m.id, name: m.name ?? m.id }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error) {
+      this.logger.error('Failed to fetch OpenRouter models', error);
+      return [];
+    }
+  }
+
+  private async fetchGeminiModels(
+    apiKey: string,
+  ): Promise<ProviderModelDto[]> {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+      );
+
+      if (!response.ok) {
+        this.logger.warn(
+          `Gemini models fetch failed: ${response.status}`,
+        );
+        return [];
+      }
+
+      const data = (await response.json()) as {
+        models: Array<{ name: string; displayName?: string }>;
+      };
+
+      return data.models
+        .filter((m) => m.name.startsWith('models/gemini'))
+        .map((m) => ({
+          id: m.name.replace('models/', ''),
+          name: m.displayName ?? m.name.replace('models/', ''),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error) {
+      this.logger.error('Failed to fetch Gemini models', error);
+      return [];
+    }
+  }
+
   // ==========================================
   // Conversation Methods
   // ==========================================
@@ -417,13 +554,27 @@ export class AgentsService {
       }
       conversation = existing;
     } else {
-      // Get preferred LLM config
-      const llmConfig = await this.getPreferredLLMConfig(workspaceId);
+      // Determine which LLM config to use
+      let llmConfig: AgentLLMConfig | null = null;
+
+      if (dto.model && dto.provider) {
+        // Find config matching the requested provider
+        llmConfig = await this.llmConfigRepository.findOne({
+          where: { workspaceId, provider: dto.provider as LLMProvider },
+        });
+      }
+
+      // Fall back to preferred config
+      if (!llmConfig) {
+        llmConfig = await this.getPreferredLLMConfig(workspaceId);
+      }
+
       if (!llmConfig) {
         throw new BadRequestException(
           'No preferred LLM config found. Please create and set a preferred LLM config first.',
         );
       }
+
       conversation = this.conversationRepository.create({
         workspaceId,
         llmConfigId: llmConfig.id,
@@ -450,12 +601,17 @@ export class AgentsService {
     });
 
     // 4. Get LLM config
-    const llmConfig = await this.llmConfigRepository.findOne({
+    let llmConfig = await this.llmConfigRepository.findOne({
       where: { id: conversation.llmConfigId, workspaceId },
     });
 
     if (!llmConfig) {
       throw new NotFoundException('LLM config not found');
+    }
+
+    // Apply model override if provided (only affects this request)
+    if (dto.model && dto.provider === llmConfig.provider) {
+      llmConfig = { ...llmConfig, model: dto.model } as AgentLLMConfig;
     }
 
     // 5. Build messages from history (reverse to chronological order)

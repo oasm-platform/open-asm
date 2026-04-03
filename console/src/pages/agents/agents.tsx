@@ -27,8 +27,15 @@ interface UIMessage {
   toolCalls?: ToolCallState[];
 }
 
+interface SelectedModel {
+  provider: string;
+  model: string;
+  configId: string;
+}
+
 interface LocationState {
   pendingMessage?: string;
+  selectedModel?: SelectedModel;
 }
 
 export default function AgentsChatPage() {
@@ -51,6 +58,15 @@ export default function AgentsChatPage() {
   const conversationIdRef = useRef<string | null>(conversationId ?? null);
   const queryClient = useQueryClient();
   const hasAutoSentRef = useRef(false);
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
+    null,
+  );
+  const selectedModelRef = useRef<SelectedModel | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedModelRef.current = selectedModel;
+  }, [selectedModel]);
 
   // Keep ref in sync with URL param
   useEffect(() => {
@@ -150,9 +166,14 @@ export default function AgentsChatPage() {
       setStreamError(null);
 
       try {
+        const modelInfo = selectedModelRef.current;
         const stream = createMessageStream({
           question: content,
           conversationId: conversationIdRef.current ?? undefined,
+          ...(modelInfo && {
+            model: modelInfo.model,
+            provider: modelInfo.provider,
+          }),
         });
 
         let fullContent = '';
@@ -282,6 +303,10 @@ export default function AgentsChatPage() {
     const state = location.state as LocationState | null;
     if (state?.pendingMessage && !hasAutoSentRef.current) {
       hasAutoSentRef.current = true;
+      if (state.selectedModel) {
+        setSelectedModel(state.selectedModel);
+        selectedModelRef.current = state.selectedModel;
+      }
       void handleSendMessage(state.pendingMessage);
       // Clear location state to prevent re-sending on re-renders
       void navigate(location.pathname, { replace: true, state: null });
@@ -308,6 +333,11 @@ export default function AgentsChatPage() {
       <ChatConversation
         messages={displayMessages}
         onSendMessage={handleSendMessage}
+        selectedProvider={selectedModel?.provider ?? null}
+        selectedModel={selectedModel?.model ?? null}
+        onSelectModel={(provider, model, configId) => {
+          setSelectedModel({ provider, model, configId });
+        }}
         onRetry={() => {
           // Find the last assistant message and its matching user message
           const reversedMessages = [...messages].reverse();

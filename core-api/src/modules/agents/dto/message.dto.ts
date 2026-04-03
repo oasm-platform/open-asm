@@ -16,6 +16,22 @@ export class SendMessageDto {
   @IsOptional()
   @IsUUID()
   conversationId?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Override model name for new conversations',
+  })
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Override provider for new conversations',
+  })
+  @IsOptional()
+  @IsString()
+  provider?: string;
 }
 
 export class MessageResponseDto {

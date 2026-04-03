@@ -86,6 +86,14 @@ export class LLMConfigResponseDto {
   updatedAt: Date;
 }
 
+export class ProviderModelDto {
+  @ApiProperty({ description: 'Model identifier for API calls' })
+  id: string;
+
+  @ApiProperty({ description: 'Human-readable model name' })
+  name: string;
+}
+
 export class LLMConfigWithProviderDto {
   @ApiProperty({ enum: LLMProvider, description: 'Provider identifier' })
   providerId: LLMProvider;

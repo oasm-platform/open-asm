@@ -1665,6 +1665,13 @@ export interface LLMConfigWithProviderDto {
   updatedAt?: string;
 }
 
+export interface ProviderModelDto {
+  /** Model identifier for API calls */
+  id: string;
+  /** Human-readable model name */
+  name: string;
+}
+
 export interface UpdateLLMConfigDto {
   /** @example "openrouter" */
   provider?: UpdateLlmConfigDtoProviderEnum;
@@ -1718,6 +1725,10 @@ export interface SendMessageDto {
    * @example "550e8400-e29b-41d4-a716-446655440000"
    */
   conversationId?: string;
+  /** Override model name for new conversations */
+  model?: string;
+  /** Override provider for new conversations */
+  provider?: string;
 }
 
 export interface NotificationResponseDto {
@@ -1755,49 +1766,6 @@ export interface CreateNotificationDto {
    * @example {"name":"John Doe"}
    */
   metadata?: object;
-}
-
-export interface McpTool {
-  name: string;
-  type: string;
-  description: string;
-  moduleId: string;
-}
-
-export interface McpPermissionValue {
-  workspaceId: string;
-  /** @example ["get_assets"] */
-  permissions: string[];
-}
-
-export interface CreateMcpPermissionsRequestDto {
-  /** @example "MCP Permission" */
-  name: string;
-  /** @example "Allows access to assets in the workspaces" */
-  description?: string;
-  value: McpPermissionValue[];
-}
-
-export interface McpPermission {
-  id: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-  /** @example "MCP Permission" */
-  name: string;
-  /** @example "Allows access to assets in the workspaces" */
-  description?: string;
-  value: McpPermissionValue[];
-}
-
-export interface GetManyMcpPermissionDto {
-  data: McpPermission[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
 }
 
 export enum GetManyTargetResponseDtoScanScheduleEnum {
@@ -1926,7 +1894,9 @@ export enum IssueCommentTypeEnum {
 export enum LlmConfigResponseDtoProviderEnum {
   Openai = "openai",
   Openrouter = "openrouter",
+  Gemini = "gemini",
   Anthropic = "anthropic",
+  KiloCode = "kilo_code",
   Custom = "custom",
 }
 
@@ -1934,7 +1904,9 @@ export enum LlmConfigResponseDtoProviderEnum {
 export enum CreateLlmConfigDtoProviderEnum {
   Openai = "openai",
   Openrouter = "openrouter",
+  Gemini = "gemini",
   Anthropic = "anthropic",
+  KiloCode = "kilo_code",
   Custom = "custom",
 }
 
@@ -1942,7 +1914,9 @@ export enum CreateLlmConfigDtoProviderEnum {
 export enum LlmConfigWithProviderDtoProviderIdEnum {
   Openai = "openai",
   Openrouter = "openrouter",
+  Gemini = "gemini",
   Anthropic = "anthropic",
+  KiloCode = "kilo_code",
   Custom = "custom",
 }
 
@@ -1950,7 +1924,9 @@ export enum LlmConfigWithProviderDtoProviderIdEnum {
 export enum UpdateLlmConfigDtoProviderEnum {
   Openai = "openai",
   Openrouter = "openrouter",
+  Gemini = "gemini",
   Anthropic = "anthropic",
+  KiloCode = "kilo_code",
   Custom = "custom",
 }
 
@@ -4832,6 +4808,30 @@ export class Api<
     });
 
   /**
+   * @description Get available models for a specific LLM provider configuration
+   *
+   * @tags Agents
+   * @name AgentsControllerGetProviderModels
+   * @summary List models for a provider config
+   * @request GET:/api/agents/llm-configs/{id}/models
+   */
+  agentsControllerGetProviderModels = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: ProviderModelDto[];
+      },
+      any
+    >({
+      path: `/api/agents/llm-configs/${id}/models`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Update an existing LLM configuration
    *
    * @tags Agents
@@ -4914,6 +4914,22 @@ export class Api<
       path: `/api/agents/conversations`,
       method: "GET",
       query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete all conversations and their messages for the workspace
+   *
+   * @tags Agents
+   * @name AgentsControllerDeleteAllConversations
+   * @summary Delete all conversations
+   * @request DELETE:/api/agents/conversations
+   */
+  agentsControllerDeleteAllConversations = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations`,
+      method: "DELETE",
       format: "json",
       ...params,
     });
@@ -5246,7 +5262,7 @@ export class Api<
     path: string,
     params: RequestParams = {},
   ) =>
-    this.request<File, any>({
+    this.request<Blob, any>({
       path: `/api/storage/${bucket}/${path}`,
       method: "GET",
       ...params,
@@ -5267,141 +5283,11 @@ export class Api<
     },
     params: RequestParams = {},
   ) =>
-    this.request<File, any>({
+    this.request<Blob, any>({
       path: `/api/storage/forward`,
       method: "GET",
       query: query,
       format: "blob",
-      ...params,
-    });
-
-  /**
-   * @description Returns a flattened array of all tools from all MCP modules.
-   *
-   * @tags MCP
-   * @name McpControllerGetMcpTools
-   * @summary Get all tools from all registered MCP modules.
-   * @request GET:/api/mcp/tools
-   */
-  mcpControllerGetMcpTools = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/mcp/tools`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Creates new MCP permissions based on the provided values.
-   *
-   * @tags MCP
-   * @name McpControllerCreateMcpPermission
-   * @summary Create MCP permissions for a user.
-   * @request POST:/api/mcp/permissions
-   */
-  mcpControllerCreateMcpPermission = (
-    data: CreateMcpPermissionsRequestDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/mcp/permissions`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Returns the MCP permissions associated with the current user.
-   *
-   * @tags MCP
-   * @name McpControllerGetMcpPermissions
-   * @summary Get MCP permissions for a user.
-   * @request GET:/api/mcp/permissions
-   */
-  mcpControllerGetMcpPermissions = (
-    query?: {
-      search?: string;
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/mcp/permissions`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Returns the API key associated with the specified MCP permission ID.
-   *
-   * @tags MCP
-   * @name McpControllerGetMcpApiKey
-   * @summary Get the API key for a specific MCP permission.
-   * @request GET:/api/mcp/{id}/api-key
-   */
-  mcpControllerGetMcpApiKey = (id: string, params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/mcp/${id}/api-key`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Deletes the MCP permission associated with the current user by ID and also deletes the related API key.
-   *
-   * @tags MCP
-   * @name McpControllerDeleteMcpPermissionById
-   * @summary Delete MCP permission by ID.
-   * @request DELETE:/api/mcp/permissions/{id}
-   */
-  mcpControllerDeleteMcpPermissionById = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/mcp/permissions/${id}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * No description
-   *
-   * @tags Sse
-   * @name SseControllerSse
-   * @request GET:/api/mcp
-   */
-  sseControllerSse = (params: RequestParams = {}) =>
-    this.request<any, any>({
-      path: `/api/mcp`,
-      method: "GET",
-      ...params,
-    });
-
-  /**
-   * No description
-   *
-   * @tags Sse
-   * @name SseControllerMessages
-   * @request POST:/api/messages
-   */
-  sseControllerMessages = (params: RequestParams = {}) =>
-    this.request<any, any>({
-      path: `/api/messages`,
-      method: "POST",
       ...params,
     });
 }

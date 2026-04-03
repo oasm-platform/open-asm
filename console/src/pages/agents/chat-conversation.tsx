@@ -20,6 +20,7 @@ import {
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
 import { Markdown } from '@/components/common/markdown';
+import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
 import {
   AlertCircle,
   Bot,
@@ -58,6 +59,13 @@ interface ChatConversationProps {
   onRetry?: () => void;
   isStreaming?: boolean;
   isLoadingMessages?: boolean;
+  selectedProvider?: string | null;
+  selectedModel?: string | null;
+  onSelectModel?: (
+    provider: string,
+    model: string,
+    configId: string,
+  ) => void;
 }
 
 /** Check if the last message is a streaming assistant message */
@@ -176,6 +184,9 @@ export function ChatConversation({
   onRetry,
   isStreaming = false,
   isLoadingMessages = false,
+  selectedProvider,
+  selectedModel,
+  onSelectModel,
 }: ChatConversationProps) {
   const [input, setInput] = useState('');
 
@@ -297,7 +308,15 @@ export function ChatConversation({
               />
             </PromptInputBody>
             <PromptInputFooter>
-              <PromptInputTools />
+              <PromptInputTools>
+                {onSelectModel && (
+                  <ChatModelSwitcher
+                    selectedProvider={selectedProvider ?? null}
+                    selectedModel={selectedModel ?? null}
+                    onSelectModel={onSelectModel}
+                  />
+                )}
+              </PromptInputTools>
               <PromptInputSubmit
                 status={isStreaming ? 'streaming' : 'ready'}
                 disabled={!input.trim() || isStreaming}

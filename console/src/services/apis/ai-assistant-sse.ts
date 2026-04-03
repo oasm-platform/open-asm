@@ -75,7 +75,11 @@ export async function* createMessageStream(
   const response = await fetch('/api/agents/messages/stream', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ question: dto.question, conversationId: dto.conversationId }),
+    body: JSON.stringify({
+      question: dto.question,
+      conversationId: dto.conversationId,
+      ...(dto.model && dto.provider && { model: dto.model, provider: dto.provider }),
+    }),
     credentials: 'include',
   });
 

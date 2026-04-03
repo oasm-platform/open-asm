@@ -28,6 +28,7 @@ import {
   CreateLLMConfigDto,
   LLMConfigResponseDto,
   LLMConfigWithProviderDto,
+  ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
 import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
@@ -69,6 +70,24 @@ export class AgentsController {
     @WorkspaceId() workspaceId: string,
   ): Promise<LLMConfigWithProviderDto[]> {
     return this.agentsService.getLLMConfigsWithProviders(workspaceId);
+  }
+
+  @Get('llm-configs/:id/models')
+  @Doc({
+    summary: 'List models for a provider config',
+    description:
+      'Get available models for a specific LLM provider configuration',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'LLM config ID' }],
+    },
+    response: { serialization: ProviderModelDto, isArray: true },
+  })
+  async getProviderModels(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<ProviderModelDto[]> {
+    return this.agentsService.getModelsForProvider(id, workspaceId);
   }
 
   @Patch('llm-configs/:id')

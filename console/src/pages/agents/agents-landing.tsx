@@ -11,7 +11,7 @@ import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 import Page from '@/components/common/page';
 import LlmConnect from '@/components/llm-connect';
 import TypewriterText from '@/components/typewriter-text';
-import { LlmConfigSwitcher } from '@/components/ui/llm-config-switcher';
+import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
 import { axiosInstance } from '@/services/apis/axios-client';
 import type {
   ConversationResponseDto,
@@ -86,6 +86,11 @@ export default function AgentsLandingPage() {
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<{
+    provider: string;
+    model: string;
+    configId: string;
+  } | null>(null);
 
   const { data: conversationsData } = useAgentsControllerGetConversations(
     { limit: 3, sortBy: 'updatedAt', sortOrder: 'DESC' },
@@ -117,10 +122,13 @@ export default function AgentsLandingPage() {
       setIsSending(true);
 
       void navigate('/agents/conversations/new', {
-        state: { pendingMessage: content.trim() },
+        state: {
+          pendingMessage: content.trim(),
+          ...(selectedModel && { selectedModel }),
+        },
       });
     },
-    [isSending, navigate],
+    [isSending, navigate, selectedModel],
   );
 
   const handleSubmit = (message: PromptInputMessage) => {
@@ -194,7 +202,13 @@ export default function AgentsLandingPage() {
             </PromptInputBody>
             <PromptInputFooter>
               <PromptInputTools>
-                <LlmConfigSwitcher />
+                <ChatModelSwitcher
+                  selectedProvider={selectedModel?.provider ?? null}
+                  selectedModel={selectedModel?.model ?? null}
+                  onSelectModel={(provider, model, configId) => {
+                    setSelectedModel({ provider, model, configId });
+                  }}
+                />
               </PromptInputTools>
               <PromptInputSubmit
                 status={isSending ? 'streaming' : 'ready'}
