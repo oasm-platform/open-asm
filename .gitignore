@@ -64,10 +64,10 @@ core-api/.storage/*
 /.cache/
 /nix/
 .direnv/
-
 .roo/*
 .open-api/*
 .agent/*
+.agents/*
 .windsurf/*
 .claude/*
 .kilocode/plans/*
