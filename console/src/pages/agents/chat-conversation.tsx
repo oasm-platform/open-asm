@@ -53,17 +53,13 @@ interface ChatConversationProps {
   onDismissError?: () => void;
   selectedProvider?: string | null;
   selectedModel?: string | null;
-  onSelectModel?: (
-    provider: string,
-    model: string,
-    configId: string,
-  ) => void;
+  onSelectModel?: (provider: string, model: string, configId: string) => void;
 }
 
 const getTextContent = (message: UIMessage): string => {
   const parts = message.parts;
   if (!parts || parts.length === 0) return '';
-  
+
   return parts
     .filter((part): part is TextUIPart => part.type === 'text')
     .map((part) => part.text)
@@ -81,16 +77,27 @@ const getToolCallsFromParts = (message: UIMessage): ToolCallState[] => {
       toolCalls.push({
         toolCallId: part.toolCallId,
         toolName: part.toolName,
-        status: part.state === 'output-available' ? 'completed' as const : 'pending' as const,
+        status:
+          part.state === 'output-available'
+            ? ('completed' as const)
+            : ('pending' as const),
         input: part.input as Record<string, unknown>,
         output: part.output as unknown,
       });
     } else if (part.type.startsWith('tool-')) {
-      const toolPart = part as { toolCallId: string; state?: string; input?: unknown; output?: unknown };
+      const toolPart = part as {
+        toolCallId: string;
+        state?: string;
+        input?: unknown;
+        output?: unknown;
+      };
       toolCalls.push({
         toolCallId: toolPart.toolCallId,
         toolName: part.type.replace('tool-', ''),
-        status: toolPart.state === 'output-available' ? 'completed' as const : 'pending' as const,
+        status:
+          toolPart.state === 'output-available'
+            ? ('completed' as const)
+            : ('pending' as const),
         input: toolPart.input as Record<string, unknown>,
         output: toolPart.output,
       });
@@ -126,16 +133,16 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function formatToolName(name: string): string {
-  return name
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
   const [expanded, setExpanded] = useState(false);
 
   const statusIcon = {
-    pending: <Loader2 className="size-3.5 animate-spin text-muted-foreground" />,
+    pending: (
+      <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+    ),
     executing: <Loader2 className="size-3.5 animate-spin text-blue-500" />,
     completed: <CheckIcon className="size-3.5 text-green-500" />,
     error: <AlertCircle className="size-3.5 text-destructive" />,
@@ -253,11 +260,12 @@ export function ChatConversation({
   );
 
   // Check if we're in a new conversation with no assistant response yet
-  const hasOnlyUserMessages = messages.length > 0 && messages.every((m) => m.role === 'user');
+  const hasOnlyUserMessages =
+    messages.length > 0 && messages.every((m) => m.role === 'user');
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      <Conversation className="flex-1 min-h-0 h-0">
+    <div className="flex flex-col overflow-hidden">
+      <Conversation className="flex-1 h-0">
         <ConversationContent className="max-w-3xl mx-auto w-full px-4 py-6 gap-6">
           {isLoadingMessages ? (
             <ConversationEmptyState
@@ -276,9 +284,11 @@ export function ChatConversation({
               {messages.map((message, idx) => {
                 const textContent = getTextContent(message);
                 const toolCalls = getToolCallsFromParts(message);
-                const hasContent = textContent.length > 0 || toolCalls.length > 0;
+                const hasContent =
+                  textContent.length > 0 || toolCalls.length > 0;
                 const isLastMessage = idx === messages.length - 1;
-                const isStreamingMessage = isLastMessage && isStreaming && message.role === 'user';
+                const isStreamingMessage =
+                  isLastMessage && isStreaming && message.role === 'user';
 
                 return (
                   <Message key={message.id} from={message.role}>
@@ -298,7 +308,10 @@ export function ChatConversation({
                           <Markdown content={textContent} preview={false} />
                         )}
                         {isStreamingMessage && (
-                          <div className="flex items-center gap-1 py-1" data-testid="streaming-indicator">
+                          <div
+                            className="flex items-center gap-1 py-1"
+                            data-testid="streaming-indicator"
+                          >
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.15s]" />
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.3s]" />
@@ -312,15 +325,17 @@ export function ChatConversation({
                       message.id !== 'streaming' && (
                         <MessageActions>
                           {textContent && <CopyButton text={textContent} />}
-                          {idx === lastAssistantIdx && onRetry && !isStreaming && (
-                            <MessageAction
-                              onClick={handleRetry}
-                              label="Try again"
-                              tooltip="Try again"
-                            >
-                              <RefreshCcwIcon className="size-3.5" />
-                            </MessageAction>
-                          )}
+                          {idx === lastAssistantIdx &&
+                            onRetry &&
+                            !isStreaming && (
+                              <MessageAction
+                                onClick={handleRetry}
+                                label="Try again"
+                                tooltip="Try again"
+                              >
+                                <RefreshCcwIcon className="size-3.5" />
+                              </MessageAction>
+                            )}
                         </MessageActions>
                       )}
                   </Message>
@@ -348,7 +363,9 @@ export function ChatConversation({
               <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm">
                 <AlertCircle className="size-5 text-destructive shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-medium text-destructive">Streaming error</p>
+                  <p className="font-medium text-destructive">
+                    Streaming error
+                  </p>
                   <p className="text-muted-foreground mt-1">{streamError}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -387,7 +404,11 @@ export function ChatConversation({
               <PromptInputTextarea
                 value={input}
                 onChange={(e) => setInput(e.currentTarget.value)}
-                placeholder={isStreaming ? 'Waiting for response…' : 'Ask anything about security…'}
+                placeholder={
+                  isStreaming
+                    ? 'Waiting for response…'
+                    : 'Ask anything about security…'
+                }
                 disabled={isStreaming}
                 className="min-h-[52px] max-h-[33vh]"
               />
