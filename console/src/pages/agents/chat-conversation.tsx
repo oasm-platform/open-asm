@@ -264,8 +264,8 @@ export function ChatConversation({
     messages.length > 0 && messages.every((m) => m.role === 'user');
 
   return (
-    <div className="flex flex-col overflow-hidden">
-      <Conversation className="flex-1 h-0">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      <Conversation className="flex-1 min-h-0 h-0">
         <ConversationContent className="max-w-3xl mx-auto w-full px-4 py-6 gap-6">
           {isLoadingMessages ? (
             <ConversationEmptyState
