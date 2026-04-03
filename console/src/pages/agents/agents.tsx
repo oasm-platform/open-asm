@@ -1,31 +1,13 @@
-import { createMessageStream } from '@/services/apis/ai-assistant-sse';
-import type { MessageResponseDto } from '@/services/apis/gen/queries';
-import { useAgentsControllerGetMessages } from '@/services/apis/gen/queries';
-import { useQueryClient } from '@tanstack/react-query';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+import type { UIMessage } from 'ai';
+import {
+  useAgentsControllerGetMessages,
+} from '@/services/apis/gen/queries';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChatConversation } from './chat-conversation';
-
-/** Tool call state for UI rendering */
-interface ToolCallState {
-  toolCallId: string;
-  toolName: string;
-  status: 'pending' | 'executing' | 'completed' | 'error';
-  input?: Record<string, unknown>;
-  output?: unknown;
-  argsTextDelta?: string;
-}
-
-/** Local message type for UI rendering */
-interface UIMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  error?: string;
-  errorCode?: string;
-  toolCalls?: ToolCallState[];
-}
+import { getGlobalWorkspaceId } from '@/utils/workspaceState';
 
 interface SelectedModel {
   provider: string;
@@ -42,22 +24,10 @@ export default function AgentsChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingContent, setStreamingContent] = useState('');
-  const [streamingToolCalls, setStreamingToolCalls] = useState<ToolCallState[]>([]);
-  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(
-    null,
-  );
-  const [streamError, setStreamError] = useState<{
-    message: string;
-    code?: string;
-  } | null>(null);
-  const [ignoredMessageIds, setIgnoredMessageIds] = useState<Set<string>>(
-    new Set(),
-  );
-  const conversationIdRef = useRef<string | null>(conversationId ?? null);
-  const queryClient = useQueryClient();
   const hasAutoSentRef = useRef(false);
+  const chatMessagesRef = useRef<UIMessage[]>([]);
+  const createdConversationIdRef = useRef<string | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
     null,
   );
@@ -68,235 +38,150 @@ export default function AgentsChatPage() {
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
 
-  // Keep ref in sync with URL param
-  useEffect(() => {
-    conversationIdRef.current = conversationId ?? null;
-  }, [conversationId]);
+  const workspaceId = getGlobalWorkspaceId();
+  const isNewConversation = conversationId === 'new' || !conversationId;
 
-  // Fetch messages for active conversation
-  const { data: messagesData, isLoading: isLoadingMessages } =
+  const effectiveConversationId = createdConversationIdRef.current || conversationId;
+  const isActuallyNew = effectiveConversationId === 'new' || !effectiveConversationId;
+
+  // Fetch messages when loading an existing conversation
+  const { data: messagesData, isLoading: isLoadingHistory } =
     useAgentsControllerGetMessages(
-      conversationId ?? '',
-      { limit: 100, sortBy: 'createdAt', sortOrder: 'ASC' },
+      effectiveConversationId!,
+      undefined,
       {
         query: {
-          enabled: !!conversationId,
-          refetchOnWindowFocus: false,
+          queryKey: ['/api/agents/conversations', effectiveConversationId, 'messages'],
+          enabled: !!effectiveConversationId && !isActuallyNew,
         },
       },
     );
 
-  // Convert API messages to UI messages
-  const messages: UIMessage[] = useMemo(() => {
-    const apiMessages: MessageResponseDto[] = Array.isArray(messagesData)
-      ? messagesData
-      : [];
-    return apiMessages.map((msg) => ({
-      id: msg.id,
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content,
-      timestamp: new Date(msg.createdAt),
-    }));
-  }, [messagesData]);
+  // Convert history messages to UIMessage format
+  const savedMessages: UIMessage[] = useMemo(() => {
+    const rawData = messagesData as unknown;
+    const dataArray = Array.isArray(rawData) ? rawData : (rawData as { data?: unknown[] })?.data;
 
-  // Append pending user message, streaming content, and errors to messages during SSE
-  const displayMessages = useMemo(() => {
-    if (isLoadingMessages && messages.length === 0) {
+    if (!Array.isArray(dataArray)) {
       return [];
     }
 
-    const result: UIMessage[] = messages.filter(
-      (m) => !ignoredMessageIds.has(m.id),
-    );
+    return dataArray.map((msg) => {
+      const m = msg as Record<string, unknown>;
+      return {
+        id: String(m.id ?? ''),
+        role: String(m.role ?? 'user').toLowerCase() as 'user' | 'assistant',
+        parts: [
+          {
+            type: 'text' as const,
+            text: String(m.content ?? ''),
+          },
+        ],
+        createdAt: m.createdAt ? new Date(String(m.createdAt)) : new Date(),
+      };
+    });
+  }, [messagesData]);
 
-    if (pendingUserMessage) {
-      const confirmedFromApi = result.some(
-        (m) => m.role === 'user' && m.content === pendingUserMessage,
-      );
-      if (!confirmedFromApi) {
-        result.push({
-          id: 'pending-user',
-          role: 'user',
-          content: pendingUserMessage,
-          timestamp: new Date(),
+  const {
+    messages: chatMessages,
+    status,
+    sendMessage,
+  } = useChat({
+    transport: new DefaultChatTransport({
+      api: '/api/agents/messages/stream',
+      headers: workspaceId ? { 'x-workspace-id': workspaceId } : {},
+      prepareSendMessagesRequest: ({ messages, trigger, messageId }) => {
+        const lastMessage = messages[messages.length - 1];
+        const textContent = lastMessage?.parts
+          .filter((p) => p.type === 'text')
+          .map((p) => ('text' in p ? p.text : ''))
+          .join('') || '';
+
+        const modelInfo = selectedModelRef.current;
+
+        return {
+          body: {
+            question: textContent,
+            conversationId: trigger === 'submit-message' ? undefined : messageId,
+            ...(modelInfo && {
+              model: modelInfo.model,
+              provider: modelInfo.provider,
+            }),
+          },
+        };
+      },
+    }),
+    id: conversationId,
+    onData: (data) => {
+      const convId = (data as Record<string, unknown>)?.conversationId as string | undefined;
+      if (isNewConversation && convId) {
+        createdConversationIdRef.current = convId;
+      }
+    },
+    onFinish: () => {
+      if (createdConversationIdRef.current) {
+        void navigate(`/agents/conversations/${createdConversationIdRef.current}`, {
+          replace: true,
+          state: null,
         });
       }
-    }
+    },
+    onError: (error) => {
+      console.error('[Chat] Error:', error);
+      setStreamError(error.message ?? 'An error occurred while streaming');
+    },
+  });
 
-    if (isStreaming && (streamingContent || streamingToolCalls.length > 0)) {
-      result.push({
-        id: 'streaming',
-        role: 'assistant',
-        content: streamingContent,
-        timestamp: new Date(),
-        toolCalls: streamingToolCalls.length > 0 ? streamingToolCalls : undefined,
-      });
-    }
+  // Keep ref in sync
+  useEffect(() => {
+    chatMessagesRef.current = chatMessages;
+  }, [chatMessages]);
 
-    // Show error message if stream failed
-    if (streamError && !isStreaming) {
-      result.push({
-        id: 'error',
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-        error: streamError.message,
-        errorCode: streamError.code,
-      });
-    }
+  const isLoading = status === 'submitted' || status === 'streaming';
 
-    return result;
-  }, [
-    messages,
-    isStreaming,
-    streamingContent,
-    streamingToolCalls,
-    pendingUserMessage,
-    isLoadingMessages,
-    streamError,
-    ignoredMessageIds,
-  ]);
+  const displayMessages: UIMessage[] = useMemo(() => {
+    if (!isActuallyNew && savedMessages.length > 0 && !chatMessages.length) {
+      return savedMessages;
+    }
+    return chatMessages;
+  }, [isActuallyNew, savedMessages, chatMessages]);
+
+  const lastAssistantIdx = useMemo(() => {
+    for (let i = displayMessages.length - 1; i >= 0; i--) {
+      if (displayMessages[i].role === 'assistant') {
+        return i;
+      }
+    }
+    return -1;
+  }, [displayMessages]);
 
   const handleSendMessage = useCallback(
     async (content: string) => {
-      setPendingUserMessage(content);
-      setIsStreaming(true);
-      setStreamingContent('');
-      setStreamingToolCalls([]);
       setStreamError(null);
-
-      try {
-        const modelInfo = selectedModelRef.current;
-        const stream = createMessageStream({
-          question: content,
-          conversationId: conversationIdRef.current ?? undefined,
-          ...(modelInfo && {
-            model: modelInfo.model,
-            provider: modelInfo.provider,
-          }),
-        });
-
-        let fullContent = '';
-        let newConversationId: string | null = null;
-        const toolCallsMap = new Map<string, ToolCallState>();
-
-        for await (const event of stream) {
-          if (event.type === 'error') {
-            console.error('Stream error:', event.data);
-            setStreamError({
-              message: event.data.error || 'An error occurred',
-              code: event.data.errorCode,
-            });
-            break;
-          }
-
-          const eventType = event.data.type;
-
-          switch (eventType) {
-            case 'text':
-              if (event.data.content) {
-                fullContent += event.data.content;
-                setStreamingContent(fullContent);
-              }
-              break;
-
-            case 'tool-call-start':
-              if (event.data.toolCallId && event.data.toolName) {
-                toolCallsMap.set(event.data.toolCallId, {
-                  toolCallId: event.data.toolCallId,
-                  toolName: event.data.toolName,
-                  status: 'pending',
-                });
-                setStreamingToolCalls(Array.from(toolCallsMap.values()));
-              }
-              break;
-
-            case 'tool-call-delta':
-              if (event.data.toolCallId && event.data.argsTextDelta) {
-                const existing = toolCallsMap.get(event.data.toolCallId);
-                if (existing) {
-                  toolCallsMap.set(event.data.toolCallId, {
-                    ...existing,
-                    argsTextDelta: (existing.argsTextDelta || '') + event.data.argsTextDelta,
-                    status: 'executing',
-                  });
-                  setStreamingToolCalls(Array.from(toolCallsMap.values()));
-                }
-              }
-              break;
-
-            case 'tool-call':
-              if (event.data.toolCallId && event.data.toolName) {
-                toolCallsMap.set(event.data.toolCallId, {
-                  toolCallId: event.data.toolCallId,
-                  toolName: event.data.toolName,
-                  status: 'executing',
-                  input: event.data.input,
-                });
-                setStreamingToolCalls(Array.from(toolCallsMap.values()));
-              }
-              break;
-
-            case 'tool-result':
-              if (event.data.toolCallId) {
-                const existing = toolCallsMap.get(event.data.toolCallId);
-                if (existing) {
-                  toolCallsMap.set(event.data.toolCallId, {
-                    ...existing,
-                    status: 'completed',
-                    output: event.data.output,
-                  });
-                  setStreamingToolCalls(Array.from(toolCallsMap.values()));
-                }
-              }
-              break;
-
-            default:
-              // Handle legacy format where content is sent without type
-              if (event.data.content && !eventType) {
-                fullContent += event.data.content;
-                setStreamingContent(fullContent);
-              }
-              break;
-          }
-
-          if (event.data.conversationId) {
-            newConversationId = event.data.conversationId;
-            if (!conversationIdRef.current) {
-              void navigate(`/agents/conversations/${newConversationId}`, {
-                replace: true,
-              });
-            }
-          }
-        }
-
-        void queryClient.invalidateQueries({
-          queryKey: ['/api/agents/conversations'],
-        });
-
-        const finalConversationId =
-          conversationIdRef.current ?? newConversationId;
-        if (finalConversationId) {
-          void queryClient.invalidateQueries({
-            queryKey: [
-              `/api/agents/conversations/${finalConversationId}/messages`,
-            ],
-          });
-        }
-      } catch (error) {
-        console.error('Failed to send message:', error);
-        setStreamError({
-          message:
-            error instanceof Error ? error.message : 'Failed to send message',
-          code: 'NETWORK_ERROR',
-        });
-      } finally {
-        setIsStreaming(false);
-        setPendingUserMessage(null);
-      }
+      await sendMessage({ text: content });
     },
-    [queryClient, navigate],
+    [sendMessage],
   );
+
+  const handleRetry = useCallback(async () => {
+    if (lastAssistantIdx !== -1 && chatMessages.length > 0) {
+      setStreamError(null);
+      const lastUserMsg = [...chatMessages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) {
+        const textContent = lastUserMsg.parts
+          .filter((p) => p.type === 'text')
+          .map((p) => ('text' in p ? p.text : ''))
+          .join('') || '';
+        if (textContent) {
+          await sendMessage({ text: textContent });
+        }
+      }
+    }
+  }, [lastAssistantIdx, chatMessages, sendMessage]);
+
+  const handleDismissError = useCallback(() => {
+    setStreamError(null);
+  }, []);
 
   // Auto-send pending message from landing page
   useEffect(() => {
@@ -308,23 +193,13 @@ export default function AgentsChatPage() {
         selectedModelRef.current = state.selectedModel;
       }
       void handleSendMessage(state.pendingMessage);
-      // Clear location state to prevent re-sending on re-renders
-      void navigate(location.pathname, { replace: true, state: null });
+      void navigate(location.pathname, {
+        replace: true,
+        state: null,
+      });
     }
-  }, [location.state, handleSendMessage, navigate, location.pathname]);
+  }, [location.state, navigate, location.pathname, handleSendMessage]);
 
-  // Clear streaming content after API messages have been refreshed
-  useEffect(() => {
-    if (!isStreaming && (streamingContent || streamingToolCalls.length > 0) && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'assistant') {
-        setStreamingContent('');
-        setStreamingToolCalls([]);
-      }
-    }
-  }, [isStreaming, streamingContent, streamingToolCalls, messages]);
-
-  // Escape ProtectedLayout's p-4 so the chat fills the full available area
   return (
     <div
       className="-m-4 flex flex-col overflow-hidden"
@@ -333,41 +208,16 @@ export default function AgentsChatPage() {
       <ChatConversation
         messages={displayMessages}
         onSendMessage={handleSendMessage}
+        onRetry={lastAssistantIdx !== -1 && !isLoading ? handleRetry : undefined}
+        isStreaming={isLoading}
+        isLoadingMessages={isLoadingHistory}
+        streamError={streamError}
+        onDismissError={handleDismissError}
         selectedProvider={selectedModel?.provider ?? null}
         selectedModel={selectedModel?.model ?? null}
         onSelectModel={(provider, model, configId) => {
           setSelectedModel({ provider, model, configId });
         }}
-        onRetry={() => {
-          // Find the last assistant message and its matching user message
-          const reversedMessages = [...messages].reverse();
-          const lastAsstRevIdx = reversedMessages.findIndex(
-            (m) => m.role === 'assistant',
-          );
-          const lastAsstIdx =
-            lastAsstRevIdx !== -1 ? messages.length - 1 - lastAsstRevIdx : -1;
-          const lastUserMsg = reversedMessages.find((m) => m.role === 'user');
-          if (lastAsstIdx !== -1) {
-            setIgnoredMessageIds((prev) => {
-              const next = new Set(prev);
-              next.add(messages[lastAsstIdx].id);
-              return next;
-            });
-          }
-          if (lastUserMsg) {
-            setIgnoredMessageIds((prev) => {
-              const next = new Set(prev);
-              next.add(lastUserMsg.id); // Also hide the user message so we don't duplicate it visually
-              return next;
-            });
-            void handleSendMessage(lastUserMsg.content);
-          } else {
-            // If somehow no user message, just resend last pending or empty trigger
-            void handleSendMessage('Retry');
-          }
-        }}
-        isStreaming={isStreaming}
-        isLoadingMessages={isLoadingMessages}
       />
     </div>
   );

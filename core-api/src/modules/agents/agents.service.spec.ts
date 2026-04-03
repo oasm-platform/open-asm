@@ -25,6 +25,7 @@ jest.mock('ai', () => ({
     })(),
   })),
   generateText: jest.fn(),
+  createUIMessageStreamResponse: jest.fn(() => new ReadableStream()),
 }));
 
 jest.mock('@ai-sdk/openai', () => ({
@@ -376,12 +377,12 @@ describe('AgentsService', () => {
     });
   });
 
-  describe('sendMessageStream', () => {
+  describe('streamMessage', () => {
     it('should throw BadRequestException when no preferred config exists', async () => {
       jest.spyOn(service, 'getPreferredLLMConfig').mockResolvedValue(null);
 
       await expect(
-        service.sendMessageStream(
+        service.streamMessage(
           { question: 'Hello' },
           mockWorkspaceId,
           mockUserId,
@@ -406,13 +407,13 @@ describe('AgentsService', () => {
         .spyOn(llmConfigRepository, 'findOne')
         .mockResolvedValue(mockLlmConfig);
 
-      const observable = await service.sendMessageStream(
+      const stream = await service.streamMessage(
         { question: 'Hello' },
         mockWorkspaceId,
         mockUserId,
       );
 
-      expect(observable).toBeDefined();
+      expect(stream).toBeDefined();
       expect(conversationRepository.create).toHaveBeenCalled();
     });
 
@@ -427,20 +428,20 @@ describe('AgentsService', () => {
         .spyOn(llmConfigRepository, 'findOne')
         .mockResolvedValue(mockLlmConfig);
 
-      const observable = await service.sendMessageStream(
+      const stream = await service.streamMessage(
         { question: 'Hello', conversationId: mockConversation.id },
         mockWorkspaceId,
         mockUserId,
       );
 
-      expect(observable).toBeDefined();
+      expect(stream).toBeDefined();
     });
 
     it('should throw NotFoundException when conversation not found', async () => {
       jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(null);
 
       await expect(
-        service.sendMessageStream(
+        service.streamMessage(
           { question: 'Hello', conversationId: 'non-existent' },
           mockWorkspaceId,
           mockUserId,

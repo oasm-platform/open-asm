@@ -6,19 +6,24 @@ import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
   Query,
-  Sse,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Observable } from 'rxjs';
+ 
+import { pipeUIMessageStreamToResponse } from 'ai';
+import type { Response } from 'express';
 import { AgentsService } from './agents.service';
 import {
   ConversationResponseDto,
@@ -234,7 +239,7 @@ export class AgentsController {
   }
 
   @Post('messages/stream')
-  @Sse()
+  @HttpCode(HttpStatus.OK)
   @Doc({
     summary: 'Send message (streaming)',
     description:
@@ -242,12 +247,47 @@ export class AgentsController {
       'If conversationId is not provided, a new conversation is created using the preferred LLM config.',
     request: { getWorkspaceId: true },
   })
-  async sendMessageStream(
+  async streamMessage(
     @Body() dto: SendMessageDto,
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
-  ): Promise<Observable<MessageEvent>> {
-    return this.agentsService.sendMessageStream(dto, workspaceId, userId);
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      // Pass workspaceId and userId to streamMessage so it can return conversationId
+      const { stream, conversationId } = await this.agentsService.streamMessage(
+        dto,
+        workspaceId,
+        userId,
+      );
+
+      pipeUIMessageStreamToResponse({
+        response: res,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'X-Conversation-Id': conversationId || dto.conversationId || '',
+          Connection: 'keep-alive',
+        },
+        stream,
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        res.status(400).json({
+          message: error.message,
+          error: 'Bad Request',
+          statusCode: 400,
+        });
+      } else {
+        res.status(500).json({
+          message: error instanceof Error ? error.message : 'Internal server error',
+          error: 'Internal Server Error',
+          statusCode: 500,
+        });
+      }
+    }
   }
 
   @Delete('conversations/:cid/messages/:mid')
