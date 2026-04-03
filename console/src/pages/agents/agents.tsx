@@ -99,10 +99,17 @@ export default function AgentsChatPage() {
 
         const modelInfo = selectedModelRef.current;
 
+        // Use effectiveConversationId for existing conversations
+        // Only omit for brand new conversations (trigger === 'submit-message' && isActuallyNew)
+        const shouldSendConversationId = !isActuallyNew || trigger !== 'submit-message';
+        const convId = shouldSendConversationId
+          ? (createdConversationIdRef.current || effectiveConversationId)
+          : undefined;
+
         return {
           body: {
             question: textContent,
-            conversationId: trigger === 'submit-message' ? undefined : messageId,
+            ...(convId && { conversationId: convId }),
             ...(modelInfo && {
               model: modelInfo.model,
               provider: modelInfo.provider,
