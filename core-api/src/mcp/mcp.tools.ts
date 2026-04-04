@@ -291,7 +291,7 @@
 //     _: Context,
 //     request: Request,
 //   ) {
-//     const { vulnId } = params;
+//     const vulnId = params.id || params.vulnId;
 //     const workspaceId = this.getWorkspaceId(request);
 //     return await this.vulnerabilitiesService.getVulnerability(
 //       vulnId,

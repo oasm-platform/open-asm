@@ -224,7 +224,7 @@ export class AgentTool {
           'Retrieves full technical details for a specific vulnerability by its ID, including description, Proof of Concept (PoC), remediation steps, and references. Use this when the user needs to understand how to fix an issue or see evidence. Keywords: vuln details, fix, remediation, PoC, CVE info.',
         parameters: detailVulnSchema,
         execute: async (params: z.infer<typeof detailVulnSchema>) => {
-          const { vulnId } = params;
+          const vulnId: string = (params.vulnId ?? params.id) as string;
           return this.vulnerabilitiesService.getVulnerability(
             vulnId,
             workspaceId,
