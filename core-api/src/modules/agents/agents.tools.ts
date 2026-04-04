@@ -8,6 +8,7 @@ import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 
+import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   detailAssetSchema,
   detailVulnSchema,
@@ -63,7 +64,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Lists discovered assets (domains, subdomains, IPs, URLs) within a workspace. Assets represent the entities found during scanning, distinct from targets (scope) or tools (scanners). Use this when the user asks about discovered infrastructure, IPs, or domains. Keywords: asset, domain, IP, URL.',
+          'Lists discovered assets (domains, subdomains, IPs, URLs) within a workspace. Assets represent the entities found during scanning, distinct from targets (scope) or tools (scanners). Use this when the user asks about discovered infrastructure, IPs, or domains. Keywords: asset, domain, IP, URL.\n\n**Parameters you can pass:**\n- `page`: Page number (default: 1)\n- `limit`: Items per page (default: 100)\n- `value`: Filter by asset value (e.g., "hackerone.com", "api", "192.168")',
         parameters: getAssetsSchema,
         execute: async (params: z.infer<typeof getAssetsSchema>) => {
           const { page, limit, value } = params;
@@ -72,6 +73,7 @@ export class AgentTool {
               limit: limit ?? 100,
               page: page ?? 1,
               sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
               value,
             },
             workspaceId,
@@ -96,22 +98,20 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Retrieves a list of security vulnerabilities identified during scans. Provides high-level info like name and severity. Use this when the user asks about security issues, CVEs, or "vulns". For in-depth technical details or remediation steps, use "detail_vuln". Keywords: vulnerability, vuln, CVE, security issue.',
+          'Retrieves a list of security vulnerabilities identified during scans. Provides high-level info like name and severity. Use this when the user asks about security issues, CVEs, or "vulns". For in-depth technical details or remediation steps, use "detail_vuln". Keywords: vulnerability, vuln, CVE, security issue.\n\n**Parameters you can pass:**\n- `page`: Page number (default: 1)\n- `limit`: Items per page (default: 100)\n- `q`: Search query to filter vulnerabilities (e.g., "XSS", "SQL injection", "CVE-2024")',
         parameters: getVulnerabilitiesSchema,
-        execute: async (
-          params: z.infer<typeof getVulnerabilitiesSchema>,
-        ) => {
+        execute: async (params: z.infer<typeof getVulnerabilitiesSchema>) => {
           const { page, limit, q } = params;
-          const response =
-            await this.vulnerabilitiesService.getVulnerabilities(
-              {
-                limit: limit ?? 100,
-                page: page ?? 1,
-                q,
-                sortBy: 'createdAt',
-              },
-              workspaceId,
-            );
+          const response = await this.vulnerabilitiesService.getVulnerabilities(
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              q,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+            },
+            workspaceId,
+          );
           return {
             ...response,
             data: response.data.map((i) => ({
@@ -133,20 +133,20 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Lists defined targets (root domains, IP ranges, CIDRs) that constitute the scanning scope. Targets are the starting points for discovery, whereas assets are the actual items found. Use this when the user asks about the "scope" or "what is being scanned". Keywords: target, scan scope, root domain, IP range.',
+          'Lists defined targets (root domains, IP ranges, CIDRs) that constitute the scanning scope. Targets are the starting points for discovery, whereas assets are the actual items found. Use this when the user asks about the "scope" or "what is being scanned". Keywords: target, scan scope, root domain, IP range.\n\n**Parameters you can pass:**\n- `page`: Page number (default: 1)\n- `limit`: Items per page (default: 100)\n- `value`: Filter by target value (e.g., "example.com", "10.0.0.0/8")',
         parameters: getTargetsSchema,
         execute: async (params: z.infer<typeof getTargetsSchema>) => {
           const { page, limit, value } = params;
-          const response =
-            await this.targetsService.getTargetsInWorkspace(
-              {
-                limit: limit ?? 100,
-                page: page ?? 1,
-                sortBy: 'createdAt',
-                value,
-              },
-              workspaceId,
-            );
+          const response = await this.targetsService.getTargetsInWorkspace(
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              value,
+            },
+            workspaceId,
+          );
           return {
             ...response,
             data: response.data.map((i) => ({
@@ -202,11 +202,9 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Lists all assets discovered within the scope of a specific target ID. Useful for drilling down into what was found for a particular root domain or IP range. Keywords: assets in target, subdomain list for domain.',
+          'Lists all assets discovered within the scope of a specific target ID. Useful for drilling down into what was found for a particular root domain or IP range. Keywords: assets in target, subdomain list for domain.\n\n**Parameters you can pass:**\n- `targetId`: (Required) The target ID to list assets from\n- `page`: Page number (default: 1)\n- `limit`: Items per page (default: 100)\n- `value`: Filter assets by value within this target',
         parameters: listAssetsInTargetSchema,
-        execute: async (
-          params: z.infer<typeof listAssetsInTargetSchema>,
-        ) => {
+        execute: async (params: z.infer<typeof listAssetsInTargetSchema>) => {
           const { targetId, limit, page, value } = params;
           return this.assetsService.getManyAsssetServices(
             {
@@ -215,6 +213,7 @@ export class AgentTool {
               targetIds: [targetId],
               value,
               sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
             },
             workspaceId,
           );
