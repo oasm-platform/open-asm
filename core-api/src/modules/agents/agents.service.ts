@@ -682,6 +682,9 @@ export class AgentsService {
     const tools = this.agentTool.getTools(workspaceId);
     const systemPrompt = this.getSystemPrompt();
 
+    // Track accumulated text for saving
+    let accumulatedText = '';
+
     // Create stream with automatic tool call continuation
     const result = streamText({
       model,
@@ -689,67 +692,44 @@ export class AgentsService {
       system: systemPrompt,
       tools,
       stopWhen: stepCountIs(10), // Max 10 steps to prevent infinite loops
+      onChunk: ({ chunk }) => {
+        // Accumulate text chunks to save later
+        if (chunk.type === 'text-delta') {
+          accumulatedText += chunk.text;
+        }
+      },
+      onFinish: async () => {
+        // Save accumulated text to assistant message when done
+        if (accumulatedText) {
+          await messageRepo.update(
+            { id: assistantMsgId },
+            {
+              content: accumulatedText,
+              metadata: {
+                ...assistantMsgMetadata,
+                status: 'completed',
+              },
+            },
+          );
+        }
+      },
     });
 
-    // Wrap stream to prepend conversation-created event
-    // and accumulate text to save when done
-    const originalStream = result.toUIMessageStream();
-    let reader: ReadableStreamDefaultReader<UIMessageChunk> | null = null;
-    let accumulatedText = '';
-    let conversationEventSent = false;
-
-    const wrappedStream = new ReadableStream<UIMessageChunk>({
-      start() {
-        reader = originalStream.getReader();
-      },
-      async pull(controller) {
-        if (!conversationEventSent) {
-          conversationEventSent = true;
+    // Use pipeThrough to prepend conversation-created event
+    // The stream will flow events in real-time as they happen
+    const wrappedStream = result.toUIMessageStream().pipeThrough(
+      new TransformStream<UIMessageChunk, UIMessageChunk>({
+        start(controller) {
+          // Send conversation created event first
           controller.enqueue({
             type: 'data-conversation-created',
             data: {
               conversationId: conversationIdStr,
             },
           } as UIMessageChunk);
-          return;
-        }
-
-        if (!reader) return;
-
-        const { done, value } = await reader.read();
-        if (done) {
-          // Save accumulated text to assistant message
-          if (accumulatedText) {
-            await messageRepo.update(
-              { id: assistantMsgId },
-              {
-                content: accumulatedText,
-                metadata: {
-                  ...assistantMsgMetadata,
-                  status: 'completed',
-                },
-              },
-            );
-          }
-          controller.close();
-          return;
-        }
-
-        // Accumulate text from chunk
-        if (
-          value?.type === 'text-delta' &&
-          'delta' in value &&
-          typeof value.delta === 'string'
-        ) {
-          accumulatedText += value.delta;
-        }
-
-        controller.enqueue(value);
-      },
-      cancel() {
-        reader?.releaseLock();
-      },
-    });
+        },
+      }),
+    );
 
     return {
       stream: wrappedStream,

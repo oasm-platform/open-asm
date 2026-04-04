@@ -21,8 +21,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
- 
-import { pipeUIMessageStreamToResponse } from 'ai';
+
 import type { Response } from 'express';
 import { AgentsService } from './agents.service';
 import {
@@ -187,7 +186,8 @@ export class AgentsController {
   @Delete('conversations')
   @Doc({
     summary: 'Delete all conversations',
-    description: 'Delete all conversations and their messages for the workspace',
+    description:
+      'Delete all conversations and their messages for the workspace',
     request: { getWorkspaceId: true },
     response: { serialization: DefaultMessageResponseDto },
   })
@@ -261,18 +261,24 @@ export class AgentsController {
         userId,
       );
 
-      pipeUIMessageStreamToResponse({
-        response: res,
-        status: 200,
-        statusText: 'OK',
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'X-Conversation-Id': conversationId || dto.conversationId || '',
-          Connection: 'keep-alive',
-        },
-        stream,
-      });
+      // Manually pipe the stream to prevent buffering
+      res.socket?.setNoDelay(true);
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Content-Encoding', 'none');
+      res.setHeader(
+        'X-Conversation-Id',
+        conversationId || dto.conversationId || '',
+      );
+      res.flushHeaders();
+
+      const reader = stream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(`data: ${JSON.stringify(value)}\n\n`);
+      }
+      res.end();
     } catch (error) {
       if (error instanceof BadRequestException) {
         res.status(400).json({
@@ -282,7 +288,8 @@ export class AgentsController {
         });
       } else {
         res.status(500).json({
-          message: error instanceof Error ? error.message : 'Internal server error',
+          message:
+            error instanceof Error ? error.message : 'Internal server error',
           error: 'Internal Server Error',
           statusCode: 500,
         });
