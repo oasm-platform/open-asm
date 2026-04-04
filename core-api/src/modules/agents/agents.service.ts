@@ -685,10 +685,20 @@ export class AgentsService {
     // Track accumulated text for saving
     let accumulatedText = '';
 
+    // Get current time and timezone for context
+    const now = new Date();
+    const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
+
     // Create stream with automatic tool call continuation
     const result = streamText({
       model,
-      messages: modelMessages,
+      messages: [
+        {
+          role: 'system' as const,
+          content: currentTimeContext,
+        },
+        ...modelMessages,
+      ],
       system: systemPrompt,
       tools,
       stopWhen: stepCountIs(10), // Max 10 steps to prevent infinite loops

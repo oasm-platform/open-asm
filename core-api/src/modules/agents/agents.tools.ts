@@ -24,6 +24,14 @@ const weatherSchema = z.object({
   location: z.string().describe('The location to get the weather for'),
 });
 
+// Web fetch tool schema
+const webFetchSchema = z.object({
+  url: z
+    .string()
+    .url()
+    .describe('The URL to fetch content from (e.g., "https://example.com")'),
+});
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolType = any;
 
@@ -39,23 +47,6 @@ export class AgentTool {
     private readonly vulnerabilitiesService: VulnerabilitiesService,
     private readonly statisticService: StatisticService,
   ) {}
-
-  /**
-   * Weather tool that returns random temperature data
-   */
-  get weatherTool(): any {
-    const toolConfig: any = {
-      description: 'Get the weather in a location',
-      parameters: weatherSchema,
-      execute: ({ location }: { location: string }) => {
-        return {
-          location,
-          temperature: 72 + Math.floor(Math.random() * 21) - 10,
-        };
-      },
-    };
-    return tool(toolConfig);
-  }
 
   /**
    * Get assets tool - returns a factory that accepts workspaceId
@@ -245,11 +236,48 @@ export class AgentTool {
   }
 
   /**
+   * Web fetch tool - makes HTTP GET requests to fetch content from URLs
+   */
+  get webFetchTool(): (workspaceId: string) => any {
+    return (_workspaceId: string) => {
+      const toolConfig: any = {
+        description:
+          'Fetches content from any URL using HTTP GET request. Use this to retrieve web pages, API responses, or online resources. Simply pass a URL and get back the response body.\n\n**Parameters you can pass:**\n- `url`: (Required) The URL to fetch',
+        parameters: webFetchSchema,
+        execute: async (params: z.infer<typeof webFetchSchema>) => {
+          const { url } = params;
+
+          try {
+            const response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'User-Agent': 'OASM-Security-Agent/1.0',
+              },
+            });
+
+            const body = await response.text();
+
+            return {
+              statusCode: response.status,
+              body,
+            };
+          } catch (error) {
+            return {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              url,
+            };
+          }
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
    * Returns all available tools as a record, bound to the given workspaceId
    */
   getTools(workspaceId: string): Record<string, ToolType> {
     return {
-      get_weather: this.weatherTool,
       get_assets: this.getAssetsTool(workspaceId),
       get_vulnerabilities: this.getVulnerabilitiesTool(workspaceId),
       get_targets: this.getTargetsTool(workspaceId),
@@ -257,6 +285,7 @@ export class AgentTool {
       detail_asset: this.detailAssetTool(workspaceId),
       list_assets_in_target: this.listAssetsInTargetTool(workspaceId),
       detail_vuln: this.detailVulnTool(workspaceId),
+      web_fetch: this.webFetchTool(workspaceId),
     };
   }
 }

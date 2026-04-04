@@ -253,22 +253,58 @@ export function ChatConversation({
     }
   }, [onRetry]);
 
-  // Loading: show when fetching history
+  // Loading: show when fetching history for existing conversation with no messages yet
   // Empty: show when no messages and not streaming (not during initial load or streaming)
+  const isLoadingHistory = isLoadingMessages && messages.length === 0;
   const isEmpty = !isLoadingMessages && messages.length === 0 && !isStreaming;
-  const lastAssistantIdx = messages.reduce(
-    (acc, m, i) => (m.role === 'assistant' ? i : acc),
-    -1,
-  );
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Conversation className="flex-1">
         <ConversationContent className="max-w-3xl mx-auto w-full px-4 py-6 gap-6">
-          {isLoadingMessages ? (
-            <div className="flex flex-col items-center justify-center h-full">
-              <Bot className="size-10 text-muted-foreground animate-pulse mb-3" />
-              <p className="text-sm text-muted-foreground">Loading messages…</p>
+          {isLoadingHistory ? (
+            <div className="space-y-6">
+              {/* User message skeleton */}
+              <div className="flex justify-end">
+                <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
+                  <div className="space-y-2">
+                    <div className="h-4 w-64 animate-pulse rounded bg-muted-foreground/20" />
+                    <div className="h-4 w-48 animate-pulse rounded bg-muted-foreground/20" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Assistant message skeleton */}
+              <div className="flex gap-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <Bot className="size-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div className="h-4 w-full animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="h-4 w-[90%] animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="h-4 w-[75%] animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="mt-2 h-4 w-[60%] animate-pulse rounded bg-muted-foreground/20" />
+                </div>
+              </div>
+
+              {/* Second user message skeleton */}
+              <div className="flex justify-end">
+                <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
+                  <div className="h-4 w-56 animate-pulse rounded bg-muted-foreground/20" />
+                </div>
+              </div>
+
+              {/* Second assistant message skeleton */}
+              <div className="flex gap-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <Bot className="size-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div className="h-4 w-[85%] animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="h-4 w-full animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="h-4 w-[70%] animate-pulse rounded bg-muted-foreground/20" />
+                </div>
+              </div>
             </div>
           ) : isEmpty ? (
             <ConversationEmptyState
@@ -317,7 +353,7 @@ export function ChatConversation({
                         <div className="mt-2 flex items-center gap-1.5">
                           <Loader2 className="size-3 animate-spin text-muted-foreground" />
                           <span className="text-xs text-muted-foreground">
-                            Generating…
+                            Thinking…
                           </span>
                         </div>
                       )}
@@ -328,17 +364,6 @@ export function ChatConversation({
                       message.id !== 'streaming' && (
                         <MessageActions>
                           {textContent && <CopyButton text={textContent} />}
-                          {idx === lastAssistantIdx &&
-                            onRetry &&
-                            !isStreaming && (
-                              <MessageAction
-                                onClick={handleRetry}
-                                label="Try again"
-                                tooltip="Try again"
-                              >
-                                <RefreshCcwIcon className="size-3.5" />
-                              </MessageAction>
-                            )}
                         </MessageActions>
                       )}
                   </Message>
