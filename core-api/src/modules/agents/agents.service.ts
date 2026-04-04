@@ -3,6 +3,7 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { decrypt, encrypt } from '@/common/utils/encryption.util';
+import { RedisService } from '@/services/redis/redis.service';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
@@ -46,6 +47,7 @@ export class AgentsService {
     private readonly conversationRepository: Repository<AgentConversation>,
     @InjectRepository(AgentMessage)
     private readonly messageRepository: Repository<AgentMessage>,
+    private readonly redisService: RedisService,
   ) {}
 
   private maskApiKey(apiKey: string): string {
@@ -86,7 +88,9 @@ export class AgentsService {
     // Validate API key by fetching models
     const provider = getLLMProviderConfig(dto.provider);
     if (!provider) {
-      throw new BadRequestException(`Provider ${dto.provider} is not supported`);
+      throw new BadRequestException(
+        `Provider ${dto.provider} is not supported`,
+      );
     }
 
     const models = await provider.fetchModels(dto.apiKey);
@@ -284,6 +288,18 @@ export class AgentsService {
     configId: string,
     workspaceId: string,
   ): Promise<ProviderModelDto[]> {
+    const cacheKey = `agents:models:${configId}`;
+
+    // Try to get from cache first
+    try {
+      const cached = await this.redisService.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached) as ProviderModelDto[];
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to read from Redis cache: ${error}`);
+    }
+
     const config = await this.llmConfigRepository.findOne({
       where: { id: configId, workspaceId },
     });
@@ -298,7 +314,16 @@ export class AgentsService {
     }
 
     const apiKey = decrypt(config.apiKey);
-    return provider.fetchModels(apiKey);
+    const models = await provider.fetchModels(apiKey);
+
+    // Cache the result for 1 hour (3600 seconds)
+    try {
+      await this.redisService.setex(cacheKey, 3600, JSON.stringify(models));
+    } catch (error) {
+      this.logger.warn(`Failed to cache models in Redis: ${error}`);
+    }
+
+    return models;
   }
 
   async getConversations(

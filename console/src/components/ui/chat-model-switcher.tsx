@@ -71,20 +71,21 @@ export function ChatModelSwitcher({
     [connectedProviders],
   );
 
+  const configId = preferredProvider?.configId ?? '';
+
   const { data: models, isLoading } = useAgentsControllerGetProviderModels(
-    preferredProvider?.configId ?? '',
-    {
-      query: {
-        enabled: !!preferredProvider?.configId,
-        staleTime: 5 * 60 * 1000,
-      },
-    },
+    configId,
+    { query: { enabled: !!configId } },
   );
 
   const updateLLMConfig = useAgentsControllerUpdateLLMConfig();
 
   const filteredModels = useMemo((): ProviderModelDto[] => {
-    const list: ProviderModelDto[] = models?.data ?? [];
+    const list: ProviderModelDto[] = Array.isArray(models)
+      ? models
+      : Array.isArray(models?.data)
+        ? models.data
+        : [];
     if (!debouncedSearch) {
       if (!selectedModel) return list;
       return [...list].sort((a) => (a.id === selectedModel ? -1 : 1));
@@ -198,19 +199,8 @@ export function ChatModelSwitcher({
             onValueChange={setSearchQuery}
           />
           <CommandList className="max-h-[320px]">
-            <CommandEmpty>
-              {isLoading
-                ? 'Loading models...'
-                : debouncedSearch
-                  ? 'No models found'
-                  : 'No models available'}
-            </CommandEmpty>
-            {preferredProvider && filteredModels.length > 0 && (
-              <div className="py-1">
-                <CommandItem onSelect={handleConnect}>
-                  <Settings className="h-4 w-4" />
-                  Provider Settings
-                </CommandItem>
+            {preferredProvider && filteredModels.length > 0 ? (
+              <>
                 {filteredModels.map((model) => {
                   const isModelSelected =
                     isSelected && selectedModel === model.id;
@@ -234,7 +224,19 @@ export function ChatModelSwitcher({
                     </CommandItem>
                   );
                 })}
-              </div>
+                <CommandItem onSelect={handleConnect}>
+                  <Settings className="h-4 w-4" />
+                  Provider Settings
+                </CommandItem>
+              </>
+            ) : (
+              <CommandEmpty>
+                {isLoading
+                  ? 'Loading models...'
+                  : debouncedSearch
+                    ? 'No models found'
+                    : 'No models available'}
+              </CommandEmpty>
             )}
           </CommandList>
         </Command>
