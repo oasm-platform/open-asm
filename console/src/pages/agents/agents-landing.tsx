@@ -12,41 +12,21 @@ import Page from '@/components/common/page';
 import LlmConnect from '@/components/llm-connect';
 import TypewriterText from '@/components/typewriter-text';
 import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
-import { axiosInstance } from '@/services/apis/axios-client';
+
 import type {
   ConversationResponseDto,
-  LLMConfigResponseDto,
+  LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
-import { useAgentsControllerGetConversations } from '@/services/apis/gen/queries';
-import { useQuery } from '@tanstack/react-query';
+import {
+  useAgentsControllerGetConversations,
+  useAgentsControllerGetLLMConfigs,
+} from '@/services/apis/gen/queries';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
-
-interface LLMProviderStatus {
-  id: string;
-  name: string;
-  logo: string;
-  isConnected: boolean;
-  config: LLMConfigResponseDto | null;
-}
-
-function useGetLLMProvidersStatus(workspaceId?: string | null) {
-  return useQuery<LLMProviderStatus[]>({
-    queryKey: ['/api/agents/llm-configs', workspaceId],
-    queryFn: async ({ signal }) => {
-      const response = await axiosInstance.get<LLMProviderStatus[]>(
-        '/api/agents/llm-configs',
-        { signal },
-      );
-      return response.data;
-    },
-    enabled: !!workspaceId,
-  });
-}
 
 const CONVERSATION_STARTERS = [
   'How can I help secure your application today?',
@@ -108,17 +88,28 @@ export default function AgentsLandingPage() {
     },
   );
 
-  const { data: llmProviders } = useGetLLMProvidersStatus(selectedWorkspace);
+  const { data: llmProviders } = useAgentsControllerGetLLMConfigs<
+    LLMConfigWithProviderDto[]
+  >({
+    query: {
+      queryKey: ['/api/agents/llm-configs', selectedWorkspace],
+      enabled: !!selectedWorkspace,
+    },
+  });
 
   const conversations: ConversationResponseDto[] = useMemo(
     () => conversationsData?.data ?? [],
     [conversationsData],
   );
 
-  const hasProviderConnected = useMemo(
-    () => (llmProviders ?? []).some((p) => p.isConnected),
-    [llmProviders],
-  );
+  const hasProviderConnected = useMemo(() => {
+    const list = Array.isArray(llmProviders)
+      ? llmProviders
+      : (llmProviders as unknown as { data?: LLMConfigWithProviderDto[] })
+          ?.data;
+    const providersArray = Array.isArray(list) ? list : [];
+    return providersArray.some((p) => p.isConnected);
+  }, [llmProviders]);
 
   // Randomly select 5 suggestions from the pool and shuffle them
   const quickSuggestions = useMemo(() => {
