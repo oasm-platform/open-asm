@@ -81,6 +81,7 @@ export default function AgentsChatPage() {
     status,
     sendMessage,
     setMessages,
+    regenerate,
   } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/agents/messages/stream',
@@ -171,21 +172,9 @@ export default function AgentsChatPage() {
   const handleRetry = useCallback(async () => {
     if (lastAssistantIdx !== -1 && chatMessages.length > 0) {
       setStreamError(null);
-      const lastUserMsg = [...chatMessages]
-        .reverse()
-        .find((m) => m.role === 'user');
-      if (lastUserMsg) {
-        const textContent =
-          lastUserMsg.parts
-            .filter((p) => p.type === 'text')
-            .map((p) => ('text' in p ? p.text : ''))
-            .join('') || '';
-        if (textContent) {
-          await sendMessage({ text: textContent });
-        }
-      }
+      await regenerate();
     }
-  }, [lastAssistantIdx, chatMessages, sendMessage]);
+  }, [lastAssistantIdx, chatMessages, regenerate]);
 
   const handleDismissError = useCallback(() => {
     setStreamError(null);
