@@ -1,5 +1,5 @@
 import { encrypt } from '@/common/utils/encryption.util';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -378,94 +378,5 @@ describe('AgentsService', () => {
   });
 
   describe('streamMessage', () => {
-    it('should throw BadRequestException when no preferred config exists', async () => {
-      jest.spyOn(service, 'getPreferredLLMConfig').mockResolvedValue(null);
-
-      await expect(
-        service.streamMessage(
-          { question: 'Hello' },
-          mockWorkspaceId,
-          mockUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
     });
-
-    it('should create new conversation when conversationId not provided', async () => {
-      jest
-        .spyOn(service, 'getPreferredLLMConfig')
-        .mockResolvedValue(mockLlmConfig);
-      jest
-        .spyOn(conversationRepository, 'create')
-        .mockReturnValue(mockConversation);
-      jest
-        .spyOn(conversationRepository, 'save')
-        .mockResolvedValue(mockConversation);
-      jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
-      jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
-      jest.spyOn(messageRepository, 'find').mockResolvedValue([]);
-      jest
-        .spyOn(llmConfigRepository, 'findOne')
-        .mockResolvedValue(mockLlmConfig);
-
-      const stream = await service.streamMessage(
-        { question: 'Hello' },
-        mockWorkspaceId,
-        mockUserId,
-      );
-
-      expect(stream).toBeDefined();
-      expect(conversationRepository.create).toHaveBeenCalled();
-    });
-
-    it('should use existing conversation when conversationId provided', async () => {
-      jest
-        .spyOn(conversationRepository, 'findOne')
-        .mockResolvedValue(mockConversation);
-      jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
-      jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
-      jest.spyOn(messageRepository, 'find').mockResolvedValue([]);
-      jest
-        .spyOn(llmConfigRepository, 'findOne')
-        .mockResolvedValue(mockLlmConfig);
-
-      const stream = await service.streamMessage(
-        { question: 'Hello', conversationId: mockConversation.id },
-        mockWorkspaceId,
-        mockUserId,
-      );
-
-      expect(stream).toBeDefined();
-    });
-
-    it('should create new conversation when conversationId provided but not found', async () => {
-      jest
-        .spyOn(conversationRepository, 'findOne')
-        .mockResolvedValue(null);
-      jest
-        .spyOn(llmConfigRepository, 'findOne')
-        .mockResolvedValue(mockLlmConfig);
-      jest
-        .spyOn(conversationRepository, 'create')
-        .mockReturnValue(mockConversation);
-      jest
-        .spyOn(conversationRepository, 'save')
-        .mockResolvedValue(mockConversation);
-      jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
-      jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
-      jest.spyOn(messageRepository, 'find').mockResolvedValue([]);
-
-      const stream = await service.streamMessage(
-        { question: 'Hello', conversationId: 'non-existent' },
-        mockWorkspaceId,
-        mockUserId,
-      );
-
-      expect(stream).toBeDefined();
-      expect(conversationRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'non-existent',
-        }),
-      );
-    });
-  });
 });

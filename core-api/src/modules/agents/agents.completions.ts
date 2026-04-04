@@ -10,10 +10,9 @@ import { stepCountIs, streamText } from 'ai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from 'typeorm';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
+
 import { decrypt } from '@/common/utils/encryption.util';
+import { getLLMProviderConfig } from './llm-provider-supported';
 import { AgentTool } from './agents.tools';
 import { SendMessageDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
@@ -97,47 +96,18 @@ export class AgentsCompletionsService {
 
   private createLanguageModel(config: AgentLLMConfig): LanguageModel {
     const apiKey = decrypt(config.apiKey);
+    const providerConfig = getLLMProviderConfig(config.provider);
 
-    switch (config.provider) {
-      case LLMProvider.OPENAI: {
-        const openai = createOpenAI({ apiKey });
-        return openai.chat(config.model);
-      }
-      case LLMProvider.ANTHROPIC: {
-        const anthropic = createAnthropic({ apiKey });
-        return anthropic(config.model);
-      }
-      case LLMProvider.GEMINI: {
-        const google = createGoogleGenerativeAI({ apiKey });
-        return google.chat(config.model);
-      }
-      case LLMProvider.OPENROUTER: {
-        const openai = createOpenAI({
-          apiKey,
-          baseURL: 'https://openrouter.ai/api/v1',
-        });
-        return openai.chat(config.model);
-      }
-      case LLMProvider.KILO_CODE: {
-        const kilo = createOpenAI({
-          apiKey,
-          baseURL: 'https://api.kilo.ai/api/gateway',
-        });
-        return kilo.chat(config.model);
-      }
-      case LLMProvider.CUSTOM: {
-        const openai = createOpenAI({
-          apiKey,
-          baseURL: config.apiUrl,
-        });
-        return openai.chat(config.model);
-      }
-      default: {
-        throw new BadRequestException(
-          `Unsupported LLM provider: ${String(config.provider)}`,
-        );
-      }
+    if (!providerConfig) {
+      throw new BadRequestException(
+        `Unsupported LLM provider: ${String(config.provider)}`,
+      );
     }
+
+    const baseURL =
+      config.provider === LLMProvider.CUSTOM ? config.apiUrl : providerConfig.baseURL;
+
+    return providerConfig.handler(apiKey, config.model, baseURL);
   }
 
   async streamMessage(
@@ -207,7 +177,7 @@ export class AgentsCompletionsService {
     if (dto.model && dto.provider === llmConfig.provider) {
       llmConfig = this.llmConfigRepository.create({
         ...llmConfig,
-        model: dto.model as string,
+        model: dto.model,
       });
     }
 

@@ -4,9 +4,6 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import { decrypt, encrypt } from '@/common/utils/encryption.util';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
 import {
   BadRequestException,
   Injectable,
@@ -14,8 +11,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { LanguageModel, UIMessageChunk } from 'ai';
-import { stepCountIs, streamText } from 'ai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from 'typeorm';
@@ -32,11 +27,11 @@ import {
   ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
-import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
+import { MessageResponseDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
-import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
+import { LLMProvider } from './enums/agent.enums';
 import { llmProviderSupported } from './llm-provider-supported';
 
 @Injectable()
@@ -423,10 +418,6 @@ export class AgentsService {
     }
   }
 
-  // ==========================================
-  // Conversation Methods
-  // ==========================================
-
   async getConversations(
     workspaceId: string,
     query?: GetManyBaseQueryParams,
@@ -506,245 +497,6 @@ export class AgentsService {
 
   async deleteAllConversations(workspaceId: string): Promise<void> {
     await this.conversationRepository.delete({ workspaceId });
-  }
-
-  // ==========================================
-  // Message / Chat Methods
-  // ==========================================
-
-  private createLanguageModel(config: AgentLLMConfig): LanguageModel {
-    const apiKey = decrypt(config.apiKey);
-
-    switch (config.provider) {
-      case LLMProvider.OPENAI: {
-        const openai = createOpenAI({ apiKey });
-        return openai.chat(config.model);
-      }
-      case LLMProvider.ANTHROPIC: {
-        const anthropic = createAnthropic({ apiKey });
-        return anthropic(config.model);
-      }
-      case LLMProvider.GEMINI: {
-        const google = createGoogleGenerativeAI({ apiKey });
-        return google.chat(config.model);
-      }
-      case LLMProvider.OPENROUTER: {
-        const openai = createOpenAI({
-          apiKey,
-          baseURL: 'https://openrouter.ai/api/v1',
-        });
-        return openai.chat(config.model);
-      }
-      case LLMProvider.KILO_CODE: {
-        const kilo = createOpenAI({
-          apiKey,
-          baseURL: 'https://api.kilo.ai/api/gateway',
-        });
-        return kilo.chat(config.model);
-      }
-      case LLMProvider.CUSTOM: {
-        const openai = createOpenAI({
-          apiKey,
-          baseURL: config.apiUrl,
-        });
-        return openai.chat(config.model);
-      }
-      default: {
-        throw new BadRequestException(
-          `Unsupported LLM provider: ${String(config.provider)}`,
-        );
-      }
-    }
-  }
-
-  async streamMessage(
-    dto: SendMessageDto,
-    workspaceId: string,
-    userId: string,
-  ): Promise<{
-    stream: ReadableStream<UIMessageChunk>;
-    conversationId: string;
-  }> {
-    // 1. Find or create conversation
-    let conversation: AgentConversation;
-    if (dto.conversationId) {
-      // Try to find existing conversation first
-      const existing = await this.conversationRepository.findOne({
-        where: { id: dto.conversationId, workspaceId },
-      });
-      if (existing) {
-        conversation = existing;
-      } else {
-        // Create new conversation with provided ID
-        const llmConfig = await this.resolveLLMConfig(
-          workspaceId,
-          dto.provider,
-          dto.model,
-        );
-        conversation = this.conversationRepository.create({
-          id: dto.conversationId, // Use provided UUID
-          workspaceId,
-          llmConfigId: llmConfig.id,
-          title: dto.question.slice(0, 500),
-          createdBy: userId,
-        });
-        conversation = await this.conversationRepository.save(conversation);
-      }
-    } else {
-      // Create new conversation with auto-generated ID
-      const llmConfig = await this.resolveLLMConfig(
-        workspaceId,
-        dto.provider,
-        dto.model,
-      );
-      conversation = this.conversationRepository.create({
-        workspaceId,
-        llmConfigId: llmConfig.id,
-        title: dto.question.slice(0, 500),
-        createdBy: userId,
-      });
-      conversation = await this.conversationRepository.save(conversation);
-    }
-
-    // 2. Save user message
-    const userMessage = this.messageRepository.create({
-      conversationId: conversation.id,
-      role: MessageRole.USER,
-      content: dto.question,
-      messageType: MessageType.TEXT,
-    });
-    await this.messageRepository.save(userMessage);
-
-    // 3. Load conversation history (last 20 messages)
-    const historyMessages = await this.messageRepository.find({
-      where: { conversationId: conversation.id },
-      order: { createdAt: 'DESC' },
-      take: 20,
-    });
-
-    // 4. Get LLM config
-    let llmConfig = await this.llmConfigRepository.findOne({
-      where: { id: conversation.llmConfigId, workspaceId },
-    });
-
-    if (!llmConfig) {
-      throw new NotFoundException('LLM config not found');
-    }
-
-    // Apply model override if provided (only affects this request)
-    if (dto.model && dto.provider === llmConfig.provider) {
-      // Create properly typed instance using repository create method
-      // This maintains correct entity type without unsafe type assertion
-      llmConfig = this.llmConfigRepository.create({
-        ...llmConfig,
-        model: dto.model as string,
-      });
-    }
-
-    // 5. Build messages from history (reverse to chronological order)
-    const reversedHistory = historyMessages.reverse();
-    const modelMessages = reversedHistory.map((msg) => {
-      // Add identity reminder prefix to user messages
-      if (msg.role === MessageRole.USER) {
-        return {
-          role: 'user' as const,
-          content: `[CONTEXT: You are the Security Agent created by OASM Platform Team. Never identify as any other AI provider.] ${msg.content}`,
-        };
-      }
-      return {
-        role: msg.role as 'assistant' | 'system',
-        content: msg.content,
-      };
-    });
-
-    // 6. Create language model
-    const model = this.createLanguageModel(llmConfig);
-
-    // 7. Create placeholder assistant message immediately (always saved)
-    const assistantMessage = this.messageRepository.create({
-      conversationId: conversation.id,
-      role: MessageRole.ASSISTANT,
-      content: '',
-      messageType: MessageType.TEXT,
-      metadata: {
-        model: llmConfig.model,
-        provider: llmConfig.provider,
-        status: 'streaming',
-      },
-    });
-    await this.messageRepository.save(assistantMessage);
-
-    // 8. Build the streaming response with tool call continuation
-    const conversationIdStr = conversation.id;
-    const messageRepo = this.messageRepository;
-    const assistantMsgId = assistantMessage.id;
-    const assistantMsgMetadata = assistantMessage.metadata;
-    const tools = this.agentTool.getTools(workspaceId);
-    const systemPrompt = this.getSystemPrompt();
-
-    // Track accumulated text for saving
-    let accumulatedText = '';
-
-    // Get current time and timezone for context
-    const now = new Date();
-    const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
-
-    // Create stream with automatic tool call continuation
-    const result = streamText({
-      model,
-      messages: [
-        {
-          role: 'system' as const,
-          content: currentTimeContext,
-        },
-        ...modelMessages,
-      ],
-      system: systemPrompt,
-      tools,
-      stopWhen: stepCountIs(10), // Max 10 steps to prevent infinite loops
-      onChunk: ({ chunk }) => {
-        // Accumulate text chunks to save later
-        if (chunk.type === 'text-delta') {
-          accumulatedText += chunk.text;
-        }
-      },
-      onFinish: async () => {
-        // Save accumulated text to assistant message when done
-        if (accumulatedText) {
-          await messageRepo.update(
-            { id: assistantMsgId },
-            {
-              content: accumulatedText,
-              metadata: {
-                ...assistantMsgMetadata,
-                status: 'completed',
-              },
-            },
-          );
-        }
-      },
-    });
-
-    // Use pipeThrough to prepend conversation-created event
-    // The stream will flow events in real-time as they happen
-    const wrappedStream = result.toUIMessageStream().pipeThrough(
-      new TransformStream<UIMessageChunk, UIMessageChunk>({
-        start(controller) {
-          // Send conversation created event first
-          controller.enqueue({
-            type: 'data-conversation-created',
-            data: {
-              conversationId: conversationIdStr,
-            },
-          } as UIMessageChunk);
-        },
-      }),
-    );
-
-    return {
-      stream: wrappedStream,
-      conversationId: conversation.id,
-    };
   }
 
   async getMessages(
