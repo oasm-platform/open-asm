@@ -13,6 +13,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 
 dayjs.extend(relativeTime);
 
@@ -24,12 +25,19 @@ export default function AgentConversationsPage() {
   const [editingTitle, setEditingTitle] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const { selectedWorkspace } = useWorkspaceSelector();
+
   const { data, fetchNextPage, hasNextPage, isLoading, isFetchingNextPage } =
     useAgentsControllerGetConversationsInfinite(
       { limit, sortBy: 'updatedAt', sortOrder: 'DESC' },
       {
         query: {
-          queryKey: ['/api/agents/conversations', 'infinite'],
+          queryKey: [
+            '/api/agents/conversations',
+            'infinite',
+            selectedWorkspace,
+          ],
+          enabled: !!selectedWorkspace,
           getNextPageParam: (lastPage) =>
             lastPage.hasNextPage ? lastPage.page + 1 : undefined,
         },
@@ -43,9 +51,9 @@ export default function AgentConversationsPage() {
 
   const invalidateConversations = useCallback(() => {
     void queryClient.invalidateQueries({
-      queryKey: ['/api/agents/conversations', 'infinite'],
+      queryKey: ['/api/agents/conversations', 'infinite', selectedWorkspace],
     });
-  }, [queryClient]);
+  }, [queryClient, selectedWorkspace]);
 
   const deleteConversationMutation = useAgentsControllerDeleteConversation({
     mutation: { onSuccess: invalidateConversations },

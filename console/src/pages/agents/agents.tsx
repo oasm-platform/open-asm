@@ -5,7 +5,7 @@ import { useAgentsControllerGetMessages } from '@/services/apis/gen/queries';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChatConversation } from './chat-conversation';
-import { getGlobalWorkspaceId } from '@/utils/workspaceState';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 
 interface SelectedModel {
   provider: string;
@@ -36,7 +36,8 @@ export default function AgentsChatPage() {
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
 
-  const workspaceId = getGlobalWorkspaceId();
+  const { selectedWorkspace } = useWorkspaceSelector();
+  const workspaceId = selectedWorkspace;
 
   // Fetch messages when loading an existing conversation (not during streaming)
   const { data: messagesData, isLoading: isLoadingHistory } =

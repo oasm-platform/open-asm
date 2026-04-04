@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { Loader2, MoreHorizontal, Pencil, Star, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 
 const providerLabels: Record<string, string> = {
   openai: 'OpenAI',
@@ -27,9 +28,13 @@ const providerLabels: Record<string, string> = {
 export function AgentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { selectedWorkspace } = useWorkspaceSelector();
 
   const { data, isLoading } = useAgentsControllerGetLLMConfigs({
-    query: { enabled: !!id },
+    query: {
+      queryKey: ['agents', selectedWorkspace],
+      enabled: !!id && !!selectedWorkspace,
+    },
   });
 
   const { mutate: deleteConfig, isPending: isDeleting } =
@@ -163,9 +168,7 @@ export function AgentDetail() {
                 {providerLabels[agent.providerId] ?? agent.providerId}
               </h1>
               <div className="flex items-center gap-2 mt-1">
-                <Badge
-                  variant={agent.isPreferred ? 'default' : 'secondary'}
-                >
+                <Badge variant={agent.isPreferred ? 'default' : 'secondary'}>
                   {agent.isPreferred ? 'Preferred' : 'Active'}
                 </Badge>
                 <span className="text-muted-foreground text-sm">
@@ -212,9 +215,9 @@ export function AgentDetail() {
                   Connected
                 </h3>
                 <p className="mt-1">
-                {agent.createdAt
-                  ? format(new Date(agent.createdAt), 'MMM dd, yyyy HH:mm')
-                  : 'N/A'}
+                  {agent.createdAt
+                    ? format(new Date(agent.createdAt), 'MMM dd, yyyy HH:mm')
+                    : 'N/A'}
                 </p>
               </div>
               <div>
@@ -222,9 +225,9 @@ export function AgentDetail() {
                   Last Updated
                 </h3>
                 <p className="mt-1">
-                {agent.updatedAt
-                  ? format(new Date(agent.updatedAt), 'MMM dd, yyyy HH:mm')
-                  : 'N/A'}
+                  {agent.updatedAt
+                    ? format(new Date(agent.updatedAt), 'MMM dd, yyyy HH:mm')
+                    : 'N/A'}
                 </p>
               </div>
               <div>

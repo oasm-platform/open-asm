@@ -22,6 +22,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
 
@@ -33,9 +34,9 @@ interface LLMProviderStatus {
   config: LLMConfigResponseDto | null;
 }
 
-function useGetLLMProvidersStatus() {
+function useGetLLMProvidersStatus(workspaceId?: string | null) {
   return useQuery<LLMProviderStatus[]>({
-    queryKey: ['/api/agents/llm-configs'],
+    queryKey: ['/api/agents/llm-configs', workspaceId],
     queryFn: async ({ signal }) => {
       const response = await axiosInstance.get<LLMProviderStatus[]>(
         '/api/agents/llm-configs',
@@ -43,6 +44,7 @@ function useGetLLMProvidersStatus() {
       );
       return response.data;
     },
+    enabled: !!workspaceId,
   });
 }
 
@@ -94,12 +96,19 @@ export default function AgentsLandingPage() {
     configId: string;
   } | null>(null);
 
+  const { selectedWorkspace } = useWorkspaceSelector();
+
   const { data: conversationsData } = useAgentsControllerGetConversations(
     { limit: 3, sortBy: 'updatedAt', sortOrder: 'DESC' },
-    { query: { queryKey: ['/api/agents/conversations'] } },
+    {
+      query: {
+        queryKey: ['/api/agents/conversations', selectedWorkspace],
+        enabled: !!selectedWorkspace,
+      },
+    },
   );
 
-  const { data: llmProviders } = useGetLLMProvidersStatus();
+  const { data: llmProviders } = useGetLLMProvidersStatus(selectedWorkspace);
 
   const conversations: ConversationResponseDto[] = useMemo(
     () => conversationsData?.data ?? [],
