@@ -6,6 +6,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { v7 as uuidv7 } from 'uuid';
 import { ChatConversation } from './chat-conversation';
 import { getGlobalWorkspaceId } from '@/utils/workspaceState';
 
@@ -99,12 +100,18 @@ export default function AgentsChatPage() {
 
         const modelInfo = selectedModelRef.current;
 
-        // Use effectiveConversationId for existing conversations
-        // Only omit for brand new conversations (trigger === 'submit-message' && isActuallyNew)
+        // Generate UUID v7 for new conversations
         const shouldSendConversationId = !isActuallyNew || trigger !== 'submit-message';
-        const convId = shouldSendConversationId
+        let convId = shouldSendConversationId
           ? (createdConversationIdRef.current || effectiveConversationId)
           : undefined;
+
+        // If no conversationId and this is a new conversation (submit-message trigger), generate UUID v7
+        if (!convId && trigger === 'submit-message' && isActuallyNew) {
+          convId = uuidv7();
+          // Store locally for immediate use
+          createdConversationIdRef.current = convId;
+        }
 
         return {
           body: {
