@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { LanguageModel, UIMessageChunk } from 'ai';
-import { stepCountIs, streamText } from 'ai';
+import { generateText, stepCountIs, streamText } from 'ai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from 'typeorm';
@@ -29,6 +29,7 @@ export interface StreamMessageResult {
 export class AgentsCompletionsService {
   private readonly logger = new Logger(AgentsCompletionsService.name);
   private systemPrompt: string | null = null;
+  private titleGeneratePrompt: string | null = null;
 
   constructor(
     @InjectRepository(AgentLLMConfig)
@@ -46,7 +47,6 @@ export class AgentsCompletionsService {
     try {
       const promptPath = path.join(__dirname, 'prompts', 'SYSTEM.md');
       this.systemPrompt = fs.readFileSync(promptPath, 'utf-8');
-      this.logger.log('System prompt loaded successfully');
     } catch (error) {
       this.logger.error('Failed to load system prompt', error);
       this.systemPrompt = 'You are a helpful assistant.';
@@ -58,6 +58,27 @@ export class AgentsCompletionsService {
       this.loadSystemPrompt();
     }
     return this.systemPrompt ?? 'You are a helpful assistant.';
+  }
+
+  private loadTitleGeneratePrompt(): void {
+    try {
+      const promptPath = path.join(__dirname, 'prompts', 'TITLE_GENERATE.md');
+      this.titleGeneratePrompt = fs.readFileSync(promptPath, 'utf-8');
+    } catch (error) {
+      this.logger.error('Failed to load title generate prompt', error);
+      this.titleGeneratePrompt =
+        'Generate a short title for this conversation.';
+    }
+  }
+
+  private getTitleGeneratePrompt(): string {
+    if (!this.titleGeneratePrompt) {
+      this.loadTitleGeneratePrompt();
+    }
+    return (
+      this.titleGeneratePrompt ??
+      'Generate a short title for this conversation.'
+    );
   }
 
   private async getPreferredLLMConfig(
@@ -108,6 +129,60 @@ export class AgentsCompletionsService {
       config.provider === LLMProvider.CUSTOM ? config.apiUrl : undefined;
 
     return providerConfig.handler(apiKey, config.model, baseURL);
+  }
+
+  private async generateTitle(
+    conversationId: string,
+    llmConfig: AgentLLMConfig,
+  ): Promise<void> {
+    try {
+      const messages = await this.messageRepository.find({
+        where: { conversationId },
+        order: { createdAt: 'ASC' },
+        take: 2,
+      });
+
+      if (messages.length < 2) {
+        return;
+      }
+
+      const conversationContent = messages
+        .map((msg) => `${msg.role}: ${msg.content}`)
+        .join('\n\n');
+
+      const prompt = this.getTitleGeneratePrompt().replace(
+        '{{CONVERSATION_CONTENT}}',
+        conversationContent,
+      );
+
+      const model = this.createLanguageModel(llmConfig);
+
+      const titleResult = await generateText({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      let titleText = '';
+      if (typeof titleResult.content === 'string') {
+        titleText = titleResult.content;
+      } else if (Array.isArray(titleResult.content)) {
+        const textPart = titleResult.content.find(
+          (part) => part.type === 'text',
+        );
+        titleText = textPart?.type === 'text' ? textPart.text : '';
+      }
+
+      const title = titleText.trim().slice(0, 500);
+
+      if (title) {
+        await this.conversationRepository.update(
+          { id: conversationId },
+          { title },
+        );
+      }
+    } catch (error) {
+      this.logger.error('Failed to generate title', error);
+    }
   }
 
   async streamMessage(
@@ -216,6 +291,7 @@ export class AgentsCompletionsService {
     const assistantMsgMetadata = assistantMessage.metadata;
     const tools = this.agentTool.getTools(workspaceId);
     const systemPrompt = this.getSystemPrompt();
+    const currentLlvmConfig = llmConfig;
 
     let accumulatedText = '';
 
@@ -251,6 +327,20 @@ export class AgentsCompletionsService {
               },
             },
           );
+          const allMessages = await messageRepo.find({
+            where: { conversationId: conversationIdStr },
+            order: { createdAt: 'ASC' },
+          });
+          if (allMessages.length >= 2) {
+            const hasCompletedAssistant = allMessages.some(
+              (msg) =>
+                msg.role === MessageRole.ASSISTANT &&
+                msg.metadata?.['status'] === 'completed',
+            );
+            if (hasCompletedAssistant) {
+              await this.generateTitle(conversationIdStr, currentLlvmConfig);
+            }
+          }
         }
       },
     });
