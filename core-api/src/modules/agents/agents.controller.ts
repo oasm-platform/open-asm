@@ -24,6 +24,7 @@ import { ApiTags } from '@nestjs/swagger';
 
 import type { Response } from 'express';
 import { AgentsService } from './agents.service';
+import { AgentsCompletionsService } from './agents.completions';
 import {
   ConversationResponseDto,
   UpdateConversationDto,
@@ -41,7 +42,10 @@ import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
 @Controller('agents')
 @UseGuards(AuthGuard)
 export class AgentsController {
-  constructor(private readonly agentsService: AgentsService) {}
+  constructor(
+    private readonly agentsService: AgentsService,
+    private readonly agentsCompletionsService: AgentsCompletionsService,
+  ) {}
 
   // ==========================================
   // LLM Config Endpoints
@@ -254,14 +258,9 @@ export class AgentsController {
     @Res() res: Response,
   ): Promise<void> {
     try {
-      // Pass workspaceId and userId to streamMessage so it can return conversationId
-      const { stream, conversationId } = await this.agentsService.streamMessage(
-        dto,
-        workspaceId,
-        userId,
-      );
+      const { stream, conversationId } =
+        await this.agentsCompletionsService.streamMessage(dto, workspaceId, userId);
 
-      // Manually pipe the stream to prevent buffering
       res.socket?.setNoDelay(true);
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');

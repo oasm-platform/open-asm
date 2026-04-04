@@ -2,6 +2,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
+import { AgentsCompletionsService } from './agents.completions';
 
 jest.mock('@/common/guards/auth.guard', () => ({
   AuthGuard: jest.fn().mockImplementation(() => ({
@@ -30,6 +31,12 @@ describe('AgentsController', () => {
             sendMessageStream: jest.fn(),
             getMessages: jest.fn(),
             deleteMessage: jest.fn(),
+          },
+        },
+        {
+          provide: AgentsCompletionsService,
+          useValue: {
+            streamMessage: jest.fn(),
           },
         },
       ],

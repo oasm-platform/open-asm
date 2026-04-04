@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
+import { AgentsCompletionsService } from './agents.completions';
 import { AgentTool } from './agents.tools';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
@@ -18,7 +19,7 @@ import { StatisticModule } from '@/modules/statistic/statistic.module';
     StatisticModule,
   ],
   controllers: [AgentsController],
-  providers: [AgentsService, AgentTool],
-  exports: [AgentsService],
+  providers: [AgentsService, AgentsCompletionsService, AgentTool],
+  exports: [AgentsService, AgentsCompletionsService],
 })
 export class AgentsModule {}
