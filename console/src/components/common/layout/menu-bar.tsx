@@ -2,7 +2,6 @@ import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import AppLogo from '@/components/ui/app-logo';
-import { GithubBadge } from '@/components/ui/github-badge';
 import {
   Sidebar,
   SidebarContent,
@@ -149,7 +148,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <div className="flex items-center justify-between">
           <AppLogo type="large" />
-          <GithubBadge />
         </div>
         {(state === 'expanded' || (state === 'collapsed' && isMobile)) && (
           <WorkspaceSwitcher />

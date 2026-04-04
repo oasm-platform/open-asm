@@ -24617,7 +24617,7 @@ export function useAgentsControllerGetMessages<
  * Send a message and receive a streaming response via SSE. If conversationId is not provided, a new conversation is created using the preferred LLM config.
  * @summary Send message (streaming)
  */
-export const agentsControllerSendMessageStream = (
+export const agentsControllerStreamMessage = (
   sendMessageDto: SendMessageDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
@@ -24634,24 +24634,24 @@ export const agentsControllerSendMessageStream = (
   );
 };
 
-export const getAgentsControllerSendMessageStreamMutationOptions = <
+export const getAgentsControllerStreamMessageMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerSendMessageStream>>,
+    Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
     TError,
     { data: SendMessageDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerSendMessageStream>>,
+  Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
   TError,
   { data: SendMessageDto },
   TContext
 > => {
-  const mutationKey = ['agentsControllerSendMessageStream'];
+  const mutationKey = ['agentsControllerStreamMessage'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -24661,33 +24661,33 @@ export const getAgentsControllerSendMessageStreamMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerSendMessageStream>>,
+    Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
     { data: SendMessageDto }
   > = (props) => {
     const { data } = props ?? {};
 
-    return agentsControllerSendMessageStream(data, requestOptions);
+    return agentsControllerStreamMessage(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type AgentsControllerSendMessageStreamMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerSendMessageStream>>
+export type AgentsControllerStreamMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerStreamMessage>>
 >;
-export type AgentsControllerSendMessageStreamMutationBody = SendMessageDto;
-export type AgentsControllerSendMessageStreamMutationError = unknown;
+export type AgentsControllerStreamMessageMutationBody = SendMessageDto;
+export type AgentsControllerStreamMessageMutationError = unknown;
 
 /**
  * @summary Send message (streaming)
  */
-export const useAgentsControllerSendMessageStream = <
+export const useAgentsControllerStreamMessage = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerSendMessageStream>>,
+      Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
       TError,
       { data: SendMessageDto },
       TContext
@@ -24696,13 +24696,13 @@ export const useAgentsControllerSendMessageStream = <
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerSendMessageStream>>,
+  Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
   TError,
   { data: SendMessageDto },
   TContext
 > => {
   const mutationOptions =
-    getAgentsControllerSendMessageStreamMutationOptions(options);
+    getAgentsControllerStreamMessageMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

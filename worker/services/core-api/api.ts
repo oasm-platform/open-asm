@@ -5015,11 +5015,11 @@ export class Api<
    * @description Send a message and receive a streaming response via SSE. If conversationId is not provided, a new conversation is created using the preferred LLM config.
    *
    * @tags Agents
-   * @name AgentsControllerSendMessageStream
+   * @name AgentsControllerStreamMessage
    * @summary Send message (streaming)
    * @request POST:/api/agents/messages/stream
    */
-  agentsControllerSendMessageStream = (
+  agentsControllerStreamMessage = (
     data: SendMessageDto,
     params: RequestParams = {},
   ) =>

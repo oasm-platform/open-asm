@@ -5,19 +5,35 @@ import {
   useAgentsControllerCreateLLMConfig,
   useAgentsControllerDeleteLLMConfig,
   useAgentsControllerGetLLMConfigs,
+  useAgentsControllerGetProviderModels,
   useAgentsControllerUpdateLLMConfig,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronDown, ChevronUp, PlugZap, Unplug } from 'lucide-react';
-import { useState } from 'react';
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+  PlugZap,
+  Unplug,
+} from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from './ui/command';
 import Image from './ui/image';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
-  const [formData, setFormData] = useState<
-    Record<string, { apiKey: string; model: string }>
-  >({});
+  const [formData, setFormData] = useState<Record<string, { apiKey: string }>>(
+    {},
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const queryClient = useQueryClient();
@@ -35,46 +51,48 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
     setExpandedProvider(expandedProvider === providerId ? null : providerId);
   };
 
-  const handleInputChange = (
-    providerId: string,
-    field: 'apiKey' | 'model',
-    value: string,
-  ) => {
+  const handleApiKeyChange = (providerId: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      [providerId]: {
-        ...prev[providerId],
-        [field]: value,
-      },
+      [providerId]: { apiKey: value },
     }));
+  };
+
+  const handleModelChange = async (providerId: string, modelId: string) => {
+    const provider = providersList.find((p) => p.providerId === providerId);
+    if (!provider?.configId) return;
+
+    setIsSubmitting(true);
+    try {
+      await updateLLMConfig.mutateAsync({
+        id: provider.configId,
+        data: { model: modelId },
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['/api/agents/llm-configs'],
+      });
+      toast.success('Model updated successfully');
+      onSuccess?.();
+    } catch {
+      toast.error('Failed to update model');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent, providerId: string) => {
     e.preventDefault();
     const data = formData[providerId];
-    if (!data?.apiKey.trim() || !data?.model.trim()) return;
+    if (!data?.apiKey.trim()) return;
 
     setIsSubmitting(true);
     try {
-      const provider = providersList.find((p) => p.providerId === providerId);
-
-      if (provider?.isConnected && provider.configId) {
-        await updateLLMConfig.mutateAsync({
-          id: provider.configId,
-          data: {
-            apiKey: data.apiKey.trim(),
-            model: data.model.trim(),
-          },
-        });
-      } else {
-        await createLLMConfig.mutateAsync({
-          data: {
-            provider: providerId as CreateLLMConfigDtoProvider,
-            apiKey: data.apiKey.trim(),
-            model: data.model.trim(),
-          },
-        });
-      }
+      await createLLMConfig.mutateAsync({
+        data: {
+          provider: providerId as CreateLLMConfigDtoProvider,
+          apiKey: data.apiKey.trim(),
+        },
+      });
 
       void queryClient.invalidateQueries({
         queryKey: ['/api/agents/llm-configs'],
@@ -82,7 +100,7 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
 
       setFormData((prev) => ({
         ...prev,
-        [providerId]: { apiKey: '', model: '' },
+        [providerId]: { apiKey: '' },
       }));
       setExpandedProvider(null);
       onSuccess?.();
@@ -108,7 +126,7 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
           setExpandedProvider(null);
           setFormData((prev) => ({
             ...prev,
-            [providerId]: { apiKey: '', model: '' },
+            [providerId]: { apiKey: '' },
           }));
           onSuccess?.();
         },
@@ -144,7 +162,7 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
       {providersList.map((provider) => {
         const isExpanded = expandedProvider === provider.providerId;
         const hasConfig = provider.isConnected;
-        console.log(provider.logo);
+
         return (
           <div
             key={provider.providerId}
@@ -201,85 +219,167 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
             </div>
 
             {isExpanded && (
-              <form
-                onSubmit={(e) => handleSubmit(e, provider.providerId)}
-                className="border-t p-4 flex flex-col gap-3 bg-muted/30"
-              >
-                <div className="flex flex-col gap-1.5">
-                  <input
-                    type="password"
-                    value={formData[provider.providerId]?.apiKey || ''}
-                    onChange={(e) =>
-                      handleInputChange(
-                        provider.providerId,
-                        'apiKey',
-                        e.target.value,
-                      )
-                    }
-                    placeholder="Enter your API key"
-                    autoComplete="new-password"
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring"
-                    required
+              <div className="border-t p-4 flex flex-col gap-3 bg-muted/30">
+                {hasConfig ? (
+                  <ModelSelectForm
+                    provider={provider}
+                    onModelChange={handleModelChange}
+                    onDelete={() => handleDelete(provider.providerId)}
+                    isUpdating={isSubmitting}
                   />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <input
-                    type="text"
-                    defaultValue={hasConfig ? provider.model : ''}
-                    value={formData[provider.providerId]?.model || ''}
-                    onChange={(e) =>
-                      handleInputChange(
-                        provider.providerId,
-                        'model',
-                        e.target.value,
-                      )
-                    }
-                    placeholder="Enter your model ID"
-                    autoComplete="off"
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring"
-                    required
+                ) : (
+                  <ConnectForm
+                    provider={provider}
+                    formData={formData}
+                    isSubmitting={isSubmitting}
+                    onApiKeyChange={handleApiKeyChange}
+                    onSubmit={handleSubmit}
                   />
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={
-                      isSubmitting ||
-                      !formData[provider.providerId]?.apiKey?.trim() ||
-                      !formData[provider.providerId]?.model?.trim()
-                    }
-                  >
-                    {isSubmitting
-                      ? 'Saving...'
-                      : hasConfig
-                        ? 'Update'
-                        : 'Connect'}
-                  </Button>
-
-                  {hasConfig && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDelete(provider.providerId)}
-                      disabled={deleteLLMConfig.isPending}
-                      className="gap-2"
-                    >
-                      <Unplug size={16} />
-                      {deleteLLMConfig.isPending
-                        ? 'Disconnecting...'
-                        : 'Disconnect'}
-                    </Button>
-                  )}
-                </div>
-              </form>
+                )}
+              </div>
             )}
           </div>
         );
       })}
     </div>
+  );
+}
+
+function ModelSelectForm({
+  provider,
+  onModelChange,
+  onDelete,
+  isUpdating,
+}: {
+  provider: LLMConfigWithProviderDto;
+  onModelChange: (providerId: string, modelId: string) => Promise<void>;
+  onDelete: () => void;
+  isUpdating: boolean;
+}) {
+  const configId = provider.configId ?? '';
+  const [selectOpen, setSelectOpen] = useState(false);
+  const { data: models, isLoading } = useAgentsControllerGetProviderModels(
+    configId,
+    {
+      query: {
+        enabled: !!provider.configId,
+        staleTime: 5 * 60 * 1000,
+      },
+    },
+  );
+
+  const modelList = models ?? [];
+  const currentModel = provider.model;
+
+  const handleSelect = useCallback(
+    (modelId: string) => {
+      void onModelChange(provider.providerId, modelId);
+      setSelectOpen(false);
+    },
+    [provider.providerId, onModelChange],
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-foreground">Models</label>
+        <Popover open={selectOpen} onOpenChange={setSelectOpen}>
+          <PopoverTrigger asChild>
+            <button
+              disabled={isUpdating || isLoading}
+              className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 flex items-center justify-between"
+            >
+              <span className="truncate">
+                {currentModel ||
+                  (isLoading ? 'Loading models...' : 'Select a model')}
+              </span>
+              <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="p-0" align="start" sideOffset={4}>
+            <Command>
+              <CommandInput placeholder="Search models..." />
+              <CommandList className="max-h-[320px]">
+                <CommandEmpty>
+                  {isLoading ? 'Loading models...' : 'No models found'}
+                </CommandEmpty>
+                {modelList.map((model) => (
+                  <CommandItem
+                    key={model.id}
+                    value={model.name}
+                    onSelect={() => handleSelect(model.id)}
+                    className="flex items-center gap-2 px-2"
+                  >
+                    <span className="truncate flex-1">{model.name}</span>
+                    {currentModel === model.id && (
+                      <Check className="h-4 w-4 shrink-0" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={onDelete}
+          disabled={isUpdating}
+          className="gap-2"
+        >
+          <Unplug size={16} />
+          Disconnect
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ConnectForm({
+  provider,
+  formData,
+  isSubmitting,
+  onApiKeyChange,
+  onSubmit,
+}: {
+  provider: LLMConfigWithProviderDto;
+  formData: Record<string, { apiKey: string }>;
+  isSubmitting: boolean;
+  onApiKeyChange: (providerId: string, value: string) => void;
+  onSubmit: (e: React.FormEvent, providerId: string) => Promise<void>;
+}) {
+  return (
+    <form
+      onSubmit={(e) => onSubmit(e, provider.providerId)}
+      className="flex flex-col gap-3"
+    >
+      <div className="flex flex-col gap-1.5">
+        <input
+          type="password"
+          value={formData[provider.providerId]?.apiKey || ''}
+          onChange={(e) => onApiKeyChange(provider.providerId, e.target.value)}
+          placeholder="Enter your API key"
+          autoComplete="new-password"
+          className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring"
+          required
+        />
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button
+          type="submit"
+          size="sm"
+          disabled={
+            isSubmitting || !formData[provider.providerId]?.apiKey?.trim()
+          }
+        >
+          {isSubmitting ? 'Connecting...' : 'Connect'}
+        </Button>
+      </div>
+    </form>
   );
 }

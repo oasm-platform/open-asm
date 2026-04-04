@@ -23,8 +23,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 
 import type { Response } from 'express';
-import { AgentsService } from './agents.service';
 import { AgentsCompletionsService } from './agents.completions';
+import { AgentsService } from './agents.service';
 import {
   ConversationResponseDto,
   UpdateConversationDto,
@@ -46,10 +46,6 @@ export class AgentsController {
     private readonly agentsService: AgentsService,
     private readonly agentsCompletionsService: AgentsCompletionsService,
   ) {}
-
-  // ==========================================
-  // LLM Config Endpoints
-  // ==========================================
 
   @Post('llm-configs')
   @Doc({
@@ -259,7 +255,11 @@ export class AgentsController {
   ): Promise<void> {
     try {
       const { stream, conversationId } =
-        await this.agentsCompletionsService.streamMessage(dto, workspaceId, userId);
+        await this.agentsCompletionsService.streamMessage(
+          dto,
+          workspaceId,
+          userId,
+        );
 
       res.socket?.setNoDelay(true);
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');

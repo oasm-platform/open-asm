@@ -1,31 +1,47 @@
-import { axiosInstance } from '@/services/apis/axios-client';
-import type { LLMConfigWithProviderDto } from '@/services/apis/gen/queries';
-import { useAgentsControllerGetLLMConfigs } from '@/services/apis/gen/queries';
-import { useQueries } from '@tanstack/react-query';
+import type {
+  LLMConfigWithProviderDto,
+  ProviderModelDto,
+} from '@/services/apis/gen/queries';
+import {
+  useAgentsControllerGetLLMConfigs,
+  useAgentsControllerGetProviderModels,
+  useAgentsControllerUpdateLLMConfig,
+} from '@/services/apis/gen/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Settings } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   Command,
   CommandEmpty,
-  CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from './command';
 import Image from './image';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
-
-interface ProviderModel {
-  id: string;
-  name: string;
-}
 
 interface ChatModelSwitcherProps {
   selectedProvider: string | null;
   selectedModel: string | null;
   onSelectModel: (provider: string, model: string, configId: string) => void;
+}
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
 }
 
 export function ChatModelSwitcher({
@@ -34,7 +50,12 @@ export function ChatModelSwitcher({
   onSelectModel,
 }: ChatModelSwitcherProps) {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
   const { data: providers } =
     useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
@@ -44,39 +65,35 @@ export function ChatModelSwitcher({
     [providers],
   );
 
-  // Fetch models for each connected provider
-  const modelQueries = useQueries({
-    queries: connectedProviders.map((p) => ({
-      queryKey: ['/api/agents/llm-configs', p.configId, 'models'] as const,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        const response = await axiosInstance.get<ProviderModel[]>(
-          `/api/agents/llm-configs/${p.configId}/models`,
-          { signal },
-        );
-        return response.data ?? [];
+  const preferredProvider = useMemo(
+    () =>
+      connectedProviders.find((p) => p.isPreferred) ?? connectedProviders[0],
+    [connectedProviders],
+  );
+
+  const { data: models, isLoading } = useAgentsControllerGetProviderModels(
+    preferredProvider?.configId ?? '',
+    {
+      query: {
+        enabled: !!preferredProvider?.configId,
+        staleTime: 5 * 60 * 1000,
       },
-      enabled: !!p.configId,
-      staleTime: 5 * 60 * 1000,
-    })),
-  });
+    },
+  );
 
-  const providerModelsMap = useMemo(() => {
-    const map = new Map<string, ProviderModel[]>();
-    connectedProviders.forEach((provider, index) => {
-      const query = modelQueries[index];
-      if (query?.data && query.data.length > 0) {
-        map.set(provider.providerId, query.data);
-      } else if (provider.model) {
-        // Fallback: show the configured model
-        map.set(provider.providerId, [
-          { id: provider.model, name: provider.model },
-        ]);
-      }
-    });
-    return map;
-  }, [connectedProviders, modelQueries]);
+  const updateLLMConfig = useAgentsControllerUpdateLLMConfig();
 
-  const isLoading = modelQueries.some((q) => q.isLoading);
+  const filteredModels = useMemo((): ProviderModelDto[] => {
+    const list: ProviderModelDto[] = models?.data ?? [];
+    if (!debouncedSearch) {
+      if (!selectedModel) return list;
+      return [...list].sort((a) => (a.id === selectedModel ? -1 : 1));
+    }
+    const query = debouncedSearch.toLowerCase();
+    return list
+      .filter((m: ProviderModelDto) => m.name.toLowerCase().includes(query))
+      .sort((a) => (a.id === selectedModel ? -1 : 1));
+  }, [models, debouncedSearch, selectedModel]);
 
   const currentDisplay = useMemo(() => {
     if (selectedProvider && selectedModel) {
@@ -89,7 +106,6 @@ export function ChatModelSwitcher({
         providerName: provider?.providerName,
       };
     }
-    // Show preferred or first connected
     const preferred = connectedProviders.find((p) => p.isPreferred);
     const fallback = preferred ?? connectedProviders[0];
     if (fallback) {
@@ -103,16 +119,36 @@ export function ChatModelSwitcher({
   }, [selectedProvider, selectedModel, connectedProviders]);
 
   const handleSelect = useCallback(
-    (providerId: string, modelId: string) => {
-      const provider = connectedProviders.find(
-        (p) => p.providerId === providerId,
-      );
-      if (provider?.configId) {
-        onSelectModel(providerId, modelId, provider.configId);
+    async (modelId: string) => {
+      if (!preferredProvider?.configId) return;
+
+      setIsUpdating(true);
+      try {
+        await updateLLMConfig.mutateAsync({
+          id: preferredProvider.configId,
+          data: { model: modelId },
+        });
+
+        void queryClient.invalidateQueries({
+          queryKey: ['/api/agents/llm-configs'],
+        });
+
+        onSelectModel(
+          preferredProvider.providerId,
+          modelId,
+          preferredProvider.configId,
+        );
+
+        toast.success('Model updated successfully');
+      } catch {
+        toast.error('Failed to update model');
+      } finally {
+        setIsUpdating(false);
+        setOpen(false);
+        setSearchQuery('');
       }
-      setOpen(false);
     },
-    [connectedProviders, onSelectModel],
+    [preferredProvider, onSelectModel, updateLLMConfig, queryClient],
   );
 
   const handleConnect = useCallback(() => {
@@ -120,15 +156,25 @@ export function ChatModelSwitcher({
     void navigate('/agents/providers/connect');
   }, [navigate]);
 
+  const handleOpenChange = useCallback((isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      setSearchQuery('');
+    }
+  }, []);
+
   if (connectedProviders.length === 0) {
     return null;
   }
 
+  const isSelected = selectedProvider === preferredProvider?.providerId;
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+          disabled={isUpdating}
+          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
           aria-label="Select model"
         >
           {currentDisplay && (
@@ -145,55 +191,51 @@ export function ChatModelSwitcher({
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-[280px] p-0" align="start" sideOffset={4}>
-        <Command>
-          <CommandInput placeholder="Search models..." />
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search models..."
+            value={searchQuery}
+            onValueChange={setSearchQuery}
+          />
           <CommandList className="max-h-[320px]">
             <CommandEmpty>
-              {isLoading ? 'Loading models...' : 'No models found'}
+              {isLoading
+                ? 'Loading models...'
+                : debouncedSearch
+                  ? 'No models found'
+                  : 'No models available'}
             </CommandEmpty>
-            {connectedProviders.map((provider) => {
-              const models = providerModelsMap.get(provider.providerId) ?? [];
-              if (models.length === 0) return null;
+            {preferredProvider && filteredModels.length > 0 && (
+              <div className="py-1">
+                <CommandItem onSelect={handleConnect}>
+                  <Settings className="h-4 w-4" />
+                  Provider Settings
+                </CommandItem>
+                {filteredModels.map((model) => {
+                  const isModelSelected =
+                    isSelected && selectedModel === model.id;
 
-              return (
-                <CommandGroup
-                  key={provider.providerId}
-                  heading={provider.providerName}
-                >
-                  {models.map((model) => {
-                    const isSelected =
-                      selectedProvider === provider.providerId &&
-                      selectedModel === model.id;
-
-                    return (
-                      <CommandItem
-                        key={`${provider.providerId}:${model.id}`}
-                        value={`${provider.providerName} ${model.name}`}
-                        onSelect={() =>
-                          handleSelect(provider.providerId, model.id)
-                        }
-                        className="flex items-center gap-2"
-                      >
-                        <Image
-                          url={provider.logo}
-                          height={16}
-                          className="dark:bg-white bg-gray-500 rounded p-0.5 shrink-0"
-                        />
-                        <span className="truncate flex-1">{model.name}</span>
-                        {isSelected && <Check className="h-4 w-4 shrink-0" />}
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              );
-            })}
-            <CommandSeparator />
-            <CommandGroup>
-              <CommandItem onSelect={handleConnect}>
-                <Settings className="mr-2 h-4 w-4" />
-                Provider Settings
-              </CommandItem>
-            </CommandGroup>
+                  return (
+                    <CommandItem
+                      key={model.id}
+                      value={`${model.name} ${model.id}`}
+                      onSelect={() => handleSelect(model.id)}
+                      className="flex items-center gap-2 px-2"
+                    >
+                      <Image
+                        url={preferredProvider.logo}
+                        height={16}
+                        className="dark:bg-white bg-gray-500 rounded p-0.5 shrink-0"
+                      />
+                      <span className="truncate flex-1">{model.name}</span>
+                      {isModelSelected && (
+                        <Check className="h-4 w-4 shrink-0" />
+                      )}
+                    </CommandItem>
+                  );
+                })}
+              </div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

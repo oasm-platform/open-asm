@@ -167,7 +167,7 @@ export default function AgentsLandingPage() {
   if (!hasProviderConnected) {
     return (
       <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto">
-        <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-8 p-4">
+        <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-8">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="rounded-full bg-muted p-4 ring-1 ring-border">
               <Sparkles className="h-8 w-8 text-muted-foreground" />
@@ -192,7 +192,7 @@ export default function AgentsLandingPage() {
 
   return (
     <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto">
-      <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-8 p-4">
+      <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-8">
         {/* Hero */}
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="rounded-full bg-muted p-3 ring-1 ring-border">

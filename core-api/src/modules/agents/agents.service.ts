@@ -83,6 +83,23 @@ export class AgentsService {
       );
     }
 
+    // Validate API key by fetching models
+    const provider = getLLMProviderConfig(dto.provider);
+    if (!provider) {
+      throw new BadRequestException(`Provider ${dto.provider} is not supported`);
+    }
+
+    const models = await provider.fetchModels(dto.apiKey);
+
+    if (models.length === 0) {
+      throw new BadRequestException(
+        'Invalid API key. Unable to fetch models from the provider.',
+      );
+    }
+
+    // Use first model from the list as default
+    const defaultModel = models[0].id;
+
     // Check if this is the first LLM config in workspace
     const totalConfigs = await this.llmConfigRepository.count({
       where: { workspaceId },
@@ -94,7 +111,7 @@ export class AgentsService {
       workspaceId,
       provider: dto.provider,
       apiKey: encrypt(dto.apiKey),
-      model: dto.model,
+      model: dto.model || defaultModel,
       apiUrl: dto.apiUrl,
       createdBy: userId,
       isPreferred,

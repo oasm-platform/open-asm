@@ -45,6 +45,7 @@ export class CreateLLMConfigDto {
 
   @ApiProperty({})
   @IsString()
+  @IsOptional()
   model: string;
 
   @ApiProperty({ required: false })
@@ -68,7 +69,9 @@ export class LLMConfigResponseDto {
   provider: LLMProvider;
 
   @ApiProperty()
-  model: string;
+  @IsString()
+  @IsOptional()
+  model?: string;
 
   @ApiProperty({ required: false })
   apiUrl?: string;

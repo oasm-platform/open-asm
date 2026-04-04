@@ -177,7 +177,7 @@ export class AgentsCompletionsService {
     if (dto.model && dto.provider === llmConfig.provider) {
       llmConfig = this.llmConfigRepository.create({
         ...llmConfig,
-        model: dto.model as string,
+        model: dto.model,
       });
     }
 

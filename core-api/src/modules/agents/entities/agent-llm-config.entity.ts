@@ -25,7 +25,7 @@ export class AgentLLMConfig extends BaseEntity {
   @Column('text')
   apiKey: string;
 
-  @ApiProperty({ example: 'gpt-4o' })
+  @ApiProperty()
   @IsString()
   @Column({ type: 'varchar', length: 255 })
   model: string;
