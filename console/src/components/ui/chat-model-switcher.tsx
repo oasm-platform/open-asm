@@ -192,13 +192,18 @@ export function ChatModelSwitcher({
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-[280px] p-0" align="start" sideOffset={4}>
-        <Command shouldFilter={false}>
+        <Command shouldFilter={false} className="p-1">
           <CommandInput
             placeholder="Search models..."
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
+
           <CommandList className="max-h-[320px]">
+            <CommandItem onSelect={handleConnect}>
+              <Settings className="h-4 w-4" />
+              Provider Settings
+            </CommandItem>
             {preferredProvider && filteredModels.length > 0 ? (
               <>
                 {filteredModels.map((model) => {
@@ -224,10 +229,6 @@ export function ChatModelSwitcher({
                     </CommandItem>
                   );
                 })}
-                <CommandItem onSelect={handleConnect}>
-                  <Settings className="h-4 w-4" />
-                  Provider Settings
-                </CommandItem>
               </>
             ) : (
               <CommandEmpty>
