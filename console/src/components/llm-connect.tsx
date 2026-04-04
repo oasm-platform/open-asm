@@ -1,11 +1,13 @@
 import { Button } from '@/components/ui/button';
 import type { LLMConfigWithProviderDto } from '@/services/apis/gen/queries';
+import { cn } from '@/lib/utils';
 import {
   CreateLLMConfigDtoProvider,
   useAgentsControllerCreateLLMConfig,
   useAgentsControllerDeleteLLMConfig,
   useAgentsControllerGetLLMConfigs,
   useAgentsControllerGetProviderModels,
+  useAgentsControllerSetPreferredLLMConfig,
   useAgentsControllerUpdateLLMConfig,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -15,6 +17,7 @@ import {
   ChevronUp,
   ChevronsUpDown,
   PlugZap,
+  Star,
   Unplug,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -29,7 +32,7 @@ import {
 import Image from './ui/image';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
-export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
+export default function LlmConnect() {
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [formData, setFormData] = useState<Record<string, { apiKey: string }>>(
     {},
@@ -46,6 +49,25 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
   const createLLMConfig = useAgentsControllerCreateLLMConfig();
   const updateLLMConfig = useAgentsControllerUpdateLLMConfig();
   const deleteLLMConfig = useAgentsControllerDeleteLLMConfig();
+  const setPreferredLLMConfig = useAgentsControllerSetPreferredLLMConfig();
+
+  const handleSetPreferred = async (providerId: string) => {
+    const provider = providersList.find((p) => p.providerId === providerId);
+    if (!provider?.configId) return;
+
+    setIsSubmitting(true);
+    try {
+      await setPreferredLLMConfig.mutateAsync({ id: provider.configId });
+      void queryClient.invalidateQueries({
+        queryKey: ['/api/agents/llm-configs'],
+      });
+      toast.success('Preferred model set successfully');
+    } catch {
+      toast.error('Failed to set preferred model');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleToggleExpand = (providerId: string) => {
     setExpandedProvider(expandedProvider === providerId ? null : providerId);
@@ -72,7 +94,6 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
         queryKey: ['/api/agents/llm-configs'],
       });
       toast.success('Model updated successfully');
-      onSuccess?.();
     } catch {
       toast.error('Failed to update model');
     } finally {
@@ -103,7 +124,6 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
         [providerId]: { apiKey: '' },
       }));
       setExpandedProvider(null);
-      onSuccess?.();
     } catch {
       // Error handled by mutation
     } finally {
@@ -128,7 +148,6 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
             ...prev,
             [providerId]: { apiKey: '' },
           }));
-          onSuccess?.();
         },
         onError: () => {
           toast.error('Failed to disconnect provider');
@@ -225,6 +244,7 @@ export default function LlmConnect({ onSuccess }: { onSuccess?: () => void }) {
                     provider={provider}
                     onModelChange={handleModelChange}
                     onDelete={() => handleDelete(provider.providerId)}
+                    onSetPreferred={() => handleSetPreferred(provider.providerId)}
                     isUpdating={isSubmitting}
                   />
                 ) : (
@@ -249,11 +269,13 @@ function ModelSelectForm({
   provider,
   onModelChange,
   onDelete,
+  onSetPreferred,
   isUpdating,
 }: {
   provider: LLMConfigWithProviderDto;
   onModelChange: (providerId: string, modelId: string) => Promise<void>;
   onDelete: () => void;
+  onSetPreferred: () => void;
   isUpdating: boolean;
 }) {
   const configId = provider.configId ?? '';
@@ -323,6 +345,27 @@ function ModelSelectForm({
       </div>
 
       <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={onSetPreferred}
+          disabled={isUpdating}
+          className={cn(
+            'gap-2',
+            provider.isPreferred && 'border-yellow-500 text-yellow-600',
+          )}
+        >
+          <Star
+            size={16}
+            className={
+              provider.isPreferred
+                ? 'fill-yellow-500 text-yellow-500'
+                : 'text-muted-foreground'
+            }
+          />
+          {provider.isPreferred ? 'Preferred' : 'Set Preferred'}
+        </Button>
         <Button
           type="button"
           size="sm"
