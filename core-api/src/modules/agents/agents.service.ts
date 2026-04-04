@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { LanguageModel, UIMessageChunk } from 'ai';
-import { streamText } from 'ai';
+import { stepCountIs, streamText } from 'ai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from 'typeorm';
@@ -297,18 +297,14 @@ export class AgentsService {
     }
   }
 
-  private async fetchOpenAIModels(
-    apiKey: string,
-  ): Promise<ProviderModelDto[]> {
+  private async fetchOpenAIModels(apiKey: string): Promise<ProviderModelDto[]> {
     try {
       const response = await fetch('https://api.openai.com/v1/models', {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
 
       if (!response.ok) {
-        this.logger.warn(
-          `OpenAI models fetch failed: ${response.status}`,
-        );
+        this.logger.warn(`OpenAI models fetch failed: ${response.status}`);
         return [];
       }
 
@@ -352,9 +348,7 @@ export class AgentsService {
       const response = await fetch('https://openrouter.ai/api/v1/models');
 
       if (!response.ok) {
-        this.logger.warn(
-          `OpenRouter models fetch failed: ${response.status}`,
-        );
+        this.logger.warn(`OpenRouter models fetch failed: ${response.status}`);
         return [];
       }
 
@@ -371,18 +365,14 @@ export class AgentsService {
     }
   }
 
-  private async fetchGeminiModels(
-    apiKey: string,
-  ): Promise<ProviderModelDto[]> {
+  private async fetchGeminiModels(apiKey: string): Promise<ProviderModelDto[]> {
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
       );
 
       if (!response.ok) {
-        this.logger.warn(
-          `Gemini models fetch failed: ${response.status}`,
-        );
+        this.logger.warn(`Gemini models fetch failed: ${response.status}`);
         return [];
       }
 
@@ -541,7 +531,10 @@ export class AgentsService {
     dto: SendMessageDto,
     workspaceId: string,
     userId: string,
-  ): Promise<{ stream: ReadableStream<UIMessageChunk>; conversationId: string }> {
+  ): Promise<{
+    stream: ReadableStream<UIMessageChunk>;
+    conversationId: string;
+  }> {
     // 1. Find or create conversation
     let conversation: AgentConversation;
     if (dto.conversationId) {
@@ -610,7 +603,12 @@ export class AgentsService {
 
     // Apply model override if provided (only affects this request)
     if (dto.model && dto.provider === llmConfig.provider) {
-      llmConfig = { ...llmConfig, model: dto.model } as AgentLLMConfig;
+      // Create properly typed instance using repository create method
+      // This maintains correct entity type without unsafe type assertion
+      llmConfig = this.llmConfigRepository.create({
+        ...llmConfig,
+        model: dto.model as string,
+      });
     }
 
     // 5. Build messages from history (reverse to chronological order)
@@ -646,24 +644,29 @@ export class AgentsService {
     });
     await this.messageRepository.save(assistantMessage);
 
-    // 8. Stream response using AI SDK
+    // 8. Build the streaming response with tool call continuation
+    const conversationIdStr = conversation.id;
+    const messageRepo = this.messageRepository;
+    const assistantMsgId = assistantMessage.id;
+    const assistantMsgMetadata = assistantMessage.metadata;
+    const tools = this.agentTool.getTools(workspaceId);
+    const systemPrompt = this.getSystemPrompt();
+
+    // Create stream with automatic tool call continuation
     const result = streamText({
       model,
       messages: modelMessages,
-      system: this.getSystemPrompt(),
-      tools: this.agentTool.getTools(workspaceId),
+      system: systemPrompt,
+      tools,
+      stopWhen: stepCountIs(10), // Max 10 steps to prevent infinite loops
     });
 
     // Wrap stream to prepend conversation-created event
     // and accumulate text to save when done
     const originalStream = result.toUIMessageStream();
-    const conversationIdStr = conversation.id;
-    let conversationEventSent = false;
     let reader: ReadableStreamDefaultReader<UIMessageChunk> | null = null;
     let accumulatedText = '';
-    const messageRepo = this.messageRepository;
-    const assistantMsgId = assistantMessage.id;
-    const assistantMsgMetadata = assistantMessage.metadata;
+    let conversationEventSent = false;
 
     const wrappedStream = new ReadableStream<UIMessageChunk>({
       start() {
@@ -703,7 +706,11 @@ export class AgentsService {
         }
 
         // Accumulate text from chunk
-        if (value?.type === 'text-delta' && 'delta' in value && typeof value.delta === 'string') {
+        if (
+          value?.type === 'text-delta' &&
+          'delta' in value &&
+          typeof value.delta === 'string'
+        ) {
           accumulatedText += value.delta;
         }
 
