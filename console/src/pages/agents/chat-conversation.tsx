@@ -21,19 +21,19 @@ import {
 } from '@/components/ai-elements/prompt-input';
 import { Markdown } from '@/components/common/markdown';
 import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
-import type { UIMessage, TextUIPart } from 'ai';
+import type { TextUIPart, UIMessage } from 'ai';
 import {
   AlertCircle,
   Bot,
   CheckIcon,
   CopyIcon,
+  Loader2,
   RefreshCcwIcon,
   ShieldAlert,
   Wrench,
-  Loader2,
   X,
 } from 'lucide-react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface ToolCallState {
   toolCallId: string;
@@ -214,11 +214,9 @@ export function ChatConversation({
   selectedProvider,
   selectedModel,
   onSelectModel,
-  hasSentFirstMessage = false,
 }: ChatConversationProps) {
   const [input, setInput] = useState('');
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevStreamingRef = useRef(false);
 
   // Track last user message for retry context
@@ -285,6 +283,9 @@ export function ChatConversation({
                 const toolCalls = getToolCallsFromParts(message);
                 const hasContent =
                   textContent.length > 0 || toolCalls.length > 0;
+                const isLastAssistant =
+                  message.role === 'assistant' && idx === messages.length - 1;
+                const isStreamingActive = isLastAssistant && isStreaming;
 
                 return (
                   <Message key={message.id} from={message.role}>
@@ -303,7 +304,23 @@ export function ChatConversation({
                         {textContent && (
                           <Markdown content={textContent} preview={false} />
                         )}
+                        {isStreamingActive && !hasContent && (
+                          <div className="flex items-center gap-2 py-1">
+                            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              Thinking…
+                            </span>
+                          </div>
+                        )}
                       </div>
+                      {isStreamingActive && hasContent && (
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <Loader2 className="size-3 animate-spin text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            Generating…
+                          </span>
+                        </div>
+                      )}
                     </MessageContent>
 
                     {message.role === 'assistant' &&
@@ -327,20 +344,6 @@ export function ChatConversation({
                   </Message>
                 );
               })}
-
-              {/* Show typing indicator when streaming and waiting for assistant response */}
-              {isStreaming &&
-                messages[messages.length - 1]?.role === 'user' && (
-                  <Message from="assistant" data-testid="assistant-typing">
-                    <MessageContent>
-                      <div className="flex items-center gap-1 py-1">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.15s]" />
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.3s]" />
-                      </div>
-                    </MessageContent>
-                  </Message>
-                )}
             </>
           )}
 
