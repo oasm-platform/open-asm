@@ -25,11 +25,7 @@ interface ProviderModel {
 interface ChatModelSwitcherProps {
   selectedProvider: string | null;
   selectedModel: string | null;
-  onSelectModel: (
-    provider: string,
-    model: string,
-    configId: string,
-  ) => void;
+  onSelectModel: (provider: string, model: string, configId: string) => void;
 }
 
 export function ChatModelSwitcher({
@@ -57,7 +53,7 @@ export function ChatModelSwitcher({
           `/api/agents/llm-configs/${p.configId}/models`,
           { signal },
         );
-        return response.data;
+        return response.data ?? [];
       },
       enabled: !!p.configId,
       staleTime: 5 * 60 * 1000,
@@ -148,11 +144,7 @@ export function ChatModelSwitcher({
           <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        className="w-[280px] p-0"
-        align="start"
-        sideOffset={4}
-      >
+      <PopoverContent className="w-[280px] p-0" align="start" sideOffset={4}>
         <Command>
           <CommandInput placeholder="Search models..." />
           <CommandList className="max-h-[320px]">
@@ -188,9 +180,7 @@ export function ChatModelSwitcher({
                           className="dark:bg-white bg-gray-500 rounded p-0.5 shrink-0"
                         />
                         <span className="truncate flex-1">{model.name}</span>
-                        {isSelected && (
-                          <Check className="h-4 w-4 shrink-0" />
-                        )}
+                        {isSelected && <Check className="h-4 w-4 shrink-0" />}
                       </CommandItem>
                     );
                   })}

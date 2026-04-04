@@ -54,6 +54,7 @@ interface ChatConversationProps {
   selectedProvider?: string | null;
   selectedModel?: string | null;
   onSelectModel?: (provider: string, model: string, configId: string) => void;
+  hasSentFirstMessage?: boolean;
 }
 
 const getTextContent = (message: UIMessage): string => {
@@ -213,6 +214,7 @@ export function ChatConversation({
   selectedProvider,
   selectedModel,
   onSelectModel,
+  hasSentFirstMessage = false,
 }: ChatConversationProps) {
   const [input, setInput] = useState('');
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
@@ -253,26 +255,23 @@ export function ChatConversation({
     }
   }, [onRetry]);
 
-  const isEmpty = !isLoadingMessages && messages.length === 0;
+  // Loading: show when fetching history
+  // Empty: show when no messages and not streaming (not during initial load or streaming)
+  const isEmpty = !isLoadingMessages && messages.length === 0 && !isStreaming;
   const lastAssistantIdx = messages.reduce(
     (acc, m, i) => (m.role === 'assistant' ? i : acc),
     -1,
   );
-
-  // Check if we're in a new conversation with no assistant response yet
-  const hasOnlyUserMessages =
-    messages.length > 0 && messages.every((m) => m.role === 'user');
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Conversation className="flex-1">
         <ConversationContent className="max-w-3xl mx-auto w-full px-4 py-6 gap-6">
           {isLoadingMessages ? (
-            <ConversationEmptyState
-              icon={<Bot className="size-12 animate-pulse" />}
-              title="Loading messages…"
-              description="Fetching your conversation history."
-            />
+            <div className="flex flex-col items-center justify-center h-full">
+              <Bot className="size-10 text-muted-foreground animate-pulse mb-3" />
+              <p className="text-sm text-muted-foreground">Loading messages…</p>
+            </div>
           ) : isEmpty ? (
             <ConversationEmptyState
               icon={<ShieldAlert className="size-12" />}
@@ -286,13 +285,10 @@ export function ChatConversation({
                 const toolCalls = getToolCallsFromParts(message);
                 const hasContent =
                   textContent.length > 0 || toolCalls.length > 0;
-                const isLastMessage = idx === messages.length - 1;
-                const isStreamingMessage =
-                  isLastMessage && isStreaming && message.role === 'user';
 
                 return (
                   <Message key={message.id} from={message.role}>
-                    <MessageContent>
+                    <MessageContent expandable={message.role === 'user'}>
                       <div className="space-y-3">
                         {toolCalls.length > 0 && (
                           <div className="space-y-2">
@@ -306,16 +302,6 @@ export function ChatConversation({
                         )}
                         {textContent && (
                           <Markdown content={textContent} preview={false} />
-                        )}
-                        {isStreamingMessage && (
-                          <div
-                            className="flex items-center gap-1 py-1"
-                            data-testid="streaming-indicator"
-                          >
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.15s]" />
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.3s]" />
-                          </div>
                         )}
                       </div>
                     </MessageContent>
@@ -342,18 +328,19 @@ export function ChatConversation({
                 );
               })}
 
-              {/* Show typing indicator when streaming but no assistant message yet */}
-              {isStreaming && hasOnlyUserMessages && (
-                <Message from="assistant" data-testid="assistant-typing">
-                  <MessageContent>
-                    <div className="flex items-center gap-1 py-1">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.15s]" />
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.3s]" />
-                    </div>
-                  </MessageContent>
-                </Message>
-              )}
+              {/* Show typing indicator when streaming and waiting for assistant response */}
+              {isStreaming &&
+                messages[messages.length - 1]?.role === 'user' && (
+                  <Message from="assistant" data-testid="assistant-typing">
+                    <MessageContent>
+                      <div className="flex items-center gap-1 py-1">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.15s]" />
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.3s]" />
+                      </div>
+                    </MessageContent>
+                  </Message>
+                )}
             </>
           )}
 
