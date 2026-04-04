@@ -12,13 +12,13 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 
 import { decrypt } from '@/common/utils/encryption.util';
-import { getLLMProviderConfig } from './llm-provider-supported';
 import { AgentTool } from './agents.tools';
 import { SendMessageDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
+import { getLLMProviderConfig } from './llm-provider-supported';
 
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
@@ -105,7 +105,7 @@ export class AgentsCompletionsService {
     }
 
     const baseURL =
-      config.provider === LLMProvider.CUSTOM ? config.apiUrl : providerConfig.baseURL;
+      config.provider === LLMProvider.CUSTOM ? config.apiUrl : undefined;
 
     return providerConfig.handler(apiKey, config.model, baseURL);
   }
@@ -177,7 +177,7 @@ export class AgentsCompletionsService {
     if (dto.model && dto.provider === llmConfig.provider) {
       llmConfig = this.llmConfigRepository.create({
         ...llmConfig,
-        model: dto.model,
+        model: dto.model as string,
       });
     }
 

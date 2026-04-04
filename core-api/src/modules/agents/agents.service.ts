@@ -11,10 +11,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as fs from 'fs';
-import * as path from 'path';
 import { Repository } from 'typeorm';
-import { AgentTool } from './agents.tools';
 import {
   ConversationResponseDto,
   UpdateConversationDto,
@@ -32,7 +29,10 @@ import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider } from './enums/agent.enums';
-import { llmProviderSupported } from './llm-provider-supported';
+import {
+  getLLMProviderConfig,
+  llmProviderSupported,
+} from './llm-provider-supported';
 
 @Injectable()
 export class AgentsService {
@@ -46,36 +46,7 @@ export class AgentsService {
     private readonly conversationRepository: Repository<AgentConversation>,
     @InjectRepository(AgentMessage)
     private readonly messageRepository: Repository<AgentMessage>,
-    private readonly agentTool: AgentTool,
-  ) {
-    this.loadSystemPrompt();
-  }
-
-  // ==========================================
-  // System Prompt Methods
-  // ==========================================
-
-  private loadSystemPrompt(): void {
-    try {
-      const promptPath = path.join(__dirname, 'prompts', 'SYSTEM.md');
-      this.systemPrompt = fs.readFileSync(promptPath, 'utf-8');
-      this.logger.log('System prompt loaded successfully');
-    } catch (error) {
-      this.logger.error('Failed to load system prompt', error);
-      this.systemPrompt = 'You are a helpful assistant.';
-    }
-  }
-
-  private getSystemPrompt(): string {
-    if (!this.systemPrompt) {
-      this.loadSystemPrompt();
-    }
-    return this.systemPrompt ?? 'You are a helpful assistant.';
-  }
-
-  // ==========================================
-  // LLM Config Methods
-  // ==========================================
+  ) {}
 
   private maskApiKey(apiKey: string): string {
     if (apiKey.length <= 4) return '****';
@@ -304,118 +275,13 @@ export class AgentsService {
       throw new NotFoundException('LLM config not found');
     }
 
+    const provider = getLLMProviderConfig(config.provider);
+    if (!provider) {
+      return [];
+    }
+
     const apiKey = decrypt(config.apiKey);
-
-    switch (config.provider) {
-      case LLMProvider.OPENAI:
-        return this.fetchOpenAIModels(apiKey);
-      case LLMProvider.ANTHROPIC:
-        return this.getAnthropicModels();
-      case LLMProvider.OPENROUTER:
-        return this.fetchOpenRouterModels();
-      case LLMProvider.GEMINI:
-        return this.fetchGeminiModels(apiKey);
-      case LLMProvider.CUSTOM:
-        return [];
-      default:
-        return [];
-    }
-  }
-
-  private async fetchOpenAIModels(apiKey: string): Promise<ProviderModelDto[]> {
-    try {
-      const response = await fetch('https://api.openai.com/v1/models', {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-
-      if (!response.ok) {
-        this.logger.warn(`OpenAI models fetch failed: ${response.status}`);
-        return [];
-      }
-
-      const data = (await response.json()) as {
-        data: Array<{ id: string }>;
-      };
-
-      return data.data
-        .filter(
-          (m) =>
-            m.id.startsWith('gpt-') ||
-            m.id.startsWith('o1') ||
-            m.id.startsWith('o3') ||
-            m.id.startsWith('o4'),
-        )
-        .map((m) => ({ id: m.id, name: m.id }))
-        .sort((a, b) => a.id.localeCompare(b.id));
-    } catch (error) {
-      this.logger.error('Failed to fetch OpenAI models', error);
-      return [];
-    }
-  }
-
-  private getAnthropicModels(): ProviderModelDto[] {
-    const models = [
-      'claude-opus-4-20250514',
-      'claude-sonnet-4-20250514',
-      'claude-haiku-4-5-20251001',
-      'claude-3-7-sonnet-20250219',
-      'claude-3-5-sonnet-20241022',
-      'claude-3-5-haiku-20241022',
-      'claude-3-opus-20240229',
-      'claude-3-sonnet-20240229',
-      'claude-3-haiku-20240307',
-    ];
-    return models.map((id) => ({ id, name: id }));
-  }
-
-  private async fetchOpenRouterModels(): Promise<ProviderModelDto[]> {
-    try {
-      const response = await fetch('https://openrouter.ai/api/v1/models');
-
-      if (!response.ok) {
-        this.logger.warn(`OpenRouter models fetch failed: ${response.status}`);
-        return [];
-      }
-
-      const data = (await response.json()) as {
-        data: Array<{ id: string; name?: string }>;
-      };
-
-      return data.data
-        .map((m) => ({ id: m.id, name: m.name ?? m.id }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-    } catch (error) {
-      this.logger.error('Failed to fetch OpenRouter models', error);
-      return [];
-    }
-  }
-
-  private async fetchGeminiModels(apiKey: string): Promise<ProviderModelDto[]> {
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-      );
-
-      if (!response.ok) {
-        this.logger.warn(`Gemini models fetch failed: ${response.status}`);
-        return [];
-      }
-
-      const data = (await response.json()) as {
-        models: Array<{ name: string; displayName?: string }>;
-      };
-
-      return data.models
-        .filter((m) => m.name.startsWith('models/gemini'))
-        .map((m) => ({
-          id: m.name.replace('models/', ''),
-          name: m.displayName ?? m.name.replace('models/', ''),
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-    } catch (error) {
-      this.logger.error('Failed to fetch Gemini models', error);
-      return [];
-    }
+    return provider.fetchModels(apiKey);
   }
 
   async getConversations(

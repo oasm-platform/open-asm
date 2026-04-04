@@ -20,8 +20,8 @@ import type {
 import { useAgentsControllerGetConversations } from '@/services/apis/gen/queries';
 import { useQuery } from '@tanstack/react-query';
 import { MessageSquare, Sparkles } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
 
@@ -85,6 +85,7 @@ const ALL_QUICK_SUGGESTIONS = [
 
 export default function AgentsLandingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
@@ -116,6 +117,8 @@ export default function AgentsLandingPage() {
     return shuffled.slice(0, 5);
   }, []);
 
+  const queryText = searchParams.get('text');
+
   const handleSendMessage = useCallback(
     (content: string) => {
       if (!content.trim() || isSending) return;
@@ -133,6 +136,15 @@ export default function AgentsLandingPage() {
     },
     [isSending, navigate, selectedModel],
   );
+
+  useEffect(() => {
+    if (queryText && !isSending && !input) {
+      handleSendMessage(queryText);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('text');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [queryText, isSending, input, handleSendMessage]);
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (message.text.trim()) {
