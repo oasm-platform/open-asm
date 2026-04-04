@@ -267,6 +267,36 @@ export class AgentsService {
     });
   }
 
+  /**
+   * Resolve LLM config to use for a conversation.
+   * Priority: requested provider/model > preferred config
+   */
+  private async resolveLLMConfig(
+    workspaceId: string,
+    provider?: string,
+    model?: string,
+  ): Promise<AgentLLMConfig> {
+    let llmConfig: AgentLLMConfig | null = null;
+
+    if (model && provider) {
+      llmConfig = await this.llmConfigRepository.findOne({
+        where: { workspaceId, provider: provider as LLMProvider },
+      });
+    }
+
+    if (!llmConfig) {
+      llmConfig = await this.getPreferredLLMConfig(workspaceId);
+    }
+
+    if (!llmConfig) {
+      throw new BadRequestException(
+        'No preferred LLM config found. Please create and set a preferred LLM config first.',
+      );
+    }
+
+    return llmConfig;
+  }
+
   async getModelsForProvider(
     configId: string,
     workspaceId: string,
@@ -538,35 +568,35 @@ export class AgentsService {
     // 1. Find or create conversation
     let conversation: AgentConversation;
     if (dto.conversationId) {
+      // Try to find existing conversation first
       const existing = await this.conversationRepository.findOne({
         where: { id: dto.conversationId, workspaceId },
       });
-      if (!existing) {
-        throw new NotFoundException('Conversation not found');
-      }
-      conversation = existing;
-    } else {
-      // Determine which LLM config to use
-      let llmConfig: AgentLLMConfig | null = null;
-
-      if (dto.model && dto.provider) {
-        // Find config matching the requested provider
-        llmConfig = await this.llmConfigRepository.findOne({
-          where: { workspaceId, provider: dto.provider as LLMProvider },
-        });
-      }
-
-      // Fall back to preferred config
-      if (!llmConfig) {
-        llmConfig = await this.getPreferredLLMConfig(workspaceId);
-      }
-
-      if (!llmConfig) {
-        throw new BadRequestException(
-          'No preferred LLM config found. Please create and set a preferred LLM config first.',
+      if (existing) {
+        conversation = existing;
+      } else {
+        // Create new conversation with provided ID
+        const llmConfig = await this.resolveLLMConfig(
+          workspaceId,
+          dto.provider,
+          dto.model,
         );
+        conversation = this.conversationRepository.create({
+          id: dto.conversationId, // Use provided UUID
+          workspaceId,
+          llmConfigId: llmConfig.id,
+          title: dto.question.slice(0, 500),
+          createdBy: userId,
+        });
+        conversation = await this.conversationRepository.save(conversation);
       }
-
+    } else {
+      // Create new conversation with auto-generated ID
+      const llmConfig = await this.resolveLLMConfig(
+        workspaceId,
+        dto.provider,
+        dto.model,
+      );
       conversation = this.conversationRepository.create({
         workspaceId,
         llmConfigId: llmConfig.id,

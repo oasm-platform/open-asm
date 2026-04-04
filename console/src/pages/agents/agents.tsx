@@ -27,7 +27,7 @@ export default function AgentsChatPage() {
   const navigate = useNavigate();
   const hasAutoSentRef = useRef(false);
   const chatMessagesRef = useRef<UIMessage[]>([]);
-  const createdConversationIdRef = useRef<string | null>(null);
+  const isStreamingRef = useRef(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
     null,
@@ -40,20 +40,17 @@ export default function AgentsChatPage() {
   }, [selectedModel]);
 
   const workspaceId = getGlobalWorkspaceId();
-  const isNewConversation = conversationId === 'new' || !conversationId;
 
-  const effectiveConversationId = createdConversationIdRef.current || conversationId;
-  const isActuallyNew = effectiveConversationId === 'new' || !effectiveConversationId;
-
-  // Fetch messages when loading an existing conversation
+  // Fetch messages when loading an existing conversation (not during streaming)
   const { data: messagesData, isLoading: isLoadingHistory } =
     useAgentsControllerGetMessages(
-      effectiveConversationId!,
+      conversationId!,
       undefined,
       {
         query: {
-          queryKey: ['/api/agents/conversations', effectiveConversationId, 'messages'],
-          enabled: !!effectiveConversationId && !isActuallyNew,
+          queryKey: ['/api/agents/conversations', conversationId, 'messages'],
+          // Only fetch if we have a valid conversation ID and not currently streaming
+          enabled: !!conversationId && !isStreamingRef.current,
         },
       },
     );
@@ -91,7 +88,7 @@ export default function AgentsChatPage() {
     transport: new DefaultChatTransport({
       api: '/api/agents/messages/stream',
       headers: workspaceId ? { 'x-workspace-id': workspaceId } : {},
-      prepareSendMessagesRequest: ({ messages, trigger, messageId }) => {
+      prepareSendMessagesRequest: ({ messages, trigger }) => {
         const lastMessage = messages[messages.length - 1];
         const textContent = lastMessage?.parts
           .filter((p) => p.type === 'text')
@@ -100,18 +97,8 @@ export default function AgentsChatPage() {
 
         const modelInfo = selectedModelRef.current;
 
-        // Generate UUID v7 for new conversations
-        const shouldSendConversationId = !isActuallyNew || trigger !== 'submit-message';
-        let convId = shouldSendConversationId
-          ? (createdConversationIdRef.current || effectiveConversationId)
-          : undefined;
-
-        // If no conversationId and this is a new conversation (submit-message trigger), generate UUID v7
-        if (!convId && trigger === 'submit-message' && isActuallyNew) {
-          convId = uuidv7();
-          // Store locally for immediate use
-          createdConversationIdRef.current = convId;
-        }
+        // For existing conversations, use the ID from URL
+        const convId = conversationId;
 
         return {
           body: {
@@ -125,21 +112,8 @@ export default function AgentsChatPage() {
         };
       },
     }),
-    id: conversationId,
-    onData: (data) => {
-      const convId = (data as Record<string, unknown>)?.conversationId as string | undefined;
-      if (isNewConversation && convId) {
-        createdConversationIdRef.current = convId;
-      }
-    },
-    onFinish: () => {
-      if (createdConversationIdRef.current) {
-        void navigate(`/agents/conversations/${createdConversationIdRef.current}`, {
-          replace: true,
-          state: null,
-        });
-      }
-    },
+    // Use a stable ID for the chat so it doesn't reset when we navigate
+    id: 'agent-chat',
     onError: (error) => {
       console.error('[Chat] Error:', error);
       setStreamError(error.message ?? 'An error occurred while streaming');
@@ -149,16 +123,18 @@ export default function AgentsChatPage() {
   // Keep ref in sync
   useEffect(() => {
     chatMessagesRef.current = chatMessages;
-  }, [chatMessages]);
+    isStreamingRef.current = status === 'submitted' || status === 'streaming';
+  }, [chatMessages, status]);
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
+  // Show saved messages if we have them and no chat messages yet
   const displayMessages: UIMessage[] = useMemo(() => {
-    if (!isActuallyNew && savedMessages.length > 0 && !chatMessages.length) {
+    if (conversationId && savedMessages.length > 0 && !chatMessages.length) {
       return savedMessages;
     }
     return chatMessages;
-  }, [isActuallyNew, savedMessages, chatMessages]);
+  }, [conversationId, savedMessages, chatMessages]);
 
   const lastAssistantIdx = useMemo(() => {
     for (let i = displayMessages.length - 1; i >= 0; i--) {

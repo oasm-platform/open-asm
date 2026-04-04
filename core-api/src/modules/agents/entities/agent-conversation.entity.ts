@@ -1,11 +1,29 @@
-import { BaseEntity } from '@/common/entities/base.entity';
+// import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsUUID } from 'class-validator';
-import { Column, Entity, OneToMany } from 'typeorm';
+import {
+  Column,
+  Entity,
+  OneToMany,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { AgentMessage } from './agent-message.entity';
 
 @Entity('agent_conversations')
-export class AgentConversation extends BaseEntity {
+export class AgentConversation {
+  @ApiProperty()
+  @PrimaryColumn({ type: 'uuid' })
+  id: string;
+
+  @ApiProperty()
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date;
+
+  @ApiProperty()
+  @UpdateDateColumn()
+  updatedAt: Date;
+
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()
   @Column({ type: 'uuid' })

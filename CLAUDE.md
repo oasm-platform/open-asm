@@ -69,6 +69,35 @@ task lint              # Check linting
 - Services in `worker/services/`
 - Auto-generated API client in `worker/services/core-api/`
 
+## Skills & External Knowledge
+
+**ALWAYS invoke skills proactively at these milestones:**
+
+| Milestone | Skill to invoke |
+|----------|----------------|
+| Creating features, building components, adding functionality | `Skill(skill="superpowers:brainstorming")` |
+| Building frontend UI, pages, or web components | `Skill(skill="frontend-design")` |
+| Writing implementation plan | `Skill(skill="superpowers:writing-plans")` |
+| Executing multi-step implementation | `Skill(skill="superpowers:executing-plans")` |
+| Bug, test failure, unexpected behavior | `Skill(skill="superpowers:systematic-debugging")` |
+| Implementing any feature/bugfix | `Skill(skill="superpowers:test-driven-development")` |
+| Verification before completion | `Skill(skill="superpowers:verification-before-completion")` |
+| Requesting code review | `Skill(skill="superpowers:requesting-code-review")` |
+| Receiving code review feedback | `Skill(skill="superpowers:receiving-code-review")` |
+| Finishing development branch | `Skill(skill="superpowers:finishing-a-development-branch")` |
+| Creating new skills | `Skill(skill="superpowers:writing-skills")` |
+| Finding existing skills | `Skill(skill="find-skills")` |
+
+**Library/Framework questions:** Use Context7 MCP (via `context7-mcp` skill or direct library query). Always fetch current docs for:
+- React, Next.js, NestJS, TypeORM, Prisma, Tailwind, etc.
+- API syntax, configuration, version migration, CLI usage
+
+**Finding functionality:** If asking "how do I do X", "is there a skill for X", use `Skill(skill="find-skills")`
+
+**Web search:**
+- Use `WebSearch` for: current events, recent releases, version-specific issues, community discussions
+- Current date: April 2026
+
 ## Subagent System
 
 When a task involves multiple files or specialized knowledge, delegate to a Task agent. Agent definitions live in `.claude/agents/`.

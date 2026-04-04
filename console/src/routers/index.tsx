@@ -394,14 +394,6 @@ export const router = createBrowserRouter([
                     ),
                   },
                   {
-                    path: 'new',
-                    element: (
-                      <RequireWorkspace>
-                        <AgentsChatPage />
-                      </RequireWorkspace>
-                    ),
-                  },
-                  {
                     path: ':conversationId',
                     element: (
                       <RequireWorkspace>

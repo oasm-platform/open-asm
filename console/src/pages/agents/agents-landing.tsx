@@ -22,6 +22,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
 
 interface LLMProviderStatus {
@@ -121,7 +122,9 @@ export default function AgentsLandingPage() {
 
       setIsSending(true);
 
-      void navigate('/agents/conversations/new', {
+      // Generate UUID v7 for new conversation and navigate immediately
+      const newConversationId = uuidv7();
+      void navigate(`/agents/conversations/${newConversationId}`, {
         state: {
           pendingMessage: content.trim(),
           ...(selectedModel && { selectedModel }),

@@ -437,16 +437,35 @@ describe('AgentsService', () => {
       expect(stream).toBeDefined();
     });
 
-    it('should throw NotFoundException when conversation not found', async () => {
-      jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(null);
+    it('should create new conversation when conversationId provided but not found', async () => {
+      jest
+        .spyOn(conversationRepository, 'findOne')
+        .mockResolvedValue(null);
+      jest
+        .spyOn(llmConfigRepository, 'findOne')
+        .mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(conversationRepository, 'create')
+        .mockReturnValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'save')
+        .mockResolvedValue(mockConversation);
+      jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
+      jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
+      jest.spyOn(messageRepository, 'find').mockResolvedValue([]);
 
-      await expect(
-        service.streamMessage(
-          { question: 'Hello', conversationId: 'non-existent' },
-          mockWorkspaceId,
-          mockUserId,
-        ),
-      ).rejects.toThrow(NotFoundException);
+      const stream = await service.streamMessage(
+        { question: 'Hello', conversationId: 'non-existent' },
+        mockWorkspaceId,
+        mockUserId,
+      );
+
+      expect(stream).toBeDefined();
+      expect(conversationRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'non-existent',
+        }),
+      );
     });
   });
 });
