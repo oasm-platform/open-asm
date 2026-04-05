@@ -19,7 +19,8 @@ export default defineConfig(({ mode }) => {
           id: '/',
           name: 'OpenASM - AI Agent Management Platform',
           short_name: 'OpenASM',
-          description: 'AI agent management and automation platform with MCP integration',
+          description:
+            'AI agent management and automation platform with MCP integration',
           scope: '/',
           start_url: '/',
           lang: 'en',
@@ -45,6 +46,7 @@ export default defineConfig(({ mode }) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           swDest: 'sw.js',
+          maximumFileSizeToCacheInBytes: 10485760,
         },
       }),
     ],

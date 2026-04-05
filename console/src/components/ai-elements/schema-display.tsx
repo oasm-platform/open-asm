@@ -1,24 +1,24 @@
-"use client";
+'use client';
 
-import { Badge } from "@/components/ui/badge";
+import { Badge } from '@/components/ui/badge';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
-import { ChevronRightIcon } from "lucide-react";
-import type { ComponentProps, HTMLAttributes } from "react";
-import { createContext, useContext, useMemo } from "react";
+} from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
+import { ChevronRightIcon } from 'lucide-react';
+import type { ComponentProps, HTMLAttributes } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface SchemaParameter {
   name: string;
   type: string;
   required?: boolean;
   description?: string;
-  location?: "path" | "query" | "header";
+  location?: 'path' | 'query' | 'header';
 }
 
 interface SchemaProperty {
@@ -40,17 +40,17 @@ interface SchemaDisplayContextType {
 }
 
 const SchemaDisplayContext = createContext<SchemaDisplayContextType>({
-  method: "GET",
-  path: "",
+  method: 'GET',
+  path: '',
 });
 
 const methodStyles: Record<HttpMethod, string> = {
-  DELETE: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  GET: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  DELETE: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  GET: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   PATCH:
-    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  POST: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  PUT: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  POST: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  PUT: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
 };
 
 export type SchemaDisplayHeaderProps = HTMLAttributes<HTMLDivElement>;
@@ -61,7 +61,7 @@ export const SchemaDisplayHeader = ({
   ...props
 }: SchemaDisplayHeaderProps) => (
   <div
-    className={cn("flex items-center gap-3 border-b px-4 py-3", className)}
+    className={cn('flex items-center gap-3 border-b px-4 py-3', className)}
     {...props}
   >
     {children}
@@ -79,7 +79,7 @@ export const SchemaDisplayMethod = ({
 
   return (
     <Badge
-      className={cn("font-mono text-xs", methodStyles[method], className)}
+      className={cn('font-mono text-xs', methodStyles[method], className)}
       variant="secondary"
       {...props}
     >
@@ -100,14 +100,22 @@ export const SchemaDisplayPath = ({
   // Highlight path parameters
   const highlightedPath = path.replaceAll(
     /\{([^}]+)\}/g,
-    '<span class="text-blue-600 dark:text-blue-400">{$1}</span>'
+    '<span class="text-blue-600 dark:text-blue-400">{$1}</span>',
   );
+
+  if (children) {
+    return (
+      <span className={cn('font-mono text-sm', className)} {...props}>
+        {children}
+      </span>
+    );
+  }
 
   return (
     <span
-      className={cn("font-mono text-sm", className)}
+      className={cn('font-mono text-sm', className)}
       // oxlint-disable-next-line eslint-plugin-react(no-danger)
-      dangerouslySetInnerHTML={{ __html: children ?? highlightedPath }}
+      dangerouslySetInnerHTML={{ __html: highlightedPath }}
       {...props}
     />
   );
@@ -126,8 +134,8 @@ export const SchemaDisplayDescription = ({
   return (
     <p
       className={cn(
-        "border-b px-4 py-3 text-muted-foreground text-sm",
-        className
+        'border-b px-4 py-3 text-muted-foreground text-sm',
+        className,
       )}
       {...props}
     >
@@ -143,7 +151,7 @@ export const SchemaDisplayContent = ({
   children,
   ...props
 }: SchemaDisplayContentProps) => (
-  <div className={cn("divide-y", className)} {...props}>
+  <div className={cn('divide-y', className)} {...props}>
     {children}
   </div>
 );
@@ -160,7 +168,7 @@ export const SchemaDisplayParameter = ({
   className,
   ...props
 }: SchemaDisplayParameterProps) => (
-  <div className={cn("px-4 py-3 pl-10", className)} {...props}>
+  <div className={cn('px-4 py-3 pl-10', className)} {...props}>
     <div className="flex items-center gap-2">
       <span className="font-mono text-sm">{name}</span>
       <Badge className="text-xs" variant="outline">
@@ -240,8 +248,8 @@ export const SchemaDisplayProperty = ({
       <Collapsible defaultOpen={depth < 2}>
         <CollapsibleTrigger
           className={cn(
-            "group flex w-full items-center gap-2 py-3 text-left transition-colors hover:bg-muted/50",
-            className
+            'group flex w-full items-center gap-2 py-3 text-left transition-colors hover:bg-muted/50',
+            className,
           )}
           style={{ paddingLeft }}
         >
@@ -291,7 +299,7 @@ export const SchemaDisplayProperty = ({
 
   return (
     <div
-      className={cn("py-3 pr-4", className)}
+      className={cn('py-3 pr-4', className)}
       style={{ paddingLeft }}
       {...props}
     >
@@ -401,15 +409,15 @@ export const SchemaDisplay = ({
       requestBody,
       responseBody,
     }),
-    [description, method, parameters, path, requestBody, responseBody]
+    [description, method, parameters, path, requestBody, responseBody],
   );
 
   return (
     <SchemaDisplayContext.Provider value={contextValue}>
       <div
         className={cn(
-          "overflow-hidden rounded-lg border bg-background",
-          className
+          'overflow-hidden rounded-lg border bg-background',
+          className,
         )}
         {...props}
       >
@@ -447,7 +455,7 @@ export const SchemaDisplayBody = ({
   children,
   ...props
 }: SchemaDisplayBodyProps) => (
-  <div className={cn("divide-y", className)} {...props}>
+  <div className={cn('divide-y', className)} {...props}>
     {children}
   </div>
 );
@@ -461,8 +469,8 @@ export const SchemaDisplayExample = ({
 }: SchemaDisplayExampleProps) => (
   <pre
     className={cn(
-      "mx-4 mb-4 overflow-auto rounded-md bg-muted p-4 font-mono text-sm",
-      className
+      'mx-4 mb-4 overflow-auto rounded-md bg-muted p-4 font-mono text-sm',
+      className,
     )}
     {...props}
   >

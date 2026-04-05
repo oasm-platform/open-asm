@@ -228,13 +228,6 @@ export function ChatConversation({
     }
   }, [messages]);
 
-  // Auto-scroll to bottom when messages change
-  // useEffect(() => {
-  //   if (messages.length > 0 || isStreaming) {
-  //     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  //   }
-  // }, [messages.length, isStreaming]);
-
   // Track streaming state transitions to prevent flicker
   useEffect(() => {
     prevStreamingRef.current = isStreaming;
@@ -406,8 +399,6 @@ export function ChatConversation({
               </div>
             </div>
           )}
-
-          {/* <div ref={messagesEndRef} /> */}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
