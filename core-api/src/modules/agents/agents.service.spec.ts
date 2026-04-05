@@ -9,6 +9,7 @@ import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
+import { RedisService } from '@/services/redis/redis.service';
 
 jest.mock('@/common/utils/encryption.util', () => ({
   encrypt: jest.fn((text: string) => `encrypted:${text}`),
@@ -42,6 +43,15 @@ jest.mock('@ai-sdk/anthropic', () => ({
     model,
     provider: 'anthropic',
   })),
+}));
+
+jest.mock('./llm-provider-supported', () => ({
+  getLLMProviderConfig: jest.fn(() => ({
+    fetchModels: jest.fn().mockResolvedValue([{ id: 'gpt-4o', name: 'GPT-4o' }]),
+  })),
+  llmProviderSupported: [
+    { id: 'openai', name: 'OpenAI', logo: 'logo.png' },
+  ],
 }));
 
 describe('AgentsService', () => {
@@ -137,6 +147,19 @@ describe('AgentsService', () => {
             findOne: jest.fn(),
             find: jest.fn(),
             remove: jest.fn(),
+          },
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+            keys: jest.fn(),
+            incr: jest.fn(),
+            decr: jest.fn(),
+            expire: jest.fn(),
+            ttl: jest.fn(),
           },
         },
       ],

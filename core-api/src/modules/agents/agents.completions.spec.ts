@@ -9,6 +9,11 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
 import { AgentTool } from './agents.tools';
+import { RedisService } from '@/services/redis/redis.service';
+import { AssetsService } from '@/modules/assets/assets.service';
+import { TargetsService } from '@/modules/targets/targets.service';
+import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
+import { StatisticService } from '@/modules/statistic/statistic.service';
 
 jest.mock('@/common/utils/encryption.util', () => ({
   decrypt: jest.fn((text: string) => text.replace('encrypted:', '')),
@@ -22,9 +27,12 @@ jest.mock('ai', () => ({
       yield ' ';
       yield 'world!';
     })(),
+    toUIMessageStream: jest.fn(() => new ReadableStream()),
   })),
   generateText: jest.fn(),
   createUIMessageStreamResponse: jest.fn(() => new ReadableStream()),
+  tool: jest.fn((config) => config),
+  stepCountIs: jest.fn((count) => ({ type: 'stepCountIs', count })),
 }));
 
 jest.mock('@ai-sdk/openai', () => ({
@@ -137,6 +145,47 @@ describe('AgentsCompletionsService', () => {
             findOne: jest.fn(),
             find: jest.fn(),
             remove: jest.fn(),
+          },
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+            keys: jest.fn(),
+            incr: jest.fn(),
+            decr: jest.fn(),
+            expire: jest.fn(),
+            ttl: jest.fn(),
+          },
+        },
+        {
+          provide: AssetsService,
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            getAssetsByTargetId: jest.fn(),
+          },
+        },
+        {
+          provide: TargetsService,
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+          },
+        },
+        {
+          provide: VulnerabilitiesService,
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+          },
+        },
+        {
+          provide: StatisticService,
+          useValue: {
+            getStatistic: jest.fn(),
           },
         },
       ],
