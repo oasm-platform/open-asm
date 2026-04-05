@@ -249,7 +249,18 @@ export class AgentsCompletionsService {
       throw new NotFoundException('LLM config not found');
     }
 
-    if (dto.model && dto.provider === llmConfig.provider) {
+    // If user switched to a different provider, resolve the correct config for it
+    if (dto.provider && (dto.provider as LLMProvider) !== llmConfig.provider) {
+      const switchedConfig = await this.llmConfigRepository.findOne({
+        where: { workspaceId, provider: dto.provider as LLMProvider },
+      });
+      if (switchedConfig) {
+        llmConfig = switchedConfig;
+      }
+    }
+
+    // Override model in-memory (no DB write) when the provider matches
+    if (dto.model && (dto.provider as LLMProvider) === llmConfig.provider) {
       llmConfig = this.llmConfigRepository.create({
         ...llmConfig,
         model: dto.model,

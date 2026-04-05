@@ -1,7 +1,11 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
-import { useAgentsControllerGetMessages } from '@/services/apis/gen/queries';
+import {
+  useAgentsControllerGetLLMConfigs,
+  useAgentsControllerGetMessages,
+  type LLMConfigWithProviderDto,
+} from '@/services/apis/gen/queries';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChatConversation } from './chat-conversation';
@@ -26,10 +30,15 @@ export default function AgentsChatPage() {
   const chatMessagesRef = useRef<UIMessage[]>([]);
   const isStreamingRef = useRef(false);
   const [streamError, setStreamError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
-    null,
-  );
-  const selectedModelRef = useRef<SelectedModel | null>(null);
+  const { data: providers } =
+    useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
+  const prefer = providers?.find((item) => item.isPreferred);
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>({
+    provider: prefer?.providerId || '',
+    model: prefer?.model || '',
+    configId: prefer?.configId || '',
+  });
+  const selectedModelRef = useRef<SelectedModel | null>(selectedModel);
 
   // Keep ref in sync with state
   useEffect(() => {

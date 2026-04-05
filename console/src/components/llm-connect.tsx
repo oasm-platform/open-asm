@@ -244,7 +244,9 @@ export default function LlmConnect() {
                     provider={provider}
                     onModelChange={handleModelChange}
                     onDelete={() => handleDelete(provider.providerId)}
-                    onSetPreferred={() => handleSetPreferred(provider.providerId)}
+                    onSetPreferred={() =>
+                      handleSetPreferred(provider.providerId)
+                    }
                     isUpdating={isSubmitting}
                   />
                 ) : (

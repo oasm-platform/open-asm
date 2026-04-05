@@ -71,7 +71,16 @@ export function ChatModelSwitcher({
     [connectedProviders],
   );
 
-  const configId = preferredProvider?.configId ?? '';
+  // Use the currently selected provider's config if available, otherwise fall back to preferred
+  const activeProvider = useMemo(
+    () =>
+      (selectedProvider
+        ? connectedProviders.find((p) => p.providerId === selectedProvider)
+        : null) ?? preferredProvider,
+    [selectedProvider, connectedProviders, preferredProvider],
+  );
+
+  const configId = activeProvider?.configId ?? '';
 
   const { data: models, isLoading } = useAgentsControllerGetProviderModels(
     configId,
@@ -121,12 +130,12 @@ export function ChatModelSwitcher({
 
   const handleSelect = useCallback(
     async (modelId: string) => {
-      if (!preferredProvider?.configId) return;
+      if (!activeProvider?.configId) return;
 
       setIsUpdating(true);
       try {
         await updateLLMConfig.mutateAsync({
-          id: preferredProvider.configId,
+          id: activeProvider.configId,
           data: { model: modelId },
         });
 
@@ -135,9 +144,9 @@ export function ChatModelSwitcher({
         });
 
         onSelectModel(
-          preferredProvider.providerId,
+          activeProvider.providerId,
           modelId,
-          preferredProvider.configId,
+          activeProvider.configId,
         );
 
         toast.success('Model updated successfully');
@@ -149,7 +158,7 @@ export function ChatModelSwitcher({
         setSearchQuery('');
       }
     },
-    [preferredProvider, onSelectModel, updateLLMConfig, queryClient],
+    [activeProvider, onSelectModel, updateLLMConfig, queryClient],
   );
 
   const handleConnect = useCallback(() => {
@@ -168,7 +177,7 @@ export function ChatModelSwitcher({
     return null;
   }
 
-  const isSelected = selectedProvider === preferredProvider?.providerId;
+  const isSelected = selectedProvider === activeProvider?.providerId;
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -204,7 +213,7 @@ export function ChatModelSwitcher({
               <Settings className="h-4 w-4" />
               Provider Settings
             </CommandItem>
-            {preferredProvider && filteredModels.length > 0 ? (
+            {activeProvider && filteredModels.length > 0 ? (
               <>
                 {filteredModels.map((model) => {
                   const isModelSelected =
@@ -218,7 +227,7 @@ export function ChatModelSwitcher({
                       className="flex items-center gap-2 px-2"
                     >
                       <Image
-                        url={preferredProvider.logo}
+                        url={activeProvider.logo}
                         height={16}
                         className="dark:bg-white bg-gray-500 rounded p-0.5 shrink-0"
                       />
