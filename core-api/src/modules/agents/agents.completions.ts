@@ -9,6 +9,7 @@ import type { LanguageModel, UIMessageChunk } from 'ai';
 import { generateText, stepCountIs, streamText } from 'ai';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as Mustache from 'mustache';
 import { Repository } from 'typeorm';
 
 import { decrypt } from '@/common/utils/encryption.util';
@@ -28,8 +29,12 @@ export interface StreamMessageResult {
 @Injectable()
 export class AgentsCompletionsService {
   private readonly logger = new Logger(AgentsCompletionsService.name);
-  private systemPrompt: string | null = null;
-  private titleGeneratePrompt: string | null = null;
+  private readonly prompts = new Map<string, string>();
+  private readonly defaultPrompts: Record<string, string> = {
+    'SYSTEM.md': 'You are a helpful assistant.',
+    'TITLE_GENERATE.md': 'Generate a short title for this conversation.',
+  };
+  private static readonly PROMPTS_DIR = 'prompts';
 
   constructor(
     @InjectRepository(AgentLLMConfig)
@@ -40,45 +45,51 @@ export class AgentsCompletionsService {
     private readonly messageRepository: Repository<AgentMessage>,
     private readonly agentTool: AgentTool,
   ) {
-    this.loadSystemPrompt();
+    this.loadAllPrompts();
   }
 
-  private loadSystemPrompt(): void {
+  /**
+   * Loads all prompt files from the prompts directory at startup.
+   */
+  private loadAllPrompts(): void {
+    const promptsDir = path.join(__dirname, AgentsCompletionsService.PROMPTS_DIR);
     try {
-      const promptPath = path.join(__dirname, 'prompts', 'SYSTEM.md');
-      this.systemPrompt = fs.readFileSync(promptPath, 'utf-8');
+      const files = fs.readdirSync(promptsDir);
+      for (const file of files) {
+        if (file.endsWith('.md')) {
+          this.loadPrompt(file);
+        }
+      }
     } catch (error) {
-      this.logger.error('Failed to load system prompt', error);
-      this.systemPrompt = 'You are a helpful assistant.';
+      this.logger.error('Failed to load prompts directory', error);
+      this.loadPrompt('SYSTEM.md');
     }
   }
 
-  private getSystemPrompt(): string {
-    if (!this.systemPrompt) {
-      this.loadSystemPrompt();
-    }
-    return this.systemPrompt ?? 'You are a helpful assistant.';
-  }
-
-  private loadTitleGeneratePrompt(): void {
+  /**
+   * Loads a prompt from file system and caches it in memory.
+   * Falls back to default prompt if file not found or read error occurs.
+   */
+  private loadPrompt(fileName: string): void {
     try {
-      const promptPath = path.join(__dirname, 'prompts', 'TITLE_GENERATE.md');
-      this.titleGeneratePrompt = fs.readFileSync(promptPath, 'utf-8');
+      const promptPath = path.join(__dirname, 'prompts', fileName);
+      this.prompts.set(fileName, fs.readFileSync(promptPath, 'utf-8'));
     } catch (error) {
-      this.logger.error('Failed to load title generate prompt', error);
-      this.titleGeneratePrompt =
-        'Generate a short title for this conversation.';
+      this.logger.error(`Failed to load prompt: ${fileName}`, error);
+      this.prompts.set(fileName, this.defaultPrompts[fileName] ?? '');
     }
   }
 
-  private getTitleGeneratePrompt(): string {
-    if (!this.titleGeneratePrompt) {
-      this.loadTitleGeneratePrompt();
+  /**
+   * Retrieves a prompt by filename and renders it with Mustache.
+   * Returns the default prompt as fallback if loading fails.
+   */
+  private getPrompt(fileName: string, data?: Record<string, unknown>): string {
+    const template = this.prompts.get(fileName) ?? this.defaultPrompts[fileName] ?? '';
+    if (data) {
+      return Mustache.render(template, data);
     }
-    return (
-      this.titleGeneratePrompt ??
-      'Generate a short title for this conversation.'
-    );
+    return template;
   }
 
   private async getPreferredLLMConfig(
@@ -150,10 +161,9 @@ export class AgentsCompletionsService {
         .map((msg) => `${msg.role}: ${msg.content}`)
         .join('\n\n');
 
-      const prompt = this.getTitleGeneratePrompt().replace(
-        '{{CONVERSATION_CONTENT}}',
-        conversationContent,
-      );
+      const prompt = this.getPrompt('TITLE_GENERATE.md', {
+        CONVERSATION_CONTENT: conversationContent,
+      });
 
       const model = this.createLanguageModel(llmConfig);
 
@@ -301,7 +311,7 @@ export class AgentsCompletionsService {
     const assistantMsgId = assistantMessage.id;
     const assistantMsgMetadata = assistantMessage.metadata;
     const tools = this.agentTool.getTools(workspaceId);
-    const systemPrompt = this.getSystemPrompt();
+    const systemPrompt = this.getPrompt('SYSTEM.md');
     const currentLlvmConfig = llmConfig;
 
     let accumulatedText = '';
