@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await */
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { tool } from 'ai';
 import { z } from 'zod';
 
@@ -13,16 +13,14 @@ import {
   detailAssetSchema,
   detailVulnSchema,
   getAssetsSchema,
+  getPortsSchema,
+  getTechnologiesSchema,
+  getTlsSchema,
   getStatisticOutPutSchema,
   getTargetsSchema,
   getVulnerabilitiesSchema,
   listAssetsInTargetSchema,
 } from '@/mcp/mcp.schema';
-
-// Weather tool schema
-const weatherSchema = z.object({
-  location: z.string().describe('The location to get the weather for'),
-});
 
 // Web fetch tool schema
 const webFetchSchema = z.object({
@@ -56,7 +54,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Lists discovered assets (domains, subdomains, IPs, URLs) within a workspace. Assets represent the entities found during scanning, distinct from targets (scope) or tools (scanners). Use this when the user asks about discovered infrastructure, IPs, or domains. Keywords: asset, domain, IP, URL.\n\n**Parameters you can pass:**\n- `page`: Page number (default: 1)\n- `limit`: Items per page (default: 100)\n- `value`: Filter by asset value (e.g., "hackerone.com", "api", "192.168")',
+          '✅ USE THIS TOOL FIRST when user asks about any discovered infrastructure.\n\nLists all assets found during security scanning in the workspace. Assets = actual discovered items: domains, subdomains, IP addresses, URLs, endpoints.\n\n✅ WHEN TO USE:\n- User asks "what assets have been found?"\n- User wants list of domains / IPs\n- Looking for specific asset value\n\n❌ WHEN NOT TO USE:\n- For scanning scope definition → use get_targets instead\n- For full technical details → use detail_asset instead\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- value: Filter results containing this text (e.g. "hackerone", "api", "192.168.1")',
         parameters: getAssetsSchema,
         execute: async (params: z.infer<typeof getAssetsSchema>) => {
           const { page, limit, value } = params;
@@ -90,7 +88,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Retrieves a list of security vulnerabilities identified during scans. Provides high-level info like name and severity. Use this when the user asks about security issues, CVEs, or "vulns". For in-depth technical details or remediation steps, use "detail_vuln". Keywords: vulnerability, vuln, CVE, security issue.\n\n**Parameters you can pass:**\n- `page`: Page number (default: 1)\n- `limit`: Items per page (default: 100)\n- `q`: Search query to filter vulnerabilities (e.g., "XSS", "SQL injection", "CVE-2024")',
+          '✅ PRIMARY TOOL for security vulnerability listings.\n\nReturns all identified security vulnerabilities with severity level (CRITICAL / HIGH / MEDIUM / LOW / INFO). This is the overview list. For full technical details use detail_vuln tool.\n\n✅ WHEN TO USE:\n- User asks "what vulnerabilities are there?"\n- User wants list of CVEs / security issues\n- Filter vulnerabilities by name or CVE number\n- Count security issues by severity\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- q: Search filter (e.g. "XSS", "SQL Injection", "CVE-2024", "RCE")',
         parameters: getVulnerabilitiesSchema,
         execute: async (params: z.infer<typeof getVulnerabilitiesSchema>) => {
           const { page, limit, q } = params;
@@ -125,7 +123,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Lists defined targets (root domains, IP ranges, CIDRs) that constitute the scanning scope. Targets are the starting points for discovery, whereas assets are the actual items found. Use this when the user asks about the "scope" or "what is being scanned". Keywords: target, scan scope, root domain, IP range.\n\n**Parameters you can pass:**\n- `page`: Page number (default: 1)\n- `limit`: Items per page (default: 100)\n- `value`: Filter by target value (e.g., "example.com", "10.0.0.0/8")',
+          '✅ Shows the actual SCANNING SCOPE of the workspace.\n\nTargets = what was ADDED to be scanned (root domains, IP ranges, CIDR blocks). This is the defined scope, not what was actually discovered.\n\n✅ WHEN TO USE:\n- User asks "what is in the scanning scope?"\n- User wants to know what targets are configured\n- Looking for root domains / IP ranges added by user\n\n❌ WHEN NOT TO USE:\n- For actual discovered items → use get_assets instead\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- value: Filter targets containing this text',
         parameters: getTargetsSchema,
         execute: async (params: z.infer<typeof getTargetsSchema>) => {
           const { page, limit, value } = params;
@@ -159,7 +157,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Provides high-level security metrics and workspace statistics, including total counts of assets, targets, and vulnerabilities by severity. Also includes the overall security score and technology counts. Use this for summaries or "how many" questions. Keywords: statistics, summary, count, score, metrics.',
+          '✅ USE THIS FOR ALL SUMMARY QUESTIONS. Returns security dashboard statistics instantly.\n\n✅ WHEN TO USE:\n- "How many assets are there?"\n- "How many critical vulnerabilities?"\n- "What is the security score?"\n- "Give me summary of this workspace"\n- Any "count" question\n\nRETURNS:\n- Total assets, targets, vulnerabilities\n- Vulnerabilities grouped by severity\n- Overall security score (0-100)\n- Detected technologies count\n- No parameters required',
         parameters: getStatisticOutPutSchema,
         execute: async () => {
           return this.statisticService.getStatistics({ workspaceId });
@@ -176,7 +174,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Retrieves comprehensive details for a specific asset by its ID, including detected technologies (e.g., Nginx, WordPress), open ports, and metadata. Use this when the user asks for more information about a specific domain or IP. Keywords: asset details, technology, ports, service info.',
+          '✅ Get FULL TECHNICAL DETAILS about a single asset.\n\nUse this after you have an asset ID from get_assets. Returns everything known about this specific domain / IP.\n\n✅ WHEN TO USE:\n- "Tell me more about this domain"\n- "What technologies are running on this IP?"\n- "What ports are open?"\n- User asks for technical details about specific asset\n\nPARAMETERS:\n- assetId: REQUIRED. The ID of the asset you want details for',
         parameters: detailAssetSchema,
         execute: async (params: z.infer<typeof detailAssetSchema>) => {
           const { assetId } = params;
@@ -194,7 +192,7 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Lists all assets discovered within the scope of a specific target ID. Useful for drilling down into what was found for a particular root domain or IP range. Keywords: assets in target, subdomain list for domain.\n\n**Parameters you can pass:**\n- `targetId`: (Required) The target ID to list assets from\n- `page`: Page number (default: 1)\n- `limit`: Items per page (default: 100)\n- `value`: Filter assets by value within this target',
+          '✅ List ALL assets that were discovered FROM a specific target.\n\nThis shows what was actually found under a single root domain / IP range that was added to the scope.\n\n✅ WHEN TO USE:\n- "What subdomains were found for example.com?"\n- "Show everything discovered under this target"\n- Drill down from target to actual discovered assets\n\nPARAMETERS:\n- targetId: REQUIRED. ID of the target to get assets for\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- value: Filter assets inside this target',
         parameters: listAssetsInTargetSchema,
         execute: async (params: z.infer<typeof listAssetsInTargetSchema>) => {
           const { targetId, limit, page, value } = params;
@@ -222,12 +220,93 @@ export class AgentTool {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Retrieves full technical details for a specific vulnerability by its ID, including description, Proof of Concept (PoC), remediation steps, and references. Use this when the user needs to understand how to fix an issue or see evidence. Keywords: vuln details, fix, remediation, PoC, CVE info.',
+          '✅ Get FULL TECHNICAL DETAILS about a single vulnerability.\n\nUse this after you have vulnerability ID from get_vulnerabilities. This is the complete vulnerability report.\n\n✅ WHEN TO USE:\n- "Tell me about this vulnerability"\n- "How do I fix this issue?"\n- "What is the PoC for this CVE?"\n- User wants remediation steps / solution\n\nRETURNS:\n- Full description\n- CVSS score & severity\n- Proof of Concept\n- Step by step remediation\n- References & external links\n\nPARAMETERS:\n- vulnId: REQUIRED. ID of the vulnerability',
         parameters: detailVulnSchema,
         execute: async (params: z.infer<typeof detailVulnSchema>) => {
           const vulnId: string = (params.vulnId ?? params.id) as string;
           return this.vulnerabilitiesService.getVulnerability(
             vulnId,
+            workspaceId,
+          );
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
+   * Get ports tool - returns a factory that accepts workspaceId
+   */
+  get getPortsTool(): (workspaceId: string) => any {
+    return (workspaceId: string) => {
+      const toolConfig: any = {
+        description:
+          '✅ Lists all open ports discovered during scanning.\n\nReturns all unique open network ports with count of assets running on each port.\n\n✅ WHEN TO USE:\n- User asks "what ports are open?"\n- Find most common open ports\n- Search for specific port number\n- Analyze network exposure\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- value: Filter ports by number (e.g. "80", "443", "22")',
+        parameters: getPortsSchema,
+        execute: async (params: z.infer<typeof getPortsSchema>) => {
+          const { page, limit, value } = params;
+          return this.assetsService.getPortAssets(
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              value,
+            },
+            workspaceId,
+          );
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
+   * Get technologies tool - returns a factory that accepts workspaceId
+   */
+  get getTechnologiesTool(): (workspaceId: string) => any {
+    return (workspaceId: string) => {
+      const toolConfig: any = {
+        description:
+          '✅ Lists all detected technologies running on assets.\n\nReturns all unique software, frameworks, servers and technologies identified with full enrichment data.\n\n✅ WHEN TO USE:\n- User asks "what technologies are running?"\n- Find specific software versions\n- Count technology usage\n- Technology stack analysis\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- value: Filter technologies by name (e.g. "Nginx", "WordPress", "React")',
+        parameters: getTechnologiesSchema,
+        execute: async (params: z.infer<typeof getTechnologiesSchema>) => {
+          const { page, limit, value } = params;
+          return this.assetsService.getTechnologyAssets(
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              value,
+            },
+            workspaceId,
+          );
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
+   * Get TLS certificates tool - returns a factory that accepts workspaceId
+   */
+  get getTlsTool(): (workspaceId: string) => any {
+    return (workspaceId: string) => {
+      const toolConfig: any = {
+        description:
+          '✅ Lists all discovered SSL/TLS certificates.\n\nReturns all TLS certificates with full details: issuer, subject, expiration dates, TLS version, cipher suite.\n\n✅ WHEN TO USE:\n- User asks "what SSL certificates are there?"\n- Check certificate expiration dates\n- Find weak TLS configurations\n- Analyze certificate chain issues\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- search: Filter certificates by host name',
+        parameters: getTlsSchema,
+        execute: async (params: z.infer<typeof getTlsSchema>) => {
+          const { page, limit, search } = params;
+          return this.assetsService.getManyTls(
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'not_after',
+              sortOrder: SortOrder.ASC,
+              search,
+            },
             workspaceId,
           );
         },
@@ -243,7 +322,7 @@ export class AgentTool {
     return (_workspaceId: string) => {
       const toolConfig: any = {
         description:
-          'Fetches content from any URL using HTTP GET request. Use this to retrieve web pages, API responses, or online resources. Simply pass a URL and get back the response body.\n\n**Parameters you can pass:**\n- `url`: (Required) The URL to fetch',
+          '✅ Make HTTP GET request to any public URL.\n\nUse this tool when you need to read content from external websites, documentation, APIs, or any online resource.\n\n✅ WHEN TO USE:\n- Read content from a web page\n- Call public API endpoints\n- Fetch documentation / reference material\n- Verify URL is accessible\n\nPARAMETERS:\n- url: REQUIRED. Full valid URL starting with http:// or https://',
         parameters: webFetchSchema,
         execute: async (params: z.infer<typeof webFetchSchema>) => {
           const { url } = params;
@@ -286,6 +365,9 @@ export class AgentTool {
       detail_asset: this.detailAssetTool(workspaceId),
       list_assets_in_target: this.listAssetsInTargetTool(workspaceId),
       detail_vuln: this.detailVulnTool(workspaceId),
+      get_ports: this.getPortsTool(workspaceId),
+      get_technologies: this.getTechnologiesTool(workspaceId),
+      get_tls: this.getTlsTool(workspaceId),
       web_fetch: this.webFetchTool(workspaceId),
     };
   }
