@@ -43,7 +43,7 @@ export class CreateLLMConfigDto {
   @IsString()
   apiKey: string;
 
-  @ApiProperty({})
+  @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
   model: string;

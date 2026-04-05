@@ -1630,7 +1630,7 @@ export interface CreateLLMConfigDto {
   /** @example "openrouter" */
   provider: CreateLlmConfigDtoProviderEnum;
   apiKey: string;
-  model: string;
+  model?: string;
   apiUrl?: string;
 }
 

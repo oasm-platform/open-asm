@@ -1663,7 +1663,7 @@ export const CreateLLMConfigDtoProvider = {
 export type CreateLLMConfigDto = {
   provider: CreateLLMConfigDtoProvider;
   apiKey: string;
-  model: string;
+  model?: string;
   apiUrl?: string;
 };
 

@@ -292,7 +292,7 @@ function ModelSelectForm({
     },
   );
 
-  const modelList = models ?? [];
+  const modelList = models?.data ?? [];
   const currentModel = provider.model;
 
   const handleSelect = useCallback(
