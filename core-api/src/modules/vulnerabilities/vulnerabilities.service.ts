@@ -1,13 +1,18 @@
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { Severity } from '@/common/enums/enum';
+import { BullMQName, Severity, VulnerabilityAnalyzeStatus } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { Queue } from 'bullmq';
+import { AgentsCompletionsService } from '../agents/agents.completions';
 import { User } from '../auth/entities/user.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { ToolsService } from '../tools/tools.service';
@@ -25,14 +30,19 @@ import { Vulnerability } from './entities/vulnerability.entity';
 
 @Injectable()
 export class VulnerabilitiesService {
+  private readonly logger = new Logger(VulnerabilitiesService.name);
+
   constructor(
     @InjectRepository(Vulnerability)
     private vulnerabilitiesRepository: Repository<Vulnerability>,
     @InjectRepository(VulnerabilityDismissal)
     private dismissRepo: Repository<VulnerabilityDismissal>,
+    @InjectQueue(BullMQName.VULNERABILITY_ANALYSIS)
+    private vulnerabilityAnalysisQueue: Queue,
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
     private workflowService: WorkflowsService,
+    private agentsCompletionsService: AgentsCompletionsService,
   ) {}
 
   /**
@@ -354,5 +364,224 @@ export class VulnerabilitiesService {
     }
 
     await this.dismissRepo.delete({ id: In(ids) });
+  }
+
+  async analyzeVulnerability(
+    id: string,
+    workspaceId: string,
+    forceRerun: boolean = false,
+  ): Promise<DefaultMessageResponseDto> {
+    const vulnerability = await this.vulnerabilitiesRepository.findOne({
+      where: { id },
+      relations: [
+        'asset',
+        'asset.target',
+        'asset.target.workspaceTargets',
+        'asset.target.workspaceTargets.workspace',
+      ],
+    });
+
+    if (!vulnerability) {
+      throw new NotFoundException(`Vulnerability with id ${id} not found`);
+    }
+
+    const workspace =
+      vulnerability.asset?.target?.workspaceTargets?.[0]?.workspace;
+    if (!workspace || workspace.id !== workspaceId) {
+      throw new NotFoundException(
+        `Vulnerability with id ${id} not found in workspace`,
+      );
+    }
+
+    if (!forceRerun) {
+      if (vulnerability.analyzeStatus === VulnerabilityAnalyzeStatus.RUNNING) {
+        throw new BadRequestException(
+          'Analysis is already running for this vulnerability',
+        );
+      }
+      if (
+        vulnerability.analyzeStatus === VulnerabilityAnalyzeStatus.DONE &&
+        vulnerability.analyzeResult
+      ) {
+        this.logger.log(
+          `Vulnerability ${id} already analyzed, returning cached result`,
+        );
+        return {
+          message: vulnerability.analyzeResult,
+        };
+      }
+    }
+
+    await this.vulnerabilitiesRepository.update(
+      { id },
+      { analyzeStatus: VulnerabilityAnalyzeStatus.RUNNING },
+    );
+    this.logger.log(`Starting analysis for vulnerability ${id}`);
+
+    const vulnerabilityData = {
+      id: vulnerability.id,
+      name: vulnerability.name,
+      description: vulnerability.description,
+      synopsis: vulnerability.synopsis,
+      severity: vulnerability.severity,
+      tags: vulnerability.tags,
+      references: vulnerability.references,
+      authors: vulnerability.authors,
+      affectedUrl: vulnerability.affectedUrl,
+      ipAddress: vulnerability.ipAddress,
+      host: vulnerability.host,
+      ports: vulnerability.ports,
+      cvssMetric: vulnerability.cvssMetric,
+      cvssScore: vulnerability.cvssScore,
+      epssScore: vulnerability.epssScore,
+      vprScore: vulnerability.vprScore,
+      cveId: vulnerability.cveId,
+      bidId: vulnerability.bidId,
+      cweId: vulnerability.cweId,
+      ceaId: vulnerability.ceaId,
+      iava: vulnerability.iava,
+      cveUrl: vulnerability.cveUrl,
+      cweUrl: vulnerability.cweUrl,
+      solution: vulnerability.solution,
+      extractorName: vulnerability.extractorName,
+      extractedResults: vulnerability.extractedResults,
+      publicationDate: vulnerability.publicationDate,
+      modificationDate: vulnerability.modificationDate,
+      filePath: vulnerability.filePath,
+      isArchived: vulnerability.isArchived,
+      fingerprint: vulnerability.fingerprint,
+      workspaceId,
+    };
+
+    await this.vulnerabilityAnalysisQueue.add(id, vulnerabilityData);
+
+    return {
+      message: 'Analysis started',
+    };
+  }
+
+  async processVulnerabilityAnalysis(jobId: string): Promise<void> {
+    const vulnerability =
+      await this.vulnerabilitiesRepository.findOne({
+        where: { id: jobId },
+      });
+
+    if (!vulnerability) {
+      this.logger.error(`Vulnerability with id ${jobId} not found`);
+      return;
+    }
+
+    try {
+      const vulnerabilityData = {
+        id: vulnerability.id,
+        name: vulnerability.name,
+        description: vulnerability.description,
+        synopsis: vulnerability.synopsis,
+        severity: vulnerability.severity,
+        tags: vulnerability.tags,
+        references: vulnerability.references,
+        authors: vulnerability.authors,
+        affectedUrl: vulnerability.affectedUrl,
+        ipAddress: vulnerability.ipAddress,
+        host: vulnerability.host,
+        ports: vulnerability.ports,
+        cvssMetric: vulnerability.cvssMetric,
+        cvssScore: vulnerability.cvssScore,
+        epssScore: vulnerability.epssScore,
+        vprScore: vulnerability.vprScore,
+        cveId: vulnerability.cveId,
+        bidId: vulnerability.bidId,
+        cweId: vulnerability.cweId,
+        ceaId: vulnerability.ceaId,
+        iava: vulnerability.iava,
+        cveUrl: vulnerability.cveUrl,
+        cweUrl: vulnerability.cweUrl,
+        solution: vulnerability.solution,
+        extractorName: vulnerability.extractorName,
+        extractedResults: vulnerability.extractedResults,
+        publicationDate: vulnerability.publicationDate,
+        modificationDate: vulnerability.modificationDate,
+        filePath: vulnerability.filePath,
+        isArchived: vulnerability.isArchived,
+        fingerprint: vulnerability.fingerprint,
+      };
+
+      const workspace = await this.getWorkspaceForVulnerability(vulnerability.id);
+      const workspaceId = workspace?.id;
+
+      if (!workspaceId) {
+        throw new Error('Workspace not found for vulnerability');
+      }
+
+      const vulnerabilityJson = JSON.stringify(vulnerabilityData, null, 2);
+      const analyzeResult = await this.agentsCompletionsService.vulAnalyze(
+        vulnerabilityJson,
+        workspaceId,
+      );
+
+      const hasMarkdownStructure =
+        analyzeResult.includes('###') ||
+        analyzeResult.includes('##') ||
+        analyzeResult.includes('#');
+
+      if (!hasMarkdownStructure) {
+        this.logger.warn(
+          `AI returned non-markdown content for vulnerability ${jobId}, wrapping as error`,
+        );
+        const errorContent = `# Analysis Error\n\nAI returned invalid content:\n\n${analyzeResult}`;
+        await this.vulnerabilitiesRepository.update(
+          { id: jobId },
+          {
+            analyzeStatus: VulnerabilityAnalyzeStatus.FAILED,
+            analyzeResult: errorContent,
+          },
+        );
+        return;
+      }
+
+      await this.vulnerabilitiesRepository.update(
+        { id: jobId },
+        {
+          analyzeStatus: VulnerabilityAnalyzeStatus.DONE,
+          analyzeResult,
+        },
+      );
+
+      this.logger.log(`Analysis completed for vulnerability ${jobId}`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      this.logger.error(
+        `Analysis failed for vulnerability ${jobId}: ${errorMessage}`,
+      );
+
+      await this.vulnerabilitiesRepository.update(
+        { id: jobId },
+        {
+          analyzeStatus: VulnerabilityAnalyzeStatus.FAILED,
+          analyzeResult: `# Analysis Error\n\n**Error details:** ${errorMessage}`,
+        },
+      );
+    }
+  }
+
+  private async getWorkspaceForVulnerability(
+    vulnerabilityId: string,
+  ): Promise<{ id: string } | null> {
+    const vulnerability = await this.vulnerabilitiesRepository.findOne({
+      where: { id: vulnerabilityId },
+      relations: [
+        'asset',
+        'asset.target',
+        'asset.target.workspaceTargets',
+        'asset.target.workspaceTargets.workspace',
+      ],
+    });
+
+    if (!vulnerability) {
+      return null;
+    }
+
+    return vulnerability.asset?.target?.workspaceTargets?.[0]?.workspace ?? null;
   }
 }

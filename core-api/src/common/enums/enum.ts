@@ -129,6 +129,7 @@ export enum BullMQName {
   NOTIFICATION = 'notification',
   JOB_RESULT = 'job-result',
   ISSUE_CREATION = 'issue-creation',
+  VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
 }
 
 export enum NotificationStatus {
@@ -208,3 +209,10 @@ export const CATEGORY_DATA_SOURCE_MAP: Record<ToolCategory, DataSource> = {
   [ToolCategory.CLASSIFIER]: DataSource.ASSET,
   [ToolCategory.ASSISTANT]: DataSource.ASSET,
 };
+
+export enum VulnerabilityAnalyzeStatus {
+  NOT_ANALYZED = 'not_analyzed',
+  RUNNING = 'running',
+  DONE = 'done',
+  FAILED = 'failed',
+}

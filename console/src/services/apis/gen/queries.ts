@@ -1205,6 +1205,17 @@ export type User = {
   role: UserRole;
 };
 
+export type VulnerabilityAnalyzeStatus =
+  (typeof VulnerabilityAnalyzeStatus)[keyof typeof VulnerabilityAnalyzeStatus];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const VulnerabilityAnalyzeStatus = {
+  not_analyzed: 'not_analyzed',
+  running: 'running',
+  done: 'done',
+  failed: 'failed',
+} as const;
+
 export type Vulnerability = {
   id: string;
   createdAt: string;
@@ -1238,6 +1249,8 @@ export type Vulnerability = {
   modificationDate: string;
   tool: Tool;
   vulnerabilityDismissal: VulnerabilityDismissal;
+  analyzeStatus: VulnerabilityAnalyzeStatus;
+  analyzeResult: string;
 };
 
 export type VulnerabilityDismissal = {
@@ -1282,6 +1295,11 @@ export type GetVulnerabilitiesStatisticsResponseDto = {
   data: VulnerabilityStatisticsDto[];
 };
 
+export type AnalyzeVulnerabilityDto = {
+  /** Force rerun analysis even if already analyzed */
+  forceRerun?: boolean;
+};
+
 export type BulkDismissVulnerabilitiesDto = {
   ids: string[];
   reason: string;
@@ -1291,6 +1309,183 @@ export type BulkDismissVulnerabilitiesDto = {
 
 export type BulkReopenVulnerabilitiesDto = {
   ids: string[];
+};
+
+export type LLMConfigResponseDtoProvider =
+  (typeof LLMConfigResponseDtoProvider)[keyof typeof LLMConfigResponseDtoProvider];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const LLMConfigResponseDtoProvider = {
+  openai: 'openai',
+  openrouter: 'openrouter',
+  gemini: 'gemini',
+  anthropic: 'anthropic',
+  kilo_code: 'kilo_code',
+  custom: 'custom',
+} as const;
+
+export type LLMConfigResponseDto = {
+  id: string;
+  provider: LLMConfigResponseDtoProvider;
+  model: string;
+  apiUrl?: string;
+  isPreferred: boolean;
+  /** Masked API key (shows last 4 chars) */
+  apiKeyMasked: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateLLMConfigDtoProvider =
+  (typeof CreateLLMConfigDtoProvider)[keyof typeof CreateLLMConfigDtoProvider];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const CreateLLMConfigDtoProvider = {
+  openai: 'openai',
+  openrouter: 'openrouter',
+  gemini: 'gemini',
+  anthropic: 'anthropic',
+  kilo_code: 'kilo_code',
+  custom: 'custom',
+} as const;
+
+export type CreateLLMConfigDto = {
+  provider: CreateLLMConfigDtoProvider;
+  apiKey: string;
+  model?: string;
+  apiUrl?: string;
+};
+
+/**
+ * Provider identifier
+ */
+export type LLMConfigWithProviderDtoProviderId =
+  (typeof LLMConfigWithProviderDtoProviderId)[keyof typeof LLMConfigWithProviderDtoProviderId];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const LLMConfigWithProviderDtoProviderId = {
+  openai: 'openai',
+  openrouter: 'openrouter',
+  gemini: 'gemini',
+  anthropic: 'anthropic',
+  kilo_code: 'kilo_code',
+  custom: 'custom',
+} as const;
+
+export type LLMConfigWithProviderDto = {
+  /** Provider identifier */
+  providerId: LLMConfigWithProviderDtoProviderId;
+  /** Provider display name */
+  providerName: string;
+  /** Provider logo path */
+  logo?: string;
+  /** Connection status */
+  isConnected: boolean;
+  /** LLM config ID if connected */
+  configId?: string;
+  /** Model name if connected */
+  model?: string;
+  /** API URL if connected */
+  apiUrl?: string;
+  /** Is preferred config if connected */
+  isPreferred?: boolean;
+  /** Masked API key if connected */
+  apiKeyMasked?: string;
+  /** Created at if connected */
+  createdAt?: string;
+  /** Updated at if connected */
+  updatedAt?: string;
+};
+
+export type ProviderModelDto = {
+  /** Model identifier for API calls */
+  id: string;
+  /** Human-readable model name */
+  name: string;
+};
+
+export type UpdateLLMConfigDtoProvider =
+  (typeof UpdateLLMConfigDtoProvider)[keyof typeof UpdateLLMConfigDtoProvider];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const UpdateLLMConfigDtoProvider = {
+  openai: 'openai',
+  openrouter: 'openrouter',
+  gemini: 'gemini',
+  anthropic: 'anthropic',
+  kilo_code: 'kilo_code',
+  custom: 'custom',
+} as const;
+
+export type UpdateLLMConfigDto = {
+  provider?: UpdateLLMConfigDtoProvider;
+  apiKey?: string;
+  model?: string;
+  apiUrl?: string;
+  isPreferred?: boolean;
+};
+
+export type ConversationResponseDto = {
+  id: string;
+  llmConfigId: string;
+  title?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GetManyConversationResponseDtoDto = {
+  data: ConversationResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type UpdateConversationDto = {
+  title?: string;
+};
+
+export type MessageResponseDtoRole =
+  (typeof MessageResponseDtoRole)[keyof typeof MessageResponseDtoRole];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const MessageResponseDtoRole = {
+  user: 'user',
+  assistant: 'assistant',
+  system: 'system',
+} as const;
+
+export type MessageResponseDtoMessageType =
+  (typeof MessageResponseDtoMessageType)[keyof typeof MessageResponseDtoMessageType];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const MessageResponseDtoMessageType = {
+  text: 'text',
+  thinking: 'thinking',
+  error: 'error',
+} as const;
+
+export type MessageResponseDtoMetadata = { [key: string]: unknown };
+
+export type MessageResponseDto = {
+  id: string;
+  conversationId: string;
+  role: MessageResponseDtoRole;
+  content: string;
+  messageType: MessageResponseDtoMessageType;
+  metadata?: MessageResponseDtoMetadata;
+  createdAt: string;
+};
+
+export type SendMessageDto = {
+  question: string;
+  /** Continue existing conversation. If not provided, a new conversation is created. */
+  conversationId?: string;
+  /** Override model name for new conversations */
+  model?: string;
+  /** Override provider for new conversations */
+  provider?: string;
 };
 
 export type ToolProvider = {
@@ -1621,183 +1816,6 @@ export type UpdateIssueCommentDto = {
 };
 
 export type Object = { [key: string]: unknown };
-
-export type LLMConfigResponseDtoProvider =
-  (typeof LLMConfigResponseDtoProvider)[keyof typeof LLMConfigResponseDtoProvider];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const LLMConfigResponseDtoProvider = {
-  openai: 'openai',
-  openrouter: 'openrouter',
-  gemini: 'gemini',
-  anthropic: 'anthropic',
-  kilo_code: 'kilo_code',
-  custom: 'custom',
-} as const;
-
-export type LLMConfigResponseDto = {
-  id: string;
-  provider: LLMConfigResponseDtoProvider;
-  model: string;
-  apiUrl?: string;
-  isPreferred: boolean;
-  /** Masked API key (shows last 4 chars) */
-  apiKeyMasked: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type CreateLLMConfigDtoProvider =
-  (typeof CreateLLMConfigDtoProvider)[keyof typeof CreateLLMConfigDtoProvider];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const CreateLLMConfigDtoProvider = {
-  openai: 'openai',
-  openrouter: 'openrouter',
-  gemini: 'gemini',
-  anthropic: 'anthropic',
-  kilo_code: 'kilo_code',
-  custom: 'custom',
-} as const;
-
-export type CreateLLMConfigDto = {
-  provider: CreateLLMConfigDtoProvider;
-  apiKey: string;
-  model?: string;
-  apiUrl?: string;
-};
-
-/**
- * Provider identifier
- */
-export type LLMConfigWithProviderDtoProviderId =
-  (typeof LLMConfigWithProviderDtoProviderId)[keyof typeof LLMConfigWithProviderDtoProviderId];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const LLMConfigWithProviderDtoProviderId = {
-  openai: 'openai',
-  openrouter: 'openrouter',
-  gemini: 'gemini',
-  anthropic: 'anthropic',
-  kilo_code: 'kilo_code',
-  custom: 'custom',
-} as const;
-
-export type LLMConfigWithProviderDto = {
-  /** Provider identifier */
-  providerId: LLMConfigWithProviderDtoProviderId;
-  /** Provider display name */
-  providerName: string;
-  /** Provider logo path */
-  logo?: string;
-  /** Connection status */
-  isConnected: boolean;
-  /** LLM config ID if connected */
-  configId?: string;
-  /** Model name if connected */
-  model?: string;
-  /** API URL if connected */
-  apiUrl?: string;
-  /** Is preferred config if connected */
-  isPreferred?: boolean;
-  /** Masked API key if connected */
-  apiKeyMasked?: string;
-  /** Created at if connected */
-  createdAt?: string;
-  /** Updated at if connected */
-  updatedAt?: string;
-};
-
-export type ProviderModelDto = {
-  /** Model identifier for API calls */
-  id: string;
-  /** Human-readable model name */
-  name: string;
-};
-
-export type UpdateLLMConfigDtoProvider =
-  (typeof UpdateLLMConfigDtoProvider)[keyof typeof UpdateLLMConfigDtoProvider];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const UpdateLLMConfigDtoProvider = {
-  openai: 'openai',
-  openrouter: 'openrouter',
-  gemini: 'gemini',
-  anthropic: 'anthropic',
-  kilo_code: 'kilo_code',
-  custom: 'custom',
-} as const;
-
-export type UpdateLLMConfigDto = {
-  provider?: UpdateLLMConfigDtoProvider;
-  apiKey?: string;
-  model?: string;
-  apiUrl?: string;
-  isPreferred?: boolean;
-};
-
-export type ConversationResponseDto = {
-  id: string;
-  llmConfigId: string;
-  title?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type GetManyConversationResponseDtoDto = {
-  data: ConversationResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
-};
-
-export type UpdateConversationDto = {
-  title?: string;
-};
-
-export type MessageResponseDtoRole =
-  (typeof MessageResponseDtoRole)[keyof typeof MessageResponseDtoRole];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const MessageResponseDtoRole = {
-  user: 'user',
-  assistant: 'assistant',
-  system: 'system',
-} as const;
-
-export type MessageResponseDtoMessageType =
-  (typeof MessageResponseDtoMessageType)[keyof typeof MessageResponseDtoMessageType];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const MessageResponseDtoMessageType = {
-  text: 'text',
-  thinking: 'thinking',
-  error: 'error',
-} as const;
-
-export type MessageResponseDtoMetadata = { [key: string]: unknown };
-
-export type MessageResponseDto = {
-  id: string;
-  conversationId: string;
-  role: MessageResponseDtoRole;
-  content: string;
-  messageType: MessageResponseDtoMessageType;
-  metadata?: MessageResponseDtoMetadata;
-  createdAt: string;
-};
-
-export type SendMessageDto = {
-  question: string;
-  /** Continue existing conversation. If not provided, a new conversation is created. */
-  conversationId?: string;
-  /** Override model name for new conversations */
-  model?: string;
-  /** Override provider for new conversations */
-  provider?: string;
-};
 
 export type NotificationResponseDtoStatus =
   (typeof NotificationResponseDtoStatus)[keyof typeof NotificationResponseDtoStatus];
@@ -2181,6 +2199,34 @@ export type VulnerabilitiesControllerBulkDismissVulnerabilities200 =
     data?: VulnerabilityDismissal[];
   };
 
+export type AgentsControllerGetLLMConfigs200 = AppResponseSerialization & {
+  data?: LLMConfigWithProviderDto[];
+};
+
+export type AgentsControllerGetProviderModels200 = AppResponseSerialization & {
+  data?: ProviderModelDto[];
+};
+
+export type AgentsControllerGetConversationsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AgentsControllerGetMessagesParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type AgentsControllerGetMessages200 = AppResponseSerialization & {
+  data?: MessageResponseDto[];
+};
+
 export type ProvidersControllerGetManyProvidersParams = {
   search?: string;
   page?: number;
@@ -2270,34 +2316,6 @@ export type IssuesControllerGetCommentsByIssueIdParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
-};
-
-export type AgentsControllerGetLLMConfigs200 = AppResponseSerialization & {
-  data?: LLMConfigWithProviderDto[];
-};
-
-export type AgentsControllerGetProviderModels200 = AppResponseSerialization & {
-  data?: ProviderModelDto[];
-};
-
-export type AgentsControllerGetConversationsParams = {
-  search?: string;
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: string;
-};
-
-export type AgentsControllerGetMessagesParams = {
-  search?: string;
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: string;
-};
-
-export type AgentsControllerGetMessages200 = AppResponseSerialization & {
-  data?: MessageResponseDto[];
 };
 
 export type NotificationsControllerGetNotificationsParams = {
@@ -16220,6 +16238,108 @@ export function useVulnerabilitiesControllerGetVulnerabilityById<
 }
 
 /**
+ * Analyzes a specific vulnerability using AI to generate a comprehensive vulnerability analysis report. Returns 404 if vulnerability not found.
+ * @summary Analyze vulnerability
+ */
+export const vulnerabilitiesControllerAnalyzeVulnerability = (
+  id: string,
+  analyzeVulnerabilityDto: AnalyzeVulnerabilityDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Vulnerability>(
+    {
+      url: `/api/vulnerabilities/${id}/analyze`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: analyzeVulnerabilityDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerAnalyzeVulnerabilityMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
+    TError,
+    { id: string; data: AnalyzeVulnerabilityDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
+  TError,
+  { id: string; data: AnalyzeVulnerabilityDto },
+  TContext
+> => {
+  const mutationKey = ['vulnerabilitiesControllerAnalyzeVulnerability'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
+    { id: string; data: AnalyzeVulnerabilityDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return vulnerabilitiesControllerAnalyzeVulnerability(
+      id,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VulnerabilitiesControllerAnalyzeVulnerabilityMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>
+  >;
+export type VulnerabilitiesControllerAnalyzeVulnerabilityMutationBody =
+  AnalyzeVulnerabilityDto;
+export type VulnerabilitiesControllerAnalyzeVulnerabilityMutationError =
+  unknown;
+
+/**
+ * @summary Analyze vulnerability
+ */
+export const useVulnerabilitiesControllerAnalyzeVulnerability = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
+      TError,
+      { id: string; data: AnalyzeVulnerabilityDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerAnalyzeVulnerability>>,
+  TError,
+  { id: string; data: AnalyzeVulnerabilityDto },
+  TContext
+> => {
+  const mutationOptions =
+    getVulnerabilitiesControllerAnalyzeVulnerabilityMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
  * Dismisses multiple security vulnerabilities identified within the system, removing them from active tracking and analysis.
  * @summary Bulk dismiss vulnerabilities
  */
@@ -16439,6 +16559,1916 @@ export const useVulnerabilitiesControllerBulkReopenVulnerabilities = <
     getVulnerabilitiesControllerBulkReopenVulnerabilitiesMutationOptions(
       options,
     );
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Create a new LLM provider configuration
+ * @summary Create LLM config
+ */
+export const agentsControllerCreateLLMConfig = (
+  createLLMConfigDto: CreateLLMConfigDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<LLMConfigResponseDto>(
+    {
+      url: `/api/agents/llm-configs`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createLLMConfigDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerCreateLLMConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+    TError,
+    { data: CreateLLMConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+  TError,
+  { data: CreateLLMConfigDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerCreateLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+    { data: CreateLLMConfigDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerCreateLLMConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerCreateLLMConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>
+>;
+export type AgentsControllerCreateLLMConfigMutationBody = CreateLLMConfigDto;
+export type AgentsControllerCreateLLMConfigMutationError = unknown;
+
+/**
+ * @summary Create LLM config
+ */
+export const useAgentsControllerCreateLLMConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+      TError,
+      { data: CreateLLMConfigDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
+  TError,
+  { data: CreateLLMConfigDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerCreateLLMConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Get all LLM providers with their configuration status for the workspace
+ * @summary List LLM configs with provider info
+ */
+export const agentsControllerGetLLMConfigs = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentsControllerGetLLMConfigs200>(
+    { url: `/api/agents/llm-configs`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetLLMConfigsQueryKey = () => {
+  return [`/api/agents/llm-configs`] as const;
+};
+
+export const getAgentsControllerGetLLMConfigsQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetLLMConfigsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
+  > = ({ signal }) => agentsControllerGetLLMConfigs(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetLLMConfigsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
+>;
+export type AgentsControllerGetLLMConfigsQueryError = unknown;
+
+export function useAgentsControllerGetLLMConfigs<
+  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetLLMConfigs<
+  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetLLMConfigs<
+  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List LLM configs with provider info
+ */
+
+export function useAgentsControllerGetLLMConfigs<
+  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetLLMConfigsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get available models for a specific LLM provider configuration
+ * @summary List models for a provider config
+ */
+export const agentsControllerGetProviderModels = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentsControllerGetProviderModels200>(
+    { url: `/api/agents/llm-configs/${id}/models`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetProviderModelsQueryKey = (id?: string) => {
+  return [`/api/agents/llm-configs/${id}/models`] as const;
+};
+
+export const getAgentsControllerGetProviderModelsQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetProviderModelsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetProviderModels>>
+  > = ({ signal }) =>
+    agentsControllerGetProviderModels(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetProviderModelsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetProviderModels>>
+>;
+export type AgentsControllerGetProviderModelsQueryError = unknown;
+
+export function useAgentsControllerGetProviderModels<
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetProviderModels>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetProviderModels<
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetProviderModels>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetProviderModels<
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List models for a provider config
+ */
+
+export function useAgentsControllerGetProviderModels<
+  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetProviderModelsQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Update an existing LLM configuration
+ * @summary Update LLM config
+ */
+export const agentsControllerUpdateLLMConfig = (
+  id: string,
+  updateLLMConfigDto: UpdateLLMConfigDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<LLMConfigResponseDto>(
+    {
+      url: `/api/agents/llm-configs/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateLLMConfigDto,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerUpdateLLMConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+    TError,
+    { id: string; data: UpdateLLMConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+  TError,
+  { id: string; data: UpdateLLMConfigDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpdateLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+    { id: string; data: UpdateLLMConfigDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerUpdateLLMConfig(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerUpdateLLMConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>
+>;
+export type AgentsControllerUpdateLLMConfigMutationBody = UpdateLLMConfigDto;
+export type AgentsControllerUpdateLLMConfigMutationError = unknown;
+
+/**
+ * @summary Update LLM config
+ */
+export const useAgentsControllerUpdateLLMConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+      TError,
+      { id: string; data: UpdateLLMConfigDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
+  TError,
+  { id: string; data: UpdateLLMConfigDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerUpdateLLMConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Delete an LLM configuration
+ * @summary Delete LLM config
+ */
+export const agentsControllerDeleteLLMConfig = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/llm-configs/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteLLMConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteLLMConfig(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteLLMConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>
+>;
+
+export type AgentsControllerDeleteLLMConfigMutationError = unknown;
+
+/**
+ * @summary Delete LLM config
+ */
+export const useAgentsControllerDeleteLLMConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerDeleteLLMConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Set an LLM config as the preferred one for the workspace
+ * @summary Set preferred LLM config
+ */
+export const agentsControllerSetPreferredLLMConfig = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<LLMConfigResponseDto>(
+    { url: `/api/agents/llm-configs/${id}/set-preferred`, method: 'PATCH' },
+    options,
+  );
+};
+
+export const getAgentsControllerSetPreferredLLMConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerSetPreferredLLMConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerSetPreferredLLMConfig(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerSetPreferredLLMConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>
+>;
+
+export type AgentsControllerSetPreferredLLMConfigMutationError = unknown;
+
+/**
+ * @summary Set preferred LLM config
+ */
+export const useAgentsControllerSetPreferredLLMConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerSetPreferredLLMConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Get all conversations for the workspace
+ * @summary List conversations
+ */
+export const agentsControllerGetConversations = (
+  params?: AgentsControllerGetConversationsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyConversationResponseDtoDto>(
+    { url: `/api/agents/conversations`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetConversationsInfiniteQueryKey = (
+  params?: AgentsControllerGetConversationsParams,
+) => {
+  return [
+    'infinite',
+    `/api/agents/conversations`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAgentsControllerGetConversationsQueryKey = (
+  params?: AgentsControllerGetConversationsParams,
+) => {
+  return [`/api/agents/conversations`, ...(params ? [params] : [])] as const;
+};
+
+export const getAgentsControllerGetConversationsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+    AgentsControllerGetConversationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetConversationsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetConversationsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+    QueryKey,
+    AgentsControllerGetConversationsParams['page']
+  > = ({ signal, pageParam }) =>
+    agentsControllerGetConversations(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+    TError,
+    TData,
+    QueryKey,
+    AgentsControllerGetConversationsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetConversationsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetConversations>>
+>;
+export type AgentsControllerGetConversationsInfiniteQueryError = unknown;
+
+export function useAgentsControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+    AgentsControllerGetConversationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AgentsControllerGetConversationsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetConversationsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+    AgentsControllerGetConversationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetConversationsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+    AgentsControllerGetConversationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetConversationsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List conversations
+ */
+
+export function useAgentsControllerGetConversationsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+    AgentsControllerGetConversationsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetConversationsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetConversationsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAgentsControllerGetConversationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetConversationsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetConversations>>
+  > = ({ signal }) =>
+    agentsControllerGetConversations(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetConversationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetConversations>>
+>;
+export type AgentsControllerGetConversationsQueryError = unknown;
+
+export function useAgentsControllerGetConversations<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+  TError = unknown,
+>(
+  params: undefined | AgentsControllerGetConversationsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConversations<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConversations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConversations<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List conversations
+ */
+
+export function useAgentsControllerGetConversations<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetConversationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetConversationsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Delete all conversations and their messages for the workspace
+ * @summary Delete all conversations
+ */
+export const agentsControllerDeleteAllConversations = (
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/conversations`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteAllConversationsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteAllConversations'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+    void
+  > = () => {
+    return agentsControllerDeleteAllConversations(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteAllConversationsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>
+>;
+
+export type AgentsControllerDeleteAllConversationsMutationError = unknown;
+
+/**
+ * @summary Delete all conversations
+ */
+export const useAgentsControllerDeleteAllConversations = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerDeleteAllConversationsMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Update a conversation title
+ * @summary Update conversation
+ */
+export const agentsControllerUpdateConversation = (
+  id: string,
+  updateConversationDto: UpdateConversationDto,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<ConversationResponseDto>(
+    {
+      url: `/api/agents/conversations/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateConversationDto,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerUpdateConversationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+    TError,
+    { id: string; data: UpdateConversationDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpdateConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+    { id: string; data: UpdateConversationDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerUpdateConversation(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerUpdateConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerUpdateConversation>>
+>;
+export type AgentsControllerUpdateConversationMutationBody =
+  UpdateConversationDto;
+export type AgentsControllerUpdateConversationMutationError = unknown;
+
+/**
+ * @summary Update conversation
+ */
+export const useAgentsControllerUpdateConversation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+      TError,
+      { id: string; data: UpdateConversationDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
+  TError,
+  { id: string; data: UpdateConversationDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerUpdateConversationMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Delete a conversation and all its messages
+ * @summary Delete conversation
+ */
+export const agentsControllerDeleteConversation = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/conversations/${id}`, method: 'DELETE' },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteConversationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteConversation(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteConversation>>
+>;
+
+export type AgentsControllerDeleteConversationMutationError = unknown;
+
+/**
+ * @summary Delete conversation
+ */
+export const useAgentsControllerDeleteConversation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerDeleteConversationMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Get all messages in a conversation
+ * @summary Get messages
+ */
+export const agentsControllerGetMessages = (
+  id: string,
+  params?: AgentsControllerGetMessagesParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentsControllerGetMessages200>(
+    {
+      url: `/api/agents/conversations/${id}/messages`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerGetMessagesInfiniteQueryKey = (
+  id?: string,
+  params?: AgentsControllerGetMessagesParams,
+) => {
+  return [
+    'infinite',
+    `/api/agents/conversations/${id}/messages`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAgentsControllerGetMessagesQueryKey = (
+  id?: string,
+  params?: AgentsControllerGetMessagesParams,
+) => {
+  return [
+    `/api/agents/conversations/${id}/messages`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAgentsControllerGetMessagesInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+    AgentsControllerGetMessagesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: AgentsControllerGetMessagesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetMessagesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetMessagesInfiniteQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+    QueryKey,
+    AgentsControllerGetMessagesParams['page']
+  > = ({ signal, pageParam }) =>
+    agentsControllerGetMessages(
+      id,
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+    TError,
+    TData,
+    QueryKey,
+    AgentsControllerGetMessagesParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetMessagesInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetMessages>>
+>;
+export type AgentsControllerGetMessagesInfiniteQueryError = unknown;
+
+export function useAgentsControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+    AgentsControllerGetMessagesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | AgentsControllerGetMessagesParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetMessagesParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+    AgentsControllerGetMessagesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: AgentsControllerGetMessagesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetMessagesParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+    AgentsControllerGetMessagesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: AgentsControllerGetMessagesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetMessagesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get messages
+ */
+
+export function useAgentsControllerGetMessagesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+    AgentsControllerGetMessagesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: AgentsControllerGetMessagesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData,
+        QueryKey,
+        AgentsControllerGetMessagesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetMessagesInfiniteQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getAgentsControllerGetMessagesQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AgentsControllerGetMessagesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetMessagesQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetMessages>>
+  > = ({ signal }) =>
+    agentsControllerGetMessages(id, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetMessagesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetMessages>>
+>;
+export type AgentsControllerGetMessagesQueryError = unknown;
+
+export function useAgentsControllerGetMessages<
+  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | AgentsControllerGetMessagesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetMessages<
+  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AgentsControllerGetMessagesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetMessages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetMessages<
+  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AgentsControllerGetMessagesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get messages
+ */
+
+export function useAgentsControllerGetMessages<
+  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: AgentsControllerGetMessagesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetMessagesQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Send a message and receive a streaming response via SSE. If conversationId is not provided, a new conversation is created using the preferred LLM config.
+ * @summary Send message (streaming)
+ */
+export const agentsControllerStreamMessage = (
+  sendMessageDto: SendMessageDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/agents/messages/stream`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: sendMessageDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerStreamMessageMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+    TError,
+    { data: SendMessageDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+  TError,
+  { data: SendMessageDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerStreamMessage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+    { data: SendMessageDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerStreamMessage(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerStreamMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerStreamMessage>>
+>;
+export type AgentsControllerStreamMessageMutationBody = SendMessageDto;
+export type AgentsControllerStreamMessageMutationError = unknown;
+
+/**
+ * @summary Send message (streaming)
+ */
+export const useAgentsControllerStreamMessage = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+      TError,
+      { data: SendMessageDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
+  TError,
+  { data: SendMessageDto },
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerStreamMessageMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+
+/**
+ * Delete a specific message in a conversation
+ * @summary Delete message
+ */
+export const agentsControllerDeleteMessage = (
+  cid: string,
+  mid: string,
+  options?: SecondParameter<typeof orvalClient>,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/agents/conversations/${cid}/messages/${mid}`,
+      method: 'DELETE',
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteMessageMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+    TError,
+    { cid: string; mid: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+  TError,
+  { cid: string; mid: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteMessage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+    { cid: string; mid: string }
+  > = (props) => {
+    const { cid, mid } = props ?? {};
+
+    return agentsControllerDeleteMessage(cid, mid, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteMessage>>
+>;
+
+export type AgentsControllerDeleteMessageMutationError = unknown;
+
+/**
+ * @summary Delete message
+ */
+export const useAgentsControllerDeleteMessage = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+      TError,
+      { cid: string; mid: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
+  TError,
+  { cid: string; mid: string },
+  TContext
+> => {
+  const mutationOptions =
+    getAgentsControllerDeleteMessageMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
@@ -22884,1916 +24914,6 @@ export const useIssuesControllerDeleteCommentById = <
 > => {
   const mutationOptions =
     getIssuesControllerDeleteCommentByIdMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Create a new LLM provider configuration
- * @summary Create LLM config
- */
-export const agentsControllerCreateLLMConfig = (
-  createLLMConfigDto: CreateLLMConfigDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<LLMConfigResponseDto>(
-    {
-      url: `/api/agents/llm-configs`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createLLMConfigDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getAgentsControllerCreateLLMConfigMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-    TError,
-    { data: CreateLLMConfigDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-  TError,
-  { data: CreateLLMConfigDto },
-  TContext
-> => {
-  const mutationKey = ['agentsControllerCreateLLMConfig'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-    { data: CreateLLMConfigDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return agentsControllerCreateLLMConfig(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AgentsControllerCreateLLMConfigMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>
->;
-export type AgentsControllerCreateLLMConfigMutationBody = CreateLLMConfigDto;
-export type AgentsControllerCreateLLMConfigMutationError = unknown;
-
-/**
- * @summary Create LLM config
- */
-export const useAgentsControllerCreateLLMConfig = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-      TError,
-      { data: CreateLLMConfigDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerCreateLLMConfig>>,
-  TError,
-  { data: CreateLLMConfigDto },
-  TContext
-> => {
-  const mutationOptions =
-    getAgentsControllerCreateLLMConfigMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Get all LLM providers with their configuration status for the workspace
- * @summary List LLM configs with provider info
- */
-export const agentsControllerGetLLMConfigs = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AgentsControllerGetLLMConfigs200>(
-    { url: `/api/agents/llm-configs`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getAgentsControllerGetLLMConfigsQueryKey = () => {
-  return [`/api/agents/llm-configs`] as const;
-};
-
-export const getAgentsControllerGetLLMConfigsQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getAgentsControllerGetLLMConfigsQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
-  > = ({ signal }) => agentsControllerGetLLMConfigs(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type AgentsControllerGetLLMConfigsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
->;
-export type AgentsControllerGetLLMConfigsQueryError = unknown;
-
-export function useAgentsControllerGetLLMConfigs<
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetLLMConfigs<
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetLLMConfigs<
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary List LLM configs with provider info
- */
-
-export function useAgentsControllerGetLLMConfigs<
-  TData = Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetLLMConfigs>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerGetLLMConfigsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Get available models for a specific LLM provider configuration
- * @summary List models for a provider config
- */
-export const agentsControllerGetProviderModels = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AgentsControllerGetProviderModels200>(
-    { url: `/api/agents/llm-configs/${id}/models`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getAgentsControllerGetProviderModelsQueryKey = (id?: string) => {
-  return [`/api/agents/llm-configs/${id}/models`] as const;
-};
-
-export const getAgentsControllerGetProviderModelsQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getAgentsControllerGetProviderModelsQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerGetProviderModels>>
-  > = ({ signal }) =>
-    agentsControllerGetProviderModels(id, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!id,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type AgentsControllerGetProviderModelsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerGetProviderModels>>
->;
-export type AgentsControllerGetProviderModelsQueryError = unknown;
-
-export function useAgentsControllerGetProviderModels<
-  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-  TError = unknown,
->(
-  id: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetProviderModels>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetProviderModels<
-  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetProviderModels>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetProviderModels<
-  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary List models for a provider config
- */
-
-export function useAgentsControllerGetProviderModels<
-  TData = Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-  TError = unknown,
->(
-  id: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetProviderModels>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerGetProviderModelsQueryOptions(
-    id,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Update an existing LLM configuration
- * @summary Update LLM config
- */
-export const agentsControllerUpdateLLMConfig = (
-  id: string,
-  updateLLMConfigDto: UpdateLLMConfigDto,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<LLMConfigResponseDto>(
-    {
-      url: `/api/agents/llm-configs/${id}`,
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      data: updateLLMConfigDto,
-    },
-    options,
-  );
-};
-
-export const getAgentsControllerUpdateLLMConfigMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-    TError,
-    { id: string; data: UpdateLLMConfigDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-  TError,
-  { id: string; data: UpdateLLMConfigDto },
-  TContext
-> => {
-  const mutationKey = ['agentsControllerUpdateLLMConfig'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-    { id: string; data: UpdateLLMConfigDto }
-  > = (props) => {
-    const { id, data } = props ?? {};
-
-    return agentsControllerUpdateLLMConfig(id, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AgentsControllerUpdateLLMConfigMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>
->;
-export type AgentsControllerUpdateLLMConfigMutationBody = UpdateLLMConfigDto;
-export type AgentsControllerUpdateLLMConfigMutationError = unknown;
-
-/**
- * @summary Update LLM config
- */
-export const useAgentsControllerUpdateLLMConfig = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-      TError,
-      { id: string; data: UpdateLLMConfigDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerUpdateLLMConfig>>,
-  TError,
-  { id: string; data: UpdateLLMConfigDto },
-  TContext
-> => {
-  const mutationOptions =
-    getAgentsControllerUpdateLLMConfigMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Delete an LLM configuration
- * @summary Delete LLM config
- */
-export const agentsControllerDeleteLLMConfig = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    { url: `/api/agents/llm-configs/${id}`, method: 'DELETE' },
-    options,
-  );
-};
-
-export const getAgentsControllerDeleteLLMConfigMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-    TError,
-    { id: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['agentsControllerDeleteLLMConfig'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
-
-    return agentsControllerDeleteLLMConfig(id, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AgentsControllerDeleteLLMConfigMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>
->;
-
-export type AgentsControllerDeleteLLMConfigMutationError = unknown;
-
-/**
- * @summary Delete LLM config
- */
-export const useAgentsControllerDeleteLLMConfig = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-      TError,
-      { id: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerDeleteLLMConfig>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationOptions =
-    getAgentsControllerDeleteLLMConfigMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Set an LLM config as the preferred one for the workspace
- * @summary Set preferred LLM config
- */
-export const agentsControllerSetPreferredLLMConfig = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<LLMConfigResponseDto>(
-    { url: `/api/agents/llm-configs/${id}/set-preferred`, method: 'PATCH' },
-    options,
-  );
-};
-
-export const getAgentsControllerSetPreferredLLMConfigMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-    TError,
-    { id: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['agentsControllerSetPreferredLLMConfig'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
-
-    return agentsControllerSetPreferredLLMConfig(id, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AgentsControllerSetPreferredLLMConfigMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>
->;
-
-export type AgentsControllerSetPreferredLLMConfigMutationError = unknown;
-
-/**
- * @summary Set preferred LLM config
- */
-export const useAgentsControllerSetPreferredLLMConfig = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-      TError,
-      { id: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerSetPreferredLLMConfig>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationOptions =
-    getAgentsControllerSetPreferredLLMConfigMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Get all conversations for the workspace
- * @summary List conversations
- */
-export const agentsControllerGetConversations = (
-  params?: AgentsControllerGetConversationsParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyConversationResponseDtoDto>(
-    { url: `/api/agents/conversations`, method: 'GET', params, signal },
-    options,
-  );
-};
-
-export const getAgentsControllerGetConversationsInfiniteQueryKey = (
-  params?: AgentsControllerGetConversationsParams,
-) => {
-  return [
-    'infinite',
-    `/api/agents/conversations`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getAgentsControllerGetConversationsQueryKey = (
-  params?: AgentsControllerGetConversationsParams,
-) => {
-  return [`/api/agents/conversations`, ...(params ? [params] : [])] as const;
-};
-
-export const getAgentsControllerGetConversationsInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-    AgentsControllerGetConversationsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: AgentsControllerGetConversationsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetConversationsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerGetConversationsInfiniteQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-    QueryKey,
-    AgentsControllerGetConversationsParams['page']
-  > = ({ signal, pageParam }) =>
-    agentsControllerGetConversations(
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-    TError,
-    TData,
-    QueryKey,
-    AgentsControllerGetConversationsParams['page']
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type AgentsControllerGetConversationsInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerGetConversations>>
->;
-export type AgentsControllerGetConversationsInfiniteQueryError = unknown;
-
-export function useAgentsControllerGetConversationsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-    AgentsControllerGetConversationsParams['page']
-  >,
-  TError = unknown,
->(
-  params: undefined | AgentsControllerGetConversationsParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetConversationsParams['page']
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetConversationsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-    AgentsControllerGetConversationsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: AgentsControllerGetConversationsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetConversationsParams['page']
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetConversationsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-    AgentsControllerGetConversationsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: AgentsControllerGetConversationsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetConversationsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary List conversations
- */
-
-export function useAgentsControllerGetConversationsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-    AgentsControllerGetConversationsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: AgentsControllerGetConversationsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetConversationsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerGetConversationsInfiniteQueryOptions(
-    params,
-    options,
-  );
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getAgentsControllerGetConversationsQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-  TError = unknown,
->(
-  params?: AgentsControllerGetConversationsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerGetConversationsQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerGetConversations>>
-  > = ({ signal }) =>
-    agentsControllerGetConversations(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type AgentsControllerGetConversationsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerGetConversations>>
->;
-export type AgentsControllerGetConversationsQueryError = unknown;
-
-export function useAgentsControllerGetConversations<
-  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-  TError = unknown,
->(
-  params: undefined | AgentsControllerGetConversationsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetConversations>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetConversations<
-  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-  TError = unknown,
->(
-  params?: AgentsControllerGetConversationsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetConversations>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetConversations<
-  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-  TError = unknown,
->(
-  params?: AgentsControllerGetConversationsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary List conversations
- */
-
-export function useAgentsControllerGetConversations<
-  TData = Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-  TError = unknown,
->(
-  params?: AgentsControllerGetConversationsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetConversations>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerGetConversationsQueryOptions(
-    params,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Delete all conversations and their messages for the workspace
- * @summary Delete all conversations
- */
-export const agentsControllerDeleteAllConversations = (
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    { url: `/api/agents/conversations`, method: 'DELETE' },
-    options,
-  );
-};
-
-export const getAgentsControllerDeleteAllConversationsMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-    TError,
-    void,
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-  TError,
-  void,
-  TContext
-> => {
-  const mutationKey = ['agentsControllerDeleteAllConversations'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-    void
-  > = () => {
-    return agentsControllerDeleteAllConversations(requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AgentsControllerDeleteAllConversationsMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>
->;
-
-export type AgentsControllerDeleteAllConversationsMutationError = unknown;
-
-/**
- * @summary Delete all conversations
- */
-export const useAgentsControllerDeleteAllConversations = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-      TError,
-      void,
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerDeleteAllConversations>>,
-  TError,
-  void,
-  TContext
-> => {
-  const mutationOptions =
-    getAgentsControllerDeleteAllConversationsMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Update a conversation title
- * @summary Update conversation
- */
-export const agentsControllerUpdateConversation = (
-  id: string,
-  updateConversationDto: UpdateConversationDto,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<ConversationResponseDto>(
-    {
-      url: `/api/agents/conversations/${id}`,
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      data: updateConversationDto,
-    },
-    options,
-  );
-};
-
-export const getAgentsControllerUpdateConversationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-    TError,
-    { id: string; data: UpdateConversationDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-  TError,
-  { id: string; data: UpdateConversationDto },
-  TContext
-> => {
-  const mutationKey = ['agentsControllerUpdateConversation'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-    { id: string; data: UpdateConversationDto }
-  > = (props) => {
-    const { id, data } = props ?? {};
-
-    return agentsControllerUpdateConversation(id, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AgentsControllerUpdateConversationMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerUpdateConversation>>
->;
-export type AgentsControllerUpdateConversationMutationBody =
-  UpdateConversationDto;
-export type AgentsControllerUpdateConversationMutationError = unknown;
-
-/**
- * @summary Update conversation
- */
-export const useAgentsControllerUpdateConversation = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-      TError,
-      { id: string; data: UpdateConversationDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerUpdateConversation>>,
-  TError,
-  { id: string; data: UpdateConversationDto },
-  TContext
-> => {
-  const mutationOptions =
-    getAgentsControllerUpdateConversationMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Delete a conversation and all its messages
- * @summary Delete conversation
- */
-export const agentsControllerDeleteConversation = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    { url: `/api/agents/conversations/${id}`, method: 'DELETE' },
-    options,
-  );
-};
-
-export const getAgentsControllerDeleteConversationMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-    TError,
-    { id: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['agentsControllerDeleteConversation'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
-
-    return agentsControllerDeleteConversation(id, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AgentsControllerDeleteConversationMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerDeleteConversation>>
->;
-
-export type AgentsControllerDeleteConversationMutationError = unknown;
-
-/**
- * @summary Delete conversation
- */
-export const useAgentsControllerDeleteConversation = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-      TError,
-      { id: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerDeleteConversation>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationOptions =
-    getAgentsControllerDeleteConversationMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Get all messages in a conversation
- * @summary Get messages
- */
-export const agentsControllerGetMessages = (
-  id: string,
-  params?: AgentsControllerGetMessagesParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AgentsControllerGetMessages200>(
-    {
-      url: `/api/agents/conversations/${id}/messages`,
-      method: 'GET',
-      params,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getAgentsControllerGetMessagesInfiniteQueryKey = (
-  id?: string,
-  params?: AgentsControllerGetMessagesParams,
-) => {
-  return [
-    'infinite',
-    `/api/agents/conversations/${id}/messages`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getAgentsControllerGetMessagesQueryKey = (
-  id?: string,
-  params?: AgentsControllerGetMessagesParams,
-) => {
-  return [
-    `/api/agents/conversations/${id}/messages`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getAgentsControllerGetMessagesInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-    AgentsControllerGetMessagesParams['page']
-  >,
-  TError = unknown,
->(
-  id: string,
-  params?: AgentsControllerGetMessagesParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetMessagesParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerGetMessagesInfiniteQueryKey(id, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-    QueryKey,
-    AgentsControllerGetMessagesParams['page']
-  > = ({ signal, pageParam }) =>
-    agentsControllerGetMessages(
-      id,
-      { ...params, page: pageParam || params?.['page'] },
-      requestOptions,
-      signal,
-    );
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!id,
-    ...queryOptions,
-  } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-    TError,
-    TData,
-    QueryKey,
-    AgentsControllerGetMessagesParams['page']
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type AgentsControllerGetMessagesInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerGetMessages>>
->;
-export type AgentsControllerGetMessagesInfiniteQueryError = unknown;
-
-export function useAgentsControllerGetMessagesInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-    AgentsControllerGetMessagesParams['page']
-  >,
-  TError = unknown,
->(
-  id: string,
-  params: undefined | AgentsControllerGetMessagesParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetMessagesParams['page']
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetMessagesInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-    AgentsControllerGetMessagesParams['page']
-  >,
-  TError = unknown,
->(
-  id: string,
-  params?: AgentsControllerGetMessagesParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetMessagesParams['page']
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetMessagesInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-    AgentsControllerGetMessagesParams['page']
-  >,
-  TError = unknown,
->(
-  id: string,
-  params?: AgentsControllerGetMessagesParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetMessagesParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get messages
- */
-
-export function useAgentsControllerGetMessagesInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-    AgentsControllerGetMessagesParams['page']
-  >,
-  TError = unknown,
->(
-  id: string,
-  params?: AgentsControllerGetMessagesParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData,
-        QueryKey,
-        AgentsControllerGetMessagesParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerGetMessagesInfiniteQueryOptions(
-    id,
-    params,
-    options,
-  );
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-export const getAgentsControllerGetMessagesQueryOptions = <
-  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-  TError = unknown,
->(
-  id: string,
-  params?: AgentsControllerGetMessagesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getAgentsControllerGetMessagesQueryKey(id, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof agentsControllerGetMessages>>
-  > = ({ signal }) =>
-    agentsControllerGetMessages(id, params, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!id,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type AgentsControllerGetMessagesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerGetMessages>>
->;
-export type AgentsControllerGetMessagesQueryError = unknown;
-
-export function useAgentsControllerGetMessages<
-  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-  TError = unknown,
->(
-  id: string,
-  params: undefined | AgentsControllerGetMessagesParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetMessages>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetMessages<
-  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-  TError = unknown,
->(
-  id: string,
-  params?: AgentsControllerGetMessagesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-          TError,
-          Awaited<ReturnType<typeof agentsControllerGetMessages>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useAgentsControllerGetMessages<
-  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-  TError = unknown,
->(
-  id: string,
-  params?: AgentsControllerGetMessagesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get messages
- */
-
-export function useAgentsControllerGetMessages<
-  TData = Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-  TError = unknown,
->(
-  id: string,
-  params?: AgentsControllerGetMessagesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof agentsControllerGetMessages>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getAgentsControllerGetMessagesQueryOptions(
-    id,
-    params,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Send a message and receive a streaming response via SSE. If conversationId is not provided, a new conversation is created using the preferred LLM config.
- * @summary Send message (streaming)
- */
-export const agentsControllerStreamMessage = (
-  sendMessageDto: SendMessageDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    {
-      url: `/api/agents/messages/stream`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: sendMessageDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getAgentsControllerStreamMessageMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-    TError,
-    { data: SendMessageDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-  TError,
-  { data: SendMessageDto },
-  TContext
-> => {
-  const mutationKey = ['agentsControllerStreamMessage'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-    { data: SendMessageDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return agentsControllerStreamMessage(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AgentsControllerStreamMessageMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerStreamMessage>>
->;
-export type AgentsControllerStreamMessageMutationBody = SendMessageDto;
-export type AgentsControllerStreamMessageMutationError = unknown;
-
-/**
- * @summary Send message (streaming)
- */
-export const useAgentsControllerStreamMessage = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-      TError,
-      { data: SendMessageDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerStreamMessage>>,
-  TError,
-  { data: SendMessageDto },
-  TContext
-> => {
-  const mutationOptions =
-    getAgentsControllerStreamMessageMutationOptions(options);
-
-  return useMutation(mutationOptions, queryClient);
-};
-
-/**
- * Delete a specific message in a conversation
- * @summary Delete message
- */
-export const agentsControllerDeleteMessage = (
-  cid: string,
-  mid: string,
-  options?: SecondParameter<typeof orvalClient>,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    {
-      url: `/api/agents/conversations/${cid}/messages/${mid}`,
-      method: 'DELETE',
-    },
-    options,
-  );
-};
-
-export const getAgentsControllerDeleteMessageMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-    TError,
-    { cid: string; mid: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-  TError,
-  { cid: string; mid: string },
-  TContext
-> => {
-  const mutationKey = ['agentsControllerDeleteMessage'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-    { cid: string; mid: string }
-  > = (props) => {
-    const { cid, mid } = props ?? {};
-
-    return agentsControllerDeleteMessage(cid, mid, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AgentsControllerDeleteMessageMutationResult = NonNullable<
-  Awaited<ReturnType<typeof agentsControllerDeleteMessage>>
->;
-
-export type AgentsControllerDeleteMessageMutationError = unknown;
-
-/**
- * @summary Delete message
- */
-export const useAgentsControllerDeleteMessage = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-      TError,
-      { cid: string; mid: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof agentsControllerDeleteMessage>>,
-  TError,
-  { cid: string; mid: string },
-  TContext
-> => {
-  const mutationOptions =
-    getAgentsControllerDeleteMessageMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

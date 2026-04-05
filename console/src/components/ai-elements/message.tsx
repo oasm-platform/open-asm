@@ -39,19 +39,20 @@ export const Message = ({
 }: MessageProps) => (
   <div
     className={cn(
-      'group flex flex-col gap-1.5 min-w-0',
+      'group flex flex-col gap-1.5',
       from === 'user'
-        ? 'is-user ml-auto items-end w-fit max-w-[85%]'
+        ? 'is-user ml-auto items-end w-fit'
         : 'is-assistant items-start w-full',
       className,
     )}
     {...props}
   >
-    {/* Message bubble - user messages size to fit, assistant messages full width */}
     <div
       className={cn(
-        'rounded-2xl px-4 py-2.5 text-sm leading-relaxed min-w-0 max-w-full overflow-x-auto',
-        from === 'user' ? 'bg-secondary text-foreground' : 'text-foreground',
+        'px-3.5 py-1.5 text-sm',
+        from === 'user'
+          ? 'bg-secondary text-foreground rounded-2xl'
+          : 'text-foreground w-full rounded-2xl',
       )}
     >
       {children}

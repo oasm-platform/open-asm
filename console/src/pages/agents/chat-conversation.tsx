@@ -157,11 +157,11 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
   }[toolCall.status];
 
   return (
-    <div className="rounded-md border border-border/60 bg-muted/30 text-sm">
+    <div className="rounded-md border border-border/60 bg-muted/30 text-sm w-fit min-w-[320px] max-w-full">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+        className="flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/50 transition-colors w-full"
       >
         <Wrench className="size-3.5 text-muted-foreground shrink-0" />
         <span className="font-medium truncate">
@@ -201,6 +201,79 @@ function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
       )}
     </div>
   );
+}
+
+// Animated Message Component - safely contains hooks per message instance
+function AnimatedMessageContent({
+  text,
+  isStreaming,
+  children,
+}: {
+  text: string;
+  isStreaming: boolean;
+  children: (displayText: string) => React.ReactNode;
+}) {
+  const [displayedText, setDisplayedText] = useState('');
+  const targetLengthRef = useRef(0);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastUpdateRef = useRef(0);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      setDisplayedText(text);
+      targetLengthRef.current = text.length;
+      return;
+    }
+
+    targetLengthRef.current = text.length;
+
+    const animate = (timestamp: number) => {
+      // Throttle to ~60fps smooth animation
+      if (timestamp - lastUpdateRef.current < 16) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
+      lastUpdateRef.current = timestamp;
+
+      setDisplayedText((current) => {
+        if (current.length >= targetLengthRef.current) {
+          return text;
+        }
+
+        const remaining = targetLengthRef.current - current.length;
+        const charsPerFrame = Math.max(
+          1,
+          Math.min(remaining, Math.ceil(targetLengthRef.current / 50)),
+        );
+        const nextLength = Math.min(
+          current.length + charsPerFrame,
+          targetLengthRef.current,
+        );
+
+        return text.slice(0, nextLength);
+      });
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [text, isStreaming]);
+
+  // Show full text immediately when stream finishes
+  useEffect(() => {
+    if (!isStreaming) {
+      setDisplayedText(text);
+    }
+  }, [isStreaming, text]);
+
+  return <>{children(displayedText)}</>;
 }
 
 export function ChatConversation({
@@ -254,7 +327,7 @@ export function ChatConversation({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Conversation className="flex-1">
-        <ConversationContent className="max-w-3xl mx-auto w-full px-4 py-6 gap-6">
+        <ConversationContent className="max-w-3xl mx-auto w-full p-1 gap-6">
           {isLoadingHistory ? (
             <div className="space-y-6">
               {/* User message skeleton */}
@@ -319,7 +392,9 @@ export function ChatConversation({
                 return (
                   <Message key={message.id} from={message.role}>
                     <MessageContent expandable={message.role === 'user'}>
-                      <div className="space-y-3">
+                      <div
+                        className={message.role === 'user' ? '' : 'space-y-3'}
+                      >
                         {toolCalls.length > 0 && (
                           <div className="space-y-2">
                             {toolCalls.map((toolCall) => (
@@ -331,25 +406,35 @@ export function ChatConversation({
                           </div>
                         )}
                         {textContent && (
-                          <Markdown content={textContent} preview={false} />
+                          <AnimatedMessageContent
+                            text={textContent}
+                            isStreaming={isStreamingActive}
+                          >
+                            {(displayText) => (
+                              <Markdown content={displayText} preview={false} />
+                            )}
+                          </AnimatedMessageContent>
                         )}
-                        {isStreamingActive && !hasContent && (
-                          <div className="flex items-center gap-2 py-1">
-                            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">
-                              Thinking…
-                            </span>
+
+                        {message.role === 'assistant' && (
+                          <div className="min-h-[26px]">
+                            {isStreamingActive && (
+                              <div
+                                className={`flex items-center gap-2 ${hasContent ? 'mt-2' : 'py-1'}`}
+                              >
+                                <Loader2
+                                  className={`${hasContent ? 'size-4' : 'size-5'} animate-spin text-muted-foreground`}
+                                />
+                                <span
+                                  className={`${hasContent ? 'text-sm' : 'text-base'} font-medium text-muted-foreground`}
+                                >
+                                  Thinking…
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                      {isStreamingActive && hasContent && (
-                        <div className="mt-2 flex items-center gap-1.5">
-                          <Loader2 className="size-3 animate-spin text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            Thinking…
-                          </span>
-                        </div>
-                      )}
                     </MessageContent>
 
                     {message.role === 'assistant' &&

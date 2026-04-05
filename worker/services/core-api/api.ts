@@ -1254,6 +1254,8 @@ export interface Vulnerability {
   modificationDate: string;
   tool: Tool;
   vulnerabilityDismissal: VulnerabilityDismissal;
+  analyzeStatus: VulnerabilityAnalyzeStatusEnum;
+  analyzeResult: string;
 }
 
 export interface VulnerabilityDismissal {
@@ -1288,6 +1290,11 @@ export interface GetVulnerabilitiesStatisticsResponseDto {
   data: VulnerabilityStatisticsDto[];
 }
 
+export interface AnalyzeVulnerabilityDto {
+  /** Force rerun analysis even if already analyzed */
+  forceRerun?: boolean;
+}
+
 export interface BulkDismissVulnerabilitiesDto {
   ids: string[];
   reason: string;
@@ -1296,6 +1303,125 @@ export interface BulkDismissVulnerabilitiesDto {
 
 export interface BulkReopenVulnerabilitiesDto {
   ids: string[];
+}
+
+export interface LLMConfigResponseDto {
+  id: string;
+  provider: LlmConfigResponseDtoProviderEnum;
+  model: string;
+  apiUrl?: string;
+  isPreferred: boolean;
+  /** Masked API key (shows last 4 chars) */
+  apiKeyMasked: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface CreateLLMConfigDto {
+  /** @example "openrouter" */
+  provider: CreateLlmConfigDtoProviderEnum;
+  apiKey: string;
+  model?: string;
+  apiUrl?: string;
+}
+
+export interface LLMConfigWithProviderDto {
+  /** Provider identifier */
+  providerId: LlmConfigWithProviderDtoProviderIdEnum;
+  /** Provider display name */
+  providerName: string;
+  /** Provider logo path */
+  logo?: string;
+  /** Connection status */
+  isConnected: boolean;
+  /** LLM config ID if connected */
+  configId?: string;
+  /** Model name if connected */
+  model?: string;
+  /** API URL if connected */
+  apiUrl?: string;
+  /** Is preferred config if connected */
+  isPreferred?: boolean;
+  /** Masked API key if connected */
+  apiKeyMasked?: string;
+  /**
+   * Created at if connected
+   * @format date-time
+   */
+  createdAt?: string;
+  /**
+   * Updated at if connected
+   * @format date-time
+   */
+  updatedAt?: string;
+}
+
+export interface ProviderModelDto {
+  /** Model identifier for API calls */
+  id: string;
+  /** Human-readable model name */
+  name: string;
+}
+
+export interface UpdateLLMConfigDto {
+  /** @example "openrouter" */
+  provider?: UpdateLlmConfigDtoProviderEnum;
+  apiKey?: string;
+  model?: string;
+  apiUrl?: string;
+  /** @example true */
+  isPreferred?: boolean;
+}
+
+export interface ConversationResponseDto {
+  id: string;
+  llmConfigId: string;
+  title?: string;
+  /** @format date-time */
+  createdAt: string;
+  /** @format date-time */
+  updatedAt: string;
+}
+
+export interface GetManyConversationResponseDtoDto {
+  data: ConversationResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface UpdateConversationDto {
+  /** @example "Updated title" */
+  title?: string;
+}
+
+export interface MessageResponseDto {
+  id: string;
+  conversationId: string;
+  role: MessageResponseDtoRoleEnum;
+  content: string;
+  messageType: MessageResponseDtoMessageTypeEnum;
+  metadata?: object;
+  /** @format date-time */
+  createdAt: string;
+}
+
+export interface SendMessageDto {
+  /** @example "Hello, how can you help me?" */
+  question: string;
+  /**
+   * Continue existing conversation. If not provided, a new conversation is created.
+   * @example "550e8400-e29b-41d4-a716-446655440000"
+   */
+  conversationId?: string;
+  /** Override model name for new conversations */
+  model?: string;
+  /** Override provider for new conversations */
+  provider?: string;
 }
 
 export interface ToolProvider {
@@ -1612,125 +1738,6 @@ export interface UpdateIssueCommentDto {
 
 export type Object = object;
 
-export interface LLMConfigResponseDto {
-  id: string;
-  provider: LlmConfigResponseDtoProviderEnum;
-  model: string;
-  apiUrl?: string;
-  isPreferred: boolean;
-  /** Masked API key (shows last 4 chars) */
-  apiKeyMasked: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-}
-
-export interface CreateLLMConfigDto {
-  /** @example "openrouter" */
-  provider: CreateLlmConfigDtoProviderEnum;
-  apiKey: string;
-  model?: string;
-  apiUrl?: string;
-}
-
-export interface LLMConfigWithProviderDto {
-  /** Provider identifier */
-  providerId: LlmConfigWithProviderDtoProviderIdEnum;
-  /** Provider display name */
-  providerName: string;
-  /** Provider logo path */
-  logo?: string;
-  /** Connection status */
-  isConnected: boolean;
-  /** LLM config ID if connected */
-  configId?: string;
-  /** Model name if connected */
-  model?: string;
-  /** API URL if connected */
-  apiUrl?: string;
-  /** Is preferred config if connected */
-  isPreferred?: boolean;
-  /** Masked API key if connected */
-  apiKeyMasked?: string;
-  /**
-   * Created at if connected
-   * @format date-time
-   */
-  createdAt?: string;
-  /**
-   * Updated at if connected
-   * @format date-time
-   */
-  updatedAt?: string;
-}
-
-export interface ProviderModelDto {
-  /** Model identifier for API calls */
-  id: string;
-  /** Human-readable model name */
-  name: string;
-}
-
-export interface UpdateLLMConfigDto {
-  /** @example "openrouter" */
-  provider?: UpdateLlmConfigDtoProviderEnum;
-  apiKey?: string;
-  model?: string;
-  apiUrl?: string;
-  /** @example true */
-  isPreferred?: boolean;
-}
-
-export interface ConversationResponseDto {
-  id: string;
-  llmConfigId: string;
-  title?: string;
-  /** @format date-time */
-  createdAt: string;
-  /** @format date-time */
-  updatedAt: string;
-}
-
-export interface GetManyConversationResponseDtoDto {
-  data: ConversationResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
-}
-
-export interface UpdateConversationDto {
-  /** @example "Updated title" */
-  title?: string;
-}
-
-export interface MessageResponseDto {
-  id: string;
-  conversationId: string;
-  role: MessageResponseDtoRoleEnum;
-  content: string;
-  messageType: MessageResponseDtoMessageTypeEnum;
-  metadata?: object;
-  /** @format date-time */
-  createdAt: string;
-}
-
-export interface SendMessageDto {
-  /** @example "Hello, how can you help me?" */
-  question: string;
-  /**
-   * Continue existing conversation. If not provided, a new conversation is created.
-   * @example "550e8400-e29b-41d4-a716-446655440000"
-   */
-  conversationId?: string;
-  /** Override model name for new conversations */
-  model?: string;
-  /** Override provider for new conversations */
-  provider?: string;
-}
-
 export interface NotificationResponseDto {
   id: string;
   status: NotificationResponseDtoStatusEnum;
@@ -1849,46 +1856,19 @@ export enum UserRoleEnum {
   Bot = "bot",
 }
 
+export enum VulnerabilityAnalyzeStatusEnum {
+  NotAnalyzed = "not_analyzed",
+  Running = "running",
+  Done = "done",
+  Failed = "failed",
+}
+
 export enum VulnerabilityStatisticsDtoSeverityEnum {
   Info = "info",
   Low = "low",
   Medium = "medium",
   High = "high",
   Critical = "critical",
-}
-
-export enum AssetGroupWorkflowScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
-}
-
-export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
-  Disabled = "disabled",
-  Value00 = "0 0 * * *",
-  Value003 = "0 0 */3 * *",
-  Value000 = "0 0 * * 0",
-  Value0014 = "0 0 */14 * *",
-  Value001 = "0 0 1 * *",
-}
-
-export enum CreateIssueDtoSourceTypeEnum {
-  Vulnerability = "vulnerability",
-}
-
-export enum ChangeIssueStatusDtoStatusEnum {
-  Open = "open",
-  Closed = "closed",
-}
-
-/** @default "content" */
-export enum IssueCommentTypeEnum {
-  Content = "content",
-  Open = "open",
-  Closed = "closed",
 }
 
 export enum LlmConfigResponseDtoProviderEnum {
@@ -1940,6 +1920,40 @@ export enum MessageResponseDtoMessageTypeEnum {
   Text = "text",
   Thinking = "thinking",
   Error = "error",
+}
+
+export enum AssetGroupWorkflowScheduleEnum {
+  Disabled = "disabled",
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum UpdateAssetGroupWorkflowDtoScheduleEnum {
+  Disabled = "disabled",
+  Value00 = "0 0 * * *",
+  Value003 = "0 0 */3 * *",
+  Value000 = "0 0 * * 0",
+  Value0014 = "0 0 */14 * *",
+  Value001 = "0 0 1 * *",
+}
+
+export enum CreateIssueDtoSourceTypeEnum {
+  Vulnerability = "vulnerability",
+}
+
+export enum ChangeIssueStatusDtoStatusEnum {
+  Open = "open",
+  Closed = "closed",
+}
+
+/** @default "content" */
+export enum IssueCommentTypeEnum {
+  Content = "content",
+  Open = "open",
+  Closed = "closed",
 }
 
 export enum NotificationResponseDtoStatusEnum {
@@ -3912,6 +3926,28 @@ export class Api<
     });
 
   /**
+   * @description Analyzes a specific vulnerability using AI to generate a comprehensive vulnerability analysis report. Returns 404 if vulnerability not found.
+   *
+   * @tags Vulnerabilities
+   * @name VulnerabilitiesControllerAnalyzeVulnerability
+   * @summary Analyze vulnerability
+   * @request POST:/api/vulnerabilities/{id}/analyze
+   */
+  vulnerabilitiesControllerAnalyzeVulnerability = (
+    id: string,
+    data: AnalyzeVulnerabilityDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/vulnerabilities/${id}/analyze`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Dismisses multiple security vulnerabilities identified within the system, removing them from active tracking and analysis.
    *
    * @tags Vulnerabilities
@@ -3954,6 +3990,293 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Create a new LLM provider configuration
+   *
+   * @tags Agents
+   * @name AgentsControllerCreateLlmConfig
+   * @summary Create LLM config
+   * @request POST:/api/agents/llm-configs
+   */
+  agentsControllerCreateLlmConfig = (
+    data: CreateLLMConfigDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/llm-configs`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get all LLM providers with their configuration status for the workspace
+   *
+   * @tags Agents
+   * @name AgentsControllerGetLlmConfigs
+   * @summary List LLM configs with provider info
+   * @request GET:/api/agents/llm-configs
+   */
+  agentsControllerGetLlmConfigs = (params: RequestParams = {}) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: LLMConfigWithProviderDto[];
+      },
+      any
+    >({
+      path: `/api/agents/llm-configs`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get available models for a specific LLM provider configuration
+   *
+   * @tags Agents
+   * @name AgentsControllerGetProviderModels
+   * @summary List models for a provider config
+   * @request GET:/api/agents/llm-configs/{id}/models
+   */
+  agentsControllerGetProviderModels = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: ProviderModelDto[];
+      },
+      any
+    >({
+      path: `/api/agents/llm-configs/${id}/models`,
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Update an existing LLM configuration
+   *
+   * @tags Agents
+   * @name AgentsControllerUpdateLlmConfig
+   * @summary Update LLM config
+   * @request PATCH:/api/agents/llm-configs/{id}
+   */
+  agentsControllerUpdateLlmConfig = (
+    id: string,
+    data: UpdateLLMConfigDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/llm-configs/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete an LLM configuration
+   *
+   * @tags Agents
+   * @name AgentsControllerDeleteLlmConfig
+   * @summary Delete LLM config
+   * @request DELETE:/api/agents/llm-configs/{id}
+   */
+  agentsControllerDeleteLlmConfig = (id: string, params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/llm-configs/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Set an LLM config as the preferred one for the workspace
+   *
+   * @tags Agents
+   * @name AgentsControllerSetPreferredLlmConfig
+   * @summary Set preferred LLM config
+   * @request PATCH:/api/agents/llm-configs/{id}/set-preferred
+   */
+  agentsControllerSetPreferredLlmConfig = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/llm-configs/${id}/set-preferred`,
+      method: "PATCH",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get all conversations for the workspace
+   *
+   * @tags Agents
+   * @name AgentsControllerGetConversations
+   * @summary List conversations
+   * @request GET:/api/agents/conversations
+   */
+  agentsControllerGetConversations = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete all conversations and their messages for the workspace
+   *
+   * @tags Agents
+   * @name AgentsControllerDeleteAllConversations
+   * @summary Delete all conversations
+   * @request DELETE:/api/agents/conversations
+   */
+  agentsControllerDeleteAllConversations = (params: RequestParams = {}) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Update a conversation title
+   *
+   * @tags Agents
+   * @name AgentsControllerUpdateConversation
+   * @summary Update conversation
+   * @request PATCH:/api/agents/conversations/{id}
+   */
+  agentsControllerUpdateConversation = (
+    id: string,
+    data: UpdateConversationDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations/${id}`,
+      method: "PATCH",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete a conversation and all its messages
+   *
+   * @tags Agents
+   * @name AgentsControllerDeleteConversation
+   * @summary Delete conversation
+   * @request DELETE:/api/agents/conversations/{id}
+   */
+  agentsControllerDeleteConversation = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations/${id}`,
+      method: "DELETE",
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Get all messages in a conversation
+   *
+   * @tags Agents
+   * @name AgentsControllerGetMessages
+   * @summary Get messages
+   * @request GET:/api/agents/conversations/{id}/messages
+   */
+  agentsControllerGetMessages = (
+    id: string,
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<
+      AppResponseSerialization & {
+        data?: MessageResponseDto[];
+      },
+      any
+    >({
+      path: `/api/agents/conversations/${id}/messages`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Send a message and receive a streaming response via SSE. If conversationId is not provided, a new conversation is created using the preferred LLM config.
+   *
+   * @tags Agents
+   * @name AgentsControllerStreamMessage
+   * @summary Send message (streaming)
+   * @request POST:/api/agents/messages/stream
+   */
+  agentsControllerStreamMessage = (
+    data: SendMessageDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/messages/stream`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Delete a specific message in a conversation
+   *
+   * @tags Agents
+   * @name AgentsControllerDeleteMessage
+   * @summary Delete message
+   * @request DELETE:/api/agents/conversations/{cid}/messages/{mid}
+   */
+  agentsControllerDeleteMessage = (
+    cid: string,
+    mid: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/agents/conversations/${cid}/messages/${mid}`,
+      method: "DELETE",
       format: "json",
       ...params,
     });
@@ -4760,293 +5083,6 @@ export class Api<
   ) =>
     this.request<AppResponseSerialization, any>({
       path: `/api/issues/comments/${id}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Create a new LLM provider configuration
-   *
-   * @tags Agents
-   * @name AgentsControllerCreateLlmConfig
-   * @summary Create LLM config
-   * @request POST:/api/agents/llm-configs
-   */
-  agentsControllerCreateLlmConfig = (
-    data: CreateLLMConfigDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/llm-configs`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Get all LLM providers with their configuration status for the workspace
-   *
-   * @tags Agents
-   * @name AgentsControllerGetLlmConfigs
-   * @summary List LLM configs with provider info
-   * @request GET:/api/agents/llm-configs
-   */
-  agentsControllerGetLlmConfigs = (params: RequestParams = {}) =>
-    this.request<
-      AppResponseSerialization & {
-        data?: LLMConfigWithProviderDto[];
-      },
-      any
-    >({
-      path: `/api/agents/llm-configs`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Get available models for a specific LLM provider configuration
-   *
-   * @tags Agents
-   * @name AgentsControllerGetProviderModels
-   * @summary List models for a provider config
-   * @request GET:/api/agents/llm-configs/{id}/models
-   */
-  agentsControllerGetProviderModels = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<
-      AppResponseSerialization & {
-        data?: ProviderModelDto[];
-      },
-      any
-    >({
-      path: `/api/agents/llm-configs/${id}/models`,
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Update an existing LLM configuration
-   *
-   * @tags Agents
-   * @name AgentsControllerUpdateLlmConfig
-   * @summary Update LLM config
-   * @request PATCH:/api/agents/llm-configs/{id}
-   */
-  agentsControllerUpdateLlmConfig = (
-    id: string,
-    data: UpdateLLMConfigDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/llm-configs/${id}`,
-      method: "PATCH",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Delete an LLM configuration
-   *
-   * @tags Agents
-   * @name AgentsControllerDeleteLlmConfig
-   * @summary Delete LLM config
-   * @request DELETE:/api/agents/llm-configs/{id}
-   */
-  agentsControllerDeleteLlmConfig = (id: string, params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/llm-configs/${id}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Set an LLM config as the preferred one for the workspace
-   *
-   * @tags Agents
-   * @name AgentsControllerSetPreferredLlmConfig
-   * @summary Set preferred LLM config
-   * @request PATCH:/api/agents/llm-configs/{id}/set-preferred
-   */
-  agentsControllerSetPreferredLlmConfig = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/llm-configs/${id}/set-preferred`,
-      method: "PATCH",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Get all conversations for the workspace
-   *
-   * @tags Agents
-   * @name AgentsControllerGetConversations
-   * @summary List conversations
-   * @request GET:/api/agents/conversations
-   */
-  agentsControllerGetConversations = (
-    query?: {
-      search?: string;
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/conversations`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Delete all conversations and their messages for the workspace
-   *
-   * @tags Agents
-   * @name AgentsControllerDeleteAllConversations
-   * @summary Delete all conversations
-   * @request DELETE:/api/agents/conversations
-   */
-  agentsControllerDeleteAllConversations = (params: RequestParams = {}) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/conversations`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Update a conversation title
-   *
-   * @tags Agents
-   * @name AgentsControllerUpdateConversation
-   * @summary Update conversation
-   * @request PATCH:/api/agents/conversations/{id}
-   */
-  agentsControllerUpdateConversation = (
-    id: string,
-    data: UpdateConversationDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/conversations/${id}`,
-      method: "PATCH",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Delete a conversation and all its messages
-   *
-   * @tags Agents
-   * @name AgentsControllerDeleteConversation
-   * @summary Delete conversation
-   * @request DELETE:/api/agents/conversations/{id}
-   */
-  agentsControllerDeleteConversation = (
-    id: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/conversations/${id}`,
-      method: "DELETE",
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Get all messages in a conversation
-   *
-   * @tags Agents
-   * @name AgentsControllerGetMessages
-   * @summary Get messages
-   * @request GET:/api/agents/conversations/{id}/messages
-   */
-  agentsControllerGetMessages = (
-    id: string,
-    query?: {
-      search?: string;
-      /** @example 1 */
-      page?: number;
-      /** @example 10 */
-      limit?: number;
-      /** @example "createdAt" */
-      sortBy?: string;
-      /** @example "DESC" */
-      sortOrder?: string;
-    },
-    params: RequestParams = {},
-  ) =>
-    this.request<
-      AppResponseSerialization & {
-        data?: MessageResponseDto[];
-      },
-      any
-    >({
-      path: `/api/agents/conversations/${id}/messages`,
-      method: "GET",
-      query: query,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Send a message and receive a streaming response via SSE. If conversationId is not provided, a new conversation is created using the preferred LLM config.
-   *
-   * @tags Agents
-   * @name AgentsControllerStreamMessage
-   * @summary Send message (streaming)
-   * @request POST:/api/agents/messages/stream
-   */
-  agentsControllerStreamMessage = (
-    data: SendMessageDto,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/messages/stream`,
-      method: "POST",
-      body: data,
-      type: ContentType.Json,
-      format: "json",
-      ...params,
-    });
-
-  /**
-   * @description Delete a specific message in a conversation
-   *
-   * @tags Agents
-   * @name AgentsControllerDeleteMessage
-   * @summary Delete message
-   * @request DELETE:/api/agents/conversations/{cid}/messages/{mid}
-   */
-  agentsControllerDeleteMessage = (
-    cid: string,
-    mid: string,
-    params: RequestParams = {},
-  ) =>
-    this.request<AppResponseSerialization, any>({
-      path: `/api/agents/conversations/${cid}/messages/${mid}`,
       method: "DELETE",
       format: "json",
       ...params,
