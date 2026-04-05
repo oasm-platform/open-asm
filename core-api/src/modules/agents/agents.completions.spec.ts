@@ -31,7 +31,7 @@ jest.mock('ai', () => ({
   })),
   generateText: jest.fn(),
   createUIMessageStreamResponse: jest.fn(() => new ReadableStream()),
-  tool: jest.fn((config) => config),
+  tool: jest.fn((config: unknown): unknown => config),
   stepCountIs: jest.fn((count) => ({ type: 'stepCountIs', count })),
 }));
 
