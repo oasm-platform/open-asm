@@ -421,7 +421,8 @@ export class AgentsService {
       throw new NotFoundException('Conversation not found');
     }
 
-    const limit = query?.limit || 50;
+    // const limit = query?.limit || 50;
+    const limit = 1000;
     const page = query?.page || 1;
 
     const messages = await this.messageRepository.find({
