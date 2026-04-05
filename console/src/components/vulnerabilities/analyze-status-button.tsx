@@ -35,7 +35,7 @@ const statusConfig: Record<
   },
   [VulnerabilityAnalyzeStatus.running]: {
     label: 'Running',
-    className: 'border-purple-500/30 text-purple-600 dark:text-purple-400',
+    className: 'border-purple-500 text-purple-600 dark:text-purple-500',
     icon: <Loader2 size={10} className="animate-spin" />,
     variant: 'outline',
     disabled: true,
