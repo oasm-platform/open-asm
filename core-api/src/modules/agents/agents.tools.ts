@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await */
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { tool } from 'ai';
 import { z } from 'zod';
 
@@ -44,6 +44,7 @@ export class AgentTool {
   constructor(
     private readonly assetsService: AssetsService,
     private readonly targetsService: TargetsService,
+    @Inject(forwardRef(() => VulnerabilitiesService))
     private readonly vulnerabilitiesService: VulnerabilitiesService,
     private readonly statisticService: StatisticService,
   ) {}

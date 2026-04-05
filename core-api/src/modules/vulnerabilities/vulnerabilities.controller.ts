@@ -2,8 +2,18 @@ import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { User } from '../auth/entities/user.entity';
+import { AnalyzeVulnerabilityDto } from './dto/analyze-vulnerability.dto';
 import {
   BulkDismissVulnerabilitiesDto,
   BulkReopenVulnerabilitiesDto,
@@ -88,6 +98,31 @@ export class VulnerabilitiesController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.vulnerabilitiesService.getVulnerability(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Analyze vulnerability',
+    description:
+      'Analyzes a specific vulnerability using AI to generate a comprehensive vulnerability analysis report. Returns 404 if vulnerability not found.',
+    response: {
+      serialization: Vulnerability,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post(':id/analyze')
+  @HttpCode(HttpStatus.OK)
+  async analyzeVulnerability(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @Body() dto: AnalyzeVulnerabilityDto,
+  ) {
+    return this.vulnerabilitiesService.analyzeVulnerability(
+      id,
+      workspaceId,
+      dto.forceRerun ?? false,
+    );
   }
 
   @Doc({

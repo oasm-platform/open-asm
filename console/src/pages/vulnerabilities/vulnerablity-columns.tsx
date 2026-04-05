@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { AnalyzeStatusButton } from '@/components/vulnerabilities/analyze-status-button';
 import type { Vulnerability } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { BellOff, CircleCheck, ExternalLink, Info } from 'lucide-react';
@@ -249,7 +250,7 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
                 <TooltipTrigger asChild>
                   <Badge
                     variant="secondary"
-                    className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1"
+                    className="bg-amber-500/10 h-7 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1"
                   >
                     <BellOff size={12} />
                     Dismissed
@@ -277,12 +278,30 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
           ) : (
             <Badge
               variant="secondary"
-              className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1"
+              className="bg-emerald-500/10 h-7 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1"
             >
               <CircleCheck size={12} />
               Open
             </Badge>
           )}
+        </div>
+      );
+    },
+    enableSorting: false,
+  },
+  {
+    id: 'analyzeStatus',
+    header: 'Analyze',
+    size: 100,
+    cell: ({ row }) => {
+      const { id, analyzeStatus, analyzeResult } = row.original;
+      return (
+        <div className="min-h-15 flex items-center">
+          <AnalyzeStatusButton
+            id={id}
+            status={analyzeStatus}
+            result={analyzeResult}
+          />
         </div>
       );
     },
