@@ -15,6 +15,7 @@ import {
   getRootControllerGetMetadataQueryKey,
   useRootControllerGetMetadata,
 } from './services/apis/gen/queries';
+import { TooltipProvider } from './components/ui/tooltip';
 
 // Hook to update document title based on metadata
 function useMetadataTitle() {
@@ -67,8 +68,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <MetadataProvider>
         <ThemeProvider defaultTheme="dark" storageKey="theme">
-          <RouterProvider router={router} />
-          <Toaster position="bottom-center" />
+          <TooltipProvider>
+            <RouterProvider router={router} />
+            <Toaster position="bottom-center" />
+          </TooltipProvider>
         </ThemeProvider>
       </MetadataProvider>
     </QueryClientProvider>

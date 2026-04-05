@@ -1,225 +1,233 @@
-import Page from '@/components/common/page';
-import { createMessageStream } from '@/services/apis/ai-assistant-sse';
-import type { MessageResponseDto } from '@/services/apis/gen/queries';
-import { useAgentsControllerGetMessages } from '@/services/apis/gen/queries';
-import { useQueryClient } from '@tanstack/react-query';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+import type { UIMessage } from 'ai';
+import {
+  useAgentsControllerGetLLMConfigs,
+  useAgentsControllerGetMessages,
+  type LLMConfigWithProviderDto,
+} from '@/services/apis/gen/queries';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChatConversation } from './chat-conversation';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 
-/** Local message type for UI rendering */
-interface UIMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  error?: string;
-  errorCode?: string;
+interface SelectedModel {
+  provider: string;
+  model: string;
+  configId: string;
 }
 
 interface LocationState {
   pendingMessage?: string;
+  selectedModel?: SelectedModel;
 }
 
 export default function AgentsChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingContent, setStreamingContent] = useState('');
-  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(
-    null,
-  );
-  const [streamError, setStreamError] = useState<{
-    message: string;
-    code?: string;
-  } | null>(null);
-  const conversationIdRef = useRef<string | null>(conversationId ?? null);
-  const queryClient = useQueryClient();
   const hasAutoSentRef = useRef(false);
+  const chatMessagesRef = useRef<UIMessage[]>([]);
+  const isStreamingRef = useRef(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const { data: providers } =
+    useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
+  const prefer = providers?.find((item) => item.isPreferred);
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>({
+    provider: prefer?.providerId || '',
+    model: prefer?.model || '',
+    configId: prefer?.configId || '',
+  });
+  const selectedModelRef = useRef<SelectedModel | null>(selectedModel);
 
-  // Keep ref in sync with URL param
+  // Keep ref in sync with state
   useEffect(() => {
-    conversationIdRef.current = conversationId ?? null;
-  }, [conversationId]);
+    selectedModelRef.current = selectedModel;
+  }, [selectedModel]);
 
-  // Fetch messages for active conversation
-  const { data: messagesData, isLoading: isLoadingMessages } =
-    useAgentsControllerGetMessages(
-      conversationId ?? '',
-      { limit: 100, sortBy: 'createdAt', sortOrder: 'ASC' },
-      {
-        query: {
-          enabled: !!conversationId,
-          refetchOnWindowFocus: false,
-        },
+  const { selectedWorkspace } = useWorkspaceSelector();
+  const workspaceId = selectedWorkspace;
+
+  // Fetch messages when loading an existing conversation (not during streaming)
+  const { data: messagesData, isLoading: isLoadingHistory } =
+    useAgentsControllerGetMessages(conversationId!, undefined, {
+      query: {
+        queryKey: ['/api/agents/conversations', conversationId, 'messages'],
+        // Only fetch if we have a valid conversation ID and not currently streaming
+        enabled: !!conversationId && !isStreamingRef.current,
       },
-    );
+    });
 
-  // Convert API messages to UI messages
-  const messages: UIMessage[] = useMemo(() => {
-    const apiMessages: MessageResponseDto[] = Array.isArray(messagesData)
-      ? messagesData
-      : [];
-    return apiMessages.map((msg) => ({
-      id: msg.id,
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content,
-      timestamp: new Date(msg.createdAt),
-    }));
-  }, [messagesData]);
+  // Convert history messages to UIMessage format
+  const savedMessages: UIMessage[] = useMemo(() => {
+    const rawData = messagesData as unknown;
+    const dataArray = Array.isArray(rawData)
+      ? rawData
+      : (rawData as { data?: unknown[] })?.data;
 
-  // Append pending user message, streaming content, and errors to messages during SSE
-  const displayMessages = useMemo(() => {
-    if (isLoadingMessages && messages.length === 0) {
+    if (!Array.isArray(dataArray)) {
       return [];
     }
 
-    const result: UIMessage[] = [...messages];
+    return dataArray.map((msg) => {
+      const m = msg as Record<string, unknown>;
+      return {
+        id: String(m.id ?? ''),
+        role: String(m.role ?? 'user').toLowerCase() as 'user' | 'assistant',
+        parts: [
+          {
+            type: 'text' as const,
+            text: String(m.content ?? ''),
+          },
+        ],
+        createdAt: m.createdAt ? new Date(String(m.createdAt)) : new Date(),
+      };
+    });
+  }, [messagesData]);
 
-    if (pendingUserMessage) {
-      const confirmedFromApi = messages.some(
-        (m) => m.role === 'user' && m.content === pendingUserMessage,
-      );
-      if (!confirmedFromApi) {
-        result.push({
-          id: 'pending-user',
-          role: 'user',
-          content: pendingUserMessage,
-          timestamp: new Date(),
-        });
+  const {
+    messages: chatMessages,
+    status,
+    sendMessage,
+    setMessages,
+    regenerate,
+  } = useChat({
+    transport: new DefaultChatTransport({
+      api: '/api/agents/messages/stream',
+      headers: workspaceId ? { 'x-workspace-id': workspaceId } : {},
+      prepareSendMessagesRequest: ({ messages }) => {
+        const lastMessage = messages[messages.length - 1];
+        const textContent =
+          lastMessage?.parts
+            .filter((p) => p.type === 'text')
+            .map((p) => ('text' in p ? p.text : ''))
+            .join('') || '';
+
+        const modelInfo = selectedModelRef.current;
+
+        // For existing conversations, use the ID from URL
+        const convId = conversationId;
+
+        return {
+          body: {
+            question: textContent,
+            ...(convId && { conversationId: convId }),
+            ...(modelInfo && {
+              model: modelInfo.model,
+              provider: modelInfo.provider,
+            }),
+          },
+        };
+      },
+    }),
+    // Use conversationId as chat ID so each conversation has its own message state
+    id: conversationId || 'agent-new-chat',
+    onError: (error) => {
+      console.error('[Chat] Error:', error);
+      setStreamError(error.message ?? 'An error occurred while streaming');
+    },
+  });
+
+  // Keep ref in sync
+  useEffect(() => {
+    chatMessagesRef.current = chatMessages;
+    isStreamingRef.current = status === 'submitted' || status === 'streaming';
+  }, [chatMessages, status]);
+
+  const isLoading = status === 'submitted' || status === 'streaming';
+
+  const isHistoryLoadedRef = useRef(false);
+
+  // Reset loaded ref when conversation changes
+  useEffect(() => {
+    isHistoryLoadedRef.current = false;
+  }, [conversationId]);
+
+  // Sync loaded history to chatMessages exactly once
+  useEffect(() => {
+    if (!conversationId) {
+      isHistoryLoadedRef.current = true;
+      return;
+    }
+
+    // Only sync if history finished loading and we haven't synced yet for this conversation
+    if (!isHistoryLoadedRef.current && !isLoadingHistory) {
+      if (savedMessages.length > 0) {
+        setMessages(savedMessages);
+      }
+      isHistoryLoadedRef.current = true;
+    }
+  }, [conversationId, isLoadingHistory, savedMessages, setMessages]);
+
+  const displayMessages: UIMessage[] = chatMessages;
+
+  const lastAssistantIdx = useMemo(() => {
+    for (let i = displayMessages.length - 1; i >= 0; i--) {
+      if (displayMessages[i].role === 'assistant') {
+        return i;
       }
     }
-
-    if (isStreaming && streamingContent) {
-      result.push({
-        id: 'streaming',
-        role: 'assistant',
-        content: streamingContent,
-        timestamp: new Date(),
-      });
-    }
-
-    // Show error message if stream failed
-    if (streamError && !isStreaming) {
-      result.push({
-        id: 'error',
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-        error: streamError.message,
-        errorCode: streamError.code,
-      });
-    }
-
-    return result;
-  }, [
-    messages,
-    isStreaming,
-    streamingContent,
-    pendingUserMessage,
-    isLoadingMessages,
-    streamError,
-  ]);
+    return -1;
+  }, [displayMessages]);
 
   const handleSendMessage = useCallback(
     async (content: string) => {
-      setPendingUserMessage(content);
-      setIsStreaming(true);
-      setStreamingContent('');
       setStreamError(null);
-
-      try {
-        const stream = createMessageStream({
-          question: content,
-          conversationId: conversationIdRef.current ?? undefined,
-        });
-
-        let fullContent = '';
-        let newConversationId: string | null = null;
-
-        for await (const event of stream) {
-          if (event.type === 'error') {
-            console.error('Stream error:', event.data);
-            setStreamError({
-              message: event.data.error?.message || 'An error occurred',
-              code: event.data.error?.code,
-            });
-            break;
-          }
-
-          if (event.data.content) {
-            fullContent += event.data.content;
-            setStreamingContent(fullContent);
-          }
-
-          if (event.data.conversationId) {
-            newConversationId = event.data.conversationId;
-            if (!conversationIdRef.current) {
-              void navigate(`/agents/conversations/${newConversationId}`, {
-                replace: true,
-              });
-            }
-          }
-        }
-
-        void queryClient.invalidateQueries({
-          queryKey: ['/api/agents/conversations'],
-        });
-
-        const finalConversationId =
-          conversationIdRef.current ?? newConversationId;
-        if (finalConversationId) {
-          void queryClient.invalidateQueries({
-            queryKey: [
-              `/api/agents/conversations/${finalConversationId}/messages`,
-            ],
-          });
-        }
-      } catch (error) {
-        console.error('Failed to send message:', error);
-        setStreamError({
-          message:
-            error instanceof Error ? error.message : 'Failed to send message',
-          code: 'NETWORK_ERROR',
-        });
-      } finally {
-        setIsStreaming(false);
-        setPendingUserMessage(null);
-      }
+      await sendMessage({ text: content });
     },
-    [queryClient, navigate],
+    [sendMessage],
   );
+
+  const handleRetry = useCallback(async () => {
+    if (lastAssistantIdx !== -1 && chatMessages.length > 0) {
+      setStreamError(null);
+      await regenerate();
+    }
+  }, [lastAssistantIdx, chatMessages, regenerate]);
+
+  const handleDismissError = useCallback(() => {
+    setStreamError(null);
+  }, []);
 
   // Auto-send pending message from landing page
   useEffect(() => {
     const state = location.state as LocationState | null;
     if (state?.pendingMessage && !hasAutoSentRef.current) {
       hasAutoSentRef.current = true;
-      void handleSendMessage(state.pendingMessage);
-      // Clear location state to prevent re-sending on re-renders
-      void navigate(location.pathname, { replace: true, state: null });
-    }
-  }, [location.state, handleSendMessage, navigate, location.pathname]);
-
-  // Clear streaming content after API messages have been refreshed
-  useEffect(() => {
-    if (!isStreaming && streamingContent && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'assistant') {
-        setStreamingContent('');
+      if (state.selectedModel) {
+        setSelectedModel(state.selectedModel);
+        selectedModelRef.current = state.selectedModel;
       }
+      void handleSendMessage(state.pendingMessage);
+      void navigate(location.pathname, {
+        replace: true,
+        state: null,
+      });
     }
-  }, [isStreaming, streamingContent, messages]);
+  }, [location.state, navigate, location.pathname, handleSendMessage]);
 
   return (
-    <Page className="w-full h-full lg:w-2/3 xl:w-1/2 mx-auto">
+    <div
+      className="-m-4 flex flex-col overflow-hidden"
+      style={{ height: 'calc(100vh - 4rem)' }}
+    >
       <ChatConversation
         messages={displayMessages}
         onSendMessage={handleSendMessage}
-        isStreaming={isStreaming}
-        isLoadingMessages={isLoadingMessages}
+        onRetry={
+          lastAssistantIdx !== -1 && !isLoading ? handleRetry : undefined
+        }
+        isStreaming={isLoading}
+        isLoadingMessages={isLoadingHistory}
+        streamError={streamError}
+        onDismissError={handleDismissError}
+        selectedProvider={selectedModel?.provider ?? null}
+        selectedModel={selectedModel?.model ?? null}
+        onSelectModel={(provider, model, configId) => {
+          setSelectedModel({ provider, model, configId });
+        }}
+        hasSentFirstMessage={isLoading || chatMessages.length > 0}
       />
-    </Page>
+    </div>
   );
 }

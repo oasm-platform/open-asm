@@ -6,19 +6,24 @@ import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
   Query,
-  Sse,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Observable } from 'rxjs';
+
+import type { Response } from 'express';
+import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
 import {
   ConversationResponseDto,
@@ -28,6 +33,7 @@ import {
   CreateLLMConfigDto,
   LLMConfigResponseDto,
   LLMConfigWithProviderDto,
+  ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
 import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
@@ -36,11 +42,10 @@ import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
 @Controller('agents')
 @UseGuards(AuthGuard)
 export class AgentsController {
-  constructor(private readonly agentsService: AgentsService) {}
-
-  // ==========================================
-  // LLM Config Endpoints
-  // ==========================================
+  constructor(
+    private readonly agentsService: AgentsService,
+    private readonly agentsCompletionsService: AgentsCompletionsService,
+  ) {}
 
   @Post('llm-configs')
   @Doc({
@@ -69,6 +74,24 @@ export class AgentsController {
     @WorkspaceId() workspaceId: string,
   ): Promise<LLMConfigWithProviderDto[]> {
     return this.agentsService.getLLMConfigsWithProviders(workspaceId);
+  }
+
+  @Get('llm-configs/:id/models')
+  @Doc({
+    summary: 'List models for a provider config',
+    description:
+      'Get available models for a specific LLM provider configuration',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'LLM config ID' }],
+    },
+    response: { serialization: ProviderModelDto, isArray: true },
+  })
+  async getProviderModels(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<ProviderModelDto[]> {
+    return this.agentsService.getModelsForProvider(id, workspaceId);
   }
 
   @Patch('llm-configs/:id')
@@ -160,6 +183,21 @@ export class AgentsController {
     return this.agentsService.updateConversation(id, dto, workspaceId);
   }
 
+  @Delete('conversations')
+  @Doc({
+    summary: 'Delete all conversations',
+    description:
+      'Delete all conversations and their messages for the workspace',
+    request: { getWorkspaceId: true },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteAllConversations(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsService.deleteAllConversations(workspaceId);
+    return { message: 'All conversations deleted successfully' };
+  }
+
   @Delete('conversations/:id')
   @Doc({
     summary: 'Delete conversation',
@@ -201,7 +239,7 @@ export class AgentsController {
   }
 
   @Post('messages/stream')
-  @Sse()
+  @HttpCode(HttpStatus.OK)
   @Doc({
     summary: 'Send message (streaming)',
     description:
@@ -209,12 +247,53 @@ export class AgentsController {
       'If conversationId is not provided, a new conversation is created using the preferred LLM config.',
     request: { getWorkspaceId: true },
   })
-  async sendMessageStream(
+  async streamMessage(
     @Body() dto: SendMessageDto,
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
-  ): Promise<Observable<MessageEvent>> {
-    return this.agentsService.sendMessageStream(dto, workspaceId, userId);
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      const { stream, conversationId } =
+        await this.agentsCompletionsService.streamMessage(
+          dto,
+          workspaceId,
+          userId,
+        );
+
+      res.socket?.setNoDelay(true);
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Content-Encoding', 'none');
+      res.setHeader(
+        'X-Conversation-Id',
+        conversationId || dto.conversationId || '',
+      );
+      res.flushHeaders();
+
+      const reader = stream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(`data: ${JSON.stringify(value)}\n\n`);
+      }
+      res.end();
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        res.status(400).json({
+          message: error.message,
+          error: 'Bad Request',
+          statusCode: 400,
+        });
+      } else {
+        res.status(500).json({
+          message:
+            error instanceof Error ? error.message : 'Internal server error',
+          error: 'Internal Server Error',
+          statusCode: 500,
+        });
+      }
+    }
   }
 
   @Delete('conversations/:cid/messages/:mid')

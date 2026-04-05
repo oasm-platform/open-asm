@@ -3,10 +3,8 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { decrypt, encrypt } from '@/common/utils/encryption.util';
+import { RedisService } from '@/services/redis/redis.service';
 import { getManyResponse } from '@/utils/getManyResponse';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
 import {
   BadRequestException,
   Injectable,
@@ -14,11 +12,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { LanguageModel } from 'ai';
-import { streamText } from 'ai';
-import * as fs from 'fs';
-import * as path from 'path';
-import { Observable } from 'rxjs';
 import { Repository } from 'typeorm';
 import {
   ConversationResponseDto,
@@ -29,14 +22,18 @@ import {
   LLMConfigResponseDto,
   LLMConfigWithProviderDto,
   LLMProviderStatusDto,
+  ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
-import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
+import { MessageResponseDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
-import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
-import { llmProviderSupported } from './llm-provider-supported';
+import { LLMProvider } from './enums/agent.enums';
+import {
+  getLLMProviderConfig,
+  llmProviderSupported,
+} from './llm-provider-supported';
 
 @Injectable()
 export class AgentsService {
@@ -50,35 +47,8 @@ export class AgentsService {
     private readonly conversationRepository: Repository<AgentConversation>,
     @InjectRepository(AgentMessage)
     private readonly messageRepository: Repository<AgentMessage>,
-  ) {
-    this.loadSystemPrompt();
-  }
-
-  // ==========================================
-  // System Prompt Methods
-  // ==========================================
-
-  private loadSystemPrompt(): void {
-    try {
-      const promptPath = path.join(__dirname, 'prompts', 'SYSTEM.md');
-      this.systemPrompt = fs.readFileSync(promptPath, 'utf-8');
-      this.logger.log('System prompt loaded successfully');
-    } catch (error) {
-      this.logger.error('Failed to load system prompt', error);
-      this.systemPrompt = 'You are a helpful assistant.';
-    }
-  }
-
-  private getSystemPrompt(): string {
-    if (!this.systemPrompt) {
-      this.loadSystemPrompt();
-    }
-    return this.systemPrompt ?? 'You are a helpful assistant.';
-  }
-
-  // ==========================================
-  // LLM Config Methods
-  // ==========================================
+    private readonly redisService: RedisService,
+  ) {}
 
   private maskApiKey(apiKey: string): string {
     if (apiKey.length <= 4) return '****';
@@ -115,6 +85,25 @@ export class AgentsService {
       );
     }
 
+    // Validate API key by fetching models
+    const provider = getLLMProviderConfig(dto.provider);
+    if (!provider) {
+      throw new BadRequestException(
+        `Provider ${dto.provider} is not supported`,
+      );
+    }
+
+    const models = await provider.fetchModels(dto.apiKey);
+
+    if (models.length === 0) {
+      throw new BadRequestException(
+        'Invalid API key. Unable to fetch models from the provider.',
+      );
+    }
+
+    // Use first model from the list as default
+    const defaultModel = models[0].id;
+
     // Check if this is the first LLM config in workspace
     const totalConfigs = await this.llmConfigRepository.count({
       where: { workspaceId },
@@ -126,7 +115,7 @@ export class AgentsService {
       workspaceId,
       provider: dto.provider,
       apiKey: encrypt(dto.apiKey),
-      model: dto.model,
+      model: dto.model || defaultModel,
       apiUrl: dto.apiUrl,
       createdBy: userId,
       isPreferred,
@@ -265,9 +254,77 @@ export class AgentsService {
     });
   }
 
-  // ==========================================
-  // Conversation Methods
-  // ==========================================
+  /**
+   * Resolve LLM config to use for a conversation.
+   * Priority: requested provider/model > preferred config
+   */
+  private async resolveLLMConfig(
+    workspaceId: string,
+    provider?: string,
+    model?: string,
+  ): Promise<AgentLLMConfig> {
+    let llmConfig: AgentLLMConfig | null = null;
+
+    if (model && provider) {
+      llmConfig = await this.llmConfigRepository.findOne({
+        where: { workspaceId, provider: provider as LLMProvider },
+      });
+    }
+
+    if (!llmConfig) {
+      llmConfig = await this.getPreferredLLMConfig(workspaceId);
+    }
+
+    if (!llmConfig) {
+      throw new BadRequestException(
+        'No preferred LLM config found. Please create and set a preferred LLM config first.',
+      );
+    }
+
+    return llmConfig;
+  }
+
+  async getModelsForProvider(
+    configId: string,
+    workspaceId: string,
+  ): Promise<ProviderModelDto[]> {
+    const cacheKey = `agents:models:${configId}`;
+
+    // Try to get from cache first
+    try {
+      const cached = await this.redisService.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached) as ProviderModelDto[];
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to read from Redis cache: ${error}`);
+    }
+
+    const config = await this.llmConfigRepository.findOne({
+      where: { id: configId, workspaceId },
+    });
+
+    if (!config) {
+      throw new NotFoundException('LLM config not found');
+    }
+
+    const provider = getLLMProviderConfig(config.provider);
+    if (!provider) {
+      return [];
+    }
+
+    const apiKey = decrypt(config.apiKey);
+    const models = await provider.fetchModels(apiKey);
+
+    // Cache the result for 1 hour (3600 seconds)
+    try {
+      await this.redisService.setex(cacheKey, 3600, JSON.stringify(models));
+    } catch (error) {
+      this.logger.warn(`Failed to cache models in Redis: ${error}`);
+    }
+
+    return models;
+  }
 
   async getConversations(
     workspaceId: string,
@@ -346,237 +403,8 @@ export class AgentsService {
     await this.conversationRepository.remove(conversation);
   }
 
-  // ==========================================
-  // Message / Chat Methods
-  // ==========================================
-
-  private createLanguageModel(config: AgentLLMConfig): LanguageModel {
-    const apiKey = decrypt(config.apiKey);
-
-    switch (config.provider) {
-      case LLMProvider.OPENAI: {
-        const openai = createOpenAI({ apiKey });
-        return openai.chat(config.model);
-      }
-      case LLMProvider.ANTHROPIC: {
-        const anthropic = createAnthropic({ apiKey });
-        return anthropic(config.model);
-      }
-      case LLMProvider.GEMINI: {
-        const google = createGoogleGenerativeAI({ apiKey });
-        return google.chat(config.model);
-      }
-      case LLMProvider.OPENROUTER: {
-        const openai = createOpenAI({
-          apiKey,
-          baseURL: 'https://openrouter.ai/api/v1',
-        });
-        return openai.chat(config.model);
-      }
-      case LLMProvider.KILO_CODE: {
-        const kilo = createOpenAI({
-          apiKey,
-          baseURL: 'https://api.kilo.ai/api/gateway',
-        });
-        return kilo.chat(config.model);
-      }
-      case LLMProvider.CUSTOM: {
-        const openai = createOpenAI({
-          apiKey,
-          baseURL: config.apiUrl,
-        });
-        return openai.chat(config.model);
-      }
-      default: {
-        throw new BadRequestException(
-          `Unsupported LLM provider: ${String(config.provider)}`,
-        );
-      }
-    }
-  }
-
-  async sendMessageStream(
-    dto: SendMessageDto,
-    workspaceId: string,
-    userId: string,
-  ): Promise<Observable<MessageEvent>> {
-    // 1. Find or create conversation
-    let conversation: AgentConversation;
-    if (dto.conversationId) {
-      const existing = await this.conversationRepository.findOne({
-        where: { id: dto.conversationId, workspaceId },
-      });
-      if (!existing) {
-        throw new NotFoundException('Conversation not found');
-      }
-      conversation = existing;
-    } else {
-      // Get preferred LLM config
-      const llmConfig = await this.getPreferredLLMConfig(workspaceId);
-      if (!llmConfig) {
-        throw new BadRequestException(
-          'No preferred LLM config found. Please create and set a preferred LLM config first.',
-        );
-      }
-      conversation = this.conversationRepository.create({
-        workspaceId,
-        llmConfigId: llmConfig.id,
-        title: dto.question.slice(0, 500),
-        createdBy: userId,
-      });
-      conversation = await this.conversationRepository.save(conversation);
-    }
-
-    // 2. Save user message
-    const userMessage = this.messageRepository.create({
-      conversationId: conversation.id,
-      role: MessageRole.USER,
-      content: dto.question,
-      messageType: MessageType.TEXT,
-    });
-    await this.messageRepository.save(userMessage);
-
-    // 3. Load conversation history (last 20 messages)
-    const historyMessages = await this.messageRepository.find({
-      where: { conversationId: conversation.id },
-      order: { createdAt: 'DESC' },
-      take: 20,
-    });
-
-    // 4. Get LLM config
-    const llmConfig = await this.llmConfigRepository.findOne({
-      where: { id: conversation.llmConfigId, workspaceId },
-    });
-
-    if (!llmConfig) {
-      throw new NotFoundException('LLM config not found');
-    }
-
-    // 5. Build messages from history (reverse to chronological order)
-    const reversedHistory = historyMessages.reverse();
-    const modelMessages = reversedHistory.map((msg) => {
-      // Add identity reminder prefix to user messages
-      if (msg.role === MessageRole.USER) {
-        return {
-          role: 'user' as const,
-          content: `[CONTEXT: You are the Security Agent created by OASM Platform Team. Never identify as any other AI provider.] ${msg.content}`,
-        };
-      }
-      return {
-        role: msg.role as 'assistant' | 'system',
-        content: msg.content,
-      };
-    });
-
-    // 6. Call streamText() from AI SDK
-    const model = this.createLanguageModel(llmConfig);
-    const result = streamText({
-      model,
-      messages: modelMessages,
-      system: this.getSystemPrompt(),
-    });
-
-    // 7. Stream response -> save assistant message
-    return new Observable<MessageEvent>((subscriber) => {
-      void (async () => {
-        try {
-          let fullContent = '';
-          for await (const chunk of result.textStream) {
-            fullContent += chunk;
-            subscriber.next({
-              data: JSON.stringify({
-                content: chunk,
-                done: false,
-                conversationId: conversation.id,
-              }),
-            } as MessageEvent);
-          }
-
-          // Save assistant message
-          const assistantMessage = this.messageRepository.create({
-            conversationId: conversation.id,
-            role: MessageRole.ASSISTANT,
-            content: fullContent,
-            messageType: MessageType.TEXT,
-            metadata: {
-              model: llmConfig.model,
-              provider: llmConfig.provider,
-            },
-          });
-          await this.messageRepository.save(assistantMessage);
-
-          subscriber.next({
-            data: JSON.stringify({
-              content: '',
-              done: true,
-              conversationId: conversation.id,
-            }),
-          } as MessageEvent);
-          subscriber.complete();
-        } catch (error) {
-          // Log error for debugging
-          this.logger.error('Error in sendMessageStream', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined,
-            conversationId: conversation.id,
-            provider: llmConfig.provider,
-            model: llmConfig.model,
-          });
-
-          // Determine error type and code
-          let errorCode = 'STREAM_ERROR';
-          let errorMessage = 'An error occurred while processing your request';
-
-          if (error instanceof Error) {
-            errorMessage = error.message;
-
-            // Categorize errors for better frontend handling
-            if (
-              error.message.includes('API key') ||
-              error.message.includes('authentication')
-            ) {
-              errorCode = 'AUTH_ERROR';
-              errorMessage = 'Invalid API key or authentication failed';
-            } else if (
-              error.message.includes('rate limit') ||
-              error.message.includes('429')
-            ) {
-              errorCode = 'RATE_LIMIT_ERROR';
-              errorMessage = 'Rate limit exceeded. Please try again later';
-            } else if (
-              error.message.includes('timeout') ||
-              error.message.includes('ETIMEDOUT')
-            ) {
-              errorCode = 'TIMEOUT_ERROR';
-              errorMessage = 'Request timed out. Please try again';
-            } else if (
-              error.message.includes('network') ||
-              error.message.includes('ECONNREFUSED')
-            ) {
-              errorCode = 'NETWORK_ERROR';
-              errorMessage = 'Network error. Please check your connection';
-            } else if (
-              error.message.includes('model') ||
-              error.message.includes('not found')
-            ) {
-              errorCode = 'MODEL_ERROR';
-              errorMessage = 'The specified model is not available';
-            }
-          }
-
-          subscriber.next({
-            data: JSON.stringify({
-              content: '',
-              done: true,
-              conversationId: conversation.id,
-              error: errorMessage,
-              errorCode,
-            }),
-          } as MessageEvent);
-          subscriber.complete();
-        }
-      })();
-    });
+  async deleteAllConversations(workspaceId: string): Promise<void> {
+    await this.conversationRepository.delete({ workspaceId });
   }
 
   async getMessages(
@@ -593,7 +421,8 @@ export class AgentsService {
       throw new NotFoundException('Conversation not found');
     }
 
-    const limit = query?.limit || 50;
+    // const limit = query?.limit || 50;
+    const limit = 1000;
     const page = query?.page || 1;
 
     const messages = await this.messageRepository.find({

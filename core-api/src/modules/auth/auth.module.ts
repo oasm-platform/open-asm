@@ -21,7 +21,7 @@ import {
 } from '@nestjs/core';
 import { type Auth } from 'better-auth';
 import { toNodeHandler } from 'better-auth/node';
-import { createAuthMiddleware } from 'better-auth/plugins';
+import { createMiddleware } from 'better-auth';
 import type { Request, Response } from 'express';
 import { APIErrorExceptionFilter } from '../../common/filters/api-error-exception-filter';
 import { SkipBodyParsingMiddleware } from '../../common/middlewares/skip-body-parsing.middlewares';
@@ -147,7 +147,7 @@ export class AuthModule implements NestModule, OnModuleInit {
       if (!hookPath) continue;
 
       const originalHook = this.auth.options.hooks[hookType];
-      this.auth.options.hooks[hookType] = createAuthMiddleware(async (ctx) => {
+      this.auth.options.hooks[hookType] = createMiddleware(async (ctx) => {
         if (originalHook) {
           await originalHook(ctx);
         }

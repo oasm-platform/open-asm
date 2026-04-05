@@ -43,8 +43,9 @@ export class CreateLLMConfigDto {
   @IsString()
   apiKey: string;
 
-  @ApiProperty({})
+  @ApiProperty({ required: false })
   @IsString()
+  @IsOptional()
   model: string;
 
   @ApiProperty({ required: false })
@@ -68,7 +69,9 @@ export class LLMConfigResponseDto {
   provider: LLMProvider;
 
   @ApiProperty()
-  model: string;
+  @IsString()
+  @IsOptional()
+  model?: string;
 
   @ApiProperty({ required: false })
   apiUrl?: string;
@@ -84,6 +87,14 @@ export class LLMConfigResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+}
+
+export class ProviderModelDto {
+  @ApiProperty({ description: 'Model identifier for API calls' })
+  id: string;
+
+  @ApiProperty({ description: 'Human-readable model name' })
+  name: string;
 }
 
 export class LLMConfigWithProviderDto {

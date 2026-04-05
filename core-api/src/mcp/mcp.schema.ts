@@ -134,10 +134,16 @@ export const listAssetsInTargetSchema = z
   .extend(getManyBaseRequestSchema.shape);
 
 export const detailVulnSchema = z.object({
-  vulnId: z
+  id: z
     .string()
     .describe(
       'The unique identifier (ID) of the vulnerability to retrieve technical details for.',
+    ),
+  vulnId: z
+    .string()
+    .optional()
+    .describe(
+      'The unique identifier (ID) of the vulnerability to retrieve technical details for. Alternative to `id`.',
     ),
 });
 

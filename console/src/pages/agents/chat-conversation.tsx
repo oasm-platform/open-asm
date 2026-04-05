@@ -1,171 +1,442 @@
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from '@/components/ai-elements/conversation';
+import {
+  Message,
+  MessageAction,
+  MessageActions,
+  MessageContent,
+} from '@/components/ai-elements/message';
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+  type PromptInputMessage,
+} from '@/components/ai-elements/prompt-input';
 import { Markdown } from '@/components/common/markdown';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { AlertCircle, Bot, Send } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
+import type { TextUIPart, UIMessage } from 'ai';
+import {
+  AlertCircle,
+  Bot,
+  CheckIcon,
+  CopyIcon,
+  Loader2,
+  RefreshCcwIcon,
+  ShieldAlert,
+  Wrench,
+  X,
+} from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-interface UIMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  error?: string;
-  errorCode?: string;
+interface ToolCallState {
+  toolCallId: string;
+  toolName: string;
+  status: 'pending' | 'executing' | 'completed' | 'error';
+  input?: Record<string, unknown>;
+  output?: unknown;
 }
 
 interface ChatConversationProps {
   messages: UIMessage[];
   onSendMessage: (content: string) => void;
+  onRetry?: () => void;
   isStreaming?: boolean;
   isLoadingMessages?: boolean;
+  streamError?: string | null;
+  onDismissError?: () => void;
+  selectedProvider?: string | null;
+  selectedModel?: string | null;
+  onSelectModel?: (provider: string, model: string, configId: string) => void;
+  hasSentFirstMessage?: boolean;
 }
 
-/**
- * Chat conversation component with message display and input
- * Supports streaming responses and auto-scroll to latest message
- */
-export function ChatConversation({
-  messages,
-  onSendMessage,
-  isStreaming = false,
-  isLoadingMessages = false,
-}: ChatConversationProps) {
-  const [input, setInput] = useState('');
-  const [isMultiLine, setIsMultiLine] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+const getTextContent = (message: UIMessage): string => {
+  const parts = message.parts;
+  if (!parts || parts.length === 0) return '';
 
-  // Auto-scroll to bottom when new messages arrive or streaming updates
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isStreaming]);
+  return parts
+    .filter((part): part is TextUIPart => part.type === 'text')
+    .map((part) => part.text)
+    .join('');
+};
 
-  // Auto-resize textarea height and detect multi-line
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    textarea.style.height = 'auto';
-    textarea.style.height = `${textarea.scrollHeight}px`;
-    setIsMultiLine(textarea.scrollHeight > 48);
-  }, [input]);
+const getToolCallsFromParts = (message: UIMessage): ToolCallState[] => {
+  const parts = message.parts;
+  if (!parts || parts.length === 0) return [];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isStreaming) {
-      return;
+  const toolCalls: ToolCallState[] = [];
+
+  for (const part of parts) {
+    if (part.type === 'dynamic-tool') {
+      toolCalls.push({
+        toolCallId: part.toolCallId,
+        toolName: part.toolName,
+        status:
+          part.state === 'output-available'
+            ? ('completed' as const)
+            : ('pending' as const),
+        input: part.input as Record<string, unknown>,
+        output: part.output as unknown,
+      });
+    } else if (part.type.startsWith('tool-')) {
+      const toolPart = part as {
+        toolCallId: string;
+        state?: string;
+        input?: unknown;
+        output?: unknown;
+      };
+      toolCalls.push({
+        toolCallId: toolPart.toolCallId,
+        toolName: part.type.replace('tool-', ''),
+        status:
+          toolPart.state === 'output-available'
+            ? ('completed' as const)
+            : ('pending' as const),
+        input: toolPart.input as Record<string, unknown>,
+        output: toolPart.output,
+      });
     }
-    onSendMessage(input.trim());
-    setInput('');
-  };
+  }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
+  return toolCalls;
+};
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)]">
-      <div
-        ref={scrollRef}
-        className="flex-1 flex flex-col overflow-y-auto scrollbar-thin"
+    <MessageAction
+      onClick={handleCopy}
+      label={copied ? 'Copied!' : 'Copy'}
+      tooltip={copied ? 'Copied!' : 'Copy message'}
+    >
+      {copied ? (
+        <CheckIcon className="size-3.5 text-green-500" />
+      ) : (
+        <CopyIcon className="size-3.5" />
+      )}
+    </MessageAction>
+  );
+}
+
+function formatToolName(name: string): string {
+  return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const statusIcon = {
+    pending: (
+      <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+    ),
+    executing: <Loader2 className="size-3.5 animate-spin text-blue-500" />,
+    completed: <CheckIcon className="size-3.5 text-green-500" />,
+    error: <AlertCircle className="size-3.5 text-destructive" />,
+  }[toolCall.status];
+
+  const statusText = {
+    pending: 'Waiting…',
+    executing: 'Executing…',
+    completed: 'Completed',
+    error: 'Failed',
+  }[toolCall.status];
+
+  return (
+    <div className="rounded-md border border-border/60 bg-muted/30 text-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
       >
-        <div className="w-full mx-auto flex flex-col flex-1 space-y-6">
-          {isLoadingMessages && (
-            <div className="flex flex-col items-center justify-center flex-1 py-20 text-center">
-              <Bot className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
-              <p className="text-base text-muted-foreground">
-                Loading messages...
+        <Wrench className="size-3.5 text-muted-foreground shrink-0" />
+        <span className="font-medium truncate">
+          {formatToolName(toolCall.toolName)}
+        </span>
+        <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+          {statusIcon}
+          {statusText}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-border/60 px-3 py-2 space-y-2">
+          {toolCall.input && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                Input
               </p>
+              <pre className="text-xs bg-background/50 rounded p-2 overflow-x-auto">
+                {JSON.stringify(toolCall.input, null, 2)}
+              </pre>
             </div>
           )}
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                'flex gap-3',
-                message.role === 'user' ? 'justify-end' : 'justify-start',
-              )}
-            >
-              {message.role === 'assistant' ? (
-                <div className="max-w-[80%] text-base">
-                  {message.error ? (
-                    <div className="flex items-start gap-2 rounded-2xl px-4 py-3 bg-destructive/10 text-destructive">
-                      <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-                      <div className="flex flex-col gap-1">
-                        <p className="font-medium">Error</p>
-                        <p className="text-sm">{message.error}</p>
-                        {message.errorCode && (
-                          <p className="text-xs text-muted-foreground">
-                            Code: {message.errorCode}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <Markdown content={message.content} />
-                  )}
-                </div>
-              ) : (
-                <div className="max-w-[80%] rounded-2xl px-4 py-2.5 text-base bg-muted text-foreground">
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                </div>
-              )}
-            </div>
-          ))}
-          {isStreaming && !hasStreamingMessage(messages) && (
-            <div className="flex gap-3 justify-start">
-              <div className="flex items-center gap-1.5 rounded-2xl px-4 py-2.5 bg-muted">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.15s]" />
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0.3s]" />
-              </div>
+          {toolCall.output !== undefined && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                Output
+              </p>
+              <pre className="text-xs bg-background/50 rounded p-2 overflow-x-auto max-h-48">
+                {typeof toolCall.output === 'string'
+                  ? toolCall.output
+                  : JSON.stringify(toolCall.output, null, 2)}
+              </pre>
             </div>
           )}
-          <div ref={bottomRef} />
         </div>
-      </div>
-      <div className="shrink-0 py-3">
-        <form onSubmit={handleSubmit} className="w-full mx-auto">
-          <div
-            className={cn(
-              'bg-muted flex items-center',
-              isMultiLine ? 'rounded-2xl' : 'rounded-full',
-            )}
-          >
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask anythink about security..."
-              rows={1}
-              disabled={isStreaming}
-              className="flex-1 resize-none bg-transparent px-5 py-4 text-base placeholder:text-muted-foreground outline-none min-h-[48px] max-h-[33vh] disabled:opacity-50 overflow-y-auto"
-            />
-            {input.trim() && (
-              <Button
-                type="submit"
-                size="icon"
-                variant="ghost"
-                disabled={isStreaming}
-                className="shrink-0 mr-2"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </form>
-      </div>
+      )}
     </div>
   );
 }
 
-/** Check if the last message is a streaming assistant message */
-function hasStreamingMessage(messages: UIMessage[]): boolean {
-  if (messages.length === 0) return false;
-  const last = messages[messages.length - 1];
-  return last.id === 'streaming' && last.role === 'assistant';
+export function ChatConversation({
+  messages,
+  onSendMessage,
+  onRetry,
+  isStreaming = false,
+  isLoadingMessages = false,
+  streamError,
+  onDismissError,
+  selectedProvider,
+  selectedModel,
+  onSelectModel,
+}: ChatConversationProps) {
+  const [input, setInput] = useState('');
+  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
+  const prevStreamingRef = useRef(false);
+
+  // Track last user message for retry context
+  useEffect(() => {
+    const userMessages = messages.filter((m) => m.role === 'user');
+    if (userMessages.length > 0) {
+      const lastUser = userMessages[userMessages.length - 1];
+      setLastUserMessage(getTextContent(lastUser));
+    }
+  }, [messages]);
+
+  // Track streaming state transitions to prevent flicker
+  useEffect(() => {
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
+  const handleSubmit = (message: PromptInputMessage) => {
+    if (message.text.trim() && !isStreaming) {
+      onSendMessage(message.text.trim());
+      setInput('');
+    }
+  };
+
+  const handleRetry = useCallback(() => {
+    if (onRetry) {
+      onRetry();
+    }
+  }, [onRetry]);
+
+  // Loading: show when fetching history for existing conversation with no messages yet
+  // Empty: show when no messages and not streaming (not during initial load or streaming)
+  const isLoadingHistory = isLoadingMessages && messages.length === 0;
+  const isEmpty = !isLoadingMessages && messages.length === 0 && !isStreaming;
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <Conversation className="flex-1">
+        <ConversationContent className="max-w-3xl mx-auto w-full px-4 py-6 gap-6">
+          {isLoadingHistory ? (
+            <div className="space-y-6">
+              {/* User message skeleton */}
+              <div className="flex justify-end">
+                <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
+                  <div className="space-y-2">
+                    <div className="h-4 w-64 animate-pulse rounded bg-muted-foreground/20" />
+                    <div className="h-4 w-48 animate-pulse rounded bg-muted-foreground/20" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Assistant message skeleton */}
+              <div className="flex gap-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <Bot className="size-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div className="h-4 w-full animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="h-4 w-[90%] animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="h-4 w-[75%] animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="mt-2 h-4 w-[60%] animate-pulse rounded bg-muted-foreground/20" />
+                </div>
+              </div>
+
+              {/* Second user message skeleton */}
+              <div className="flex justify-end">
+                <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
+                  <div className="h-4 w-56 animate-pulse rounded bg-muted-foreground/20" />
+                </div>
+              </div>
+
+              {/* Second assistant message skeleton */}
+              <div className="flex gap-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                  <Bot className="size-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div className="h-4 w-[85%] animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="h-4 w-full animate-pulse rounded bg-muted-foreground/20" />
+                  <div className="h-4 w-[70%] animate-pulse rounded bg-muted-foreground/20" />
+                </div>
+              </div>
+            </div>
+          ) : isEmpty ? (
+            <ConversationEmptyState
+              icon={<ShieldAlert className="size-12" />}
+              title="Security AI ready"
+              description="Ask anything about vulnerabilities, secure coding, and best practices."
+            />
+          ) : (
+            <>
+              {messages.map((message, idx) => {
+                const textContent = getTextContent(message);
+                const toolCalls = getToolCallsFromParts(message);
+                const hasContent =
+                  textContent.length > 0 || toolCalls.length > 0;
+                const isLastAssistant =
+                  message.role === 'assistant' && idx === messages.length - 1;
+                const isStreamingActive = isLastAssistant && isStreaming;
+
+                return (
+                  <Message key={message.id} from={message.role}>
+                    <MessageContent expandable={message.role === 'user'}>
+                      <div className="space-y-3">
+                        {toolCalls.length > 0 && (
+                          <div className="space-y-2">
+                            {toolCalls.map((toolCall) => (
+                              <ToolCallDisplay
+                                key={toolCall.toolCallId}
+                                toolCall={toolCall}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {textContent && (
+                          <Markdown content={textContent} preview={false} />
+                        )}
+                        {isStreamingActive && !hasContent && (
+                          <div className="flex items-center gap-2 py-1">
+                            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              Thinking…
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {isStreamingActive && hasContent && (
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <Loader2 className="size-3 animate-spin text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            Thinking…
+                          </span>
+                        </div>
+                      )}
+                    </MessageContent>
+
+                    {message.role === 'assistant' &&
+                      hasContent &&
+                      message.id !== 'streaming' && (
+                        <MessageActions>
+                          {textContent && <CopyButton text={textContent} />}
+                        </MessageActions>
+                      )}
+                  </Message>
+                );
+              })}
+            </>
+          )}
+
+          {/* Stream error banner */}
+          {streamError && (
+            <div className="mx-auto max-w-3xl w-full px-4">
+              <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm">
+                <AlertCircle className="size-5 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-destructive">
+                    Streaming error
+                  </p>
+                  <p className="text-muted-foreground mt-1">{streamError}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {lastUserMessage && (
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+                    >
+                      <RefreshCcwIcon className="size-3.5" />
+                      Retry
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onDismissError}
+                    className="rounded-md p-1 hover:bg-accent transition-colors"
+                    aria-label="Dismiss error"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
+
+      <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pt-3 pb-4">
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
+          <PromptInput onSubmit={handleSubmit} className="w-full shadow-sm">
+            <PromptInputBody>
+              <PromptInputTextarea
+                value={input}
+                onChange={(e) => setInput(e.currentTarget.value)}
+                placeholder={
+                  isStreaming
+                    ? 'Waiting for response…'
+                    : 'Ask anything about security…'
+                }
+                disabled={isStreaming}
+                className="min-h-[52px] max-h-[33vh]"
+              />
+            </PromptInputBody>
+            <PromptInputFooter>
+              <PromptInputTools>
+                {onSelectModel && (
+                  <ChatModelSwitcher
+                    selectedProvider={selectedProvider ?? null}
+                    selectedModel={selectedModel ?? null}
+                    onSelectModel={onSelectModel}
+                  />
+                )}
+              </PromptInputTools>
+              <PromptInputSubmit
+                status={isStreaming ? 'streaming' : 'ready'}
+                disabled={!input.trim() || isStreaming}
+              />
+            </PromptInputFooter>
+          </PromptInput>
+        </div>
+      </div>
+    </div>
+  );
 }
