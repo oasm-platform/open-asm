@@ -1,5 +1,8 @@
 import { Button } from '@/components/ui/button';
-import type { LLMConfigWithProviderDto } from '@/services/apis/gen/queries';
+import type {
+  LLMConfigWithProviderDto,
+  ProviderModelDto,
+} from '@/services/apis/gen/queries';
 import { cn } from '@/lib/utils';
 import {
   CreateLLMConfigDtoProvider,
@@ -282,17 +285,16 @@ function ModelSelectForm({
 }) {
   const configId = provider.configId ?? '';
   const [selectOpen, setSelectOpen] = useState(false);
-  const { data: models, isLoading } = useAgentsControllerGetProviderModels(
-    configId,
-    {
-      query: {
-        enabled: !!provider.configId,
-        staleTime: 5 * 60 * 1000,
-      },
+  const { data: models, isLoading } = useAgentsControllerGetProviderModels<
+    ProviderModelDto[]
+  >(configId, {
+    query: {
+      enabled: !!provider.configId,
+      staleTime: 5 * 60 * 1000,
     },
-  );
+  });
 
-  const modelList = models?.data ?? [];
+  const modelList = models ?? [];
   const currentModel = provider.model;
 
   const handleSelect = useCallback(
