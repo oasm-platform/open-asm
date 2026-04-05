@@ -111,7 +111,6 @@ export function Markdown({ content, className, preview }: MarkdownProps) {
           />
         ),
         td: ({ ...props }: ComponentPropsWithoutRef<'td'>) => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { style: _style, ...rest } = props;
           return (
             <td
