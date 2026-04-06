@@ -84,10 +84,23 @@ export default function AgentsChatPage() {
 
     const dataArray = pages
       .flatMap((p) => {
-        const pageData = p as { data?: unknown[] };
-        return Array.isArray(pageData?.data) ? pageData.data : [];
+        // Each page can be either an array of messages or an object with data/items/messages property
+        if (Array.isArray(p)) {
+          return p;
+        }
+        const pageData = p as Record<string, unknown>;
+        const rawData =
+          pageData?.data ??
+          pageData?.items ??
+          pageData?.messages ??
+          [];
+        return Array.isArray(rawData) ? rawData : [];
       })
       .reverse();
+
+    if (dataArray.length === 0) {
+      return [];
+    }
 
     return dataArray.map((msg) => {
       const m = msg as Record<string, unknown>;
