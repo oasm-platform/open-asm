@@ -1410,6 +1410,15 @@ export interface MessageResponseDto {
   createdAt: string;
 }
 
+export interface GetManyMessageResponseDtoDto {
+  data: MessageResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export interface SendMessageDto {
   /** @example "Hello, how can you help me?" */
   question: string;

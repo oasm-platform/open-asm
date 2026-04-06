@@ -1478,6 +1478,15 @@ export type MessageResponseDto = {
   createdAt: string;
 };
 
+export type GetManyMessageResponseDtoDto = {
+  data: MessageResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type SendMessageDto = {
   question: string;
   /** Continue existing conversation. If not provided, a new conversation is created. */
@@ -17892,7 +17901,7 @@ export const agentsControllerGetMessages = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<MessageResponseDto>(
+  return orvalClient<GetManyMessageResponseDtoDto>(
     {
       url: `/api/agents/conversations/${id}/messages`,
       method: 'GET',
