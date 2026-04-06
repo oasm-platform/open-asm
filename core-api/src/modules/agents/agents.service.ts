@@ -423,13 +423,11 @@ export class AgentsService {
 
     const limit = query?.limit || 10;
     const page = query?.page || 1;
-    const sortOrder = query?.sortOrder || 'DESC';
 
-    // Query with DESC order to get newest first, then reverse for response
     const qb = this.messageRepository
       .createQueryBuilder('message')
       .where('message.conversationId = :conversationId', { conversationId })
-      .orderBy('message.createdAt', sortOrder as 'ASC' | 'DESC')
+      .orderBy('message.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
