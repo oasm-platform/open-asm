@@ -8,8 +8,8 @@ import {
   useAgentsControllerUpdateLLMConfig,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Settings } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Check, ChevronsUpDown, Loader2, Settings } from 'lucide-react';
+import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -28,21 +28,94 @@ interface ChatModelSwitcherProps {
   onSelectModel: (provider: string, model: string, configId: string) => void;
 }
 
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
+interface ModelListProps {
+  models: ProviderModelDto[];
+  isLoading: boolean;
+  searchQuery: string;
+  selectedModel: string | null;
+  isSelected: boolean;
+  activeProviderLogo?: string;
+  onSelect: (modelId: string) => void;
+  onConnect: () => void;
 }
+
+const ModelListItem = memo(
+  ({
+    model,
+    isSelected,
+    activeProviderLogo,
+    onSelect,
+  }: {
+    model: ProviderModelDto;
+    isSelected: boolean;
+    activeProviderLogo?: string;
+    onSelect: (id: string) => void;
+  }) => (
+    <CommandItem
+      value={`${model.name} ${model.id}`}
+      onSelect={() => onSelect(model.id)}
+      className="flex items-center gap-2 px-2"
+    >
+      <Image
+        url={activeProviderLogo}
+        height={16}
+        className="dark:bg-white bg-gray-500 rounded p-0.5 shrink-0"
+      />
+      <span className="truncate flex-1">{model.name}</span>
+      {isSelected && <Check className="h-4 w-4 shrink-0" />}
+    </CommandItem>
+  ),
+);
+
+ModelListItem.displayName = 'ModelListItem';
+
+const ModelListContent = memo(
+  ({
+    models,
+    isLoading,
+    searchQuery,
+    selectedModel,
+    isSelected,
+    activeProviderLogo,
+    onSelect,
+    onConnect,
+  }: ModelListProps) => {
+    if (isLoading && models.length === 0) {
+      return (
+        <CommandEmpty className="py-6 flex items-center justify-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading models...
+        </CommandEmpty>
+      );
+    }
+
+    return (
+      <CommandList className="max-h-[320px]">
+        <CommandItem onSelect={onConnect} className="gap-2">
+          <Settings className="h-4 w-4" />
+          Provider Settings
+        </CommandItem>
+        {models.length > 0 ? (
+          models.map((model) => (
+            <ModelListItem
+              key={model.id}
+              model={model}
+              isSelected={isSelected && selectedModel === model.id}
+              activeProviderLogo={activeProviderLogo}
+              onSelect={onSelect}
+            />
+          ))
+        ) : (
+          <CommandEmpty>
+            {searchQuery ? 'No models found' : 'No models available'}
+          </CommandEmpty>
+        )}
+      </CommandList>
+    );
+  },
+);
+
+ModelListContent.displayName = 'ModelListContent';
 
 export function ChatModelSwitcher({
   selectedProvider,
@@ -54,8 +127,6 @@ export function ChatModelSwitcher({
   const [isUpdating, setIsUpdating] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  const debouncedSearch = useDebounce(searchQuery, 300);
 
   const { data: providers } =
     useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
@@ -89,21 +160,23 @@ export function ChatModelSwitcher({
 
   const updateLLMConfig = useAgentsControllerUpdateLLMConfig();
 
+  const deferredSearch = useDeferredValue(searchQuery);
+
   const filteredModels = useMemo((): ProviderModelDto[] => {
     const list: ProviderModelDto[] = Array.isArray(models)
       ? models
       : Array.isArray(models?.data)
         ? models.data
         : [];
-    if (!debouncedSearch) {
+    if (!deferredSearch) {
       if (!selectedModel) return list;
       return [...list].sort((a) => (a.id === selectedModel ? -1 : 1));
     }
-    const query = debouncedSearch.toLowerCase();
+    const query = deferredSearch.toLowerCase();
     return list
       .filter((m: ProviderModelDto) => m.name.toLowerCase().includes(query))
       .sort((a) => (a.id === selectedModel ? -1 : 1));
-  }, [models, debouncedSearch, selectedModel]);
+  }, [models, deferredSearch, selectedModel]);
 
   const currentDisplay = useMemo(() => {
     if (selectedProvider && selectedModel) {
@@ -129,34 +202,40 @@ export function ChatModelSwitcher({
   }, [selectedProvider, selectedModel, connectedProviders]);
 
   const handleSelect = useCallback(
-    async (modelId: string) => {
+    (modelId: string) => {
       if (!activeProvider?.configId) return;
 
+      // Update UI immediately (optimistic local state)
+      onSelectModel(
+        activeProvider.providerId,
+        modelId,
+        activeProvider.configId,
+      );
+      setOpen(false);
+      setSearchQuery('');
+
+      // Send update to backend in background
       setIsUpdating(true);
-      try {
-        await updateLLMConfig.mutateAsync({
+      updateLLMConfig.mutate(
+        {
           id: activeProvider.configId,
           data: { model: modelId },
-        });
-
-        void queryClient.invalidateQueries({
-          queryKey: ['/api/agents/llm-configs'],
-        });
-
-        onSelectModel(
-          activeProvider.providerId,
-          modelId,
-          activeProvider.configId,
-        );
-
-        toast.success('Model updated successfully');
-      } catch {
-        toast.error('Failed to update model');
-      } finally {
-        setIsUpdating(false);
-        setOpen(false);
-        setSearchQuery('');
-      }
+        },
+        {
+          onSuccess: () => {
+            void queryClient.invalidateQueries({
+              queryKey: ['/api/agents/llm-configs'],
+            });
+            toast.success('Model updated successfully');
+          },
+          onError: () => {
+            toast.error('Failed to sync model preference');
+          },
+          onSettled: () => {
+            setIsUpdating(false);
+          },
+        },
+      );
     },
     [activeProvider, onSelectModel, updateLLMConfig, queryClient],
   );
@@ -207,48 +286,16 @@ export function ChatModelSwitcher({
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-
-          <CommandList className="max-h-[320px]">
-            <CommandItem onSelect={handleConnect}>
-              <Settings className="h-4 w-4" />
-              Provider Settings
-            </CommandItem>
-            {activeProvider && filteredModels.length > 0 ? (
-              <>
-                {filteredModels.map((model) => {
-                  const isModelSelected =
-                    isSelected && selectedModel === model.id;
-
-                  return (
-                    <CommandItem
-                      key={model.id}
-                      value={`${model.name} ${model.id}`}
-                      onSelect={() => handleSelect(model.id)}
-                      className="flex items-center gap-2 px-2"
-                    >
-                      <Image
-                        url={activeProvider.logo}
-                        height={16}
-                        className="dark:bg-white bg-gray-500 rounded p-0.5 shrink-0"
-                      />
-                      <span className="truncate flex-1">{model.name}</span>
-                      {isModelSelected && (
-                        <Check className="h-4 w-4 shrink-0" />
-                      )}
-                    </CommandItem>
-                  );
-                })}
-              </>
-            ) : (
-              <CommandEmpty>
-                {isLoading
-                  ? 'Loading models...'
-                  : debouncedSearch
-                    ? 'No models found'
-                    : 'No models available'}
-              </CommandEmpty>
-            )}
-          </CommandList>
+          <ModelListContent
+            models={filteredModels}
+            isLoading={isLoading}
+            searchQuery={deferredSearch}
+            selectedModel={selectedModel}
+            isSelected={isSelected}
+            activeProviderLogo={activeProvider?.logo}
+            onSelect={handleSelect}
+            onConnect={handleConnect}
+          />
         </Command>
       </PopoverContent>
     </Popover>

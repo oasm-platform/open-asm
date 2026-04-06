@@ -67,7 +67,7 @@ core-api/.storage/*
 .roo/*
 .open-api/*
 .agent/*
-.agents/*
+# .agents/*
 .windsurf/*
 .claude/*
 .kilocode/plans/*

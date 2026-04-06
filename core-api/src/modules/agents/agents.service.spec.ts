@@ -3,7 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
+import type { Repository, SelectQueryBuilder, UpdateResult } from 'typeorm';
 import { AgentsService } from './agents.service';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
@@ -47,11 +47,11 @@ jest.mock('@ai-sdk/anthropic', () => ({
 
 jest.mock('./llm-provider-supported', () => ({
   getLLMProviderConfig: jest.fn(() => ({
-    fetchModels: jest.fn().mockResolvedValue([{ id: 'gpt-4o', name: 'GPT-4o' }]),
+    fetchModels: jest
+      .fn()
+      .mockResolvedValue([{ id: 'gpt-4o', name: 'GPT-4o' }]),
   })),
-  llmProviderSupported: [
-    { id: 'openai', name: 'OpenAI', logo: 'logo.png' },
-  ],
+  llmProviderSupported: [{ id: 'openai', name: 'OpenAI', logo: 'logo.png' }],
 }));
 
 describe('AgentsService', () => {
@@ -111,14 +111,17 @@ describe('AgentsService', () => {
             remove: jest.fn(),
             update: jest.fn(),
             count: jest.fn(),
-            createQueryBuilder: jest.fn(() => ({
-              where: jest.fn().mockReturnThis(),
-              andWhere: jest.fn().mockReturnThis(),
-              orderBy: jest.fn().mockReturnThis(),
-              skip: jest.fn().mockReturnThis(),
-              take: jest.fn().mockReturnThis(),
-              getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-            })),
+            createQueryBuilder: jest.fn(
+              () =>
+                ({
+                  where: jest.fn().mockReturnThis(),
+                  andWhere: jest.fn().mockReturnThis(),
+                  orderBy: jest.fn().mockReturnThis(),
+                  skip: jest.fn().mockReturnThis(),
+                  take: jest.fn().mockReturnThis(),
+                  getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+                }) as unknown as SelectQueryBuilder<AgentLLMConfig>,
+            ),
           },
         },
         {
@@ -129,14 +132,17 @@ describe('AgentsService', () => {
             findOne: jest.fn(),
             find: jest.fn(),
             remove: jest.fn(),
-            createQueryBuilder: jest.fn(() => ({
-              where: jest.fn().mockReturnThis(),
-              andWhere: jest.fn().mockReturnThis(),
-              orderBy: jest.fn().mockReturnThis(),
-              skip: jest.fn().mockReturnThis(),
-              take: jest.fn().mockReturnThis(),
-              getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-            })),
+            createQueryBuilder: jest.fn(
+              () =>
+                ({
+                  where: jest.fn().mockReturnThis(),
+                  andWhere: jest.fn().mockReturnThis(),
+                  orderBy: jest.fn().mockReturnThis(),
+                  skip: jest.fn().mockReturnThis(),
+                  take: jest.fn().mockReturnThis(),
+                  getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+                }) as unknown as SelectQueryBuilder<AgentConversation>,
+            ),
           },
         },
         {
@@ -147,6 +153,16 @@ describe('AgentsService', () => {
             findOne: jest.fn(),
             find: jest.fn(),
             remove: jest.fn(),
+            createQueryBuilder: jest.fn(
+              () =>
+                ({
+                  where: jest.fn().mockReturnThis(),
+                  orderBy: jest.fn().mockReturnThis(),
+                  skip: jest.fn().mockReturnThis(),
+                  take: jest.fn().mockReturnThis(),
+                  getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+                }) as unknown as SelectQueryBuilder<AgentMessage>,
+            ),
           },
         },
         {
@@ -268,7 +284,9 @@ describe('AgentsService', () => {
       jest
         .spyOn(llmConfigRepository, 'findOne')
         .mockResolvedValue(mockLlmConfig);
-      jest.spyOn(llmConfigRepository, 'update').mockResolvedValue({} as any);
+      jest
+        .spyOn(llmConfigRepository, 'update')
+        .mockResolvedValue({} as UpdateResult);
       jest.spyOn(llmConfigRepository, 'save').mockResolvedValue({
         ...mockLlmConfig,
         isPreferred: true,
@@ -347,15 +365,23 @@ describe('AgentsService', () => {
       jest
         .spyOn(conversationRepository, 'findOne')
         .mockResolvedValue(mockConversation);
-      jest.spyOn(messageRepository, 'find').mockResolvedValue([mockMessage]);
+      jest.spyOn(messageRepository, 'createQueryBuilder').mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockMessage], 1]),
+      } as unknown as SelectQueryBuilder<AgentMessage>);
 
       const result = await service.getMessages(
         mockConversation.id,
         mockWorkspaceId,
       );
 
-      expect(result).toHaveLength(1);
-      expect(result[0].content).toBe('Hello');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].content).toBe('Hello');
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
     });
 
     it('should throw NotFoundException when conversation not found', async () => {
@@ -400,6 +426,5 @@ describe('AgentsService', () => {
     });
   });
 
-  describe('streamMessage', () => {
-    });
+  describe('streamMessage', () => {});
 });

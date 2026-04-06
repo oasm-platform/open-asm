@@ -411,7 +411,7 @@ export class AgentsService {
     conversationId: string,
     workspaceId: string,
     query?: GetManyBaseQueryParams,
-  ): Promise<MessageResponseDto[]> {
+  ): Promise<GetManyBaseResponseDto<MessageResponseDto>> {
     // Verify conversation belongs to workspace
     const conversation = await this.conversationRepository.findOne({
       where: { id: conversationId, workspaceId },
@@ -421,26 +421,31 @@ export class AgentsService {
       throw new NotFoundException('Conversation not found');
     }
 
-    // const limit = query?.limit || 50;
-    const limit = 1000;
+    const limit = query?.limit || 10;
     const page = query?.page || 1;
 
-    const messages = await this.messageRepository.find({
-      where: { conversationId },
-      order: { createdAt: 'ASC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const qb = this.messageRepository
+      .createQueryBuilder('message')
+      .where('message.conversationId = :conversationId', { conversationId })
+      .orderBy('message.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
 
-    return messages.map((m) => ({
-      id: m.id,
-      conversationId: m.conversationId,
-      role: m.role,
-      content: m.content,
-      messageType: m.messageType,
-      metadata: m.metadata,
-      createdAt: m.createdAt,
-    }));
+    const [messages, total] = await qb.getManyAndCount();
+
+    return getManyResponse({
+      query: { ...query, page, limit } as GetManyBaseQueryParams,
+      data: messages.map((m) => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        role: m.role,
+        content: m.content,
+        messageType: m.messageType,
+        metadata: m.metadata,
+        createdAt: m.createdAt,
+      })),
+      total,
+    });
   }
 
   async deleteMessage(

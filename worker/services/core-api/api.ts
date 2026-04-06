@@ -1410,6 +1410,15 @@ export interface MessageResponseDto {
   createdAt: string;
 }
 
+export interface GetManyMessageResponseDtoDto {
+  data: MessageResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export interface SendMessageDto {
   /** @example "Hello, how can you help me?" */
   question: string;
@@ -4227,12 +4236,7 @@ export class Api<
     },
     params: RequestParams = {},
   ) =>
-    this.request<
-      AppResponseSerialization & {
-        data?: MessageResponseDto[];
-      },
-      any
-    >({
+    this.request<AppResponseSerialization, any>({
       path: `/api/agents/conversations/${id}/messages`,
       method: "GET",
       query: query,

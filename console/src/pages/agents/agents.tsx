@@ -3,7 +3,7 @@ import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
 import {
   useAgentsControllerGetLLMConfigs,
-  useAgentsControllerGetMessages,
+  useAgentsControllerGetMessagesInfinite,
   type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -48,24 +48,54 @@ export default function AgentsChatPage() {
   const { selectedWorkspace } = useWorkspaceSelector();
   const workspaceId = selectedWorkspace;
 
-  // Fetch messages when loading an existing conversation (not during streaming)
-  const { data: messagesData, isLoading: isLoadingHistory } =
-    useAgentsControllerGetMessages(conversationId!, undefined, {
+  // Fetch messages with infinite scroll
+  const {
+    data: messagesData,
+    isLoading: isLoadingHistory,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useAgentsControllerGetMessagesInfinite(
+    conversationId!,
+    { page: 1, limit: 10, sortOrder: 'DESC' },
+    {
       query: {
         queryKey: ['/api/agents/conversations', conversationId, 'messages'],
-        // Only fetch if we have a valid conversation ID and not currently streaming
         enabled: !!conversationId && !isStreamingRef.current,
+        // maxPages: 5, // limit re-fetch pages on F5/focus; page 1 is evicted when page 2+ fetches with maxPages:1
+        getNextPageParam: (lastPage) => {
+          const page = lastPage.page ?? 1;
+          const limit = lastPage.limit ?? 10;
+          const total = lastPage.total ?? 0;
+          const hasMore = page * limit < total;
+          return hasMore ? page + 1 : undefined;
+        },
+        initialPageParam: 1,
       },
-    });
+    },
+  );
 
   // Convert history messages to UIMessage format
   const savedMessages: UIMessage[] = useMemo(() => {
-    const rawData = messagesData as unknown;
-    const dataArray = Array.isArray(rawData)
-      ? rawData
-      : (rawData as { data?: unknown[] })?.data;
+    const pages = messagesData?.pages;
+    if (!pages || !Array.isArray(pages)) {
+      return [];
+    }
 
-    if (!Array.isArray(dataArray)) {
+    const dataArray = pages
+      .flatMap((p) => {
+        // Each page can be either an array of messages or an object with data/items/messages property
+        if (Array.isArray(p)) {
+          return p;
+        }
+        const pageData = p as Record<string, unknown>;
+        const rawData =
+          pageData?.data ?? pageData?.items ?? pageData?.messages ?? [];
+        return Array.isArray(rawData) ? rawData : [];
+      })
+      .reverse();
+
+    if (dataArray.length === 0) {
       return [];
     }
 
@@ -74,12 +104,7 @@ export default function AgentsChatPage() {
       return {
         id: String(m.id ?? ''),
         role: String(m.role ?? 'user').toLowerCase() as 'user' | 'assistant',
-        parts: [
-          {
-            type: 'text' as const,
-            text: String(m.content ?? ''),
-          },
-        ],
+        parts: [{ type: 'text' as const, text: String(m.content ?? '') }],
         createdAt: m.createdAt ? new Date(String(m.createdAt)) : new Date(),
       };
     });
@@ -136,30 +161,18 @@ export default function AgentsChatPage() {
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
-  const isHistoryLoadedRef = useRef(false);
-
-  // Reset loaded ref when conversation changes
+  // Sync history whenever savedMessages changes (new pages loaded) but not while streaming
   useEffect(() => {
-    isHistoryLoadedRef.current = false;
-  }, [conversationId]);
-
-  // Sync loaded history to chatMessages exactly once
-  useEffect(() => {
-    if (!conversationId) {
-      isHistoryLoadedRef.current = true;
-      return;
-    }
-
-    // Only sync if history finished loading and we haven't synced yet for this conversation
-    if (!isHistoryLoadedRef.current && !isLoadingHistory) {
-      if (savedMessages.length > 0) {
-        setMessages(savedMessages);
-      }
-      isHistoryLoadedRef.current = true;
+    if (!conversationId || isLoadingHistory || isStreamingRef.current) return;
+    if (savedMessages.length > 0) {
+      setMessages(savedMessages);
     }
   }, [conversationId, isLoadingHistory, savedMessages, setMessages]);
 
-  const displayMessages: UIMessage[] = chatMessages;
+  // Display savedMessages (history) when chatMessages is empty, otherwise use chatMessages (includes new messages)
+  // This ensures messages show immediately after loading, without waiting for sync to complete
+  const displayMessages: UIMessage[] =
+    chatMessages.length > 0 ? chatMessages : savedMessages;
 
   const lastAssistantIdx = useMemo(() => {
     for (let i = displayMessages.length - 1; i >= 0; i--) {
@@ -178,12 +191,31 @@ export default function AgentsChatPage() {
     [sendMessage],
   );
 
+  const handleSelectModel = useCallback(
+    (provider: string, model: string, configId: string) => {
+      setSelectedModel({ provider, model, configId });
+    },
+    [],
+  );
+
   const handleRetry = useCallback(async () => {
     if (lastAssistantIdx !== -1 && chatMessages.length > 0) {
       setStreamError(null);
       await regenerate();
     }
   }, [lastAssistantIdx, chatMessages, regenerate]);
+
+  const onRetryAction = useMemo(() => {
+    return lastAssistantIdx !== -1 && !isLoading ? handleRetry : undefined;
+  }, [lastAssistantIdx, isLoading, handleRetry]);
+
+  const hasSentFirstMessage = useMemo(() => {
+    return isLoading || chatMessages.length > 0;
+  }, [isLoading, chatMessages.length]);
+
+  const onLoadMoreAction = useMemo(() => {
+    return hasNextPage && !isFetchingNextPage ? fetchNextPage : undefined;
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleDismissError = useCallback(() => {
     setStreamError(null);
@@ -214,19 +246,18 @@ export default function AgentsChatPage() {
       <ChatConversation
         messages={displayMessages}
         onSendMessage={handleSendMessage}
-        onRetry={
-          lastAssistantIdx !== -1 && !isLoading ? handleRetry : undefined
-        }
+        onRetry={onRetryAction}
         isStreaming={isLoading}
         isLoadingMessages={isLoadingHistory}
         streamError={streamError}
         onDismissError={handleDismissError}
         selectedProvider={selectedModel?.provider ?? null}
         selectedModel={selectedModel?.model ?? null}
-        onSelectModel={(provider, model, configId) => {
-          setSelectedModel({ provider, model, configId });
-        }}
-        hasSentFirstMessage={isLoading || chatMessages.length > 0}
+        onSelectModel={handleSelectModel}
+        hasSentFirstMessage={hasSentFirstMessage}
+        onLoadMore={onLoadMoreAction}
+        hasMoreMessages={hasNextPage ?? false}
+        isLoadingMoreMessages={isFetchingNextPage}
       />
     </div>
   );

@@ -33,7 +33,14 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 
 interface ToolCallState {
   toolCallId: string;
@@ -55,6 +62,9 @@ interface ChatConversationProps {
   selectedModel?: string | null;
   onSelectModel?: (provider: string, model: string, configId: string) => void;
   hasSentFirstMessage?: boolean;
+  onLoadMore?: () => void;
+  hasMoreMessages?: boolean;
+  isLoadingMoreMessages?: boolean;
 }
 
 const getTextContent = (message: UIMessage): string => {
@@ -276,7 +286,81 @@ function AnimatedMessageContent({
   return <>{children(displayedText)}</>;
 }
 
-export function ChatConversation({
+// Memoized individual message component to prevent list re-renders on every parent render
+const ChatMessage = memo(function ChatMessage({
+  message,
+  idx,
+  messagesLength,
+  isStreaming,
+}: {
+  message: UIMessage;
+  idx: number;
+  messagesLength: number;
+  isStreaming: boolean;
+}) {
+  const textContent = getTextContent(message);
+  const toolCalls = getToolCallsFromParts(message);
+  const hasContent = textContent.length > 0 || toolCalls.length > 0;
+  const isLastAssistant =
+    message.role === 'assistant' && idx === messagesLength - 1;
+  const isStreamingActive = isLastAssistant && isStreaming;
+
+  return (
+    <Message from={message.role}>
+      <MessageContent expandable={message.role === 'user'}>
+        <div className={message.role === 'user' ? '' : 'space-y-3'}>
+          {toolCalls.length > 0 && (
+            <div className="space-y-2">
+              {toolCalls.map((toolCall) => (
+                <ToolCallDisplay
+                  key={toolCall.toolCallId}
+                  toolCall={toolCall}
+                />
+              ))}
+            </div>
+          )}
+          {textContent && (
+            <AnimatedMessageContent
+              text={textContent}
+              isStreaming={isStreamingActive}
+            >
+              {(displayText) => (
+                <Markdown content={displayText} preview={false} />
+              )}
+            </AnimatedMessageContent>
+          )}
+
+          {message.role === 'assistant' && isStreamingActive && (
+            <div className="min-h-[26px]">
+              <div
+                className={`flex items-center gap-2 ${hasContent ? 'mt-2' : 'py-1'}`}
+              >
+                <Loader2
+                  className={`${hasContent ? 'size-4' : 'size-5'} animate-spin text-muted-foreground`}
+                />
+                <span
+                  className={`${hasContent ? 'text-sm' : 'text-base'} font-medium text-muted-foreground`}
+                >
+                  Thinking…
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </MessageContent>
+
+      {message.role === 'assistant' &&
+        hasContent &&
+        message.id !== 'streaming' && (
+          <MessageActions>
+            {textContent && <CopyButton text={textContent} />}
+          </MessageActions>
+        )}
+    </Message>
+  );
+});
+
+export const ChatConversation = memo(function ChatConversation({
   messages,
   onSendMessage,
   onRetry,
@@ -287,10 +371,110 @@ export function ChatConversation({
   selectedProvider,
   selectedModel,
   onSelectModel,
+  onLoadMore,
+  hasMoreMessages = false,
+  isLoadingMoreMessages = false,
 }: ChatConversationProps) {
   const [input, setInput] = useState('');
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const prevStreamingRef = useRef(false);
+  const isLoadingMoreRef = useRef(false);
+
+  // Stable refs for values used inside the IntersectionObserver callback
+  const onLoadMoreRef = useRef(onLoadMore);
+  const hasMoreRef = useRef(hasMoreMessages);
+
+  // Keep refs in sync with latest prop values
+  useEffect(() => {
+    isLoadingMoreRef.current = isLoadingMoreMessages;
+  }, [isLoadingMoreMessages]);
+  useEffect(() => {
+    onLoadMoreRef.current = onLoadMore;
+  }, [onLoadMore]);
+  useEffect(() => {
+    hasMoreRef.current = hasMoreMessages;
+  }, [hasMoreMessages]);
+
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
+
+  // Use a ref-callback instead of useRef + useEffect so the observer is created
+  // exactly when the sentinel element mounts into the DOM.
+  // With useEffect([], []), the effect ran at component-mount time when
+  // isLoadingHistory=true → the sentinel div was not in the DOM yet →
+  // sentinelRef.current was null → the observer was never created.
+  // const [isIntersecting, setIsIntersecting] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const sentinelRef = useCallback((el: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (el) {
+      let currentScrollContainer = scrollContainerRef.current;
+
+      if (!currentScrollContainer) {
+        let parent = el.parentElement;
+        while (parent) {
+          const style = window.getComputedStyle(parent);
+          if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+            currentScrollContainer = parent;
+            break;
+          }
+          parent = parent.parentElement;
+        }
+        if (!currentScrollContainer) {
+          currentScrollContainer = el.parentElement;
+        }
+        scrollContainerRef.current = currentScrollContainer;
+      }
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (
+            entry.isIntersecting &&
+            hasMoreRef.current &&
+            !isLoadingMoreRef.current &&
+            onLoadMoreRef.current
+          ) {
+            onLoadMoreRef.current();
+          }
+        },
+        {
+          root: currentScrollContainer,
+          rootMargin: '400px 0px 0px 0px',
+        },
+      );
+
+      observer.observe(el);
+      observerRef.current = observer;
+    }
+  }, []);
+
+  const prevScrollHeightRef = useRef<number>(0);
+  const prevMessageCountRef = useRef<number>(0);
+
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    container.style.overflowAnchor = 'none';
+
+    if (
+      messages.length > prevMessageCountRef.current &&
+      prevMessageCountRef.current > 0
+    ) {
+      const heightDifference =
+        container.scrollHeight - prevScrollHeightRef.current;
+
+      if (heightDifference > 0) {
+        container.scrollTop += heightDifference;
+      }
+    }
+
+    prevScrollHeightRef.current = container.scrollHeight;
+    prevMessageCountRef.current = messages.length;
+  }, [messages]);
 
   // Track last user message for retry context
   useEffect(() => {
@@ -306,12 +490,15 @@ export function ChatConversation({
     prevStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
-  const handleSubmit = (message: PromptInputMessage) => {
-    if (message.text.trim() && !isStreaming) {
-      onSendMessage(message.text.trim());
-      setInput('');
-    }
-  };
+  const handleSubmit = useCallback(
+    (message: PromptInputMessage) => {
+      if (message.text.trim() && !isStreaming) {
+        onSendMessage(message.text.trim());
+        setInput('');
+      }
+    },
+    [isStreaming, onSendMessage],
+  );
 
   const handleRetry = useCallback(() => {
     if (onRetry) {
@@ -380,73 +567,25 @@ export function ChatConversation({
             />
           ) : (
             <>
-              {messages.map((message, idx) => {
-                const textContent = getTextContent(message);
-                const toolCalls = getToolCallsFromParts(message);
-                const hasContent =
-                  textContent.length > 0 || toolCalls.length > 0;
-                const isLastAssistant =
-                  message.role === 'assistant' && idx === messages.length - 1;
-                const isStreamingActive = isLastAssistant && isStreaming;
+              {/* Sentinel div for infinite scroll - positioned at top of messages */}
+              <div ref={sentinelRef} className="h-px" aria-hidden="true" />
 
-                return (
-                  <Message key={message.id} from={message.role}>
-                    <MessageContent expandable={message.role === 'user'}>
-                      <div
-                        className={message.role === 'user' ? '' : 'space-y-3'}
-                      >
-                        {toolCalls.length > 0 && (
-                          <div className="space-y-2">
-                            {toolCalls.map((toolCall) => (
-                              <ToolCallDisplay
-                                key={toolCall.toolCallId}
-                                toolCall={toolCall}
-                              />
-                            ))}
-                          </div>
-                        )}
-                        {textContent && (
-                          <AnimatedMessageContent
-                            text={textContent}
-                            isStreaming={isStreamingActive}
-                          >
-                            {(displayText) => (
-                              <Markdown content={displayText} preview={false} />
-                            )}
-                          </AnimatedMessageContent>
-                        )}
+              {/* Loading indicator for older messages */}
+              {isLoadingMoreMessages && (
+                <div className="flex justify-center py-2">
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
 
-                        {message.role === 'assistant' && (
-                          <div className="min-h-[26px]">
-                            {isStreamingActive && (
-                              <div
-                                className={`flex items-center gap-2 ${hasContent ? 'mt-2' : 'py-1'}`}
-                              >
-                                <Loader2
-                                  className={`${hasContent ? 'size-4' : 'size-5'} animate-spin text-muted-foreground`}
-                                />
-                                <span
-                                  className={`${hasContent ? 'text-sm' : 'text-base'} font-medium text-muted-foreground`}
-                                >
-                                  Thinking…
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </MessageContent>
-
-                    {message.role === 'assistant' &&
-                      hasContent &&
-                      message.id !== 'streaming' && (
-                        <MessageActions>
-                          {textContent && <CopyButton text={textContent} />}
-                        </MessageActions>
-                      )}
-                  </Message>
-                );
-              })}
+              {messages.map((message, idx) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  idx={idx}
+                  messagesLength={messages.length}
+                  isStreaming={isStreaming}
+                />
+              ))}
             </>
           )}
 
@@ -524,4 +663,4 @@ export function ChatConversation({
       </div>
     </div>
   );
-}
+});
