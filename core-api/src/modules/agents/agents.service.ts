@@ -435,12 +435,9 @@ export class AgentsService {
 
     const [messages, total] = await qb.getManyAndCount();
 
-    // Reverse to get oldest first for response (ASC order)
-    const reversedMessages = messages.reverse();
-
     return getManyResponse({
       query: { ...query, page, limit } as GetManyBaseQueryParams,
-      data: reversedMessages.map((m) => ({
+      data: messages.map((m) => ({
         id: m.id,
         conversationId: m.conversationId,
         role: m.role,

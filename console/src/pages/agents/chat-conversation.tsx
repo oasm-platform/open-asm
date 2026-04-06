@@ -321,8 +321,6 @@ export function ChatConversation({
   }, [hasMoreMessages]);
 
   const scrollContainerRef = useRef<HTMLElement | null>(null);
-  const previousScrollHeightRef = useRef<number>(0);
-  const previousMessageCountRef = useRef<number>(0);
 
   // Use a ref-callback instead of useRef + useEffect so the observer is created
   // exactly when the sentinel element mounts into the DOM.
@@ -338,24 +336,24 @@ export function ChatConversation({
     }
 
     if (el) {
-      // Tự động tìm thẻ cha có chứa thanh cuộn để gán vào ref
-      if (!scrollContainerRef.current) {
+      let currentScrollContainer = scrollContainerRef.current;
+
+      if (!currentScrollContainer) {
         let parent = el.parentElement;
         while (parent) {
           const style = window.getComputedStyle(parent);
           if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-            scrollContainerRef.current = parent;
+            currentScrollContainer = parent;
             break;
           }
           parent = parent.parentElement;
         }
-        // Fallback: nếu không dò được style, lấy thẻ cha gần nhất
-        if (!scrollContainerRef.current) {
-          scrollContainerRef.current = el.parentElement;
+        if (!currentScrollContainer) {
+          currentScrollContainer = el.parentElement;
         }
+        scrollContainerRef.current = currentScrollContainer;
       }
 
-      // Khởi tạo observer
       const observer = new IntersectionObserver(
         ([entry]) => {
           if (
@@ -367,7 +365,10 @@ export function ChatConversation({
             onLoadMoreRef.current();
           }
         },
-        { rootMargin: '10px' },
+        {
+          root: currentScrollContainer,
+          rootMargin: '400px 0px 0px 0px',
+        },
       );
 
       observer.observe(el);
@@ -375,42 +376,30 @@ export function ChatConversation({
     }
   }, []);
 
+  const prevScrollHeightRef = useRef<number>(0);
+  const prevMessageCountRef = useRef<number>(0);
+
   useLayoutEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // KHI ĐANG LOAD: Lưu lại chiều cao cũ trước khi tin nhắn mới được render
-    if (isLoadingMoreMessages) {
-      previousScrollHeightRef.current = container.scrollHeight;
-    }
-    // KHI LOAD XONG (Có tin nhắn mới chèn vào DOM):
-    else if (
-      messages.length > previousMessageCountRef.current &&
-      previousMessageCountRef.current > 0
+    container.style.overflowAnchor = 'none';
+
+    if (
+      messages.length > prevMessageCountRef.current &&
+      prevMessageCountRef.current > 0
     ) {
-      const currentScrollHeight = container.scrollHeight;
-      // Chiều cao mới tăng lên bao nhiêu...
       const heightDifference =
-        currentScrollHeight - previousScrollHeightRef.current;
+        container.scrollHeight - prevScrollHeightRef.current;
 
-      // ...thì cộng thêm bấy nhiêu vào vị trí cuộn (scrollTop) để triệt tiêu sự chênh lệch
-      container.scrollTop += heightDifference;
+      if (heightDifference > 0) {
+        container.scrollTop += heightDifference;
+      }
     }
 
-    // Cập nhật lại số lượng tin nhắn hiện tại
-    previousMessageCountRef.current = messages.length;
-  }, [messages, isLoadingMoreMessages]);
-
-  // useEffect(() => {
-  //   if (
-  //     isIntersecting &&
-  //     hasMoreMessages &&
-  //     !isLoadingMoreMessages &&
-  //     onLoadMore
-  //   ) {
-  //     onLoadMore();
-  //   }
-  // }, [isIntersecting, hasMoreMessages, isLoadingMoreMessages, onLoadMore]);
+    prevScrollHeightRef.current = container.scrollHeight;
+    prevMessageCountRef.current = messages.length;
+  }, [messages]);
 
   // Track last user message for retry context
   useEffect(() => {

@@ -82,24 +82,19 @@ export default function AgentsChatPage() {
       return [];
     }
 
-    // Each page is DESC (newest first). Reverse each page, then put pages in
-    // reverse-page order so combined result is oldest→newest overall.
-    const dataArray = [...pages].reverse().flatMap((p) => {
-      const pageData = p as { data?: unknown[] };
-      return Array.isArray(pageData?.data) ? [...pageData.data] : [];
-    });
+    const dataArray = pages
+      .flatMap((p) => {
+        const pageData = p as { data?: unknown[] };
+        return Array.isArray(pageData?.data) ? pageData.data : [];
+      })
+      .reverse();
 
     return dataArray.map((msg) => {
       const m = msg as Record<string, unknown>;
       return {
         id: String(m.id ?? ''),
         role: String(m.role ?? 'user').toLowerCase() as 'user' | 'assistant',
-        parts: [
-          {
-            type: 'text' as const,
-            text: String(m.content ?? ''),
-          },
-        ],
+        parts: [{ type: 'text' as const, text: String(m.content ?? '') }],
         createdAt: m.createdAt ? new Date(String(m.createdAt)) : new Date(),
       };
     });
