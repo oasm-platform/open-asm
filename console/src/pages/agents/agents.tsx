@@ -90,10 +90,7 @@ export default function AgentsChatPage() {
         }
         const pageData = p as Record<string, unknown>;
         const rawData =
-          pageData?.data ??
-          pageData?.items ??
-          pageData?.messages ??
-          [];
+          pageData?.data ?? pageData?.items ?? pageData?.messages ?? [];
         return Array.isArray(rawData) ? rawData : [];
       })
       .reverse();
@@ -194,12 +191,31 @@ export default function AgentsChatPage() {
     [sendMessage],
   );
 
+  const handleSelectModel = useCallback(
+    (provider: string, model: string, configId: string) => {
+      setSelectedModel({ provider, model, configId });
+    },
+    [],
+  );
+
   const handleRetry = useCallback(async () => {
     if (lastAssistantIdx !== -1 && chatMessages.length > 0) {
       setStreamError(null);
       await regenerate();
     }
   }, [lastAssistantIdx, chatMessages, regenerate]);
+
+  const onRetryAction = useMemo(() => {
+    return lastAssistantIdx !== -1 && !isLoading ? handleRetry : undefined;
+  }, [lastAssistantIdx, isLoading, handleRetry]);
+
+  const hasSentFirstMessage = useMemo(() => {
+    return isLoading || chatMessages.length > 0;
+  }, [isLoading, chatMessages.length]);
+
+  const onLoadMoreAction = useMemo(() => {
+    return hasNextPage && !isFetchingNextPage ? fetchNextPage : undefined;
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleDismissError = useCallback(() => {
     setStreamError(null);
@@ -230,22 +246,16 @@ export default function AgentsChatPage() {
       <ChatConversation
         messages={displayMessages}
         onSendMessage={handleSendMessage}
-        onRetry={
-          lastAssistantIdx !== -1 && !isLoading ? handleRetry : undefined
-        }
+        onRetry={onRetryAction}
         isStreaming={isLoading}
         isLoadingMessages={isLoadingHistory}
         streamError={streamError}
         onDismissError={handleDismissError}
         selectedProvider={selectedModel?.provider ?? null}
         selectedModel={selectedModel?.model ?? null}
-        onSelectModel={(provider, model, configId) => {
-          setSelectedModel({ provider, model, configId });
-        }}
-        hasSentFirstMessage={isLoading || chatMessages.length > 0}
-        onLoadMore={
-          hasNextPage && !isFetchingNextPage ? fetchNextPage : undefined
-        }
+        onSelectModel={handleSelectModel}
+        hasSentFirstMessage={hasSentFirstMessage}
+        onLoadMore={onLoadMoreAction}
         hasMoreMessages={hasNextPage ?? false}
         isLoadingMoreMessages={isFetchingNextPage}
       />

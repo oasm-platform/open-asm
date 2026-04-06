@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { CodeBlock } from './code-block';
-import type { ComponentPropsWithoutRef } from 'react';
+import { memo, type ComponentPropsWithoutRef } from 'react';
 
 interface MarkdownProps {
   content: string;
@@ -10,7 +10,11 @@ interface MarkdownProps {
   preview?: boolean;
 }
 
-export function Markdown({ content, className, preview }: MarkdownProps) {
+export const Markdown = memo(function Markdown({
+  content,
+  className,
+  preview,
+}: MarkdownProps) {
   const components: Record<string, React.ElementType> = preview
     ? {
         p: (props: ComponentPropsWithoutRef<'p'>) => <span {...props} />,
@@ -157,4 +161,4 @@ export function Markdown({ content, className, preview }: MarkdownProps) {
       </ReactMarkdown>
     </div>
   );
-}
+});

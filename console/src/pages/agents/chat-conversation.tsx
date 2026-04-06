@@ -34,6 +34,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -285,7 +286,81 @@ function AnimatedMessageContent({
   return <>{children(displayedText)}</>;
 }
 
-export function ChatConversation({
+// Memoized individual message component to prevent list re-renders on every parent render
+const ChatMessage = memo(function ChatMessage({
+  message,
+  idx,
+  messagesLength,
+  isStreaming,
+}: {
+  message: UIMessage;
+  idx: number;
+  messagesLength: number;
+  isStreaming: boolean;
+}) {
+  const textContent = getTextContent(message);
+  const toolCalls = getToolCallsFromParts(message);
+  const hasContent = textContent.length > 0 || toolCalls.length > 0;
+  const isLastAssistant =
+    message.role === 'assistant' && idx === messagesLength - 1;
+  const isStreamingActive = isLastAssistant && isStreaming;
+
+  return (
+    <Message from={message.role}>
+      <MessageContent expandable={message.role === 'user'}>
+        <div className={message.role === 'user' ? '' : 'space-y-3'}>
+          {toolCalls.length > 0 && (
+            <div className="space-y-2">
+              {toolCalls.map((toolCall) => (
+                <ToolCallDisplay
+                  key={toolCall.toolCallId}
+                  toolCall={toolCall}
+                />
+              ))}
+            </div>
+          )}
+          {textContent && (
+            <AnimatedMessageContent
+              text={textContent}
+              isStreaming={isStreamingActive}
+            >
+              {(displayText) => (
+                <Markdown content={displayText} preview={false} />
+              )}
+            </AnimatedMessageContent>
+          )}
+
+          {message.role === 'assistant' && isStreamingActive && (
+            <div className="min-h-[26px]">
+              <div
+                className={`flex items-center gap-2 ${hasContent ? 'mt-2' : 'py-1'}`}
+              >
+                <Loader2
+                  className={`${hasContent ? 'size-4' : 'size-5'} animate-spin text-muted-foreground`}
+                />
+                <span
+                  className={`${hasContent ? 'text-sm' : 'text-base'} font-medium text-muted-foreground`}
+                >
+                  Thinking…
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </MessageContent>
+
+      {message.role === 'assistant' &&
+        hasContent &&
+        message.id !== 'streaming' && (
+          <MessageActions>
+            {textContent && <CopyButton text={textContent} />}
+          </MessageActions>
+        )}
+    </Message>
+  );
+});
+
+export const ChatConversation = memo(function ChatConversation({
   messages,
   onSendMessage,
   onRetry,
@@ -415,12 +490,15 @@ export function ChatConversation({
     prevStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
-  const handleSubmit = (message: PromptInputMessage) => {
-    if (message.text.trim() && !isStreaming) {
-      onSendMessage(message.text.trim());
-      setInput('');
-    }
-  };
+  const handleSubmit = useCallback(
+    (message: PromptInputMessage) => {
+      if (message.text.trim() && !isStreaming) {
+        onSendMessage(message.text.trim());
+        setInput('');
+      }
+    },
+    [isStreaming, onSendMessage],
+  );
 
   const handleRetry = useCallback(() => {
     if (onRetry) {
@@ -499,71 +577,15 @@ export function ChatConversation({
                 </div>
               )}
 
-              {messages.map((message, idx) => {
-                const textContent = getTextContent(message);
-                const toolCalls = getToolCallsFromParts(message);
-                const hasContent =
-                  textContent.length > 0 || toolCalls.length > 0;
-                const isLastAssistant =
-                  message.role === 'assistant' && idx === messages.length - 1;
-                const isStreamingActive = isLastAssistant && isStreaming;
-
-                return (
-                  <Message key={message.id} from={message.role}>
-                    <MessageContent expandable={message.role === 'user'}>
-                      <div
-                        className={message.role === 'user' ? '' : 'space-y-3'}
-                      >
-                        {toolCalls.length > 0 && (
-                          <div className="space-y-2">
-                            {toolCalls.map((toolCall) => (
-                              <ToolCallDisplay
-                                key={toolCall.toolCallId}
-                                toolCall={toolCall}
-                              />
-                            ))}
-                          </div>
-                        )}
-                        {textContent && (
-                          <AnimatedMessageContent
-                            text={textContent}
-                            isStreaming={isStreamingActive}
-                          >
-                            {(displayText) => (
-                              <Markdown content={displayText} preview={false} />
-                            )}
-                          </AnimatedMessageContent>
-                        )}
-
-                        {message.role === 'assistant' && isStreamingActive && (
-                          <div className="min-h-[26px]">
-                            <div
-                              className={`flex items-center gap-2 ${hasContent ? 'mt-2' : 'py-1'}`}
-                            >
-                              <Loader2
-                                className={`${hasContent ? 'size-4' : 'size-5'} animate-spin text-muted-foreground`}
-                              />
-                              <span
-                                className={`${hasContent ? 'text-sm' : 'text-base'} font-medium text-muted-foreground`}
-                              >
-                                Thinking…
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </MessageContent>
-
-                    {message.role === 'assistant' &&
-                      hasContent &&
-                      message.id !== 'streaming' && (
-                        <MessageActions>
-                          {textContent && <CopyButton text={textContent} />}
-                        </MessageActions>
-                      )}
-                  </Message>
-                );
-              })}
+              {messages.map((message, idx) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  idx={idx}
+                  messagesLength={messages.length}
+                  isStreaming={isStreaming}
+                />
+              ))}
             </>
           )}
 
@@ -641,4 +663,4 @@ export function ChatConversation({
       </div>
     </div>
   );
-}
+});
