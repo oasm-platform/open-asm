@@ -33,7 +33,13 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 
 interface ToolCallState {
   toolCallId: string;
@@ -55,6 +61,9 @@ interface ChatConversationProps {
   selectedModel?: string | null;
   onSelectModel?: (provider: string, model: string, configId: string) => void;
   hasSentFirstMessage?: boolean;
+  onLoadMore?: () => void;
+  hasMoreMessages?: boolean;
+  isLoadingMoreMessages?: boolean;
 }
 
 const getTextContent = (message: UIMessage): string => {
@@ -287,10 +296,121 @@ export function ChatConversation({
   selectedProvider,
   selectedModel,
   onSelectModel,
+  onLoadMore,
+  hasMoreMessages = false,
+  isLoadingMoreMessages = false,
 }: ChatConversationProps) {
   const [input, setInput] = useState('');
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const prevStreamingRef = useRef(false);
+  const isLoadingMoreRef = useRef(false);
+
+  // Stable refs for values used inside the IntersectionObserver callback
+  const onLoadMoreRef = useRef(onLoadMore);
+  const hasMoreRef = useRef(hasMoreMessages);
+
+  // Keep refs in sync with latest prop values
+  useEffect(() => {
+    isLoadingMoreRef.current = isLoadingMoreMessages;
+  }, [isLoadingMoreMessages]);
+  useEffect(() => {
+    onLoadMoreRef.current = onLoadMore;
+  }, [onLoadMore]);
+  useEffect(() => {
+    hasMoreRef.current = hasMoreMessages;
+  }, [hasMoreMessages]);
+
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
+  const previousScrollHeightRef = useRef<number>(0);
+  const previousMessageCountRef = useRef<number>(0);
+
+  // Use a ref-callback instead of useRef + useEffect so the observer is created
+  // exactly when the sentinel element mounts into the DOM.
+  // With useEffect([], []), the effect ran at component-mount time when
+  // isLoadingHistory=true → the sentinel div was not in the DOM yet →
+  // sentinelRef.current was null → the observer was never created.
+  // const [isIntersecting, setIsIntersecting] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const sentinelRef = useCallback((el: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (el) {
+      // Tự động tìm thẻ cha có chứa thanh cuộn để gán vào ref
+      if (!scrollContainerRef.current) {
+        let parent = el.parentElement;
+        while (parent) {
+          const style = window.getComputedStyle(parent);
+          if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+            scrollContainerRef.current = parent;
+            break;
+          }
+          parent = parent.parentElement;
+        }
+        // Fallback: nếu không dò được style, lấy thẻ cha gần nhất
+        if (!scrollContainerRef.current) {
+          scrollContainerRef.current = el.parentElement;
+        }
+      }
+
+      // Khởi tạo observer
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (
+            entry.isIntersecting &&
+            hasMoreRef.current &&
+            !isLoadingMoreRef.current &&
+            onLoadMoreRef.current
+          ) {
+            onLoadMoreRef.current();
+          }
+        },
+        { rootMargin: '10px' },
+      );
+
+      observer.observe(el);
+      observerRef.current = observer;
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // KHI ĐANG LOAD: Lưu lại chiều cao cũ trước khi tin nhắn mới được render
+    if (isLoadingMoreMessages) {
+      previousScrollHeightRef.current = container.scrollHeight;
+    }
+    // KHI LOAD XONG (Có tin nhắn mới chèn vào DOM):
+    else if (
+      messages.length > previousMessageCountRef.current &&
+      previousMessageCountRef.current > 0
+    ) {
+      const currentScrollHeight = container.scrollHeight;
+      // Chiều cao mới tăng lên bao nhiêu...
+      const heightDifference =
+        currentScrollHeight - previousScrollHeightRef.current;
+
+      // ...thì cộng thêm bấy nhiêu vào vị trí cuộn (scrollTop) để triệt tiêu sự chênh lệch
+      container.scrollTop += heightDifference;
+    }
+
+    // Cập nhật lại số lượng tin nhắn hiện tại
+    previousMessageCountRef.current = messages.length;
+  }, [messages, isLoadingMoreMessages]);
+
+  // useEffect(() => {
+  //   if (
+  //     isIntersecting &&
+  //     hasMoreMessages &&
+  //     !isLoadingMoreMessages &&
+  //     onLoadMore
+  //   ) {
+  //     onLoadMore();
+  //   }
+  // }, [isIntersecting, hasMoreMessages, isLoadingMoreMessages, onLoadMore]);
 
   // Track last user message for retry context
   useEffect(() => {
@@ -380,6 +500,16 @@ export function ChatConversation({
             />
           ) : (
             <>
+              {/* Sentinel div for infinite scroll - positioned at top of messages */}
+              <div ref={sentinelRef} className="h-px" aria-hidden="true" />
+
+              {/* Loading indicator for older messages */}
+              {isLoadingMoreMessages && (
+                <div className="flex justify-center py-2">
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
               {messages.map((message, idx) => {
                 const textContent = getTextContent(message);
                 const toolCalls = getToolCallsFromParts(message);
@@ -416,22 +546,20 @@ export function ChatConversation({
                           </AnimatedMessageContent>
                         )}
 
-                        {message.role === 'assistant' && (
+                        {message.role === 'assistant' && isStreamingActive && (
                           <div className="min-h-[26px]">
-                            {isStreamingActive && (
-                              <div
-                                className={`flex items-center gap-2 ${hasContent ? 'mt-2' : 'py-1'}`}
+                            <div
+                              className={`flex items-center gap-2 ${hasContent ? 'mt-2' : 'py-1'}`}
+                            >
+                              <Loader2
+                                className={`${hasContent ? 'size-4' : 'size-5'} animate-spin text-muted-foreground`}
+                              />
+                              <span
+                                className={`${hasContent ? 'text-sm' : 'text-base'} font-medium text-muted-foreground`}
                               >
-                                <Loader2
-                                  className={`${hasContent ? 'size-4' : 'size-5'} animate-spin text-muted-foreground`}
-                                />
-                                <span
-                                  className={`${hasContent ? 'text-sm' : 'text-base'} font-medium text-muted-foreground`}
-                                >
-                                  Thinking…
-                                </span>
-                              </div>
-                            )}
+                                Thinking…
+                              </span>
+                            </div>
                           </div>
                         )}
                       </div>

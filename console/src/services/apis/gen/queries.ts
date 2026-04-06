@@ -2223,10 +2223,6 @@ export type AgentsControllerGetMessagesParams = {
   sortOrder?: string;
 };
 
-export type AgentsControllerGetMessages200 = AppResponseSerialization & {
-  data?: MessageResponseDto[];
-};
-
 export type ProvidersControllerGetManyProvidersParams = {
   search?: string;
   page?: number;
@@ -17896,7 +17892,7 @@ export const agentsControllerGetMessages = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AgentsControllerGetMessages200>(
+  return orvalClient<MessageResponseDto>(
     {
       url: `/api/agents/conversations/${id}/messages`,
       method: 'GET',

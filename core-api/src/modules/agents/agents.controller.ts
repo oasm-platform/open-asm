@@ -1,7 +1,7 @@
 import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { GetManyBaseQueryParams, GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -228,13 +228,13 @@ export class AgentsController {
       getWorkspaceId: true,
       params: [{ name: 'id', description: 'Conversation ID' }],
     },
-    response: { serialization: MessageResponseDto, isArray: true },
+    response: { serialization: MessageResponseDto },
   })
   async getMessages(
     @Param() { id }: IdQueryParamDto,
     @Query() query: GetManyBaseQueryParams,
     @WorkspaceId() workspaceId: string,
-  ): Promise<MessageResponseDto[]> {
+  ): Promise<GetManyBaseResponseDto<MessageResponseDto>> {
     return this.agentsService.getMessages(id, workspaceId, query);
   }
 

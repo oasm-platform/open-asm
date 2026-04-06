@@ -4227,12 +4227,7 @@ export class Api<
     },
     params: RequestParams = {},
   ) =>
-    this.request<
-      AppResponseSerialization & {
-        data?: MessageResponseDto[];
-      },
-      any
-    >({
+    this.request<AppResponseSerialization, any>({
       path: `/api/agents/conversations/${id}/messages`,
       method: "GET",
       query: query,
