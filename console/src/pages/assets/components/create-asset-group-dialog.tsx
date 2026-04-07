@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useAssetGroupControllerCreate,
   type AssetGroup,
@@ -42,7 +42,9 @@ export function CreateAssetGroupDialog({
   onSuccess,
 }: CreateAssetGroupDialogProps) {
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -55,7 +57,7 @@ export function CreateAssetGroupDialog({
     useAssetGroupControllerCreate();
 
   const onSubmit = (values: FormValues) => {
-    if (!selectedWorkspace) {
+    if (!selectedWorkspaceId) {
       // Handle case where workspace is not selected
       console.error('No workspace selected');
       return;

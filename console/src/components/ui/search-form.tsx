@@ -1,36 +1,36 @@
-import { Label } from "@/components/ui/label";
+import { Label } from '@/components/ui/label';
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarInput,
-} from "@/components/ui/sidebar";
-import useDebounce from "@/hooks/use-debounce";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
+} from '@/components/ui/sidebar';
+import useDebounce from '@/hooks/use-debounce';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useSearchControllerDeleteSearchHistory,
   useSearchControllerGetSearchHistory,
   useSearchControllerSearchAssetsTargets,
-} from "@/services/apis/gen/queries";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient } from "@tanstack/react-query";
-import { CloudCheck, HistoryIcon, Search, Target, X } from "lucide-react";
-import * as React from "react";
-import { useForm, type UseFormSetValue } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
-import { z } from "zod";
-import { Form, FormField } from "./form";
-import { Popover, PopoverContent, PopoverTrigger } from "./popover";
-import { Skeleton } from "./skeleton";
+} from '@/services/apis/gen/queries';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
+import { CloudCheck, HistoryIcon, Search, Target, X } from 'lucide-react';
+import * as React from 'react';
+import { useForm, type UseFormSetValue } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import { z } from 'zod';
+import { Form, FormField } from './form';
+import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import { Skeleton } from './skeleton';
 
 const formSchema = z.object({
   value: z.string().min(1),
 });
 
-export function SearchForm({ ...props }: React.ComponentProps<"form">) {
+export function SearchForm({ ...props }: React.ComponentProps<'form'>) {
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      value: "",
+      value: '',
     },
   });
 
@@ -79,7 +79,7 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
                 >
                   <DropdownCard
                     setValue={form.setValue}
-                    value={form.watch("value")}
+                    value={form.watch('value')}
                   />
                 </PopoverContent>
               </Popover>
@@ -99,7 +99,9 @@ const DropdownCard = React.memo(
     setValue: UseFormSetValue<{ value: string }>;
     value: string;
   }) => {
-    const { selectedWorkspace } = useWorkspaceSelector();
+    const {
+      state: { selectedWorkspaceId },
+    } = useWorkspaceState();
     const { mutate } = useSearchControllerDeleteSearchHistory();
 
     const debouncedValue = useDebounce(value, 500);
@@ -109,7 +111,7 @@ const DropdownCard = React.memo(
     const { data, isFetching } = useSearchControllerSearchAssetsTargets(
       {
         value: debouncedValue,
-        workspaceId: selectedWorkspace?.toString() || "",
+        workspaceId: selectedWorkspaceId || '',
         isSaveHistory: false,
       },
       { query: { enabled: value.length > 0 } },
@@ -120,7 +122,7 @@ const DropdownCard = React.memo(
       isFetching: isHistoryFetching,
       queryKey,
     } = useSearchControllerGetSearchHistory({
-      workspaceId: selectedWorkspace?.toString() || "",
+      workspaceId: selectedWorkspaceId || '',
       query: debouncedValue,
       limit: value.length > 0 ? 3 : 10,
     });
@@ -161,7 +163,7 @@ const DropdownCard = React.memo(
               <div
                 key={e.id}
                 className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors group"
-                onClick={() => setValue("value", e.query)}
+                onClick={() => setValue('value', e.query)}
               >
                 <HistoryIcon className="size-4 text-gray-400 group-hover:text-gray-600" />
                 <span className="text-gray-700 dark:text-gray-300 truncate">
@@ -193,7 +195,7 @@ const DropdownCard = React.memo(
               <div
                 key={target.id}
                 className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors group"
-                onClick={() => navigate("targets/" + target.id)}
+                onClick={() => navigate('targets/' + target.id)}
               >
                 <Target className="size-4 text-gray-400 group-hover:text-gray-600" />
                 <span className="text-gray-700 dark:text-gray-300 truncate">
@@ -207,7 +209,7 @@ const DropdownCard = React.memo(
             data.data.assets.map((asset) => (
               <div
                 key={asset.id}
-                onClick={() => navigate("assets/" + asset.id)}
+                onClick={() => navigate('assets/' + asset.id)}
                 className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors group"
               >
                 <CloudCheck className="size-4 text-gray-400 group-hover:text-gray-600" />

@@ -10,7 +10,7 @@ interface WorkspaceState {
 }
 
 // Create global workspace state
-const useWorkspaceState = createState<WorkspaceState>(
+export const useWorkspaceState = createState<WorkspaceState>(
   'workspace',
   { selectedWorkspaceId: '' },
   {
@@ -43,6 +43,7 @@ export function useWorkspaceSelector() {
     {
       query: {
         queryKey: ['workspaces'],
+        staleTime: 1000 * 60 * 5,
       },
     },
   );
