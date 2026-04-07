@@ -5,19 +5,20 @@ import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { GrpcMethod, GrpcStreamMethod } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
+import { mergeMap, Observable } from 'rxjs';
 import {
   GetManyWorkersDto,
   WorkerAliveDto,
   WorkerJoinDto,
+  WorkerManifestResponseDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
-import { mergeMap, Observable } from 'rxjs';
 
 @ApiTags('Workers')
 @Controller('workers')
 export class WorkersController {
-  constructor(private readonly workersService: WorkersService) {}
+  constructor(private readonly workersService: WorkersService) { }
 
   @Doc({
     summary: 'Worker alive',
@@ -58,6 +59,19 @@ export class WorkersController {
   @Get()
   getWorkers(@Query() query: GetManyWorkersDto) {
     return this.workersService.getWorkers(query);
+  }
+
+  @Doc({
+    summary: 'Get worker tools manifest',
+    description: 'Returns the URL to the worker tools archive package.',
+    response: {
+      serialization: WorkerManifestResponseDto,
+    },
+  })
+  @Public()
+  @Get('/manifest')
+  getManifest(): WorkerManifestResponseDto {
+    return { downloadToolsUrl: '/static/archived/tools.tar.gz' };
   }
 
   @GrpcMethod('WorkersService', 'Join')

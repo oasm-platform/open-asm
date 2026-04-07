@@ -2,6 +2,14 @@ import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsUUID } from 'class-validator';
 
+export class WorkerManifestResponseDto {
+  @ApiProperty({
+    description: 'URL to the worker tools archive package',
+    example: '/static/archived/tools.tar.gz',
+  })
+  downloadToolsUrl: string;
+}
+
 export class WorkerJoinDto {
   @ApiProperty()
   @IsString()
