@@ -24,7 +24,7 @@ import {
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
 
@@ -76,14 +76,16 @@ export default function AgentsLandingPage() {
     configId: string;
   } | null>(null);
 
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
 
   const { data: conversationsData } = useAgentsControllerGetConversations(
     { limit: 3, sortBy: 'updatedAt', sortOrder: 'DESC' },
     {
       query: {
-        queryKey: ['/api/agents/conversations', selectedWorkspace],
-        enabled: !!selectedWorkspace,
+        queryKey: ['/api/agents/conversations', selectedWorkspaceId],
+        enabled: !!selectedWorkspaceId,
       },
     },
   );
@@ -92,8 +94,8 @@ export default function AgentsLandingPage() {
     LLMConfigWithProviderDto[]
   >({
     query: {
-      queryKey: ['/api/agents/llm-configs', selectedWorkspace],
-      enabled: !!selectedWorkspace,
+      queryKey: ['/api/agents/llm-configs', selectedWorkspaceId],
+      enabled: !!selectedWorkspaceId,
     },
   });
 

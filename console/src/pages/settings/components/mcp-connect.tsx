@@ -1,5 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import ViewCode from '@/pages/assets/components/view-code';
 import { useWorkspacesControllerGetWorkspaceApiKey } from '@/services/apis/gen/queries';
 import { RefreshCw } from 'lucide-react';
@@ -8,13 +8,14 @@ import { RefreshCw } from 'lucide-react';
  * MCP Connect settings component displaying MCP server configuration JSON.
  */
 export default function McpConnect() {
-  const { selectedWorkspace } = useWorkspaceSelector();
-
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const { data: apiKeyData, isLoading } =
     useWorkspacesControllerGetWorkspaceApiKey({
       query: {
-        queryKey: [selectedWorkspace],
-        enabled: !!selectedWorkspace,
+        queryKey: [selectedWorkspaceId],
+        enabled: !!selectedWorkspaceId,
       },
     });
 

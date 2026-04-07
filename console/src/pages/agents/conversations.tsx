@@ -1,6 +1,7 @@
 import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useAgentsControllerDeleteAllConversations,
   useAgentsControllerDeleteConversation,
@@ -13,7 +14,6 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 
 dayjs.extend(relativeTime);
 
@@ -25,8 +25,9 @@ export default function AgentConversationsPage() {
   const [editingTitle, setEditingTitle] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { selectedWorkspace } = useWorkspaceSelector();
-
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const { data, fetchNextPage, hasNextPage, isLoading, isFetchingNextPage } =
     useAgentsControllerGetConversationsInfinite(
       { limit, sortBy: 'updatedAt', sortOrder: 'DESC' },
@@ -35,9 +36,9 @@ export default function AgentConversationsPage() {
           queryKey: [
             '/api/agents/conversations',
             'infinite',
-            selectedWorkspace,
+            selectedWorkspaceId,
           ],
-          enabled: !!selectedWorkspace,
+          enabled: !!selectedWorkspaceId,
           getNextPageParam: (lastPage) =>
             lastPage.hasNextPage ? lastPage.page + 1 : undefined,
         },
@@ -51,9 +52,9 @@ export default function AgentConversationsPage() {
 
   const invalidateConversations = useCallback(() => {
     void queryClient.invalidateQueries({
-      queryKey: ['/api/agents/conversations', 'infinite', selectedWorkspace],
+      queryKey: ['/api/agents/conversations', 'infinite', selectedWorkspaceId],
     });
-  }, [queryClient, selectedWorkspace]);
+  }, [queryClient, selectedWorkspaceId]);
 
   const deleteConversationMutation = useAgentsControllerDeleteConversation({
     mutation: { onSuccess: invalidateConversations },
