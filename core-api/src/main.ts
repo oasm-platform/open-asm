@@ -21,6 +21,7 @@ import { AuthGuard } from './common/guards/auth.guard';
 import type { MicroserviceOptions } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
 import { join } from 'path';
+import { ReflectionService } from '@grpc/reflection';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
@@ -101,6 +102,9 @@ async function bootstrap() {
         join(__dirname, 'proto/jobs_registry.proto'),
       ],
       url: '0.0.0.0:5000',
+      onLoadPackageDefinition: (pkg, server) => {
+        new ReflectionService(pkg).addToServer(server);
+      },
     },
   });
 
