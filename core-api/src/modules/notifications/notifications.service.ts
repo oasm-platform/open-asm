@@ -25,7 +25,7 @@ export class NotificationsService {
   ) {}
 
   async createNotification(body: CreateNotificationDto) {
-    await this.notificationQueue.add('create-notification', body);
+    await this.notificationQueue.add(BullMQName.NOTIFICATION, body);
   }
 
   subscribeToStream(userId: string) {
@@ -66,7 +66,7 @@ export class NotificationsService {
       }) as string;
 
       return {
-        id: n.notification.id,
+        id: n.id,
         status: n.status,
         createdAt: n.createdAt,
         message,
@@ -104,6 +104,7 @@ export class NotificationsService {
   }
 
   async markAsRead(id: string, userId: string) {
+    console.log(id, userId);
     return this.notificationRecipientRepo.update(
       { id, userId },
       { status: NotificationStatus.READ },

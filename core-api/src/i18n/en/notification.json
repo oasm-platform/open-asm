@@ -1,3 +1,4 @@
 {
-  "WORKSPACE_CREATED": "Workspace {name} created"
+  "WORKSPACE_CREATED": "Workspace {name} created",
+  "VULNERABILITY_ANALYSIS_COMPLETED": "Vulnerability analysis completed for {name}"
 }

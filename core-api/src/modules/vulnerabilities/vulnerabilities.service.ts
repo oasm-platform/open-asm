@@ -1,6 +1,10 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { BullMQName, Severity, VulnerabilityAnalyzeStatus } from '@/common/enums/enum';
+import {
+  BullMQName,
+  Severity,
+  VulnerabilityAnalyzeStatus,
+} from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
@@ -10,11 +14,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
 import { Queue } from 'bullmq';
+import { In, Repository } from 'typeorm';
 import { AgentsCompletionsService } from '../agents/agents.completions';
 import { User } from '../auth/entities/user.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ToolsService } from '../tools/tools.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import {
@@ -43,6 +48,7 @@ export class VulnerabilitiesService {
     private toolsService: ToolsService,
     private workflowService: WorkflowsService,
     private agentsCompletionsService: AgentsCompletionsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -369,6 +375,7 @@ export class VulnerabilitiesService {
   async analyzeVulnerability(
     id: string,
     workspaceId: string,
+    userId: string,
     forceRerun: boolean = false,
   ): Promise<DefaultMessageResponseDto> {
     const vulnerability = await this.vulnerabilitiesRepository.findOne({
@@ -451,6 +458,7 @@ export class VulnerabilitiesService {
       isArchived: vulnerability.isArchived,
       fingerprint: vulnerability.fingerprint,
       workspaceId,
+      userId,
     };
 
     await this.vulnerabilityAnalysisQueue.add(id, vulnerabilityData);
@@ -460,11 +468,12 @@ export class VulnerabilitiesService {
     };
   }
 
-  async processVulnerabilityAnalysis(jobId: string): Promise<void> {
-    const vulnerability =
-      await this.vulnerabilitiesRepository.findOne({
-        where: { id: jobId },
-      });
+  async processVulnerabilityAnalysis(
+    jobId: string,
+  ): Promise<Vulnerability | undefined> {
+    const vulnerability = await this.vulnerabilitiesRepository.findOne({
+      where: { id: jobId },
+    });
 
     if (!vulnerability) {
       this.logger.error(`Vulnerability with id ${jobId} not found`);
@@ -506,7 +515,9 @@ export class VulnerabilitiesService {
         fingerprint: vulnerability.fingerprint,
       };
 
-      const workspace = await this.getWorkspaceForVulnerability(vulnerability.id);
+      const workspace = await this.getWorkspaceForVulnerability(
+        vulnerability.id,
+      );
       const workspaceId = workspace?.id;
 
       if (!workspaceId) {
@@ -548,6 +559,8 @@ export class VulnerabilitiesService {
       );
 
       this.logger.log(`Analysis completed for vulnerability ${jobId}`);
+
+      return vulnerability;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
@@ -582,6 +595,8 @@ export class VulnerabilitiesService {
       return null;
     }
 
-    return vulnerability.asset?.target?.workspaceTargets?.[0]?.workspace ?? null;
+    return (
+      vulnerability.asset?.target?.workspaceTargets?.[0]?.workspace ?? null
+    );
   }
 }
