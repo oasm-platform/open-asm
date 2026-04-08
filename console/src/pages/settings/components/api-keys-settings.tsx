@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useWorkspacesControllerGetWorkspaceApiKey,
   useWorkspacesControllerRotateApiKey,
@@ -13,7 +13,9 @@ import { toast } from 'sonner';
  * API Keys settings component displaying workspace API key with copy and rotate functionality.
  */
 export default function ApiKeysSettings() {
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const [copied, setCopied] = useState(false);
 
   const {
@@ -22,8 +24,8 @@ export default function ApiKeysSettings() {
     refetch,
   } = useWorkspacesControllerGetWorkspaceApiKey({
     query: {
-      queryKey: [selectedWorkspace],
-      enabled: !!selectedWorkspace,
+      queryKey: [selectedWorkspaceId],
+      enabled: !!selectedWorkspaceId,
     },
   });
 
@@ -50,11 +52,11 @@ export default function ApiKeysSettings() {
   };
 
   const handleRotate = () => {
-    if (!selectedWorkspace) return;
-    rotateApiKey({ id: selectedWorkspace });
+    if (!selectedWorkspaceId) return;
+    rotateApiKey({ id: selectedWorkspaceId });
   };
 
-  if (!selectedWorkspace) {
+  if (!selectedWorkspaceId) {
     return (
       <div className="space-y-4">
         <Card>
@@ -100,7 +102,7 @@ export default function ApiKeysSettings() {
                     variant="secondary"
                     size="sm"
                     onClick={handleRotate}
-                    disabled={isRotating || !selectedWorkspace}
+                    disabled={isRotating || !selectedWorkspaceId}
                   >
                     <RefreshCw
                       className={`h-4 w-4 ${isRotating ? 'animate-spin' : ''}`}

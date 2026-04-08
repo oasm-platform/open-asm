@@ -9,7 +9,7 @@ import {
 
 import { Badge } from '@/components/ui/badge';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { format } from 'date-fns';
 
 const providerLabels: Record<string, string> = {
@@ -76,12 +76,14 @@ export function ListAgents() {
     tableHandlers: { setPage, setPageSize, setParams },
   } = useServerDataTable();
 
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
 
   const { data, isLoading } = useAgentsControllerGetLLMConfigs({
     query: {
-      queryKey: ['agents', selectedWorkspace],
-      enabled: !!selectedWorkspace,
+      queryKey: ['agents', selectedWorkspaceId],
+      enabled: !!selectedWorkspaceId,
     },
   });
 

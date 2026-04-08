@@ -5,9 +5,9 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination";
-import { useWorkspaceSelector } from "@/hooks/useWorkspaceSelector";
-import { useSearchControllerSearchAssetsTargets } from "@/services/apis/gen/queries";
+} from '@/components/ui/pagination';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { useSearchControllerSearchAssetsTargets } from '@/services/apis/gen/queries';
 import {
   CloudCheckIcon,
   ExternalLink,
@@ -15,21 +15,23 @@ import {
   Loader2,
   Search as SearchIcon,
   TargetIcon,
-} from "lucide-react";
-import * as React from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+} from 'lucide-react';
+import * as React from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function Search() {
   const [param] = useSearchParams();
   const [page, setPage] = React.useState(1);
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const navigate = useNavigate();
 
-  const searchQuery = param.get("query") as string;
+  const searchQuery = param.get('query') as string;
 
   const { data, isFetching } = useSearchControllerSearchAssetsTargets({
     value: searchQuery,
-    workspaceId: selectedWorkspace as string,
+    workspaceId: selectedWorkspaceId,
     page: page,
     isSaveHistory: true,
   });
@@ -82,7 +84,7 @@ export default function Search() {
             {data.data.targets.map((target, index) => (
               <div
                 key={target.id || index}
-                onClick={() => navigate("/targets/" + target.id)}
+                onClick={() => navigate('/targets/' + target.id)}
                 className="px-6 py-4 cursor-pointer transition-colors group"
               >
                 <div className="flex items-center justify-between">
@@ -114,7 +116,7 @@ export default function Search() {
               <div
                 key={asset.id || index}
                 onClick={() => {
-                  navigate("assets/" + asset.id);
+                  navigate('assets/' + asset.id);
                 }}
                 className="px-6 py-4 cursor-pointer transition-colors group"
               >
@@ -164,13 +166,13 @@ function Pagination({
       (p) => p === 1 || p === pageCount || Math.abs(p - page) <= 2,
     );
 
-    const mergedPages: (number | "...")[] = [];
+    const mergedPages: (number | '...')[] = [];
 
     pages.forEach((curr, i) => {
       if (i === 0 || curr - pages[i - 1] === 1) {
         mergedPages.push(curr);
       } else {
-        mergedPages.push("...", curr);
+        mergedPages.push('...', curr);
       }
     });
 
@@ -190,12 +192,12 @@ function Pagination({
 
                   setPage(page - 1);
                 }}
-                className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
               />
             </PaginationItem>
 
             {getPaginationPages().map((p, idx) =>
-              p === "..." ? (
+              p === '...' ? (
                 <PaginationItem key={`ellipsis-${idx}`}>
                   <PaginationEllipsis />
                 </PaginationItem>
@@ -225,7 +227,7 @@ function Pagination({
                   setPage(page + 1);
                 }}
                 className={
-                  page >= pageCount ? "pointer-events-none opacity-50" : ""
+                  page >= pageCount ? 'pointer-events-none opacity-50' : ''
                 }
               />
             </PaginationItem>

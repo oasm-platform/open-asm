@@ -12,7 +12,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetIssuesTimeline } from '@/services/apis/gen/queries';
 import clsx from 'clsx';
 import { format } from 'date-fns';
@@ -30,11 +30,13 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function IssuesTimeline() {
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const { data } = useStatisticControllerGetIssuesTimeline({
     query: {
-      enabled: !!selectedWorkspace,
-      queryKey: [selectedWorkspace],
+      enabled: !!selectedWorkspaceId,
+      queryKey: [selectedWorkspaceId],
     },
   });
 

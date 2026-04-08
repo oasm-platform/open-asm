@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
@@ -29,14 +29,16 @@ const severityOrder = ['info', 'low', 'medium', 'high', 'critical'] as const;
 
 const TopAssetsVulnerabilitiesTable = () => {
   const navigate = useNavigate();
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const {
     data: apiData,
     isLoading,
     error,
   } = useStatisticControllerGetTopAssetsWithMostVulnerabilities({
     query: {
-      queryKey: ['top-assets-vulnerabilities', selectedWorkspace],
+      queryKey: ['top-assets-vulnerabilities', selectedWorkspaceId],
     },
   });
 
@@ -163,4 +165,3 @@ const TopAssetsVulnerabilitiesTable = () => {
 };
 
 export default TopAssetsVulnerabilitiesTable;
-

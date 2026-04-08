@@ -8,17 +8,19 @@ import { Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AgentForm, type AgentFormData } from './agent-form';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 export default function EditAgentPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
 
   const { data, isLoading } = useAgentsControllerGetLLMConfigs({
     query: {
-      queryKey: ['agents', selectedWorkspace],
-      enabled: !!id && !!selectedWorkspace,
+      queryKey: ['agents', selectedWorkspaceId],
+      enabled: !!id && !!selectedWorkspaceId,
     },
   });
 

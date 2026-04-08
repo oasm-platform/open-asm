@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { Loader2, MoreHorizontal, Pencil, Star, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 const providerLabels: Record<string, string> = {
   openai: 'OpenAI',
@@ -28,12 +28,14 @@ const providerLabels: Record<string, string> = {
 export function AgentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
 
   const { data, isLoading } = useAgentsControllerGetLLMConfigs({
     query: {
-      queryKey: ['agents', selectedWorkspace],
-      enabled: !!id && !!selectedWorkspace,
+      queryKey: ['agents', selectedWorkspaceId],
+      enabled: !!id && !!selectedWorkspaceId,
     },
   });
 

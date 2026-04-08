@@ -9,7 +9,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChatConversation } from './chat-conversation';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 interface SelectedModel {
   provider: string;
@@ -45,8 +45,9 @@ export default function AgentsChatPage() {
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
 
-  const { selectedWorkspace } = useWorkspaceSelector();
-  const workspaceId = selectedWorkspace;
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
 
   // Fetch messages with infinite scroll
   const {
@@ -119,7 +120,9 @@ export default function AgentsChatPage() {
   } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/agents/messages/stream',
-      headers: workspaceId ? { 'x-workspace-id': workspaceId } : {},
+      headers: selectedWorkspaceId
+        ? { 'x-workspace-id': selectedWorkspaceId }
+        : {},
       prepareSendMessagesRequest: ({ messages }) => {
         const lastMessage = messages[messages.length - 1];
         const textContent =

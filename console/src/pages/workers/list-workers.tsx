@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ConnectWorker } from '@/components/ui/connect-worker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -14,7 +14,9 @@ import { Loader2Icon } from 'lucide-react';
 dayjs.extend(relativeTime);
 
 const ListWorkers = () => {
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const navigateWithParams = useNavigateWithParams();
   const { data, isLoading } = useWorkersControllerGetWorkers(
     {
@@ -22,7 +24,7 @@ const ListWorkers = () => {
       page: 1,
       sortBy: 'createdAt',
       sortOrder: 'DESC',
-      workspaceId: selectedWorkspace as string,
+      workspaceId: selectedWorkspaceId,
     },
     {
       query: {

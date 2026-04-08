@@ -1,16 +1,18 @@
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useToolsControllerGetManyTools } from '@/services/apis/gen/queries';
 import { LayoutGrid } from 'lucide-react';
 import ToolsList from '../tools-list';
 import ToolInstallButton from './tool-install-button';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 const Marketplace = () => {
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const { data, isLoading } = useToolsControllerGetManyTools(
     {},
     {
       query: {
-        queryKey: [selectedWorkspace],
+        queryKey: [selectedWorkspaceId],
       },
     },
   );
@@ -22,7 +24,7 @@ const Marketplace = () => {
         icon={<LayoutGrid className="w-6 h-6" />}
         title="Marketplace"
         renderButton={(tool) => (
-          <ToolInstallButton tool={tool} workspaceId={selectedWorkspace} />
+          <ToolInstallButton tool={tool} workspaceId={selectedWorkspaceId} />
         )}
       />
     </div>

@@ -5,15 +5,14 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
 
-import { useState } from 'react';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
-  useTargetsControllerGetTargetsInWorkspace,
-  TargetType,
   JobStatus,
+  TargetType,
+  useTargetsControllerGetTargetsInWorkspace,
 } from '@/services/apis/gen/queries';
+import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,9 +22,9 @@ import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { GetManyTargetResponseDto } from '@/services/apis/gen/queries';
 import { Target } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import CreateWorkspace from '../workspaces/create-workspace';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { TargetTypeFilter } from './components/target-type-filter';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 const targetTypeColor: Record<string, string> = {
   DOMAIN: 'border-blue-500 text-blue-500',
@@ -112,7 +111,9 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
 ];
 
 export function ListTargets() {
-  const { selectedWorkspace, workspaces } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -159,40 +160,42 @@ export function ListTargets() {
     tableHandlers: { setPage, setPageSize, setFilter, setParams },
   } = useServerDataTable();
 
-  const { data, isLoading, refetch } = useTargetsControllerGetTargetsInWorkspace(
-    {
-      limit: pageSize,
-      page,
-      sortBy,
-      sortOrder,
-      value: filter,
-      type: typeFilter,
-      status: statusFilter,
-    },
-    {
-      query: {
-        refetchInterval: 3000,
-        queryKey: [
-          'targets',
-          selectedWorkspace,
-          pageSize,
-          page,
-          sortBy,
-          sortOrder,
-          filter,
-          typeFilter,
-          statusFilter,
-        ],
+  const { data, isLoading, refetch } =
+    useTargetsControllerGetTargetsInWorkspace(
+      {
+        limit: pageSize,
+        page,
+        sortBy,
+        sortOrder,
+        value: filter,
+        type: typeFilter,
+        status: statusFilter,
       },
-    },
-  );
+      {
+        query: {
+          refetchInterval: 3000,
+          queryKey: [
+            'targets',
+            selectedWorkspaceId,
+            pageSize,
+            page,
+            sortBy,
+            sortOrder,
+            filter,
+            typeFilter,
+            statusFilter,
+          ],
+        },
+      },
+    );
 
   const targets = data?.data ?? [];
   const total = data?.total ?? 0;
 
-  if (workspaces.length === 0) return <CreateWorkspace />;
   if (!data && !isLoading)
-    return <DataTableError message="Failed to load targets." onRetry={refetch} />;
+    return (
+      <DataTableError message="Failed to load targets." onRetry={refetch} />
+    );
 
   const handleRowClick = (target: GetManyTargetResponseDto) => {
     navigate(`/targets/${target.id}/asset-services`);

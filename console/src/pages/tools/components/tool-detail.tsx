@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from '@/components/ui/image';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import {
   ToolsControllerGetManyToolsType,
   useToolsControllerGetToolById,
@@ -13,10 +12,13 @@ import { Group, Verified } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ToolInstallButton from './tool-install-button';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
 
   const {
     data: toolResponse,
@@ -25,7 +27,7 @@ export default function ToolDetail() {
     refetch,
   } = useToolsControllerGetToolById(id || '', {
     query: {
-      queryKey: [selectedWorkspace, id],
+      queryKey: [selectedWorkspaceId, id],
     },
   });
 
@@ -103,7 +105,7 @@ export default function ToolDetail() {
                       <ToolApiKeyDialog tool={tool} />
                       <ToolInstallButton
                         tool={tool}
-                        workspaceId={selectedWorkspace || ''}
+                        workspaceId={selectedWorkspaceId || ''}
                         onInstallChange={handleInstallChange}
                       />
                     </div>

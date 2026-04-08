@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { Target } from '@/services/apis/gen/queries';
 import {
   JobStatus,
@@ -33,7 +33,9 @@ const SettingTarget = ({
   target: Target;
   refetch: () => void;
 }) => {
-  const { selectedWorkspace } = useWorkspaceSelector();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -202,7 +204,7 @@ const SettingTarget = ({
                 setIsDeleting(true);
                 deleteTarget({
                   id: target.id,
-                  workspaceId: selectedWorkspace ?? '',
+                  workspaceId: selectedWorkspaceId ?? '',
                 });
                 navigate(-1);
               }}
