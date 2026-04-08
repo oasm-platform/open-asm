@@ -104,7 +104,6 @@ export class NotificationsService {
   }
 
   async markAsRead(id: string, userId: string) {
-    console.log(id, userId);
     return this.notificationRecipientRepo.update(
       { id, userId },
       { status: NotificationStatus.READ },
