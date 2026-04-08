@@ -101,9 +101,17 @@ async function bootstrap() {
         join(__dirname, 'proto/workers.proto'),
         join(__dirname, 'proto/jobs_registry.proto'),
       ],
-      url: '0.0.0.0:5000',
+      url: '0.0.0.0:50051',
+      loader: {
+        keepCase: false,
+        longs: String,
+        enums: String,
+        defaults: true,
+        oneofs: true,
+      },
       onLoadPackageDefinition: (pkg, server) => {
-        new ReflectionService(pkg).addToServer(server);
+        const reflection = new ReflectionService(pkg);
+        reflection.addToServer(server);
       },
     },
   });

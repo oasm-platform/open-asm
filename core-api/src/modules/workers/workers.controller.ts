@@ -18,7 +18,7 @@ import { WorkersService } from './workers.service';
 @ApiTags('Workers')
 @Controller('workers')
 export class WorkersController {
-  constructor(private readonly workersService: WorkersService) { }
+  constructor(private readonly workersService: WorkersService) {}
 
   @Doc({
     summary: 'Worker alive',
