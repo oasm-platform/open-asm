@@ -21,7 +21,7 @@ message Worker {
 
 message Job {
   string id = 1;
-  string asset = 2;
+  Asset asset = 2;
   optional string command = 3;
 }
 
