@@ -189,7 +189,9 @@ export function DataTable<TData, TValue>({
   const showSkeleton = isLoading && data.length === 0;
   return (
     <div className="w-full">
-      {(toolbarComponents.length > 0 || filterColumnKey || filterComponents) && (
+      {(toolbarComponents.length > 0 ||
+        filterColumnKey ||
+        filterComponents) && (
         <div className="flex flex-col mb-2 gap-2 md:flex-row-reverse md:justify-between md:items-center">
           <div className="flex gap-2 flex-col md:flex-row w-full justify-end md:w-auto">
             {toolbarComponents.map((c, i) => (
@@ -318,7 +320,7 @@ export function DataTable<TData, TValue>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-24 text-center text-muted-foreground"
                 >
                   {emptyMessage}
                 </TableCell>
