@@ -75,7 +75,7 @@ export function NotificationBell() {
             </Link>
           </Button>
         </div>
-        <NotificationList />
+        <NotificationList onClose={() => setOpen(false)} />
       </PopoverContent>
     </Popover>
   );

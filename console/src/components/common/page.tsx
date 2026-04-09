@@ -23,14 +23,14 @@ const Page = ({
   return (
     <div className={(className || '') + ' h-full flex flex-col gap-4'}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 mr-3">
+        <div className="flex items-start md:items-center gap-3 mr-3">
           {isShowButtonGoBack && (
             <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
           {title && (
-            <h3 className="text-2xl font-bold tracking-tight">{title}</h3>
+            <span className="text-2xl font-bold tracking-tight">{title}</span>
           )}
         </div>
         <div className="flex items-center gap-2">

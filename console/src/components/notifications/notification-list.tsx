@@ -9,9 +9,10 @@ import { NotificationItem } from './notification-item';
 
 interface NotificationListProps {
   variant?: 'popup' | 'page';
+  onClose?: () => void;
 }
 
-export function NotificationList({ variant = 'popup' }: NotificationListProps) {
+export function NotificationList({ variant = 'popup', onClose }: NotificationListProps) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useNotificationsControllerGetNotificationsInfinite(
       { limit: 10 },
@@ -50,6 +51,7 @@ export function NotificationList({ variant = 'popup' }: NotificationListProps) {
           key={notification.id}
           notification={notification}
           variant={variant}
+          onClose={onClose}
         />
       ))}
       {hasNextPage && (

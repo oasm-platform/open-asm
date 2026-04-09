@@ -1,5 +1,6 @@
 import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -101,11 +102,11 @@ export class VulnerabilitiesController {
   }
 
   @Doc({
-    summary: 'Analyze vulnerability',
+    summary: 'Analyze a vulnerability',
     description:
-      'Analyzes a specific vulnerability using AI to generate a comprehensive vulnerability analysis report. Returns 404 if vulnerability not found.',
+      'Initiates an AI-powered analysis of a specific security vulnerability to provide detailed insights and recommendations.',
     response: {
-      serialization: Vulnerability,
+      serialization: DefaultMessageResponseDto,
     },
     request: {
       getWorkspaceId: true,
@@ -116,11 +117,13 @@ export class VulnerabilitiesController {
   async analyzeVulnerability(
     @Param('id') id: string,
     @WorkspaceId() workspaceId: string,
+    @UserContext() user: User,
     @Body() dto: AnalyzeVulnerabilityDto,
   ) {
     return this.vulnerabilitiesService.analyzeVulnerability(
       id,
       workspaceId,
+      user.id,
       dto.forceRerun ?? false,
     );
   }

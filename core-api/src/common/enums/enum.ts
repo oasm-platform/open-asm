@@ -146,17 +146,12 @@ export enum NotificationScope {
 
 export enum NotificationType {
   WORKSPACE_CREATED = 'WORKSPACE_CREATED',
+  VULNERABILITY_ANALYSIS_COMPLETED = 'VULNERABILITY_ANALYSIS_COMPLETED',
 }
 
 export enum Language {
   EN = 'en',
   VI = 'vi',
-}
-
-export enum NotificationEventType {
-  SCAN_FAILED = 'events.notification.content.SCAN_FAILED',
-  VULNERABILITY_DISCOVERY = 'events.notification.content.VULNERABILITY_DISCOVERY',
-  WORKFLOW_RUN = 'events.notification.content.WORKFLOW_RUN',
 }
 
 export enum IssueStatus {
