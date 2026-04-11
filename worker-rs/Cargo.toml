@@ -21,6 +21,7 @@ flate2 = "1"
 tokio-stream = "0.1"
 thiserror = "2"
 tar = "0.4"
+walkdir = "2"
 prost-types = "0.14"
 
 [build-dependencies]
