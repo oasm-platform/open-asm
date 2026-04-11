@@ -11,3 +11,9 @@
 
 # MSVC Windows builds generate these for debugging
 *.pdb
+
+# Environment secrets
+.env
+
+# Generated protobuf code
+src/grpc/generated/

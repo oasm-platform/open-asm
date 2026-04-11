@@ -1,4 +1,2 @@
-pub mod error {
-    use anyhow::Result;
-    pub type Error = anyhow::Error;
-}
+pub type Error = anyhow::Error;
+pub type Result<T> = std::result::Result<T, Error>;
