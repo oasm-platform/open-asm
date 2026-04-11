@@ -20,6 +20,7 @@ pub struct JobExecutionOutput {
     pub exit_code: Option<i32>,
 }
 
+#[derive(Debug, Clone)]
 pub struct JobExecutor {
     timeout_secs: u64,
 }

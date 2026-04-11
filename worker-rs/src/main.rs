@@ -4,13 +4,13 @@ use worker_rs::tools::{ToolManager, ToolManagerConfig};
 use worker_rs::executor::{JobExecutor, JobExecutionInput};
 use worker_rs::error::WorkerError;
 
-use grpc::generated::{JoinRequest, AliveRequest};
+use grpc::generated::{JoinRequest};
 use grpc::generated::{Worker as ProtoWorker, JobResultRequest, UpdateResultDto, DataPayloadResult};
 
 use tokio::time::{interval, Duration};
-use tokio_stream::wrappers::ReceiverStream;
-use tokio_stream::StreamExt;
 use clap::Parser;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 #[derive(Parser, Debug)]
 #[command(name = "worker-rs", about = "High-performance gRPC worker for Open-ASM")]
@@ -66,6 +66,7 @@ struct WorkerConfig {
     api_key: String,
     worker_signature: String,
     job_timeout_secs: u64,
+    max_concurrent_jobs: usize,
 }
 
 impl WorkerConfig {
@@ -76,6 +77,7 @@ impl WorkerConfig {
             api_key: cli.api_key.clone(),
             worker_signature: cli.signature.clone(),
             job_timeout_secs: cli.job_timeout_secs,
+            max_concurrent_jobs: cli.max_concurrent_jobs,
         }
     }
 }
@@ -115,89 +117,41 @@ impl Worker {
 
     async fn alive_loop(&self) -> Result<(), WorkerError> {
         let state = self.state.clone();
-        let mut workers_client = self.grpc.workers.clone();
+        let api_host = self.tool_manager.get_config().api_host.clone();
+        let api_port = self.tool_manager.get_config().api_port;
 
         tokio::spawn(async move {
-            let (tx, rx) = tokio::sync::mpsc::channel::<AliveRequest>(4);
-            let stream = ReceiverStream::new(rx);
-
-            let mut response_stream = match workers_client.alive(tonic::Request::new(stream)).await {
-                Ok(resp) => resp.into_inner(),
-                Err(e) => {
-                    tracing::error!("Failed to start alive stream: {}", e);
-                    let mut state = state.write().await;
-                    state.is_connected = false;
-                    return;
-                }
-            };
-
+            let client = reqwest::Client::new();
             let mut ticker = interval(Duration::from_secs(5));
 
             loop {
-                tokio::select! {
-                    _ = ticker.tick() => {
-                        let worker_token = {
-                            let s = state.read().await;
-                            if !s.is_connected {
-                                continue;
-                            }
-                            s.worker_token.clone()
-                        };
+                ticker.tick().await;
 
-                        let Some(token) = worker_token else { continue };
+                let worker_token = {
+                    let s = state.read().await;
+                    if !s.is_connected {
+                        continue;
+                    }
+                    s.worker_token.clone()
+                };
 
-                        let request = AliveRequest { worker_token: token };
-                        if tx.send(request).await.is_err() {
-                            tracing::warn!("Alive channel receiver dropped, exiting");
-                            break;
+                let Some(token) = worker_token else { continue };
+
+                let url = format!("http://{}:{}/api/workers/alive", api_host, api_port);
+                match client.post(&url).json(&serde_json::json!({ "token": token })).send().await {
+                    Ok(resp) => {
+                        if resp.status().is_success() {
+                            tracing::debug!("Alive heartbeat acknowledged");
+                        } else {
+                            tracing::warn!("Alive returned status: {}", resp.status());
+                            let mut state = state.write().await;
+                            state.is_connected = false;
                         }
                     }
-                    resp = response_stream.next() => {
-                        match resp {
-                            Some(Ok(ack)) => {
-                                tracing::debug!("Alive heartbeat acknowledged: alive={}", ack.alive);
-                            }
-                            Some(Err(e)) => {
-                                tracing::warn!("Error on alive stream: {}", e);
-                                let (new_tx, new_rx) = tokio::sync::mpsc::channel::<AliveRequest>(4);
-                                let new_stream = ReceiverStream::new(new_rx);
-                                match workers_client.alive(tonic::Request::new(new_stream)).await {
-                                    Ok(resp) => {
-                                        response_stream = resp.into_inner();
-                                        let s = state.read().await;
-                                        if let Some(token) = s.worker_token.clone() {
-                                            let _ = new_tx.send(AliveRequest { worker_token: token }).await;
-                                        }
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("Alive reconnect failed: {}", e);
-                                        let mut state = state.write().await;
-                                        state.is_connected = false;
-                                        break;
-                                    }
-                                }
-                            }
-                            None => {
-                                tracing::warn!("Alive stream closed by server, reconnecting...");
-                                let (new_tx, new_rx) = tokio::sync::mpsc::channel::<AliveRequest>(4);
-                                let new_stream = ReceiverStream::new(new_rx);
-                                match workers_client.alive(tonic::Request::new(new_stream)).await {
-                                    Ok(resp) => {
-                                        response_stream = resp.into_inner();
-                                        let s = state.read().await;
-                                        if let Some(token) = s.worker_token.clone() {
-                                            let _ = new_tx.send(AliveRequest { worker_token: token }).await;
-                                        }
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("Alive reconnect failed: {}", e);
-                                        let mut state = state.write().await;
-                                        state.is_connected = false;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                    Err(e) => {
+                        tracing::warn!("Alive request failed: {}", e);
+                        let mut state = state.write().await;
+                        state.is_connected = false;
                     }
                 }
             }
@@ -210,26 +164,36 @@ impl Worker {
         // Join worker
         self.join().await?;
 
-        // Download tools on startup
-        match self.tool_manager.fetch_manifest().await {
-            Ok(manifest) => {
-                if let Err(e) = self.tool_manager.download_tools(&manifest.download_tools_url).await {
-                    tracing::warn!("Failed to download tools: {}", e);
+        // Download tools only if needed
+        if self.tool_manager.needs_download().await {
+            match self.tool_manager.fetch_manifest().await {
+                Ok(manifest) => {
+                    if let Err(e) = self.tool_manager.download_tools(&manifest.download_tools_url).await {
+                        tracing::warn!("Failed to download tools: {}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to fetch manifest: {}", e);
                 }
             }
-            Err(e) => {
-                tracing::warn!("Failed to fetch manifest: {}", e);
-            }
+        } else {
+            tracing::info!("Tools already cached, skipping download");
         }
 
         // Start alive loop in background
         self.alive_loop().await?;
 
-        // Main job polling loop
+        let max_concurrent = self.config.max_concurrent_jobs;
+        let semaphore = Arc::new(Semaphore::new(max_concurrent));
+        let state = self.state.clone();
+        let mut jobs_client = self.grpc.jobs.clone();
+        let executor = self.executor.clone();
+
+        // Main job polling loop with concurrent execution
         loop {
             let (worker_id, worker_token) = {
-                let state = self.state.read().await;
-                match (state.worker_id.clone(), state.worker_token.clone()) {
+                let s = state.read().await;
+                match (s.worker_id.clone(), s.worker_token.clone()) {
                     (Some(id), Some(token)) => (id, token),
                     _ => {
                         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -242,69 +206,83 @@ impl Worker {
             let mut request = tonic::Request::new(ProtoWorker { id: worker_id.clone() });
             request.metadata_mut().insert("worker-token", worker_token.parse().unwrap());
 
-            match self.grpc.jobs.next(request).await {
-                Ok(response) => {
-                    let job = response.into_inner();
-
-                    if job.id.is_empty() {
-                        // No job available, wait and retry
-                        tokio::time::sleep(Duration::from_millis(500)).await;
-                        continue;
-                    }
-
-                    tracing::info!("Received job: {}", job.id);
-
-                    // Execute job
-                    let execution = self.executor.execute(JobExecutionInput {
-                        job_id: job.id.clone(),
-                        command: job.command.clone().unwrap_or_default(),
-                        working_dir: None,
-                    }).await;
-
-                    // Report result
-                    let result = match execution {
-                        Ok(output) => {
-                            JobResultRequest {
-                                worker_id: worker_id.clone(),
-                                data: Some(UpdateResultDto {
-                                    job_id: job.id,
-                                    data: Some(DataPayloadResult {
-                                        error: !output.success,
-                                        raw: Some(output.stdout.clone()),
-                                        payload: None,
-                                    }),
-                                }),
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Job execution failed: {}", e);
-                            JobResultRequest {
-                                worker_id: worker_id.clone(),
-                                data: Some(UpdateResultDto {
-                                    job_id: job.id,
-                                    data: Some(DataPayloadResult {
-                                        error: true,
-                                        raw: Some(e.to_string()),
-                                        payload: None,
-                                    }),
-                                }),
-                            }
-                        }
-                    };
-
-                    if let Err(e) = self.grpc.jobs.result({
-                        let mut request = tonic::Request::new(result);
-                        request.metadata_mut().insert("worker-token", worker_token.parse().unwrap());
-                        request
-                    }).await {
-                        tracing::error!("Failed to report job result: {}", e);
-                    }
-                }
+            let job = match jobs_client.next(request).await {
+                Ok(resp) => resp.into_inner(),
                 Err(e) => {
                     tracing::warn!("Failed to poll job: {}", e);
                     tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
                 }
+            };
+
+            if job.id.is_empty() {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                continue;
             }
+
+            let job_id = job.id;
+            let command = job.command.unwrap_or_default();
+
+            tracing::info!("Received job: {} (concurrent slots: {}/{})",
+                job_id, max_concurrent - semaphore.available_permits(), max_concurrent);
+
+            let permit = semaphore.clone().acquire_owned().await
+                .expect("Semaphore closed");
+
+            let worker_id = worker_id.clone();
+            let worker_token = worker_token.clone();
+            let mut jobs_client = jobs_client.clone();
+            let executor = executor.clone();
+
+            tokio::spawn(async move {
+                let span = tracing::info_span!("job", job_id = %job_id);
+                let _enter = span.enter();
+
+                let execution: Result<worker_rs::executor::JobExecutionOutput, WorkerError> = executor.execute(JobExecutionInput {
+                    job_id: job_id.clone(),
+                    command: command.clone(),
+                    working_dir: None,
+                }).await;
+
+                let result = match execution {
+                    Ok(output) => {
+                        tracing::info!("Job completed: success={}", output.success);
+                        JobResultRequest {
+                            worker_id: worker_id.clone(),
+                            data: Some(UpdateResultDto {
+                                job_id: job_id.clone(),
+                                data: Some(DataPayloadResult {
+                                    error: !output.success,
+                                    raw: Some(output.stdout.clone()),
+                                    payload: None,
+                                }),
+                            }),
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Job execution failed: {}", e);
+                        JobResultRequest {
+                            worker_id: worker_id.clone(),
+                            data: Some(UpdateResultDto {
+                                job_id: job_id.clone(),
+                                data: Some(DataPayloadResult {
+                                    error: true,
+                                    raw: Some(e.to_string()),
+                                    payload: None,
+                                }),
+                            }),
+                        }
+                    }
+                };
+
+                let mut req = tonic::Request::new(result);
+                req.metadata_mut().insert("worker-token", worker_token.parse().unwrap());
+                if let Err(e) = jobs_client.result(req).await {
+                    tracing::error!("Failed to report job result: {}", e);
+                }
+
+                drop(permit);
+            });
         }
     }
 }

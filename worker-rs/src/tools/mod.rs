@@ -170,7 +170,47 @@ impl ToolManager {
         .map_err(|e| WorkerError::JobExecution(e.to_string()))?
     }
 
+    pub fn get_config(&self) -> &ToolManagerConfig {
+        &self.config
+    }
+
     pub fn get_tool_path(&self, tool_name: &str) -> std::path::PathBuf {
         self.cache_dir.join(tool_name)
+    }
+
+    /// Check if tools have already been downloaded and extracted.
+    /// Returns true if the cache directory exists and contains executable files.
+    pub async fn needs_download(&self) -> bool {
+        // Check if cache directory exists
+        if !self.cache_dir.exists() || !self.cache_dir.is_dir() {
+            return true;
+        }
+
+        // Check if it contains at least one executable file
+        match tokio::fs::read_dir(&self.cache_dir).await {
+            Ok(mut entries) => {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    let path = entry.path();
+                    if path.is_file() {
+                        #[cfg(unix)]
+                        {
+                            if let Ok(metadata) = std::fs::metadata(&path) {
+                                use std::os::unix::fs::PermissionsExt;
+                                let mode = metadata.permissions().mode();
+                                if mode & 0o111 != 0 {
+                                    return false; // Found executable
+                                }
+                            }
+                        }
+                        #[cfg(not(unix))]
+                        {
+                            return false; // On non-unix, any file counts as tools
+                        }
+                    }
+                }
+                true // No executables found
+            }
+            Err(_) => true, // Can't read directory, assume need download
+        }
     }
 }
