@@ -23,6 +23,7 @@ thiserror = "2"
 tar = "0.4"
 walkdir = "2"
 prost-types = "0.14"
+clap = { version = "4", features = ["derive"] }
 
 [build-dependencies]
 tonic-prost-build = "0.14"

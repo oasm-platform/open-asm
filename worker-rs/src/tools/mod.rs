@@ -14,16 +14,12 @@ pub struct ToolManagerConfig {
     pub tools_cache_dir: String,
 }
 
-impl Default for ToolManagerConfig {
-    fn default() -> Self {
+impl ToolManagerConfig {
+    pub fn new(api_host: String, api_port: u16, tools_cache_dir: String) -> Self {
         Self {
-            api_host: std::env::var("API_HOST").unwrap_or_else(|_| "localhost".to_string()),
-            api_port: std::env::var("API_PORT")
-                .unwrap_or_else(|_| "6276".to_string())
-                .parse()
-                .unwrap_or(6276),
-            tools_cache_dir: std::env::var("TOOLS_CACHE_DIR")
-                .unwrap_or_else(|_| "./tools-cache".to_string()),
+            api_host,
+            api_port,
+            tools_cache_dir,
         }
     }
 }
@@ -36,7 +32,11 @@ pub struct ToolManager {
 
 impl ToolManager {
     pub fn new() -> Self {
-        let config = ToolManagerConfig::default();
+        let config = ToolManagerConfig::new(
+            "localhost".to_string(),
+            6276,
+            "./tools-cache".to_string(),
+        );
         Self::with_config(config)
     }
 

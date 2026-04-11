@@ -1,6 +1,6 @@
 use worker_rs::grpc::{self, GrpcClient};
 use worker_rs::state::SharedState;
-use worker_rs::tools::ToolManager;
+use worker_rs::tools::{ToolManager, ToolManagerConfig};
 use worker_rs::executor::{JobExecutor, JobExecutionInput};
 use worker_rs::error::WorkerError;
 
@@ -10,6 +10,47 @@ use grpc::generated::{Worker as ProtoWorker, JobResultRequest, UpdateResultDto, 
 use tokio::time::{interval, Duration};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(name = "worker-rs", about = "High-performance gRPC worker for Open-ASM")]
+struct Cli {
+    /// gRPC server host
+    #[arg(long, default_value = "localhost")]
+    grpc_host: String,
+
+    /// gRPC server port
+    #[arg(long, default_value = "50051")]
+    grpc_port: u16,
+
+    /// API server host
+    #[arg(long, default_value = "localhost")]
+    api_host: String,
+
+    /// API server port
+    #[arg(long, default_value = "6276")]
+    api_port: u16,
+
+    /// API key for worker authentication
+    #[arg(long)]
+    api_key: String,
+
+    /// Worker signature (optional for cloud workers)
+    #[arg(long, default_value = "")]
+    signature: String,
+
+    /// Maximum concurrent jobs
+    #[arg(long, default_value = "5")]
+    max_concurrent_jobs: usize,
+
+    /// Job timeout in seconds
+    #[arg(long, default_value = "300")]
+    job_timeout_secs: u64,
+
+    /// Tools cache directory
+    #[arg(long, default_value = "./tools-cache")]
+    tools_cache_dir: String,
+}
 
 struct Worker {
     grpc: GrpcClient,
@@ -28,31 +69,25 @@ struct WorkerConfig {
 }
 
 impl WorkerConfig {
-    fn from_env() -> Self {
+    fn from_cli(cli: &Cli) -> Self {
         Self {
-            grpc_host: std::env::var("GRPC_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
-            grpc_port: std::env::var("GRPC_PORT")
-                .unwrap_or_else(|_| "50051".to_string())
-                .parse()
-                .unwrap_or(50051),
-            api_key: std::env::var("API_KEY").unwrap_or_default(),
-            worker_signature: std::env::var("WORKER_SIGNATURE").unwrap_or_default(),
-            job_timeout_secs: std::env::var("JOB_TIMEOUT_SECS")
-                .unwrap_or_else(|_| "300".to_string())
-                .parse()
-                .unwrap_or(300),
+            grpc_host: cli.grpc_host.clone(),
+            grpc_port: cli.grpc_port,
+            api_key: cli.api_key.clone(),
+            worker_signature: cli.signature.clone(),
+            job_timeout_secs: cli.job_timeout_secs,
         }
     }
 }
 
 impl Worker {
-    async fn new(config: WorkerConfig) -> Result<Self, WorkerError> {
+    async fn new(config: WorkerConfig, tool_config: ToolManagerConfig) -> Result<Self, WorkerError> {
         let grpc = GrpcClient::new(&config.grpc_host, config.grpc_port).await?;
 
         Ok(Self {
             grpc,
             state: worker_rs::state::new_shared_state(),
-            tool_manager: ToolManager::new(),
+            tool_manager: ToolManager::with_config(tool_config),
             executor: JobExecutor::new(config.job_timeout_secs),
             config,
         })
@@ -265,10 +300,19 @@ async fn shutdown_signal() {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-    tracing::info!("Starting worker-rs");
 
-    let config = WorkerConfig::from_env();
-    let mut worker = Worker::new(config).await?;
+    let cli = Cli::parse();
+
+    tracing::info!("Starting worker-rs");
+    tracing::info!("Connecting to gRPC at {}:{}", cli.grpc_host, cli.grpc_port);
+
+    let config = WorkerConfig::from_cli(&cli);
+    let tool_config = ToolManagerConfig::new(
+        cli.api_host.clone(),
+        cli.api_port,
+        cli.tools_cache_dir.clone(),
+    );
+    let mut worker = Worker::new(config, tool_config).await?;
 
     tokio::select! {
         result = worker.run() => {
