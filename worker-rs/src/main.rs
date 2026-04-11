@@ -192,21 +192,20 @@ impl Worker {
 
         // Main job polling loop
         loop {
-            let worker_id = {
+            let (worker_id, worker_token) = {
                 let state = self.state.read().await;
-                state.worker_id.clone()
-            };
-
-            let worker_id = match worker_id {
-                Some(id) => id,
-                None => {
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                    continue;
+                match (state.worker_id.clone(), state.worker_token.clone()) {
+                    (Some(id), Some(token)) => (id, token),
+                    _ => {
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        continue;
+                    }
                 }
             };
 
             // Poll for next job
-            let request = tonic::Request::new(ProtoWorker { id: worker_id.clone() });
+            let mut request = tonic::Request::new(ProtoWorker { id: worker_id.clone() });
+            request.metadata_mut().insert("worker-token", worker_token.parse().unwrap());
 
             match self.grpc.jobs.next(request).await {
                 Ok(response) => {
@@ -258,7 +257,11 @@ impl Worker {
                         }
                     };
 
-                    if let Err(e) = self.grpc.jobs.result(result).await {
+                    if let Err(e) = self.grpc.jobs.result({
+                        let mut request = tonic::Request::new(result);
+                        request.metadata_mut().insert("worker-token", worker_token.parse().unwrap());
+                        request
+                    }).await {
                         tracing::error!("Failed to report job result: {}", e);
                     }
                 }

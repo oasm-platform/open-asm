@@ -96,11 +96,18 @@ impl ToolManager {
     async fn extract_tar_gz(&self, data: &[u8]) -> Result<(), WorkerError> {
         // TODO: For large archives, stream to a temp file instead of loading all bytes.
         let cache_dir = self.cache_dir.clone();
-        let data = data.to_vec();
+        let bytes = data.to_vec();
+
+        tracing::info!("Downloaded {} bytes", bytes.len());
+        if bytes.len() < 2 || bytes[0] != 0x1f || bytes[1] != 0x8b {
+            tracing::warn!("Downloaded file is not a valid gzip archive (size: {} bytes)", bytes.len());
+            return Ok(());
+        }
+
         tokio::task::spawn_blocking(move || {
             use flate2::read::GzDecoder;
             use tar::Archive;
-            let decoder = GzDecoder::new(data.as_slice());
+            let decoder = GzDecoder::new(bytes.as_slice());
             let mut archive = Archive::new(decoder);
             archive.unpack(&cache_dir)?;
             Ok::<_, WorkerError>(())
