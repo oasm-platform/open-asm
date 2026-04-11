@@ -78,3 +78,4 @@ core-api/.storage/*
 .clinerules/*
 docs/superpowers/*
 core-api/public/tools/*
+.qwen/
