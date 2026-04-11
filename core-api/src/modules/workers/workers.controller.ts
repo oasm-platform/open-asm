@@ -3,9 +3,8 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { GrpcMethod, GrpcStreamMethod } from '@nestjs/microservices';
+import { GrpcMethod } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
-import { mergeMap, Observable } from 'rxjs';
 import {
   GetManyWorkersDto,
   WorkerAliveDto,
@@ -89,21 +88,15 @@ export class WorkersController {
     };
   }
 
-  @GrpcStreamMethod('WorkersService', 'Alive')
-  grpcAlive$(
-    requests$: Observable<{ workerToken: string }>,
-  ): Observable<{ alive: boolean }> {
-    return requests$.pipe(
-      mergeMap(async (request) => {
-        try {
-          const result = await this.workersService.alive({
-            token: request.workerToken,
-          });
-          return { alive: result.alive === 'OK' };
-        } catch {
-          return { alive: false };
-        }
-      }),
-    );
+  @GrpcMethod('WorkersService', 'Alive')
+  async grpcAlive(request: { workerToken: string }): Promise<{ alive: boolean }> {
+    try {
+      const result = await this.workersService.alive({
+        token: request.workerToken,
+      });
+      return { alive: result.alive === 'OK' };
+    } catch {
+      return { alive: false };
+    }
   }
 }

@@ -4,7 +4,7 @@ use worker_rs::tools::{ToolManager, ToolManagerConfig};
 use worker_rs::executor::{JobExecutor, JobExecutionInput};
 use worker_rs::error::WorkerError;
 
-use grpc::generated::{JoinRequest};
+use grpc::generated::{JoinRequest, AliveRequest};
 use grpc::generated::{Worker as ProtoWorker, JobResultRequest, UpdateResultDto, DataPayloadResult};
 
 use tokio::time::{interval, Duration};
@@ -117,11 +117,9 @@ impl Worker {
 
     async fn alive_loop(&self) -> Result<(), WorkerError> {
         let state = self.state.clone();
-        let api_host = self.tool_manager.get_config().api_host.clone();
-        let api_port = self.tool_manager.get_config().api_port;
+        let mut workers_client = self.grpc.workers.clone();
 
         tokio::spawn(async move {
-            let client = reqwest::Client::new();
             let mut ticker = interval(Duration::from_secs(5));
 
             loop {
@@ -137,19 +135,15 @@ impl Worker {
 
                 let Some(token) = worker_token else { continue };
 
-                let url = format!("http://{}:{}/api/workers/alive", api_host, api_port);
-                match client.post(&url).json(&serde_json::json!({ "token": token })).send().await {
+                match workers_client
+                    .alive(tonic::Request::new(AliveRequest { worker_token: token }))
+                    .await
+                {
                     Ok(resp) => {
-                        if resp.status().is_success() {
-                            tracing::debug!("Alive heartbeat acknowledged");
-                        } else {
-                            tracing::warn!("Alive returned status: {}", resp.status());
-                            let mut state = state.write().await;
-                            state.is_connected = false;
-                        }
+                        tracing::debug!("Alive heartbeat: {}", resp.into_inner().alive);
                     }
                     Err(e) => {
-                        tracing::warn!("Alive request failed: {}", e);
+                        tracing::warn!("Alive heartbeat failed: {}", e);
                         let mut state = state.write().await;
                         state.is_connected = false;
                     }

@@ -4,7 +4,7 @@ package workers;
 
 service WorkersService {
   rpc Join(JoinRequest) returns (JoinResponse);
-  rpc Alive(stream AliveRequest) returns (stream AliveResponse);
+  rpc Alive(AliveRequest) returns (AliveResponse);
 }
 
 message JoinRequest {
