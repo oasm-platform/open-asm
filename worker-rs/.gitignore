@@ -17,3 +17,5 @@
 
 # Generated protobuf code
 src/grpc/generated/
+
+tools-cache/

@@ -45,16 +45,8 @@ impl JobExecutor {
         &self,
         input: &JobExecutionInput,
     ) -> Result<JobExecutionOutput, WorkerError> {
-        let parts: Vec<&str> = input.command.split_whitespace().collect();
-        if parts.is_empty() {
-            return Err(WorkerError::JobExecution("Empty command".to_string()));
-        }
-
-        let program = parts[0];
-        let args = &parts[1..];
-
-        let mut cmd = Command::new(program);
-        cmd.args(args);
+        let mut cmd = Command::new("/bin/sh");
+        cmd.arg("-c").arg(&input.command);
 
         if let Some(ref dir) = input.working_dir {
             cmd.current_dir(dir);

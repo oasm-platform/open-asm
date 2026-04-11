@@ -118,11 +118,10 @@ impl Worker {
         let mut workers_client = self.grpc.workers.clone();
 
         tokio::spawn(async move {
-            let (tx, rx) = tokio::sync::mpsc::channel(4);
+            let (tx, rx) = tokio::sync::mpsc::channel::<AliveRequest>(4);
             let stream = ReceiverStream::new(rx);
 
-            // Start the bidirectional streaming call once
-            let mut response_stream = match workers_client.alive(stream).await {
+            let mut response_stream = match workers_client.alive(tonic::Request::new(stream)).await {
                 Ok(resp) => resp.into_inner(),
                 Err(e) => {
                     tracing::error!("Failed to start alive stream: {}", e);
@@ -155,12 +154,48 @@ impl Worker {
                     }
                     resp = response_stream.next() => {
                         match resp {
-                            Some(_) => tracing::debug!("Alive heartbeat acknowledged"),
+                            Some(Ok(ack)) => {
+                                tracing::debug!("Alive heartbeat acknowledged: alive={}", ack.alive);
+                            }
+                            Some(Err(e)) => {
+                                tracing::warn!("Error on alive stream: {}", e);
+                                let (new_tx, new_rx) = tokio::sync::mpsc::channel::<AliveRequest>(4);
+                                let new_stream = ReceiverStream::new(new_rx);
+                                match workers_client.alive(tonic::Request::new(new_stream)).await {
+                                    Ok(resp) => {
+                                        response_stream = resp.into_inner();
+                                        let s = state.read().await;
+                                        if let Some(token) = s.worker_token.clone() {
+                                            let _ = new_tx.send(AliveRequest { worker_token: token }).await;
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Alive reconnect failed: {}", e);
+                                        let mut state = state.write().await;
+                                        state.is_connected = false;
+                                        break;
+                                    }
+                                }
+                            }
                             None => {
-                                tracing::warn!("Alive stream closed by server");
-                                let mut state = state.write().await;
-                                state.is_connected = false;
-                                break;
+                                tracing::warn!("Alive stream closed by server, reconnecting...");
+                                let (new_tx, new_rx) = tokio::sync::mpsc::channel::<AliveRequest>(4);
+                                let new_stream = ReceiverStream::new(new_rx);
+                                match workers_client.alive(tonic::Request::new(new_stream)).await {
+                                    Ok(resp) => {
+                                        response_stream = resp.into_inner();
+                                        let s = state.read().await;
+                                        if let Some(token) = s.worker_token.clone() {
+                                            let _ = new_tx.send(AliveRequest { worker_token: token }).await;
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Alive reconnect failed: {}", e);
+                                        let mut state = state.write().await;
+                                        state.is_connected = false;
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
