@@ -14,7 +14,7 @@ use tokio_stream::StreamExt;
 struct Worker {
     grpc: GrpcClient,
     state: SharedState,
-    _tool_manager: ToolManager,
+    tool_manager: ToolManager,
     executor: JobExecutor,
     config: WorkerConfig,
 }
@@ -52,7 +52,7 @@ impl Worker {
         Ok(Self {
             grpc,
             state: worker_rs::state::new_shared_state(),
-            _tool_manager: ToolManager::new(),
+            tool_manager: ToolManager::new(),
             executor: JobExecutor::new(config.job_timeout_secs),
             config,
         })
@@ -140,6 +140,18 @@ impl Worker {
         // Join worker
         self.join().await?;
 
+        // Download tools on startup
+        match self.tool_manager.fetch_manifest().await {
+            Ok(manifest) => {
+                if let Err(e) = self.tool_manager.download_tools(&manifest.download_tools_url).await {
+                    tracing::warn!("Failed to download tools: {}", e);
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to fetch manifest: {}", e);
+            }
+        }
+
         // Start alive loop in background
         self.alive_loop().await?;
 
@@ -224,6 +236,32 @@ impl Worker {
     }
 }
 
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    tracing::info!("Shutdown signal received");
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
@@ -231,7 +269,17 @@ async fn main() -> anyhow::Result<()> {
 
     let config = WorkerConfig::from_env();
     let mut worker = Worker::new(config).await?;
-    worker.run().await?;
+
+    tokio::select! {
+        result = worker.run() => {
+            if let Err(e) = result {
+                tracing::error!("Worker error: {}", e);
+            }
+        }
+        _ = shutdown_signal() => {
+            tracing::info!("Shutting down worker");
+        }
+    }
 
     Ok(())
 }
