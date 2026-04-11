@@ -71,7 +71,7 @@ export class WorkersController {
   @Public()
   @Get('/manifest')
   getManifest(): WorkerManifestResponseDto {
-    return { downloadToolsUrl: '/static/archived/tools.tar.gz' };
+    return { downloadToolsUrl: '/api/static/archived/tools.tar.gz' };
   }
 
   @GrpcMethod('WorkersService', 'Join')
