@@ -1,8 +1,8 @@
+import { cn } from '@/lib/utils';
+import { memo, type ComponentPropsWithoutRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '@/lib/utils';
 import { CodeBlock } from './code-block';
-import { memo, type ComponentPropsWithoutRef } from 'react';
 
 interface MarkdownProps {
   content: string;
@@ -48,16 +48,10 @@ export const Markdown = memo(function Markdown({
       }
     : {
         h1: (props: ComponentPropsWithoutRef<'h1'>) => (
-          <h1
-            className="text-xl font-bold border-b pb-2 mb-4 mt-6"
-            {...props}
-          />
+          <h1 className="text-xl font-bold  pb-2 mb-4 mt-6" {...props} />
         ),
         h2: (props: ComponentPropsWithoutRef<'h2'>) => (
-          <h2
-            className="text-lg font-bold border-b pb-1 mb-3 mt-5"
-            {...props}
-          />
+          <h2 className="text-lg font-bold  pb-1 mb-3 mt-5" {...props} />
         ),
         h3: (props: ComponentPropsWithoutRef<'h3'>) => (
           <h3 className="text-base font-bold mb-2 mt-4" {...props} />
@@ -95,7 +89,7 @@ export const Markdown = memo(function Markdown({
         ),
         thead: ({ ...props }: ComponentPropsWithoutRef<'thead'>) => (
           <thead
-            className="bg-zinc-100/50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800"
+            className="bg-zinc-100/50 dark:bg-zinc-900/50  border-zinc-200 dark:border-zinc-800"
             {...props}
           />
         ),
@@ -104,7 +98,7 @@ export const Markdown = memo(function Markdown({
         ),
         tr: ({ ...props }: ComponentPropsWithoutRef<'tr'>) => (
           <tr
-            className="border-b border-zinc-100 dark:border-zinc-800/50 transition-colors hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50"
+            className=" border-zinc-100 dark:border-zinc-800/50 transition-colors hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50"
             {...props}
           />
         ),

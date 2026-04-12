@@ -1,7 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useVulnerabilitiesControllerGetVulnerabilitiesStatistics } from '@/services/apis/gen/queries';
-import { AlertTriangle, Bug, Eye, Flame, Info } from 'lucide-react';
+import clsx from 'clsx';
 import { useLocation } from 'react-router-dom';
 
 interface VulnerabilitiesStatisticProps {
@@ -10,9 +9,7 @@ interface VulnerabilitiesStatisticProps {
 const VulnerabilitiesStatistic = ({
   targetId,
 }: VulnerabilitiesStatisticProps) => {
-  const {
-    state: { selectedWorkspaceId },
-  } = useWorkspaceState();
+  const { selectedWorkspace } = useWorkspaceSelector();
   const location = useLocation();
 
   // Extract targetId from URL search params if present
@@ -27,12 +24,12 @@ const VulnerabilitiesStatistic = ({
   const { data, isLoading } =
     useVulnerabilitiesControllerGetVulnerabilitiesStatistics(
       {
-        workspaceId: selectedWorkspaceId ?? '',
+        workspaceId: selectedWorkspace ?? '',
         ...(targetId ? { targetIds: [targetId] } : {}),
       },
       {
         query: {
-          enabled: !!selectedWorkspaceId,
+          enabled: !!selectedWorkspace,
           refetchInterval: 5000,
         },
       },
@@ -53,88 +50,38 @@ const VulnerabilitiesStatistic = ({
     critical: 0,
   };
 
-  // Loading state - show skeleton cards
+  // Loading state - show skeleton
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="flex items-center gap-12">
         {[...Array(5)].map((_, index) => (
-          <Card key={index} className="animate-pulse">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="h-4 bg-muted rounded w-16"></div>
-              <div className="h-5 w-5 bg-muted rounded-full"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-8 bg-muted rounded w-8"></div>
-            </CardContent>
-          </Card>
+          <div key={index} className="flex flex-col animate-pulse">
+            <div className="h-4 bg-muted rounded w-16 mb-1"></div>
+            <div className="h-8 bg-muted rounded w-8"></div>
+          </div>
         ))}
       </div>
     );
   }
 
+  const severityConfig = [
+    { key: 'critical', label: 'Critical', color: 'text-red-500' },
+    { key: 'high', label: 'High', color: 'text-orange-500' },
+    { key: 'medium', label: 'Medium', color: 'text-yellow-500' },
+    { key: 'low', label: 'Low', color: 'text-blue-500' },
+    { key: 'info', label: 'Info', color: '' },
+  ];
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-red-500 font-medium text-base">
-            Critical
-          </CardTitle>
-          <Flame className="h-5 w-5 text-red-500" />
-        </CardHeader>
-        <CardContent>
-          <p className="text-4xl font-bold text-red-500">
-            {severityCounts.critical}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-orange-500 font-medium text-base">
-            High
-          </CardTitle>
-          <AlertTriangle className="h-5 w-5 text-orange-500" />
-        </CardHeader>
-        <CardContent>
-          <p className="text-4xl font-bold text-orange-500">
-            {severityCounts.high}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-yellow-500 font-medium text-base">
-            Medium
-          </CardTitle>
-          <Bug className="h-5 w-5 text-yellow-500" />
-        </CardHeader>
-        <CardContent>
-          <p className="text-4xl font-bold text-yellow-500">
-            {severityCounts.medium}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-blue-500 font-medium text-base">
-            Low
-          </CardTitle>
-          <Eye className="h-5 w-5 text-blue-500" />
-        </CardHeader>
-        <CardContent>
-          <p className="text-4xl font-bold text-blue-500">
-            {severityCounts.low}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="font-medium text-base">Info</CardTitle>
-          <Info className="h-5 w-5" />
-        </CardHeader>
-        <CardContent>
-          <p className="text-4xl font-bold">{severityCounts.info}</p>
-        </CardContent>
-      </Card>
+    <div className="flex items-center gap-12">
+      {severityConfig.map(({ key, label, color }) => (
+        <div key={key} className="flex flex-col">
+          <span className="text-muted-foreground text-sm">{label}</span>
+          <span className={clsx('text-2xl font-bold ', color)}>
+            {severityCounts[key]}
+          </span>
+        </div>
+      ))}
     </div>
   );
 };

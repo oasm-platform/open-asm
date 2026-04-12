@@ -6,6 +6,7 @@ import {
   HOOK_KEY,
 } from '@/common/constants/app.constants';
 import type {
+  DynamicModule,
   MiddlewareConsumer,
   NestModule,
   OnModuleInit,
@@ -19,9 +20,8 @@ import {
   HttpAdapterHost,
   MetadataScanner,
 } from '@nestjs/core';
-import { type Auth } from 'better-auth';
+import { createMiddleware, type Auth } from 'better-auth';
 import { toNodeHandler } from 'better-auth/node';
-import { createMiddleware } from 'better-auth';
 import type { Request, Response } from 'express';
 import { APIErrorExceptionFilter } from '../../common/filters/api-error-exception-filter';
 import { SkipBodyParsingMiddleware } from '../../common/middlewares/skip-body-parsing.middlewares';
@@ -182,11 +182,12 @@ export class AuthModule implements NestModule, OnModuleInit {
    * @param auth - The Auth instance to use
    * @param options - Configuration options for the module
    */
-  static forRoot(options: AuthModuleOptions = {}) {
+  static forRoot(options: AuthModuleOptions = {}): DynamicModule {
+    const authInstance = auth as unknown;
     const providers: Provider[] = [
       {
         provide: AUTH_INSTANCE_KEY,
-        useValue: auth,
+        useValue: authInstance,
       },
       {
         provide: AUTH_MODULE_OPTIONS_KEY,
@@ -209,7 +210,7 @@ export class AuthModule implements NestModule, OnModuleInit {
       exports: [
         {
           provide: AUTH_INSTANCE_KEY,
-          useValue: auth,
+          useValue: authInstance,
         },
         {
           provide: AUTH_MODULE_OPTIONS_KEY,

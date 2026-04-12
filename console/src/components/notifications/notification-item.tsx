@@ -7,7 +7,7 @@ import {
   useNotificationsControllerMarkAsRead,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCheck, Info } from 'lucide-react';
+import { CheckCheck } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -15,12 +15,14 @@ interface NotificationItemProps {
   notification: NotificationResponseDto;
   variant?: 'popup' | 'page';
   onClick?: () => void;
+  onClose?: () => void;
 }
 
 export const NotificationItem = memo(function NotificationItem({
   notification,
   variant = 'popup',
   onClick,
+  onClose,
 }: NotificationItemProps) {
   const queryClient = useQueryClient();
   const markAsRead = useNotificationsControllerMarkAsRead({
@@ -44,8 +46,9 @@ export const NotificationItem = memo(function NotificationItem({
     if (isUnread) {
       markAsRead.mutate({ id: notification.id });
     }
+    onClose?.();
     onClick?.();
-  }, [isUnread, notification.id, markAsRead, onClick]);
+  }, [isUnread, notification.id, markAsRead, onClick, onClose]);
 
   return (
     <Link
@@ -57,9 +60,9 @@ export const NotificationItem = memo(function NotificationItem({
         variant === 'page' && 'border-b',
       )}
     >
-      <div className="mt-1">
+      {/* <div className="mt-1">
         <Info className="h-5 w-5 text-primary" />
-      </div>
+      </div> */}
       <div className="flex-1 space-y-1">
         <p
           className={cn(
