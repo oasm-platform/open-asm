@@ -23,6 +23,12 @@ pub enum WorkerError {
     #[error("Job execution failed: {0}")]
     JobExecution(String),
 
+    #[error("Tool dependency missing: {tool} - {message}")]
+    ToolDependencyMissing {
+        tool: String,
+        message: String,
+    },
+
     #[error("Connection lost: {0}")]
     ConnectionLost(String),
 }

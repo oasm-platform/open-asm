@@ -20,9 +20,16 @@ impl GrpcClient {
             .await
             .map_err(WorkerError::Transport)?;
 
+        // Increase max message size to 64MB (default is 4MB) to handle large job outputs
+        let max_message_size = 64 * 1024 * 1024; // 64MB
+        
         Ok(Self {
-            workers: generated::workers_service_client::WorkersServiceClient::new(channel.clone()),
-            jobs: generated::jobs_registry_service_client::JobsRegistryServiceClient::new(channel),
+            workers: generated::workers_service_client::WorkersServiceClient::new(channel.clone())
+                .max_decoding_message_size(max_message_size)
+                .max_encoding_message_size(max_message_size),
+            jobs: generated::jobs_registry_service_client::JobsRegistryServiceClient::new(channel)
+                .max_decoding_message_size(max_message_size)
+                .max_encoding_message_size(max_message_size),
         })
     }
 }

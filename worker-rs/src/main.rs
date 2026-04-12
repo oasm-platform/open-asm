@@ -43,12 +43,12 @@ struct Cli {
     #[arg(long, default_value = "5")]
     max_concurrent_jobs: usize,
 
-    /// Job timeout in seconds
-    #[arg(long, default_value = "300")]
+    /// Job timeout in seconds (default 1800/30min to accommodate nuclei scans)
+    #[arg(long, default_value = "1800")]
     job_timeout_secs: u64,
 
     /// Tools cache directory
-    #[arg(long, default_value = "./tools-cache")]
+    #[arg(long, default_value = "tools-cache")]
     tools_cache_dir: String,
 }
 
@@ -86,11 +86,14 @@ impl Worker {
     async fn new(config: WorkerConfig, tool_config: ToolManagerConfig) -> Result<Self, WorkerError> {
         let grpc = GrpcClient::new(&config.grpc_host, config.grpc_port).await?;
 
+        // Create executor with empty tool_paths initially; will be refreshed after download
+        let executor = JobExecutor::new(config.job_timeout_secs, std::collections::HashMap::new());
+
         Ok(Self {
             grpc,
             state: worker_rs::state::new_shared_state(),
             tool_manager: ToolManager::with_config(tool_config),
-            executor: JobExecutor::new(config.job_timeout_secs),
+            executor,
             config,
         })
     }
@@ -105,12 +108,15 @@ impl Worker {
             .map_err(|e| WorkerError::Grpc(e))?
             .into_inner();
 
+        tracing::info!(
+            worker_id = %response.worker_id,
+            "Worker joined successfully"
+        );
+
         let mut state = self.state.write().await;
         state.worker_id = Some(response.worker_id.clone());
         state.worker_token = Some(response.worker_token.clone());
         state.is_connected = true;
-
-        tracing::info!("Worker joined with ID: {}", response.worker_id);
 
         Ok(())
     }
@@ -121,6 +127,7 @@ impl Worker {
 
         tokio::spawn(async move {
             let mut ticker = interval(Duration::from_secs(5));
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
             loop {
                 ticker.tick().await;
@@ -133,20 +140,17 @@ impl Worker {
                     s.worker_token.clone()
                 };
 
-                let Some(token) = worker_token else { continue };
+                let Some(token) = worker_token else {
+                    continue;
+                };
 
-                match workers_client
+                if let Err(e) = workers_client
                     .alive(tonic::Request::new(AliveRequest { worker_token: token }))
                     .await
                 {
-                    Ok(resp) => {
-                        tracing::debug!("Alive heartbeat: {}", resp.into_inner().alive);
-                    }
-                    Err(e) => {
-                        tracing::warn!("Alive heartbeat failed: {}", e);
-                        let mut state = state.write().await;
-                        state.is_connected = false;
-                    }
+                    tracing::warn!(error = %e, "Alive heartbeat failed");
+                    let mut state = state.write().await;
+                    state.is_connected = false;
                 }
             }
         });
@@ -160,19 +164,49 @@ impl Worker {
 
         // Download tools only if needed
         if self.tool_manager.needs_download().await {
-            match self.tool_manager.fetch_manifest().await {
-                Ok(manifest) => {
-                    if let Err(e) = self.tool_manager.download_tools(&manifest.download_tools_url).await {
-                        tracing::warn!("Failed to download tools: {}", e);
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to fetch manifest: {}", e);
-                }
-            }
-        } else {
-            tracing::info!("Tools already cached, skipping download");
+            tracing::info!("Downloading tools...");
+            let manifest = self.tool_manager.fetch_manifest().await
+                .map_err(|e| WorkerError::JobExecution(format!("Failed to fetch manifest: {}", e)))?;
+
+            self.tool_manager.download_tools(&manifest.download_tools_url).await
+                .map_err(|e| WorkerError::JobExecution(format!("Failed to download tools: {}", e)))?;
+
+            tracing::info!("Tools downloaded successfully");
         }
+
+        // Initialize nuclei templates
+        if let Err(e) = self.tool_manager.init_nuclei_templates().await {
+            tracing::warn!(error = %e, "Failed to initialize nuclei templates");
+        }
+
+        // Refresh executor's tool paths now that tools are downloaded
+        self.executor = JobExecutor::with_resolved_tools(&self.tool_manager, self.config.job_timeout_secs).await;
+
+        // Log tool validation status
+        let tool_status = self.executor.get_tool_validation_status().await;
+        let mut valid_tools = Vec::new();
+        let mut invalid_tools = Vec::new();
+
+        for (name, status) in &tool_status {
+            if status.is_valid {
+                valid_tools.push(name.clone());
+            } else {
+                let reason = if !status.missing_deps.is_empty() {
+                    format!("missing: {}", status.missing_deps.join(", "))
+                } else {
+                    status.error_message.clone().unwrap_or_else(|| "unknown".to_string())
+                };
+                invalid_tools.push(format!("{} ({})", name, reason));
+            }
+        }
+
+        if !valid_tools.is_empty() {
+            tracing::info!(tools = %valid_tools.join(", "), "Valid tools");
+        }
+        if !invalid_tools.is_empty() {
+            tracing::warn!(tools = %invalid_tools.join(", "), "Tools with issues");
+        }
+        tracing::info!(valid = valid_tools.len(), invalid = invalid_tools.len(), "Tool validation complete");
 
         // Start alive loop in background
         self.alive_loop().await?;
@@ -198,12 +232,21 @@ impl Worker {
 
             // Poll for next job
             let mut request = tonic::Request::new(ProtoWorker { id: worker_id.clone() });
-            request.metadata_mut().insert("worker-token", worker_token.parse().unwrap());
+            match worker_token.parse() {
+                Ok(token_value) => {
+                    request.metadata_mut().insert("worker-token", token_value);
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to parse worker token");
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+            }
 
             let job = match jobs_client.next(request).await {
                 Ok(resp) => resp.into_inner(),
                 Err(e) => {
-                    tracing::warn!("Failed to poll job: {}", e);
+                    tracing::warn!(error = %e, "Failed to poll job via gRPC");
                     tokio::time::sleep(Duration::from_secs(1)).await;
                     continue;
                 }
@@ -217,8 +260,13 @@ impl Worker {
             let job_id = job.id;
             let command = job.command.unwrap_or_default();
 
-            tracing::info!("Received job: {} (concurrent slots: {}/{})",
-                job_id, max_concurrent - semaphore.available_permits(), max_concurrent);
+            tracing::info!(
+                job_id = %job_id,
+                active = max_concurrent - semaphore.available_permits(),
+                max = max_concurrent,
+                command = %command,
+                "Received job"
+            );
 
             let permit = semaphore.clone().acquire_owned().await
                 .expect("Semaphore closed");
@@ -240,7 +288,7 @@ impl Worker {
 
                 let result = match execution {
                     Ok(output) => {
-                        tracing::info!("Job completed: success={}", output.success);
+                        tracing::info!(success = output.success, "Job completed");
                         JobResultRequest {
                             worker_id: worker_id.clone(),
                             data: Some(UpdateResultDto {
@@ -253,8 +301,22 @@ impl Worker {
                             }),
                         }
                     }
+                    Err(WorkerError::ToolDependencyMissing { tool, message }) => {
+                        tracing::error!(tool = %tool, "Job failed - missing dependency");
+                        JobResultRequest {
+                            worker_id: worker_id.clone(),
+                            data: Some(UpdateResultDto {
+                                job_id: job_id.clone(),
+                                data: Some(DataPayloadResult {
+                                    error: true,
+                                    raw: Some(format!("Tool '{}' is not functional: {}. Please install missing dependencies or update the tool.", tool, message)),
+                                    payload: None,
+                                }),
+                            }),
+                        }
+                    }
                     Err(e) => {
-                        tracing::error!("Job execution failed: {}", e);
+                        tracing::error!(error = %e, "Job execution failed");
                         JobResultRequest {
                             worker_id: worker_id.clone(),
                             data: Some(UpdateResultDto {
@@ -272,7 +334,7 @@ impl Worker {
                 let mut req = tonic::Request::new(result);
                 req.metadata_mut().insert("worker-token", worker_token.parse().unwrap());
                 if let Err(e) = jobs_client.result(req).await {
-                    tracing::error!("Failed to report job result: {}", e);
+                    tracing::error!(error = %e, "Failed to report job result");
                 }
 
                 drop(permit);
@@ -309,12 +371,22 @@ async fn shutdown_signal() {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+    // Initialize tracing with RUST_LOG environment variable support
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
+        )
+        .init();
 
     let cli = Cli::parse();
 
-    tracing::info!("Starting worker-rs");
-    tracing::info!("Connecting to gRPC at {}:{}", cli.grpc_host, cli.grpc_port);
+    tracing::info!(
+        host = %cli.grpc_host,
+        port = cli.grpc_port,
+        max_concurrent = cli.max_concurrent_jobs,
+        "Starting worker-rs"
+    );
 
     let config = WorkerConfig::from_cli(&cli);
     let tool_config = ToolManagerConfig::new(
@@ -327,7 +399,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::select! {
         result = worker.run() => {
             if let Err(e) = result {
-                tracing::error!("Worker error: {}", e);
+                tracing::error!(error = %e, "Worker error");
             }
         }
         _ = shutdown_signal() => {

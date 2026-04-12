@@ -23,10 +23,21 @@ pub struct JobExecutionOutput {
 }
 
 #[derive(Debug, Clone)]
+pub struct ToolValidationResult {
+    pub tool_name: String,
+    pub path: PathBuf,
+    pub is_valid: bool,
+    pub missing_deps: Vec<String>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct JobExecutor {
     timeout_secs: u64,
     /// Map of tool name -> absolute path, used to replace bare tool names in commands.
     tool_paths: Arc<HashMap<String, PathBuf>>,
+    /// Cache of tool validation results to avoid repeated checks.
+    tool_validations: Arc<Mutex<Option<HashMap<String, ToolValidationResult>>>>,
 }
 
 impl JobExecutor {
@@ -34,13 +45,160 @@ impl JobExecutor {
         Self {
             timeout_secs,
             tool_paths: Arc::new(tool_paths),
+            tool_validations: Arc::new(Mutex::new(None)),
         }
     }
 
     /// Resolve tool paths from the tool manager and update the executor.
     pub async fn with_resolved_tools(tool_manager: &crate::tools::ToolManager, timeout_secs: u64) -> Self {
         let paths = tool_manager.get_all_tool_paths().await;
-        Self::new(timeout_secs, paths)
+        let executor = Self::new(timeout_secs, paths);
+        
+        // Validate all tools at startup
+        executor.validate_all_tools().await;
+        
+        executor
+    }
+
+    /// Validate all tools and cache the results.
+    pub async fn validate_all_tools(&self) {
+        let mut validations = HashMap::new();
+        
+        for (tool_name, tool_path) in self.tool_paths.iter() {
+            let result = self.validate_tool(tool_name, tool_path).await;
+            validations.insert(tool_name.clone(), result);
+        }
+        
+        let mut cache = self.tool_validations.lock().await;
+        *cache = Some(validations);
+    }
+
+    /// Validate a single tool by checking if it exists and has all required dependencies.
+    async fn validate_tool(&self, tool_name: &str, tool_path: &PathBuf) -> ToolValidationResult {
+        // Check if file exists
+        if !tool_path.exists() {
+            return ToolValidationResult {
+                tool_name: tool_name.to_string(),
+                path: tool_path.clone(),
+                is_valid: false,
+                missing_deps: vec![],
+                error_message: Some("Binary not found".to_string()),
+            };
+        }
+
+        // Check if file is executable
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(metadata) = std::fs::metadata(tool_path) {
+                let mode = metadata.permissions().mode();
+                if mode & 0o111 == 0 {
+                    return ToolValidationResult {
+                        tool_name: tool_name.to_string(),
+                        path: tool_path.clone(),
+                        is_valid: false,
+                        missing_deps: vec![],
+                        error_message: Some("Not executable".to_string()),
+                    };
+                }
+            }
+        }
+
+        // Check for missing shared library dependencies using ldd
+        let missing_deps = self.check_missing_dependencies(tool_path).await;
+        
+        ToolValidationResult {
+            tool_name: tool_name.to_string(),
+            path: tool_path.clone(),
+            is_valid: missing_deps.is_empty(),
+            missing_deps,
+            error_message: None,
+        }
+    }
+
+    /// Check for missing shared library dependencies using ldd.
+    async fn check_missing_dependencies(&self, tool_path: &PathBuf) -> Vec<String> {
+        let mut missing = Vec::new();
+        
+        // Only check on Linux
+        #[cfg(target_os = "linux")]
+        {
+            match Command::new("ldd")
+                .arg(tool_path)
+                .output()
+                .await
+            {
+                Ok(output) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    for line in stdout.lines() {
+                        if line.contains("not found") {
+                            // Extract library name from "libfoo.so => not found"
+                            if let Some(lib_name) = line.split_whitespace().next() {
+                                missing.push(lib_name.to_string());
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to run ldd for {:?}: {}", tool_path, e);
+                }
+            }
+        }
+        
+        missing
+    }
+
+    /// Check if tools used in a command are valid.
+    /// Returns error details if any tool has missing dependencies.
+    async fn validate_command_tools(&self, command: &str) -> Result<(), WorkerError> {
+        // Extract tool names from command first (before acquiring lock)
+        let delimiters = &[' ', '|', ';', '(', '\n', '\t', '&'];
+        let command_tools: Vec<String> = command
+            .split(|c| delimiters.contains(&c))
+            .map(|s| s.to_string())
+            .collect();
+
+        // Get validations, refresh if needed
+        let need_refresh = {
+            let validations = self.tool_validations.lock().await;
+            validations.is_none()
+        };
+
+        if need_refresh {
+            self.validate_all_tools().await;
+        }
+
+        let validations = self.tool_validations.lock().await;
+        let validations = match validations.as_ref() {
+            Some(v) => v.clone(), // Clone to avoid borrow issues
+            None => return Ok(()), // Should not happen, but be lenient
+        };
+
+        // Check each tool in the command
+        for tool_name in &command_tools {
+            if let Some(validation) = validations.get(tool_name) {
+                if !validation.is_valid {
+                    let missing = validation.missing_deps.join(", ");
+                    let error_msg = if missing.is_empty() {
+                        validation.error_message.clone().unwrap_or_else(|| "Unknown error".to_string())
+                    } else {
+                        format!("Missing dependencies: {}", missing)
+                    };
+
+                    tracing::error!(
+                        "Tool '{}' is not functional: {} (path: {:?})",
+                        tool_name, error_msg, validation.path
+                    );
+
+                    return Err(WorkerError::ToolDependencyMissing {
+                        tool: tool_name.clone(),
+                        message: error_msg,
+                    });
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Replace bare tool names in the command with absolute paths.
@@ -107,17 +265,19 @@ impl JobExecutor {
     pub async fn execute(&self, input: JobExecutionInput) -> Result<JobExecutionOutput, WorkerError> {
         let timeout = tokio::time::Duration::from_secs(self.timeout_secs);
 
+        // Validate that tools used in the command have all dependencies met
+        self.validate_command_tools(&input.command).await?;
+
         // Resolve tool paths in the command
         let resolved_command = self.resolve_command(&input.command);
-        tracing::info!(
-            "Executing job {}: {}",
-            input.job_id,
-            if resolved_command != input.command {
-                format!("{} (resolved: {})", input.command, resolved_command)
-            } else {
-                resolved_command.clone()
-            }
-        );
+        if resolved_command != input.command {
+            tracing::debug!(
+                job_id = %input.job_id,
+                original = %input.command,
+                resolved = %resolved_command,
+                "Command resolved with full paths"
+            );
+        }
 
         let output = tokio::time::timeout(timeout, self.execute_command(&input, &resolved_command))
             .await
@@ -206,9 +366,29 @@ impl JobExecutor {
         let success = status.success();
         let exit_code = status.code();
 
-        tracing::info!(
-            "Job {} completed: success={}, exit_code={:?}",
-            input.job_id, success, exit_code
+        // Provide enhanced error message for exit code 127
+        if exit_code == Some(127) {
+            let stderr_output = stderr_lines.join("\n");
+            let enhanced_error = if stderr_output.is_empty() {
+                "Command not found or missing dependencies (stderr empty)".to_string()
+            } else {
+                format!("Command not found or missing dependencies: {}", stderr_output)
+            };
+
+            tracing::error!(
+                job_id = %input.job_id,
+                "Job failed with exit code 127"
+            );
+
+            return Err(WorkerError::JobExecution(enhanced_error));
+        }
+
+        tracing::debug!(
+            job_id = %input.job_id,
+            success = success,
+            exit_code = ?exit_code,
+            command = %input.command,
+            "Job completed"
         );
 
         Ok(JobExecutionOutput {
@@ -218,6 +398,12 @@ impl JobExecutor {
             stderr: stderr_lines.join("\n"),
             exit_code,
         })
+    }
+
+    /// Get validation status for all tools.
+    pub async fn get_tool_validation_status(&self) -> HashMap<String, ToolValidationResult> {
+        let validations = self.tool_validations.lock().await;
+        validations.clone().unwrap_or_default()
     }
 }
 

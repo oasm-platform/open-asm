@@ -16,7 +16,7 @@ serde_json = "1"
 tokio-util = "0.7"
 tower = "0.5"
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 flate2 = "1"
 tokio-stream = "0.1"
 thiserror = "2"

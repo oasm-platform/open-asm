@@ -50,6 +50,12 @@ impl ToolManager {
 
     pub fn with_config(config: ToolManagerConfig) -> Self {
         let cache_dir = std::path::PathBuf::from(&config.tools_cache_dir);
+        // Convert to absolute path to avoid issues with relative paths in command execution
+        let cache_dir = if cache_dir.is_absolute() {
+            cache_dir
+        } else {
+            std::env::current_dir().unwrap_or_default().join(&cache_dir)
+        };
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
@@ -68,25 +74,19 @@ impl ToolManager {
             self.config.api_host, self.config.api_port
         );
 
-        tracing::info!("Fetching manifest from: {}", url);
+        tracing::debug!(url = %url, "Fetching manifest");
 
         let response = self.client.get(&url).send().await?;
         let manifest: WorkerManifestResponse = response.json().await?;
-
-        tracing::info!("Got manifest with download URL: {}", manifest.download_tools_url);
 
         Ok(manifest)
     }
 
     pub async fn download_tools(&self, download_url: &str) -> Result<(), WorkerError> {
         let base_url = format!("http://{}:{}", self.config.api_host, self.config.api_port);
-        let full_url = if download_url.starts_with('/') {
-            format!("{}{}", base_url, download_url)
-        } else {
-            download_url.to_string()
-        };
+        let full_url = format!("{}/api{}", base_url, download_url);
 
-        tracing::info!("Downloading tools from: {}", full_url);
+        tracing::info!(url = %full_url, "Downloading tools");
 
         tokio::fs::create_dir_all(&self.cache_dir).await?;
 
@@ -103,7 +103,7 @@ impl ToolManager {
         self.set_execute_permissions().await?;
         self.refresh_tool_paths().await;
 
-        tracing::info!("Tools extracted to: {:?}", self.cache_dir);
+        tracing::info!(cache_dir = ?self.cache_dir, "Tools extracted");
         Ok(())
     }
 
@@ -112,9 +112,8 @@ impl ToolManager {
         let cache_dir = self.cache_dir.clone();
         let bytes = data.to_vec();
 
-        tracing::info!("Downloaded {} bytes", bytes.len());
         if bytes.len() < 2 || bytes[0] != 0x1f || bytes[1] != 0x8b {
-            tracing::warn!("Downloaded file is not a valid gzip archive (size: {} bytes)", bytes.len());
+            tracing::warn!(size = bytes.len(), "Downloaded file is not a valid gzip archive");
             return Ok(());
         }
 
@@ -187,11 +186,11 @@ impl ToolManager {
     /// Scan the cache directory and populate the tool_paths map.
     async fn refresh_tool_paths(&self) {
         let cache_dir = self.cache_dir.clone();
-        
+
         // Use spawn_blocking for filesystem operations to avoid blocking the async runtime
         let paths_map = tokio::task::spawn_blocking(move || {
             let mut paths = HashMap::new();
-            
+
             for tool_name in KNOWN_TOOLS {
                 let path = cache_dir.join(tool_name);
                 // Add platform-specific extension if needed
@@ -217,16 +216,13 @@ impl ToolManager {
                     }
                 }
             }
-            
+
             paths
         }).await.unwrap_or_default();
-        
+
         let mut paths = self.tool_paths.write().await;
         paths.clear();
         paths.extend(paths_map);
-        drop(paths); // Release write lock immediately
-
-        tracing::info!("Resolved tool paths: {:?}", self.tool_paths.read().await);
     }
 
     /// Get the absolute path for a known tool by name.
@@ -270,8 +266,6 @@ impl ToolManager {
             }
         };
 
-        tracing::info!("Initializing nuclei templates...");
-
         let output = tokio::process::Command::new(&nuclei_path)
             .arg("-ut")
             .output()
@@ -279,18 +273,11 @@ impl ToolManager {
             .map_err(|e| WorkerError::JobExecution(format!("nuclei -ut failed: {}", e)))?;
 
         if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            tracing::info!(
-                "Nuclei templates initialized: {}",
-                stdout.lines().take(5).collect::<Vec<_>>().join(" ")
-            );
+            tracing::debug!("Nuclei templates initialized");
             Ok(())
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            tracing::warn!(
-                "Nuclei template initialization had issues: {}",
-                stderr.lines().take(3).collect::<Vec<_>>().join(" ")
-            );
+            tracing::warn!(error = %stderr.lines().next().unwrap_or(""), "Nuclei template initialization had issues");
             // Non-fatal: continue anyway since templates may already exist
             Ok(())
         }
@@ -305,7 +292,7 @@ impl ToolManager {
     /// Also populates the tool_paths map if tools are found.
     pub async fn needs_download(&self) -> bool {
         let cache_dir = self.cache_dir.clone();
-        
+
         // Use spawn_blocking for filesystem operations to avoid blocking the async runtime
         let result = tokio::task::spawn_blocking(move || {
             // Check if cache directory exists
@@ -346,12 +333,12 @@ impl ToolManager {
         }).await;
 
         let needs_download = result.unwrap_or(true);
-        
+
         // If tools exist, populate tool_paths map
         if !needs_download {
             self.refresh_tool_paths().await;
         }
-        
+
         needs_download
     }
 }

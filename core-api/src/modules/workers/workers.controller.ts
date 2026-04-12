@@ -70,7 +70,7 @@ export class WorkersController {
   @Public()
   @Get('/manifest')
   getManifest(): WorkerManifestResponseDto {
-    return { downloadToolsUrl: '/api/static/archived/tools.tar.gz' };
+    return { downloadToolsUrl: '/static/archived/tools.tar.gz' };
   }
 
   @GrpcMethod('WorkersService', 'Join')
@@ -89,7 +89,9 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'Alive')
-  async grpcAlive(request: { workerToken: string }): Promise<{ alive: boolean }> {
+  async grpcAlive(request: {
+    workerToken: string;
+  }): Promise<{ alive: boolean }> {
     try {
       const result = await this.workersService.alive({
         token: request.workerToken,

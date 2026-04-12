@@ -113,6 +113,7 @@ async function bootstrap() {
         const reflection = new ReflectionService(pkg);
         reflection.addToServer(server);
       },
+      maxReceiveMessageLength: 64 * 1024 * 1024,
     },
   });
 
