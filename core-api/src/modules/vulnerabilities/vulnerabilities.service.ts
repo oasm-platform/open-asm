@@ -599,4 +599,41 @@ export class VulnerabilitiesService {
       vulnerability.asset?.target?.workspaceTargets?.[0]?.workspace ?? null
     );
   }
+
+  async deleteVulnerabilityAnalysis(
+    id: string,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const vulnerability = await this.vulnerabilitiesRepository.findOne({
+      where: { id },
+      relations: [
+        'asset',
+        'asset.target',
+        'asset.target.workspaceTargets',
+        'asset.target.workspaceTargets.workspace',
+      ],
+    });
+
+    if (!vulnerability) {
+      throw new NotFoundException(`Vulnerability with id ${id} not found`);
+    }
+
+    const workspace =
+      vulnerability.asset?.target?.workspaceTargets?.[0]?.workspace;
+    if (!workspace || workspace.id !== workspaceId) {
+      throw new NotFoundException(
+        `Vulnerability with id ${id} not found in workspace`,
+      );
+    }
+
+    await this.vulnerabilitiesRepository.update(
+      { id },
+      {
+        analyzeStatus: VulnerabilityAnalyzeStatus.NOT_ANALYZED,
+        analyzeResult: '',
+      },
+    );
+
+    return { message: 'Analysis result deleted successfully' };
+  }
 }
