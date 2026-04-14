@@ -9,7 +9,6 @@ import {
   GetManyWorkersDto,
   WorkerAliveDto,
   WorkerJoinDto,
-  WorkerManifestResponseDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
@@ -60,16 +59,8 @@ export class WorkersController {
     return this.workersService.getWorkers(query);
   }
 
-  @Doc({
-    summary: 'Get worker tools manifest',
-    description: 'Returns the URL to the worker tools archive package.',
-    response: {
-      serialization: WorkerManifestResponseDto,
-    },
-  })
-  @Public()
-  @Get('/manifest')
-  getManifest(): WorkerManifestResponseDto {
+  @GrpcMethod('WorkersService', 'GetManifest')
+  grpcGetManifest(): { downloadToolsUrl: string } {
     return { downloadToolsUrl: '/static/archived/tools.tar.gz' };
   }
 

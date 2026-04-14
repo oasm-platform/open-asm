@@ -183,7 +183,7 @@ export class AuthModule implements NestModule, OnModuleInit {
    * @param options - Configuration options for the module
    */
   static forRoot(options: AuthModuleOptions = {}): DynamicModule {
-    const authInstance = auth as unknown;
+    const authInstance = auth;
     const providers: Provider[] = [
       {
         provide: AUTH_INSTANCE_KEY,
