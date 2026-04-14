@@ -4,10 +4,10 @@ use worker_rs::tools::{ToolManager, ToolManagerConfig};
 use worker_rs::executor::{JobExecutor, JobExecutionInput};
 use worker_rs::error::WorkerError;
 
-use grpc::generated::{JoinRequest, AliveRequest};
+use grpc::generated::JoinRequest;
 use grpc::generated::{Worker as ProtoWorker, JobResultRequest, UpdateResultDto, DataPayloadResult};
 
-use tokio::time::{interval, Duration};
+use tokio::time::Duration;
 use clap::Parser;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
@@ -45,7 +45,7 @@ struct Cli {
 }
 
 struct Worker {
-    grpc: GrpcClient,
+    grpc: Option<GrpcClient>,
     state: SharedState,
     tool_manager: ToolManager,
     executor: JobExecutor,
@@ -82,7 +82,7 @@ impl Worker {
         let executor = JobExecutor::new(config.job_timeout_secs, std::collections::HashMap::new());
 
         Ok(Self {
-            grpc: grpc.clone(),
+            grpc: Some(grpc.clone()),
             state: worker_rs::state::new_shared_state(),
             tool_manager: ToolManager::with_grpc_client(grpc.workers, tool_config),
             executor,
@@ -96,7 +96,8 @@ impl Worker {
             signature: self.config.worker_signature.clone(),
         };
 
-        let response = self.grpc.workers.join(request).await
+        let grpc = self.grpc.as_mut().ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
+        let response = grpc.workers.join(request).await
             .map_err(|e| WorkerError::Grpc(e))?
             .into_inner();
 
@@ -114,40 +115,36 @@ impl Worker {
     }
 
     async fn alive_loop(&self) -> Result<(), WorkerError> {
-        let state = self.state.clone();
-        let mut workers_client = self.grpc.workers.clone();
-
+        // Alive loop is now handled by main loop reconnection logic
         tokio::spawn(async move {
-            let mut ticker = interval(Duration::from_secs(5));
-            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
+            // Keep the task alive but don't do anything since reconnection is handled elsewhere
             loop {
-                ticker.tick().await;
-
-                let worker_token = {
-                    let s = state.read().await;
-                    if !s.is_connected {
-                        continue;
-                    }
-                    s.worker_token.clone()
-                };
-
-                let Some(token) = worker_token else {
-                    continue;
-                };
-
-                if let Err(e) = workers_client
-                    .alive(tonic::Request::new(AliveRequest { worker_token: token }))
-                    .await
-                {
-                    tracing::warn!(error = %e, "Alive heartbeat failed");
-                    let mut state = state.write().await;
-                    state.is_connected = false;
-                }
+                tokio::time::sleep(Duration::from_secs(60)).await;
             }
         });
 
         Ok(())
+    }
+
+    async fn reconnect_grpc(&mut self) -> Result<(), WorkerError> {
+        tracing::info!("Attempting to reconnect gRPC client...");
+        match GrpcClient::new(&self.config.grpc_host, self.config.grpc_port).await {
+            Ok(grpc) => {
+                self.grpc = Some(grpc);
+                tracing::info!("gRPC reconnection successful");
+
+                // Rejoin worker to get new token
+                tracing::info!("Rejoining worker after reconnection...");
+                self.join().await?;
+                tracing::info!("Worker rejoined successfully after reconnection");
+
+                Ok(())
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "gRPC reconnection failed");
+                Err(e)
+            }
+        }
     }
 
     async fn run(&mut self) -> Result<(), WorkerError> {
@@ -205,14 +202,32 @@ impl Worker {
 
         let max_concurrent = self.config.max_concurrent_jobs;
         let semaphore = Arc::new(Semaphore::new(max_concurrent));
-        let state = self.state.clone();
-        let mut jobs_client = self.grpc.jobs.clone();
         let executor = self.executor.clone();
 
         // Main job polling loop with concurrent execution
         loop {
+            // Check connection status and reconnect if needed
+            {
+                let is_connected = {
+                    let s = self.state.read().await;
+                    s.is_connected
+                };
+
+                if !is_connected {
+                    if let Err(e) = self.reconnect_grpc().await {
+                        tracing::warn!(error = %e, "Reconnection failed, will retry in next iteration");
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        continue;
+                    }
+                }
+            }
+
+            // Get current jobs client for this iteration
+            let grpc = self.grpc.as_ref().ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
+            let mut jobs_client = grpc.jobs.clone();
+
             let (worker_id, worker_token) = {
-                let s = state.read().await;
+                let s = self.state.read().await;
                 match (s.worker_id.clone(), s.worker_token.clone()) {
                     (Some(id), Some(token)) => (id, token),
                     _ => {
@@ -238,7 +253,7 @@ impl Worker {
             let job = match jobs_client.next(request).await {
                 Ok(resp) => resp.into_inner(),
                 Err(e) => {
-                    tracing::warn!(error = %e, "Failed to pull job via gRPC");
+                    tracing::error!(error = %e, "Failed to pull job via gRPC");
                     tokio::time::sleep(Duration::from_secs(1)).await;
                     continue;
                 }
@@ -265,7 +280,7 @@ impl Worker {
 
             let worker_id = worker_id.clone();
             let worker_token = worker_token.clone();
-            let mut jobs_client = jobs_client.clone();
+
             let executor = executor.clone();
 
             tokio::spawn(async move {
