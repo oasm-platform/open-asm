@@ -8,8 +8,8 @@ includes:
     taskfile: ./console/taskfile.yml
     dir: ./console
   worker:
-    taskfile: ./worker/taskfile.yml
-    dir: ./worker
+    taskfile: ./worker-rs/taskfile.yml
+    dir: ./worker-rs
 
 tasks:
   # Development environment setup and start
