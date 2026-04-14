@@ -1,16 +1,15 @@
 use crate::error::WorkerError;
-use serde::Deserialize;
+use crate::grpc::generated::workers_service_client::WorkersServiceClient;
+use crate::grpc::generated::GetManifestRequest;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tonic::transport::Channel;
+use reqwest::Client as HttpClient;
 
-#[derive(Debug, Deserialize)]
-pub struct WorkerManifestResponse {
-    #[serde(rename = "downloadToolsUrl")]
-    pub download_tools_url: String,
-}
 
-#[derive(Debug, Deserialize)]
+
+#[derive(Debug)]
 pub struct ToolManagerConfig {
     pub api_host: String,
     pub api_port: u16,
@@ -31,7 +30,8 @@ impl ToolManagerConfig {
 const KNOWN_TOOLS: &[&str] = &["nuclei", "httpx", "naabu", "subfinder", "dnsx", "screenshot"];
 
 pub struct ToolManager {
-    client: reqwest::Client,
+    grpc_client: WorkersServiceClient<Channel>,
+    http_client: HttpClient,
     config: ToolManagerConfig,
     cache_dir: std::path::PathBuf,
     /// Resolved absolute paths of cached tools, populated after download/extraction.
@@ -40,15 +40,18 @@ pub struct ToolManager {
 
 impl ToolManager {
     pub fn new() -> Self {
+        // For testing, create a dummy grpc_client
         let config = ToolManagerConfig::new(
             "localhost".to_string(),
             6276,
             "./tools-cache".to_string(),
         );
-        Self::with_config(config)
+        // Note: This will panic if used, but for compatibility
+        let grpc_client = panic!("ToolManager::new not implemented for gRPC");
+        Self::with_grpc_client(grpc_client, config)
     }
 
-    pub fn with_config(config: ToolManagerConfig) -> Self {
+    pub fn with_grpc_client(grpc_client: WorkersServiceClient<Channel>, config: ToolManagerConfig) -> Self {
         let cache_dir = std::path::PathBuf::from(&config.tools_cache_dir);
         // Convert to absolute path to avoid issues with relative paths in command execution
         let cache_dir = if cache_dir.is_absolute() {
@@ -56,30 +59,29 @@ impl ToolManager {
         } else {
             std::env::current_dir().unwrap_or_default().join(&cache_dir)
         };
-        let client = reqwest::Client::builder()
+        let http_client = HttpClient::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
         Self {
-            client,
+            grpc_client,
+            http_client,
             config,
             cache_dir,
             tool_paths: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub async fn fetch_manifest(&self) -> Result<WorkerManifestResponse, WorkerError> {
-        let url = format!(
-            "http://{}:{}/api/workers/manifest",
-            self.config.api_host, self.config.api_port
-        );
+    pub async fn fetch_manifest(&mut self) -> Result<String, WorkerError> {
+        tracing::debug!("Fetching manifest via gRPC");
 
-        tracing::debug!(url = %url, "Fetching manifest");
+        let response = self.grpc_client
+            .get_manifest(tonic::Request::new(GetManifestRequest {}))
+            .await
+            .map_err(|e| WorkerError::Grpc(e))?
+            .into_inner();
 
-        let response = self.client.get(&url).send().await?;
-        let manifest: WorkerManifestResponse = response.json().await?;
-
-        Ok(manifest)
+        Ok(response.download_tools_url)
     }
 
     pub async fn download_tools(&self, download_url: &str) -> Result<(), WorkerError> {
@@ -90,7 +92,7 @@ impl ToolManager {
 
         tokio::fs::create_dir_all(&self.cache_dir).await?;
 
-        let response = self.client.get(&full_url).send().await?;
+        let response = self.http_client.get(&full_url).send().await?;
         let bytes = response.bytes().await?;
 
         if full_url.ends_with(".tar.gz") || full_url.ends_with(".tgz") {

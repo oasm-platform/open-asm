@@ -5,6 +5,7 @@ package workers;
 service WorkersService {
   rpc Join(JoinRequest) returns (JoinResponse);
   rpc Alive(AliveRequest) returns (AliveResponse);
+  rpc GetManifest(GetManifestRequest) returns (GetManifestResponse);
 }
 
 message JoinRequest {
@@ -23,4 +24,10 @@ message AliveRequest {
 
 message AliveResponse {
   bool alive = 1;
+}
+
+message GetManifestRequest {}
+
+message GetManifestResponse {
+  string download_tools_url = 1;
 }

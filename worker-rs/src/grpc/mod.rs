@@ -6,6 +6,7 @@ pub mod generated {
 use tonic::transport::{Channel, Endpoint};
 use crate::error::WorkerError;
 
+#[derive(Clone)]
 pub struct GrpcClient {
     pub workers: generated::workers_service_client::WorkersServiceClient<Channel>,
     pub jobs: generated::jobs_registry_service_client::JobsRegistryServiceClient<Channel>,

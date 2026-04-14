@@ -90,9 +90,9 @@ impl Worker {
         let executor = JobExecutor::new(config.job_timeout_secs, std::collections::HashMap::new());
 
         Ok(Self {
-            grpc,
+            grpc: grpc.clone(),
             state: worker_rs::state::new_shared_state(),
-            tool_manager: ToolManager::with_config(tool_config),
+            tool_manager: ToolManager::with_grpc_client(grpc.workers, tool_config),
             executor,
             config,
         })
@@ -165,10 +165,10 @@ impl Worker {
         // Download tools only if needed
         if self.tool_manager.needs_download().await {
             tracing::info!("Downloading tools...");
-            let manifest = self.tool_manager.fetch_manifest().await
+            let download_tools_url = self.tool_manager.fetch_manifest().await
                 .map_err(|e| WorkerError::JobExecution(format!("Failed to fetch manifest: {}", e)))?;
 
-            self.tool_manager.download_tools(&manifest.download_tools_url).await
+            self.tool_manager.download_tools(&download_tools_url).await
                 .map_err(|e| WorkerError::JobExecution(format!("Failed to download tools: {}", e)))?;
 
             tracing::info!("Tools downloaded successfully");
