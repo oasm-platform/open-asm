@@ -68,20 +68,28 @@ export class WorkersService {
    * @param workerId The worker's unique identifier.
    */
   public async alive(dto: WorkerAliveDto) {
-    const result = await this.repo.update(
-      {
-        token: dto.token,
-      },
-      {
-        lastSeenAt: new Date(),
-      },
-    );
-    if (result.affected === 0) {
+    const worker = await this.repo.findOne({
+      where: { token: dto.token },
+    });
+
+    if (!worker) {
       throw new UnauthorizedException('Invalid token');
     }
-    return {
-      alive: 'OK',
-    };
+
+    // Detect reconnection: if lastSeenAt is older than WORKER_TIMEOUT, worker was likely offline
+    const wasOffline =
+      worker.lastSeenAt &&
+      Date.now() - worker.lastSeenAt.getTime() > WORKER_TIMEOUT * 0.8;
+
+    await this.repo.update({ token: dto.token }, { lastSeenAt: new Date() });
+
+    if (wasOffline) {
+      this.logger.log(
+        `Worker ${worker.id} reconnected after being offline (last seen: ${worker.lastSeenAt.toISOString()})`,
+      );
+    }
+
+    return { alive: 'OK' };
   }
 
   /**

@@ -5,9 +5,9 @@ import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
-import { Observable } from 'rxjs';
 import { createReadStream } from 'fs';
 import { join } from 'path';
+import { Observable } from 'rxjs';
 import {
   GetManyWorkersDto,
   WorkerAliveDto,
@@ -68,7 +68,9 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'DownloadTools')
-  grpcDownloadTools(request: { url: string }): Observable<{ chunk: Buffer; offset: number; eof: boolean }> {
+  grpcDownloadTools(request: {
+    url: string;
+  }): Observable<{ chunk: Buffer; offset: number; eof: boolean }> {
     return new Observable((subscriber) => {
       const filePath = join(process.cwd(), request.url);
       const stream = createReadStream(filePath, { highWaterMark: 1024 * 1024 }); // 1MB chunks
@@ -113,6 +115,7 @@ export class WorkersController {
       const result = await this.workersService.alive({
         token: request.workerToken,
       });
+
       return { alive: result.alive === 'OK' };
     } catch {
       return { alive: false };

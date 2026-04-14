@@ -115,11 +115,55 @@ impl Worker {
     }
 
     async fn alive_loop(&self) -> Result<(), WorkerError> {
-        // Alive loop is now handled by main loop reconnection logic
+        let grpc = self.grpc.clone().ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
+        let state = self.state.clone();
+
         tokio::spawn(async move {
-            // Keep the task alive but don't do anything since reconnection is handled elsewhere
+            let mut was_offline = false;
+
             loop {
-                tokio::time::sleep(Duration::from_secs(60)).await;
+                tokio::time::sleep(Duration::from_secs(5)).await;
+
+                let worker_token = {
+                    let s = state.read().await;
+                    s.worker_token.clone()
+                };
+
+                let Some(token) = worker_token else {
+                    tracing::debug!("No worker token yet, skipping alive ping");
+                    continue;
+                };
+
+                // Parse token for metadata first
+                let token_value = match token.parse() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        tracing::error!(error = %e, "Failed to parse worker token for alive request");
+                        continue;
+                    }
+                };
+
+                let mut request = tonic::Request::new(grpc::generated::AliveRequest {
+                    worker_token: token.clone(),
+                });
+
+                // Attach worker token to metadata
+                request.metadata_mut().insert("worker-token", token_value);
+
+                match grpc.workers.clone().alive(request).await {
+                    Ok(_) => {
+                        if was_offline {
+                            tracing::info!("Worker reconnected to server successfully");
+                            was_offline = false;
+                        }
+                    }
+                    Err(e) => {
+                        if !was_offline {
+                            tracing::warn!(error = %e, "Lost connection to server");
+                            was_offline = true;
+                        }
+                    }
+                }
             }
         });
 
