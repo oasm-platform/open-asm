@@ -23,14 +23,6 @@ struct Cli {
     #[arg(long, default_value = "50051")]
     grpc_port: u16,
 
-    /// API server host
-    #[arg(long, default_value = "localhost")]
-    api_host: String,
-
-    /// API server port
-    #[arg(long, default_value = "6276")]
-    api_port: u16,
-
     /// API key for worker authentication
     #[arg(long)]
     api_key: String,
@@ -246,7 +238,7 @@ impl Worker {
             let job = match jobs_client.next(request).await {
                 Ok(resp) => resp.into_inner(),
                 Err(e) => {
-                    tracing::warn!(error = %e, "Failed to poll job via gRPC");
+                    tracing::warn!(error = %e, "Failed to pull job via gRPC");
                     tokio::time::sleep(Duration::from_secs(1)).await;
                     continue;
                 }
@@ -389,11 +381,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let config = WorkerConfig::from_cli(&cli);
-    let tool_config = ToolManagerConfig::new(
-        cli.api_host.clone(),
-        cli.api_port,
-        cli.tools_cache_dir.clone(),
-    );
+    let tool_config = ToolManagerConfig::new(cli.tools_cache_dir.clone());
     let mut worker = Worker::new(config, tool_config).await?;
 
     tokio::select! {

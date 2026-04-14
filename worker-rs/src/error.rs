@@ -8,9 +8,6 @@ pub enum WorkerError {
     #[error("gRPC transport error: {0}")]
     Transport(#[from] tonic::transport::Error),
 
-    #[error("HTTP error: {0}")]
-    Http(#[from] reqwest::Error),
-
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -24,10 +21,7 @@ pub enum WorkerError {
     JobExecution(String),
 
     #[error("Tool dependency missing: {tool} - {message}")]
-    ToolDependencyMissing {
-        tool: String,
-        message: String,
-    },
+    ToolDependencyMissing { tool: String, message: String },
 
     #[error("Connection lost: {0}")]
     ConnectionLost(String),

@@ -1,26 +1,21 @@
 use crate::error::WorkerError;
 use crate::grpc::generated::workers_service_client::WorkersServiceClient;
-use crate::grpc::generated::GetManifestRequest;
+use crate::grpc::generated::{GetManifestRequest, DownloadToolsRequest};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tonic::transport::Channel;
-use reqwest::Client as HttpClient;
 
 
 
 #[derive(Debug)]
 pub struct ToolManagerConfig {
-    pub api_host: String,
-    pub api_port: u16,
     pub tools_cache_dir: String,
 }
 
 impl ToolManagerConfig {
-    pub fn new(api_host: String, api_port: u16, tools_cache_dir: String) -> Self {
+    pub fn new(tools_cache_dir: String) -> Self {
         Self {
-            api_host,
-            api_port,
             tools_cache_dir,
         }
     }
@@ -31,7 +26,6 @@ const KNOWN_TOOLS: &[&str] = &["nuclei", "httpx", "naabu", "subfinder", "dnsx", 
 
 pub struct ToolManager {
     grpc_client: WorkersServiceClient<Channel>,
-    http_client: HttpClient,
     config: ToolManagerConfig,
     cache_dir: std::path::PathBuf,
     /// Resolved absolute paths of cached tools, populated after download/extraction.
@@ -40,12 +34,8 @@ pub struct ToolManager {
 
 impl ToolManager {
     pub fn new() -> Self {
-        // For testing, create a dummy grpc_client
-        let config = ToolManagerConfig::new(
-            "localhost".to_string(),
-            6276,
-            "./tools-cache".to_string(),
-        );
+        // For testing, create a dummy config
+        let config = ToolManagerConfig::new("./tools-cache".to_string());
         // Note: This will panic if used, but for compatibility
         let grpc_client = panic!("ToolManager::new not implemented for gRPC");
         Self::with_grpc_client(grpc_client, config)
@@ -59,13 +49,8 @@ impl ToolManager {
         } else {
             std::env::current_dir().unwrap_or_default().join(&cache_dir)
         };
-        let http_client = HttpClient::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .expect("Failed to create HTTP client");
         Self {
             grpc_client,
-            http_client,
             config,
             cache_dir,
             tool_paths: Arc::new(RwLock::new(HashMap::new())),
@@ -84,28 +69,36 @@ impl ToolManager {
         Ok(response.download_tools_url)
     }
 
-    pub async fn download_tools(&self, download_url: &str) -> Result<(), WorkerError> {
-        let base_url = format!("http://{}:{}", self.config.api_host, self.config.api_port);
-        let full_url = format!("{}/api{}", base_url, download_url);
-
-        tracing::info!(url = %full_url, "Downloading tools");
+    pub async fn download_tools(&mut self, download_url: &str) -> Result<(), WorkerError> {
+        tracing::info!(url = %download_url, "Downloading tools via gRPC streaming");
 
         tokio::fs::create_dir_all(&self.cache_dir).await?;
 
-        let response = self.http_client.get(&full_url).send().await?;
-        let bytes = response.bytes().await?;
+        let mut stream = self.grpc_client
+            .download_tools(tonic::Request::new(DownloadToolsRequest {
+                url: download_url.to_string(),
+            }))
+            .await
+            .map_err(|e| WorkerError::Grpc(e))?
+            .into_inner();
 
-        if full_url.ends_with(".tar.gz") || full_url.ends_with(".tgz") {
-            self.extract_tar_gz(&bytes).await?;
-        } else {
-            // Default to zip
-            self.extract_zip(&bytes).await?;
+        let mut all_bytes = Vec::new();
+
+        while let Some(response) = stream.message().await.map_err(|e| WorkerError::Grpc(e))? {
+            all_bytes.extend_from_slice(&response.chunk);
+            if response.eof {
+                break;
+            }
         }
 
-        self.set_execute_permissions().await?;
-        self.refresh_tool_paths().await;
+        if download_url.ends_with(".tar.gz") || download_url.ends_with(".tgz") {
+            self.extract_tar_gz(&all_bytes).await?;
+        } else {
+            // Save file
+            let file_path = self.cache_dir.join("tools.bin");
+            tokio::fs::write(&file_path, all_bytes).await?;
+        }
 
-        tracing::info!(cache_dir = ?self.cache_dir, "Tools extracted");
         Ok(())
     }
 
