@@ -232,13 +232,9 @@ impl Worker {
 
                     // Rejoin worker to get new token
                     tracing::info!("Rejoining worker after reconnection...");
-                    if let Err(e) = self.join().await {
-                        tracing::error!(error = %e, "Failed to rejoin worker during reconnection");
-                        // If join fails, we consider the reconnection failed and continue backoff
-                    } else {
-                        tracing::info!("Worker rejoined successfully after reconnection");
-                        return Ok(());
-                    }
+                    self.join().await?;
+                    tracing::info!("Worker rejoined successfully after reconnection");
+                    return Ok(());
                 }
                 Err(e) => {
                     tracing::error!(error = %e, "gRPC reconnection failed");
@@ -317,11 +313,7 @@ impl Worker {
                 };
 
                 if !is_connected {
-                    if let Err(e) = self.reconnect_grpc().await {
-                        tracing::warn!(error = %e, "Reconnection failed, will retry in next iteration");
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                        continue;
-                    }
+                    self.reconnect_grpc().await?;
                 }
             }
 
@@ -347,6 +339,11 @@ impl Worker {
             let job = match jobs_client.next(request).await {
                 Ok(resp) => resp.into_inner(),
                 Err(e) => {
+                    if e.message().contains("Invalid worker token") {
+                        tracing::warn!("Invalid worker token detected, attempting to rejoin...");
+                        self.join().await?;
+                        continue;
+                    }
                     tracing::error!(error = %e, "Failed to pull job via gRPC");
                     tokio::time::sleep(Duration::from_secs(1)).await;
                     continue;
