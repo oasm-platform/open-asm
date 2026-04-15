@@ -130,7 +130,7 @@ impl Worker {
 
         let grpc = self.grpc.as_mut().ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
         let response = grpc.workers.join(request).await
-            .map_err(|e| WorkerError::Grpc(e))?
+            .map_err(WorkerError::Grpc)?
             .into_inner();
 
         tracing::info!(
@@ -183,7 +183,6 @@ impl Worker {
                     Ok(response) => {
                         if was_offline {
                             tracing::info!("Worker established alive stream to server");
-                            was_offline = false;
                             let mut s = state.write().await;
                             s.is_connected = true;
                         }

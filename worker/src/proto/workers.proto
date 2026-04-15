@@ -25,6 +25,8 @@ message AliveRequest {
 
 message AliveResponse {
   bool alive = 1;
+  string last_seen_at = 2;
+  string worker_id = 3;
 }
 
 message GetManifestRequest {}

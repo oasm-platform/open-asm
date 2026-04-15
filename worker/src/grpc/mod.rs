@@ -1,3 +1,4 @@
+#[allow(clippy::large_enum_variant)]
 pub mod generated {
     tonic::include_proto!("workers");
     tonic::include_proto!("jobs_registry");

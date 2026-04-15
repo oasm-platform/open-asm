@@ -76,10 +76,9 @@ export class WorkersService {
       throw new UnauthorizedException('Invalid token');
     }
 
-
     await this.repo.update({ token: dto.token }, { lastSeenAt: new Date() });
 
-    return { alive: 'OK' };
+    return this.repo.findOne({ where: { token: dto.token } });
   }
 
   /**

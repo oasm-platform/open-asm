@@ -110,14 +110,24 @@ export class WorkersController {
   @GrpcMethod('WorkersService', 'Alive')
   grpcAlive(request: {
     workerToken: string;
-  }): Observable<{ alive: boolean }> {
+  }): Observable<{ alive: boolean; lastSeenAt: string; workerId: string }> {
     return new Observable((subscriber) => {
       let intervalId: NodeJS.Timeout;
 
       const updateAlive = async () => {
         try {
-          await this.workersService.alive({ token: request.workerToken });
-          subscriber.next({ alive: true });
+          const worker = await this.workersService.alive({
+            token: request.workerToken,
+          });
+          if (worker) {
+            subscriber.next({
+              alive: true,
+              lastSeenAt: worker.lastSeenAt.toISOString(),
+              workerId: worker.id,
+            });
+          } else {
+            subscriber.error(new Error('Worker not found after update.'));
+          }
         } catch (err) {
           subscriber.error(err);
         }
