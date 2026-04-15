@@ -298,8 +298,13 @@ impl JobExecutor {
         input: &JobExecutionInput,
         resolved_command: &str,
     ) -> Result<JobExecutionOutput, WorkerError> {
-        let mut cmd = Command::new("/bin/sh");
-        cmd.arg("-c").arg(resolved_command);
+        let (shell, flag) = if cfg!(target_os = "windows") {
+            ("cmd", "/C")
+        } else {
+            ("/bin/sh", "-c")
+        };
+        let mut cmd = Command::new(shell);
+        cmd.arg(flag).arg(resolved_command);
 
         if let Some(ref dir) = input.working_dir {
             cmd.current_dir(dir);
