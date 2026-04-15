@@ -75,7 +75,7 @@ core-api/.storage/*
 .windsurf/*
 .claude/*
 .kilocode/plans/*
-.clinerules/*
+.kilo/*
 docs/superpowers/*
 core-api/public/tools/*
 .qwen/
