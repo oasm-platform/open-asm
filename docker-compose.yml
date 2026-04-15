@@ -59,11 +59,12 @@ services:
     env_file:
       - ./worker/.env
     environment:
-      - API=http://core-api:6276/
-      - MAX_JOBS=10
-      - OASM_CLOUD_APIKEY=change_me
+      - GRPC_HOST=core-api
+      - GRPC_PORT=50051
+      - MAX_CONCURRENT_JOBS=10
     volumes:
       - nuclei-templates:/root/nuclei-templates:rw
+      - worker-tools-cache:/app/tools-cache:rw
     networks:
       - oasm
     restart: 'always'
@@ -216,6 +217,7 @@ volumes:
   assistant-logs:
   assistant-knowledge:
   searxng-data:
+  worker-tools-cache:
 
 networks:
   oasm:

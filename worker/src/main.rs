@@ -19,31 +19,31 @@ use std::path::Path;
 #[command(name = "worker", about = "High-performance gRPC worker for Open-ASM")]
 struct Cli {
     /// gRPC server host
-    #[arg(long, default_value = "localhost")]
+    #[arg(long, env = "GRPC_HOST", default_value = "localhost")]
     grpc_host: String,
 
     /// gRPC server port
-    #[arg(long, default_value = "50051")]
+    #[arg(long, env = "GRPC_PORT", default_value = "50051")]
     grpc_port: u16,
 
     /// API key for worker authentication
-    #[arg(long)]
+    #[arg(long, env = "API_KEY")]
     api_key: Option<String>,
 
     /// Worker signature (optional for cloud workers)
-    #[arg(long, default_value = "")]
+    #[arg(long, env = "WORKER_SIGNATURE", default_value = "")]
     signature: String,
 
     /// Maximum concurrent jobs
-    #[arg(long, default_value = "5")]
+    #[arg(long, env = "MAX_CONCURRENT_JOBS", default_value = "5")]
     max_concurrent_jobs: usize,
 
     /// Job timeout in seconds (default 1800/30min to accommodate nuclei scans)
-    #[arg(long, default_value = "1800")]
+    #[arg(long, env = "JOB_TIMEOUT_SECS", default_value = "1800")]
     job_timeout_secs: u64,
 
     /// Tools cache directory
-    #[arg(long, default_value = "tools-cache")]
+    #[arg(long, env = "TOOLS_CACHE_DIR", default_value = "tools-cache")]
     tools_cache_dir: String,
 }
 
