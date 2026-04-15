@@ -11,6 +11,9 @@ use tokio::time::Duration;
 use clap::Parser;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
+use serde::{Serialize, Deserialize};
+use std::fs;
+use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[command(name = "worker-rs", about = "High-performance gRPC worker for Open-ASM")]
@@ -25,7 +28,7 @@ struct Cli {
 
     /// API key for worker authentication
     #[arg(long)]
-    api_key: String,
+    api_key: Option<String>,
 
     /// Worker signature (optional for cloud workers)
     #[arg(long, default_value = "")]
@@ -52,6 +55,7 @@ struct Worker {
     config: WorkerConfig,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct WorkerConfig {
     grpc_host: String,
     grpc_port: u16,
@@ -62,15 +66,43 @@ struct WorkerConfig {
 }
 
 impl WorkerConfig {
-    fn from_cli(cli: &Cli) -> Self {
+    const CONFIG_FILE: &'static str = ".configs.json";
+
+    fn load_or_create(cli: &Cli) -> Result<Self, WorkerError> {
+        if let Some(api_key) = &cli.api_key {
+            let config = Self::from_cli(cli, api_key);
+            config.save()?;
+            return Ok(config);
+        }
+
+        if Path::new(Self::CONFIG_FILE).exists() {
+            let content = fs::read_to_string(Self::CONFIG_FILE)
+                .map_err(|e| WorkerError::Config(format!("Failed to read config file: {}", e)))?;
+            let config: Self = serde_json::from_str(&content)
+                .map_err(|e| WorkerError::Config(format!("Failed to parse config file: {}", e)))?;
+            return Ok(config);
+        }
+
+        Err(WorkerError::Config("API key is required. Provide it via --api-key or ensure .configs.json exists".to_string()))
+    }
+
+    fn from_cli(cli: &Cli, api_key: &str) -> Self {
         Self {
             grpc_host: cli.grpc_host.clone(),
             grpc_port: cli.grpc_port,
-            api_key: cli.api_key.clone(),
+            api_key: api_key.to_string(),
             worker_signature: cli.signature.clone(),
             job_timeout_secs: cli.job_timeout_secs,
             max_concurrent_jobs: cli.max_concurrent_jobs,
         }
+    }
+
+    fn save(&self) -> Result<(), WorkerError> {
+        let content = serde_json::to_string_pretty(self)
+            .map_err(|e| WorkerError::Config(format!("Failed to serialize config: {}", e)))?;
+        fs::write(Self::CONFIG_FILE, content)
+            .map_err(|e| WorkerError::Config(format!("Failed to write config file: {}", e)))?;
+        Ok(())
     }
 }
 
@@ -106,9 +138,12 @@ impl Worker {
             "Worker joined successfully"
         );
 
+        let token_value = response.worker_token.parse().ok();
+
         let mut state = self.state.write().await;
         state.worker_id = Some(response.worker_id.clone());
         state.worker_token = Some(response.worker_token.clone());
+        state.worker_token_value = token_value;
         state.is_connected = true;
 
         Ok(())
@@ -122,9 +157,9 @@ impl Worker {
             let mut was_offline = false;
 
             loop {
-                let worker_token = {
+                let (worker_token, token_value) = {
                     let s = state.read().await;
-                    s.worker_token.clone()
+                    (s.worker_token.clone(), s.worker_token_value.clone())
                 };
 
                 let Some(token) = worker_token else {
@@ -133,19 +168,16 @@ impl Worker {
                     continue;
                 };
 
-                let token_value = match token.parse() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        tracing::error!(error = %e, "Failed to parse worker token for alive stream");
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                        continue;
-                    }
+                let Some(token_val) = token_value else {
+                    tracing::error!("Worker token value not cached, cannot establish alive stream");
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
                 };
 
                 let mut request = tonic::Request::new(grpc::generated::AliveRequest {
                     worker_token: token.clone(),
                 });
-                request.metadata_mut().insert("worker-token", token_value);
+                request.metadata_mut().insert("worker-token", token_val);
 
                 match grpc.workers.clone().alive(request).await {
                     Ok(response) => {
@@ -184,23 +216,37 @@ impl Worker {
     }
 
     async fn reconnect_grpc(&mut self) -> Result<(), WorkerError> {
-        tracing::info!("Attempting to reconnect gRPC client...");
-        match GrpcClient::new(&self.config.grpc_host, self.config.grpc_port).await {
-            Ok(grpc) => {
-                self.grpc = Some(grpc);
-                tracing::info!("gRPC reconnection successful");
+        let mut backoff = Duration::from_secs(1);
+        let max_backoff = Duration::from_secs(60);
 
-                // Rejoin worker to get new token
-                tracing::info!("Rejoining worker after reconnection...");
-                self.join().await?;
-                tracing::info!("Worker rejoined successfully after reconnection");
+        loop {
+            tracing::info!(
+                retry_in = ?backoff,
+                "Attempting to reconnect gRPC client..."
+            );
+            
+            match GrpcClient::new(&self.config.grpc_host, self.config.grpc_port).await {
+                Ok(grpc) => {
+                    self.grpc = Some(grpc);
+                    tracing::info!("gRPC reconnection successful");
 
-                Ok(())
+                    // Rejoin worker to get new token
+                    tracing::info!("Rejoining worker after reconnection...");
+                    if let Err(e) = self.join().await {
+                        tracing::error!(error = %e, "Failed to rejoin worker during reconnection");
+                        // If join fails, we consider the reconnection failed and continue backoff
+                    } else {
+                        tracing::info!("Worker rejoined successfully after reconnection");
+                        return Ok(());
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "gRPC reconnection failed");
+                }
             }
-            Err(e) => {
-                tracing::error!(error = %e, "gRPC reconnection failed");
-                Err(e)
-            }
+
+            tokio::time::sleep(backoff).await;
+            backoff = std::cmp::min(backoff * 2, max_backoff);
         }
     }
 
@@ -283,10 +329,10 @@ impl Worker {
             let grpc = self.grpc.as_ref().ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
             let mut jobs_client = grpc.jobs.clone();
 
-            let (worker_id, worker_token) = {
+            let (worker_id, worker_token, token_value) = {
                 let s = self.state.read().await;
-                match (s.worker_id.clone(), s.worker_token.clone()) {
-                    (Some(id), Some(token)) => (id, token),
+                match (s.worker_id.clone(), s.worker_token.clone(), s.worker_token_value.clone()) {
+                    (Some(id), Some(token), Some(val)) => (id, token, val),
                     _ => {
                         tokio::time::sleep(Duration::from_secs(1)).await;
                         continue;
@@ -296,16 +342,7 @@ impl Worker {
 
             // Poll for next job
             let mut request = tonic::Request::new(ProtoWorker { id: worker_id.clone() });
-            match worker_token.parse() {
-                Ok(token_value) => {
-                    request.metadata_mut().insert("worker-token", token_value);
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "Failed to parse worker token");
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                    continue;
-                }
-            }
+            request.metadata_mut().insert("worker-token", token_value.clone());
 
             let job = match jobs_client.next(request).await {
                 Ok(resp) => resp.into_inner(),
@@ -336,7 +373,8 @@ impl Worker {
                 .expect("Semaphore closed");
 
             let worker_id = worker_id.clone();
-            let worker_token = worker_token.clone();
+            let _worker_token = worker_token.clone();
+            let token_value = token_value.clone();
 
             let executor = executor.clone();
 
@@ -396,7 +434,7 @@ impl Worker {
                 };
 
                 let mut req = tonic::Request::new(result);
-                req.metadata_mut().insert("worker-token", worker_token.parse().unwrap());
+                req.metadata_mut().insert("worker-token", token_value);
                 if let Err(e) = jobs_client.result(req).await {
                     tracing::error!(error = %e, "Failed to report job result");
                 }
@@ -452,7 +490,7 @@ async fn main() -> anyhow::Result<()> {
         "Starting worker-rs"
     );
 
-    let config = WorkerConfig::from_cli(&cli);
+    let config = WorkerConfig::load_or_create(&cli)?;
     let tool_config = ToolManagerConfig::new(cli.tools_cache_dir.clone());
     let mut worker = Worker::new(config, tool_config).await?;
 

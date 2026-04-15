@@ -114,16 +114,20 @@ export class WorkersController {
     return new Observable((subscriber) => {
       let intervalId: NodeJS.Timeout;
 
-      this.workersService.alive({ token: request.workerToken })
-        .then(() => {
+      const updateAlive = async () => {
+        try {
+          await this.workersService.alive({ token: request.workerToken });
           subscriber.next({ alive: true });
-          intervalId = setInterval(() => {
-            subscriber.next({ alive: true });
-          }, 10000);
-        })
-        .catch((err) => {
+        } catch (err) {
           subscriber.error(err);
-        });
+        }
+      };
+
+      void updateAlive().then(() => {
+        intervalId = setInterval(() => {
+          void updateAlive();
+        }, 10000);
+      });
 
       return () => {
         if (intervalId) clearInterval(intervalId);

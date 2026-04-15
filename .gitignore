@@ -79,3 +79,5 @@ core-api/.storage/*
 docs/superpowers/*
 core-api/public/tools/*
 .qwen/
+./kilo/plans/*
+worker-rs/.configs.json

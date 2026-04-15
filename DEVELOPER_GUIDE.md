@@ -25,7 +25,7 @@ Before you begin, ensure you have the following installed:
 
 - **Task (taskfile)** - [Installation Guide](https://taskfile.dev/#/installation)
 - **Node.js v18+** - [Installation Guide](https://nodejs.org/en/download/package-manager)
-- **Bun runtime (latest)** - [Installation Guide](https://bun.sh/docs/installation)
+- **Rust (latest)** - [Installation Guide](https://www.rust-lang.org/tools/install)
 - **PostgreSQL v12+**
 - **Docker & Docker Compose (optional but recommended for database)**
 
@@ -43,11 +43,10 @@ open-asm/
 │   ├── src/               # React components
 │   ├── public/            # Static assets
 │   └── package.json
-├── worker/             # Bun-based workers
-│   ├── services/          # Worker services
-│   ├── tools/             # Security tools integration
-│   ├── example.env        # Worker environment
-│   └── package.json
+├── worker-rs/           # Rust-based workers
+│   ├── src/               # Source code
+│   ├── Cargo.toml         # Rust package manifest
+│   └── .env.example       # Environment template
 ├── .open-api/           # Auto-generated API docs
 ├── docker-compose.yml  # Container orchestration
 ├── taskfile.yml        # Task automation
@@ -64,7 +63,7 @@ task init
 
 This command will:
 
-- Copy example environment files (`.env`) for `core-api`, `console`, and `worker`.
+- Copy example environment files (`.env`) for `core-api`, `console`, and `worker-rs`.
 - Install project dependencies using `npm` (managed by the task for each workspace).
 - Start a PostgreSQL Docker container named `open-asm-postgres` (requires Docker).
 
@@ -174,7 +173,7 @@ The `--rm` flag ensures the container is removed after it stops.
 
 - **Core API (NestJS):** Uses ESLint and Prettier for code formatting and linting. Currently, you need to run `npm run lint` and `npm run format` directly from the `core-api` directory. Consider creating a task to wrap these commands for convenience.
 - **Console (React):** Uses ESLint and Prettier. Currently, you need to run `npm run lint` directly from the `console` directory. Consider creating a task to wrap this command for convenience.
-- **Workers (Bun):** Likely follows standard TypeScript conventions. You may need to run linting/formatting commands directly from the `worker` directory.
+- **Workers (Rust):** Follows standard Rust conventions. Use `cargo` for building and running.
 
 ### Testing
 

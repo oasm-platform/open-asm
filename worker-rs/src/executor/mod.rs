@@ -117,6 +117,7 @@ impl JobExecutor {
     }
 
     /// Check for missing shared library dependencies using ldd.
+    #[allow(unused_mut)]
     async fn check_missing_dependencies(&self, tool_path: &PathBuf) -> Vec<String> {
         let mut missing = Vec::new();
         
@@ -145,6 +146,12 @@ impl JobExecutor {
             }
         }
         
+        // Suppress unused variable warning on non-linux platforms
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = tool_path;
+        }
+
         missing
     }
 

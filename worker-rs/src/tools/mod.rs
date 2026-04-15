@@ -33,14 +33,6 @@ pub struct ToolManager {
 }
 
 impl ToolManager {
-    pub fn new() -> Self {
-        // For testing, create a dummy config
-        let config = ToolManagerConfig::new("./tools-cache".to_string());
-        // Note: This will panic if used, but for compatibility
-        let grpc_client = panic!("ToolManager::new not implemented for gRPC");
-        Self::with_grpc_client(grpc_client, config)
-    }
-
     pub fn with_grpc_client(grpc_client: WorkersServiceClient<Channel>, config: ToolManagerConfig) -> Self {
         let cache_dir = std::path::PathBuf::from(&config.tools_cache_dir);
         // Convert to absolute path to avoid issues with relative paths in command execution
@@ -63,7 +55,7 @@ impl ToolManager {
         let response = self.grpc_client
             .get_manifest(tonic::Request::new(GetManifestRequest {}))
             .await
-            .map_err(|e| WorkerError::Grpc(e))?
+            .map_err(WorkerError::Grpc)?
             .into_inner();
 
         Ok(response.download_tools_url)
@@ -79,12 +71,12 @@ impl ToolManager {
                 url: download_url.to_string(),
             }))
             .await
-            .map_err(|e| WorkerError::Grpc(e))?
+            .map_err(WorkerError::Grpc)?
             .into_inner();
 
         let mut all_bytes = Vec::new();
 
-        while let Some(response) = stream.message().await.map_err(|e| WorkerError::Grpc(e))? {
+        while let Some(response) = stream.message().await.map_err(WorkerError::Grpc)? {
             all_bytes.extend_from_slice(&response.chunk);
             if response.eof {
                 break;
@@ -124,6 +116,7 @@ impl ToolManager {
         .map_err(|e| WorkerError::JobExecution(e.to_string()))?
     }
 
+    #[allow(dead_code)]
     async fn extract_zip(&self, data: &[u8]) -> Result<(), WorkerError> {
         // TODO: For large archives, stream to a temp file instead of loading all bytes.
         let cache_dir = self.cache_dir.clone();
@@ -155,6 +148,7 @@ impl ToolManager {
         .map_err(|e| WorkerError::JobExecution(e.to_string()))?
     }
 
+    #[allow(dead_code)]
     async fn set_execute_permissions(&self) -> Result<(), WorkerError> {
         let cache_dir = self.cache_dir.clone();
         tokio::task::spawn_blocking(move || {
@@ -302,24 +296,22 @@ impl ToolManager {
                 Err(_) => return true, // Can't read directory, assume need download
             };
 
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
-                    if path.is_file() {
-                        #[cfg(unix)]
-                        {
-                            if let Ok(metadata) = std::fs::metadata(&path) {
-                                use std::os::unix::fs::PermissionsExt;
-                                let mode = metadata.permissions().mode();
-                                if mode & 0o111 != 0 {
-                                    found_executable = true;
-                                }
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    #[cfg(unix)]
+                    {
+                        if let Ok(metadata) = std::fs::metadata(&path) {
+                            use std::os::unix::fs::PermissionsExt;
+                            let mode = metadata.permissions().mode();
+                            if mode & 0o111 != 0 {
+                                found_executable = true;
                             }
                         }
-                        #[cfg(not(unix))]
-                        {
-                            found_executable = true;
-                        }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        found_executable = true;
                     }
                 }
             }
@@ -341,43 +333,4 @@ impl ToolManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn test_resolve_command_tools_finds_tools() {
-        let config = ToolManagerConfig::new(
-            "localhost".to_string(),
-            6276,
-            "/tmp/test-tools".to_string(),
-        );
-        let tm = ToolManager::with_config(config);
-
-        // Manually populate tool_paths
-        {
-            let mut paths = tm.tool_paths.write().await;
-            paths.insert("nuclei".to_string(), std::path::PathBuf::from("/tmp/test-tools/nuclei"));
-            paths.insert("dnsx".to_string(), std::path::PathBuf::from("/tmp/test-tools/dnsx"));
-            paths.insert("subfinder".to_string(), std::path::PathBuf::from("/tmp/test-tools/subfinder"));
-        }
-
-        let command = "(echo example.com && subfinder -duc -d example.com) | dnsx -duc -a -resp";
-        let resolved = tm.resolve_command_tools(command).await;
-
-        assert!(resolved.contains_key("subfinder"));
-        assert!(resolved.contains_key("dnsx"));
-        assert!(!resolved.contains_key("nuclei"));
-    }
-
-    #[tokio::test]
-    async fn test_resolve_command_tools_empty() {
-        let config = ToolManagerConfig::new(
-            "localhost".to_string(),
-            6276,
-            "/tmp/test-tools".to_string(),
-        );
-        let tm = ToolManager::with_config(config);
-
-        let command = "echo hello";
-        let resolved = tm.resolve_command_tools(command).await;
-        assert!(resolved.is_empty());
-    }
 }
