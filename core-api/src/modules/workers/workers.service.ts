@@ -76,10 +76,6 @@ export class WorkersService {
       throw new UnauthorizedException('Invalid token');
     }
 
-    // Detect reconnection: if lastSeenAt is older than WORKER_TIMEOUT, worker was likely offline
-    const wasOffline =
-      worker.lastSeenAt &&
-      Date.now() - worker.lastSeenAt.getTime() > WORKER_TIMEOUT * 0.8;
 
     await this.repo.update({ token: dto.token }, { lastSeenAt: new Date() });
 
