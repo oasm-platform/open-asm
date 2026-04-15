@@ -122,23 +122,22 @@ impl Worker {
             let mut was_offline = false;
 
             loop {
-                tokio::time::sleep(Duration::from_secs(5)).await;
-
                 let worker_token = {
                     let s = state.read().await;
                     s.worker_token.clone()
                 };
 
                 let Some(token) = worker_token else {
-                    tracing::debug!("No worker token yet, skipping alive ping");
+                    tracing::debug!("No worker token yet, skipping alive stream");
+                    tokio::time::sleep(Duration::from_secs(5)).await;
                     continue;
                 };
 
-                // Parse token for metadata first
                 let token_value = match token.parse() {
                     Ok(v) => v,
                     Err(e) => {
-                        tracing::error!(error = %e, "Failed to parse worker token for alive request");
+                        tracing::error!(error = %e, "Failed to parse worker token for alive stream");
+                        tokio::time::sleep(Duration::from_secs(5)).await;
                         continue;
                     }
                 };
@@ -146,24 +145,38 @@ impl Worker {
                 let mut request = tonic::Request::new(grpc::generated::AliveRequest {
                     worker_token: token.clone(),
                 });
-
-                // Attach worker token to metadata
                 request.metadata_mut().insert("worker-token", token_value);
 
                 match grpc.workers.clone().alive(request).await {
-                    Ok(_) => {
+                    Ok(response) => {
                         if was_offline {
-                            tracing::info!("Worker reconnected to server successfully");
+                            tracing::info!("Worker established alive stream to server");
                             was_offline = false;
+                            let mut s = state.write().await;
+                            s.is_connected = true;
                         }
+
+                        let mut stream = response.into_inner();
+                        while let Ok(Some(_)) = stream.message().await {
+                            // Heartbeat received, connection is healthy
+                        }
+                        
+                        tracing::warn!("Alive stream closed by server");
+                        was_offline = true;
+                        let mut s = state.write().await;
+                        s.is_connected = false;
                     }
                     Err(e) => {
                         if !was_offline {
-                            tracing::warn!(error = %e, "Lost connection to server");
+                            tracing::warn!(error = %e, "Failed to establish alive stream");
                             was_offline = true;
+                            let mut s = state.write().await;
+                            s.is_connected = false;
                         }
                     }
                 }
+
+                tokio::time::sleep(Duration::from_secs(5)).await;
             }
         });
 

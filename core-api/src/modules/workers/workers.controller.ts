@@ -108,17 +108,26 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'Alive')
-  async grpcAlive(request: {
+  grpcAlive(request: {
     workerToken: string;
-  }): Promise<{ alive: boolean }> {
-    try {
-      const result = await this.workersService.alive({
-        token: request.workerToken,
-      });
+  }): Observable<{ alive: boolean }> {
+    return new Observable((subscriber) => {
+      let intervalId: NodeJS.Timeout;
 
-      return { alive: result.alive === 'OK' };
-    } catch {
-      return { alive: false };
-    }
+      this.workersService.alive({ token: request.workerToken })
+        .then(() => {
+          subscriber.next({ alive: true });
+          intervalId = setInterval(() => {
+            subscriber.next({ alive: true });
+          }, 10000);
+        })
+        .catch((err) => {
+          subscriber.error(err);
+        });
+
+      return () => {
+        if (intervalId) clearInterval(intervalId);
+      };
+    });
   }
 }
