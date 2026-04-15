@@ -1,4 +1,4 @@
-# AI Agents for worker-rs (Rust)
+# AI Agents for worker (Rust)
 
 ## Code Quality Standards
 
@@ -36,7 +36,7 @@
 
 1. **Setup**
    ```bash
-   cd worker-rs
+    cd worker
    cargo build
    cargo test
    ```

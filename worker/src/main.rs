@@ -1,8 +1,8 @@
-use worker_rs::grpc::{self, GrpcClient};
-use worker_rs::state::SharedState;
-use worker_rs::tools::{ToolManager, ToolManagerConfig};
-use worker_rs::executor::{JobExecutor, JobExecutionInput};
-use worker_rs::error::WorkerError;
+use worker::grpc::{self, GrpcClient};
+use worker::state::SharedState;
+use worker::tools::{ToolManager, ToolManagerConfig};
+use worker::executor::{JobExecutor, JobExecutionInput};
+use worker::error::WorkerError;
 
 use grpc::generated::JoinRequest;
 use grpc::generated::{Worker as ProtoWorker, JobResultRequest, UpdateResultDto, DataPayloadResult};
@@ -16,7 +16,7 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Parser, Debug)]
-#[command(name = "worker-rs", about = "High-performance gRPC worker for Open-ASM")]
+#[command(name = "worker", about = "High-performance gRPC worker for Open-ASM")]
 struct Cli {
     /// gRPC server host
     #[arg(long, default_value = "localhost")]
@@ -115,7 +115,7 @@ impl Worker {
 
         Ok(Self {
             grpc: Some(grpc.clone()),
-            state: worker_rs::state::new_shared_state(),
+            state: worker::state::new_shared_state(),
             tool_manager: ToolManager::with_grpc_client(grpc.workers, tool_config),
             executor,
             config,
@@ -382,7 +382,7 @@ impl Worker {
                 let span = tracing::info_span!("job", job_id = %job_id);
                 let _enter = span.enter();
 
-                let execution: Result<worker_rs::executor::JobExecutionOutput, WorkerError> = executor.execute(JobExecutionInput {
+                let execution: Result<worker::executor::JobExecutionOutput, WorkerError> = executor.execute(JobExecutionInput {
                     job_id: job_id.clone(),
                     command: command.clone(),
                     working_dir: None,
@@ -487,7 +487,7 @@ async fn main() -> anyhow::Result<()> {
         host = %cli.grpc_host,
         port = cli.grpc_port,
         max_concurrent = cli.max_concurrent_jobs,
-        "Starting worker-rs"
+        "Starting worker"
     );
 
     let config = WorkerConfig::load_or_create(&cli)?;

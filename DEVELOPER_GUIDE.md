@@ -43,7 +43,7 @@ open-asm/
 │   ├── src/               # React components
 │   ├── public/            # Static assets
 │   └── package.json
-├── worker-rs/           # Rust-based workers
+├── worker/           # Rust-based workers
 │   ├── src/               # Source code
 │   ├── Cargo.toml         # Rust package manifest
 │   └── .env.example       # Environment template
@@ -63,7 +63,7 @@ task init
 
 This command will:
 
-- Copy example environment files (`.env`) for `core-api`, `console`, and `worker-rs`.
+- Copy example environment files (`.env`) for `core-api`, `console`, and `worker`.
 - Install project dependencies using `npm` (managed by the task for each workspace).
 - Start a PostgreSQL Docker container named `open-asm-postgres` (requires Docker).
 

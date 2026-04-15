@@ -83,12 +83,6 @@ export class WorkersService {
 
     await this.repo.update({ token: dto.token }, { lastSeenAt: new Date() });
 
-    if (wasOffline) {
-      this.logger.log(
-        `Worker ${worker.id} reconnected after being offline (last seen: ${worker.lastSeenAt.toISOString()})`,
-      );
-    }
-
     return { alive: 'OK' };
   }
 
