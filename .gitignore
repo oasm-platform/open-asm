@@ -74,8 +74,6 @@ core-api/.storage/*
 # .agents/*
 .windsurf/*
 .claude/*
-.kilocode/plans/*
-.kilo/*
 docs/superpowers/*
 core-api/public/tools/*
 .qwen/
