@@ -1,4 +1,6 @@
 use crate::error::WorkerError;
+use crate::services::browser::BrowserService;
+use serde_json::json;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -38,14 +40,21 @@ pub struct JobExecutor {
     tool_paths: Arc<HashMap<String, PathBuf>>,
     /// Cache of tool validation results to avoid repeated checks.
     tool_validations: Arc<Mutex<Option<HashMap<String, ToolValidationResult>>>>,
+    /// Browser service for screenshot jobs
+    browser_service: Option<BrowserService>,
 }
 
 impl JobExecutor {
-    pub fn new(timeout_secs: u64, tool_paths: HashMap<String, PathBuf>) -> Self {
+    pub fn new(
+        timeout_secs: u64,
+        tool_paths: HashMap<String, PathBuf>,
+        browser_service: Option<BrowserService>,
+    ) -> Self {
         Self {
             timeout_secs,
             tool_paths: Arc::new(tool_paths),
             tool_validations: Arc::new(Mutex::new(None)),
+            browser_service,
         }
     }
 
@@ -53,9 +62,10 @@ impl JobExecutor {
     pub async fn with_resolved_tools(
         tool_manager: &crate::tools::ToolManager,
         timeout_secs: u64,
+        browser_service: Option<BrowserService>,
     ) -> Self {
         let paths = tool_manager.get_all_tool_paths().await;
-        let executor = Self::new(timeout_secs, paths);
+        let executor = Self::new(timeout_secs, paths, browser_service);
 
         // Validate all tools at startup
         executor.validate_all_tools().await;
@@ -277,6 +287,11 @@ impl JobExecutor {
         &self,
         input: JobExecutionInput,
     ) -> Result<JobExecutionOutput, WorkerError> {
+        // Check if this is a screenshot job
+        if input.command.starts_with("screenshot ") {
+            return self.execute_screenshot(input).await;
+        }
+
         let timeout = tokio::time::Duration::from_secs(self.timeout_secs);
 
         // Validate that tools used in the command have all dependencies met
@@ -422,10 +437,65 @@ impl JobExecutor {
         })
     }
 
-    /// Get validation status for all tools.
     pub async fn get_tool_validation_status(&self) -> HashMap<String, ToolValidationResult> {
         let validations = self.tool_validations.lock().await;
         validations.clone().unwrap_or_default()
+    }
+
+    async fn execute_screenshot(
+        &self,
+        input: JobExecutionInput,
+    ) -> Result<JobExecutionOutput, WorkerError> {
+        let browser_service = self
+            .browser_service
+            .as_ref()
+            .ok_or_else(|| WorkerError::JobExecution("Browser service not available".into()))?;
+
+        // Parse command: "screenshot <url> [--full-page]"
+        let parts: Vec<&str> = input.command.split_whitespace().collect();
+        if parts.len() < 2 {
+            return Err(WorkerError::JobExecution(
+                "Invalid screenshot command. Usage: screenshot <url> [--full-page]".into(),
+            ));
+        }
+
+        let url = parts[1];
+        let full_page = parts.contains(&"--full-page");
+
+        tracing::info!(job_id = %input.job_id, url = %url, full_page = %full_page, "Executing screenshot job");
+
+        let timeout = tokio::time::Duration::from_secs(self.timeout_secs);
+        let screenshot_result =
+            tokio::time::timeout(timeout, browser_service.screenshot(url, full_page))
+                .await
+                .map_err(|_| WorkerError::JobExecution("Screenshot timeout".into()))?;
+
+        match screenshot_result {
+            Ok(png_data) => {
+                let base64 =
+                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &png_data);
+
+                let result_json = json!({
+                    "screenshot": base64,
+                    "url": url,
+                });
+
+                Ok(JobExecutionOutput {
+                    job_id: input.job_id.clone(),
+                    success: true,
+                    stdout: result_json.to_string(),
+                    stderr: String::new(),
+                    exit_code: Some(0),
+                })
+            }
+            Err(e) => Ok(JobExecutionOutput {
+                job_id: input.job_id.clone(),
+                success: false,
+                stdout: String::new(),
+                stderr: e.to_string(),
+                exit_code: Some(1),
+            }),
+        }
     }
 }
 
@@ -437,7 +507,7 @@ mod tests {
     fn test_resolve_command_simple() {
         let mut tool_paths = HashMap::new();
         tool_paths.insert("nuclei".to_string(), PathBuf::from("/tools/nuclei"));
-        let executor = JobExecutor::new(300, tool_paths);
+        let executor = JobExecutor::new(300, tool_paths, None);
 
         let result = executor.resolve_command("nuclei -u http://example.com -silent");
         assert_eq!(result, "/tools/nuclei -u http://example.com -silent");
@@ -448,7 +518,7 @@ mod tests {
         let mut tool_paths = HashMap::new();
         tool_paths.insert("subfinder".to_string(), PathBuf::from("/tools/subfinder"));
         tool_paths.insert("dnsx".to_string(), PathBuf::from("/tools/dnsx"));
-        let executor = JobExecutor::new(300, tool_paths);
+        let executor = JobExecutor::new(300, tool_paths, None);
 
         let result = executor.resolve_command(
             "(echo example.com && subfinder -duc -d example.com) | dnsx -duc -a -resp",
@@ -463,7 +533,7 @@ mod tests {
     fn test_resolve_command_httpx() {
         let mut tool_paths = HashMap::new();
         tool_paths.insert("httpx".to_string(), PathBuf::from("/tools/httpx"));
-        let executor = JobExecutor::new(300, tool_paths);
+        let executor = JobExecutor::new(300, tool_paths, None);
 
         let result = executor.resolve_command("httpx -duc -u {{value}} -status-code -silent");
         assert_eq!(
@@ -475,7 +545,7 @@ mod tests {
     #[test]
     fn test_resolve_command_no_tools() {
         let tool_paths = HashMap::new();
-        let executor = JobExecutor::new(300, tool_paths);
+        let executor = JobExecutor::new(300, tool_paths, None);
 
         let result = executor.resolve_command("echo hello");
         assert_eq!(result, "echo hello");
@@ -485,7 +555,7 @@ mod tests {
     fn test_resolve_command_naabu() {
         let mut tool_paths = HashMap::new();
         tool_paths.insert("naabu".to_string(), PathBuf::from("/tools/naabu"));
-        let executor = JobExecutor::new(300, tool_paths);
+        let executor = JobExecutor::new(300, tool_paths, None);
 
         let result = executor.resolve_command("naabu -host example.com -silent");
         assert_eq!(result, "/tools/naabu -host example.com -silent");

@@ -1,6 +1,7 @@
 use worker::error::WorkerError;
 use worker::executor::{JobExecutionInput, JobExecutor};
 use worker::grpc::{self, GrpcClient};
+use worker::services::browser::BrowserService;
 use worker::state::SharedState;
 use worker::tools::{ToolManager, ToolManagerConfig};
 
@@ -55,6 +56,7 @@ struct Worker {
     tool_manager: ToolManager,
     executor: JobExecutor,
     config: WorkerConfig,
+    browser_service: Option<BrowserService>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -119,7 +121,23 @@ impl Worker {
         let grpc = GrpcClient::new(&config.grpc_host, config.grpc_port).await?;
 
         // Create executor with empty tool_paths initially; will be refreshed after download
-        let executor = JobExecutor::new(config.job_timeout_secs, std::collections::HashMap::new());
+        let executor = JobExecutor::new(
+            config.job_timeout_secs,
+            std::collections::HashMap::new(),
+            None,
+        );
+
+        // Initialize browser service
+        let browser_service = match BrowserService::new().await {
+            Ok(service) => {
+                tracing::info!("Browser service initialized successfully");
+                Some(service)
+            }
+            Err(e) => {
+                tracing::warn!("Failed to initialize browser service: {}", e);
+                None
+            }
+        };
 
         Ok(Self {
             grpc: Some(grpc.clone()),
@@ -127,6 +145,7 @@ impl Worker {
             tool_manager: ToolManager::with_grpc_client(grpc.workers, tool_config),
             executor,
             config,
+            browser_service,
         })
     }
 
@@ -289,9 +308,12 @@ impl Worker {
         }
 
         // Refresh executor's tool paths now that tools are downloaded
-        self.executor =
-            JobExecutor::with_resolved_tools(&self.tool_manager, self.config.job_timeout_secs)
-                .await;
+        self.executor = JobExecutor::with_resolved_tools(
+            &self.tool_manager,
+            self.config.job_timeout_secs,
+            self.browser_service.clone(),
+        )
+        .await;
 
         // Log tool validation status
         let tool_status = self.executor.get_tool_validation_status().await;
@@ -545,6 +567,13 @@ async fn main() -> anyhow::Result<()> {
         }
         _ = shutdown_signal() => {
             tracing::info!("Shutting down worker");
+
+            // Shutdown browser service
+            if let Some(browser_service) = worker.browser_service {
+                if let Err(e) = browser_service.shutdown().await {
+                    tracing::warn!("Failed to shutdown browser service: {}", e);
+                }
+            }
         }
     }
 

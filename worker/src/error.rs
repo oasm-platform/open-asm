@@ -28,6 +28,9 @@ pub enum WorkerError {
 
     #[error("Configuration error: {0}")]
     Config(String),
+
+    #[error("Browser error: {0}")]
+    Browser(String),
 }
 
 pub type Result<T> = std::result::Result<T, WorkerError>;
