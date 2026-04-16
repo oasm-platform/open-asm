@@ -25,6 +25,7 @@ tar = "0.4"
 walkdir = "2"
 prost-types = "0.14"
 clap = { version = "4", features = ["derive", "env"] }
+headless_chrome = { version = "1.0.21", features = ["fetch"] }
 
 [build-dependencies]
 tonic-prost-build = "0.14"
