@@ -1,19 +1,21 @@
+use worker::error::WorkerError;
+use worker::executor::{JobExecutionInput, JobExecutor};
 use worker::grpc::{self, GrpcClient};
 use worker::state::SharedState;
 use worker::tools::{ToolManager, ToolManagerConfig};
-use worker::executor::{JobExecutor, JobExecutionInput};
-use worker::error::WorkerError;
 
 use grpc::generated::JoinRequest;
-use grpc::generated::{Worker as ProtoWorker, JobResultRequest, UpdateResultDto, DataPayloadResult};
+use grpc::generated::{
+    DataPayloadResult, JobResultRequest, UpdateResultDto, Worker as ProtoWorker,
+};
 
-use tokio::time::Duration;
 use clap::Parser;
-use std::sync::Arc;
-use tokio::sync::Semaphore;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
+use tokio::time::Duration;
 
 #[derive(Parser, Debug)]
 #[command(name = "worker", about = "High-performance gRPC worker for Open-ASM")]
@@ -83,7 +85,10 @@ impl WorkerConfig {
             return Ok(config);
         }
 
-        Err(WorkerError::Config("API key is required. Provide it via --api-key or ensure .configs.json exists".to_string()))
+        Err(WorkerError::Config(
+            "API key is required. Provide it via --api-key or ensure .configs.json exists"
+                .to_string(),
+        ))
     }
 
     fn from_cli(cli: &Cli, api_key: &str) -> Self {
@@ -107,7 +112,10 @@ impl WorkerConfig {
 }
 
 impl Worker {
-    async fn new(config: WorkerConfig, tool_config: ToolManagerConfig) -> Result<Self, WorkerError> {
+    async fn new(
+        config: WorkerConfig,
+        tool_config: ToolManagerConfig,
+    ) -> Result<Self, WorkerError> {
         let grpc = GrpcClient::new(&config.grpc_host, config.grpc_port).await?;
 
         // Create executor with empty tool_paths initially; will be refreshed after download
@@ -128,8 +136,14 @@ impl Worker {
             signature: self.config.worker_signature.clone(),
         };
 
-        let grpc = self.grpc.as_mut().ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
-        let response = grpc.workers.join(request).await
+        let grpc = self
+            .grpc
+            .as_mut()
+            .ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
+        let response = grpc
+            .workers
+            .join(request)
+            .await
             .map_err(WorkerError::Grpc)?
             .into_inner();
 
@@ -150,7 +164,10 @@ impl Worker {
     }
 
     async fn alive_loop(&self) -> Result<(), WorkerError> {
-        let grpc = self.grpc.clone().ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
+        let grpc = self
+            .grpc
+            .clone()
+            .ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
         let state = self.state.clone();
 
         tokio::spawn(async move {
@@ -191,7 +208,7 @@ impl Worker {
                         while let Ok(Some(_)) = stream.message().await {
                             // Heartbeat received, connection is healthy
                         }
-                        
+
                         tracing::warn!("Alive stream closed by server");
                         was_offline = true;
                         let mut s = state.write().await;
@@ -223,7 +240,7 @@ impl Worker {
                 retry_in = ?backoff,
                 "Attempting to reconnect gRPC client..."
             );
-            
+
             match GrpcClient::new(&self.config.grpc_host, self.config.grpc_port).await {
                 Ok(grpc) => {
                     self.grpc = Some(grpc);
@@ -252,11 +269,16 @@ impl Worker {
         // Download tools only if needed
         if self.tool_manager.needs_download().await {
             tracing::info!("Downloading tools...");
-            let download_tools_url = self.tool_manager.fetch_manifest().await
-                .map_err(|e| WorkerError::JobExecution(format!("Failed to fetch manifest: {}", e)))?;
+            let download_tools_url = self.tool_manager.fetch_manifest().await.map_err(|e| {
+                WorkerError::JobExecution(format!("Failed to fetch manifest: {}", e))
+            })?;
 
-            self.tool_manager.download_tools(&download_tools_url).await
-                .map_err(|e| WorkerError::JobExecution(format!("Failed to download tools: {}", e)))?;
+            self.tool_manager
+                .download_tools(&download_tools_url)
+                .await
+                .map_err(|e| {
+                    WorkerError::JobExecution(format!("Failed to download tools: {}", e))
+                })?;
 
             tracing::info!("Tools downloaded successfully");
         }
@@ -267,7 +289,9 @@ impl Worker {
         }
 
         // Refresh executor's tool paths now that tools are downloaded
-        self.executor = JobExecutor::with_resolved_tools(&self.tool_manager, self.config.job_timeout_secs).await;
+        self.executor =
+            JobExecutor::with_resolved_tools(&self.tool_manager, self.config.job_timeout_secs)
+                .await;
 
         // Log tool validation status
         let tool_status = self.executor.get_tool_validation_status().await;
@@ -281,7 +305,10 @@ impl Worker {
                 let reason = if !status.missing_deps.is_empty() {
                     format!("missing: {}", status.missing_deps.join(", "))
                 } else {
-                    status.error_message.clone().unwrap_or_else(|| "unknown".to_string())
+                    status
+                        .error_message
+                        .clone()
+                        .unwrap_or_else(|| "unknown".to_string())
                 };
                 invalid_tools.push(format!("{} ({})", name, reason));
             }
@@ -293,7 +320,11 @@ impl Worker {
         if !invalid_tools.is_empty() {
             tracing::warn!(tools = %invalid_tools.join(", "), "Tools with issues");
         }
-        tracing::info!(valid = valid_tools.len(), invalid = invalid_tools.len(), "Tool validation complete");
+        tracing::info!(
+            valid = valid_tools.len(),
+            invalid = invalid_tools.len(),
+            "Tool validation complete"
+        );
 
         // Start alive loop in background
         self.alive_loop().await?;
@@ -317,12 +348,19 @@ impl Worker {
             }
 
             // Get current jobs client for this iteration
-            let grpc = self.grpc.as_ref().ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
+            let grpc = self
+                .grpc
+                .as_ref()
+                .ok_or_else(|| WorkerError::ConnectionLost("No gRPC client".to_string()))?;
             let mut jobs_client = grpc.jobs.clone();
 
             let (worker_id, worker_token, token_value) = {
                 let s = self.state.read().await;
-                match (s.worker_id.clone(), s.worker_token.clone(), s.worker_token_value.clone()) {
+                match (
+                    s.worker_id.clone(),
+                    s.worker_token.clone(),
+                    s.worker_token_value.clone(),
+                ) {
                     (Some(id), Some(token), Some(val)) => (id, token, val),
                     _ => {
                         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -332,8 +370,12 @@ impl Worker {
             };
 
             // Poll for next job
-            let mut request = tonic::Request::new(ProtoWorker { id: worker_id.clone() });
-            request.metadata_mut().insert("worker-token", token_value.clone());
+            let mut request = tonic::Request::new(ProtoWorker {
+                id: worker_id.clone(),
+            });
+            request
+                .metadata_mut()
+                .insert("worker-token", token_value.clone());
 
             let job = match jobs_client.next(request).await {
                 Ok(resp) => resp.into_inner(),
@@ -365,7 +407,10 @@ impl Worker {
                 "Received job"
             );
 
-            let permit = semaphore.clone().acquire_owned().await
+            let permit = semaphore
+                .clone()
+                .acquire_owned()
+                .await
                 .expect("Semaphore closed");
 
             let worker_id = worker_id.clone();
@@ -378,11 +423,13 @@ impl Worker {
                 let span = tracing::info_span!("job", job_id = %job_id);
                 let _enter = span.enter();
 
-                let execution: Result<worker::executor::JobExecutionOutput, WorkerError> = executor.execute(JobExecutionInput {
-                    job_id: job_id.clone(),
-                    command: command.clone(),
-                    working_dir: None,
-                }).await;
+                let execution: Result<worker::executor::JobExecutionOutput, WorkerError> = executor
+                    .execute(JobExecutionInput {
+                        job_id: job_id.clone(),
+                        command: command.clone(),
+                        working_dir: None,
+                    })
+                    .await;
 
                 let result = match execution {
                     Ok(output) => {
@@ -473,7 +520,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
         )
         .init();
 

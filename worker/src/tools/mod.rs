@@ -1,12 +1,10 @@
 use crate::error::WorkerError;
 use crate::grpc::generated::workers_service_client::WorkersServiceClient;
-use crate::grpc::generated::{GetManifestRequest, DownloadToolsRequest};
+use crate::grpc::generated::{DownloadToolsRequest, GetManifestRequest};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tonic::transport::Channel;
-
-
 
 #[derive(Debug)]
 pub struct ToolManagerConfig {
@@ -15,14 +13,19 @@ pub struct ToolManagerConfig {
 
 impl ToolManagerConfig {
     pub fn new(tools_cache_dir: String) -> Self {
-        Self {
-            tools_cache_dir,
-        }
+        Self { tools_cache_dir }
     }
 }
 
 /// Known tool names that we expect to find in the cache.
-const KNOWN_TOOLS: &[&str] = &["nuclei", "httpx", "naabu", "subfinder", "dnsx", "screenshot"];
+const KNOWN_TOOLS: &[&str] = &[
+    "nuclei",
+    "httpx",
+    "naabu",
+    "subfinder",
+    "dnsx",
+    "screenshot",
+];
 
 pub struct ToolManager {
     grpc_client: WorkersServiceClient<Channel>,
@@ -33,7 +36,10 @@ pub struct ToolManager {
 }
 
 impl ToolManager {
-    pub fn with_grpc_client(grpc_client: WorkersServiceClient<Channel>, config: ToolManagerConfig) -> Self {
+    pub fn with_grpc_client(
+        grpc_client: WorkersServiceClient<Channel>,
+        config: ToolManagerConfig,
+    ) -> Self {
         let cache_dir = std::path::PathBuf::from(&config.tools_cache_dir);
         // Convert to absolute path to avoid issues with relative paths in command execution
         let cache_dir = if cache_dir.is_absolute() {
@@ -52,7 +58,8 @@ impl ToolManager {
     pub async fn fetch_manifest(&mut self) -> Result<String, WorkerError> {
         tracing::debug!("Fetching manifest via gRPC");
 
-        let response = self.grpc_client
+        let response = self
+            .grpc_client
             .get_manifest(tonic::Request::new(GetManifestRequest {}))
             .await
             .map_err(WorkerError::Grpc)?
@@ -66,7 +73,8 @@ impl ToolManager {
 
         tokio::fs::create_dir_all(&self.cache_dir).await?;
 
-        let mut stream = self.grpc_client
+        let mut stream = self
+            .grpc_client
             .download_tools(tonic::Request::new(DownloadToolsRequest {
                 url: download_url.to_string(),
             }))
@@ -100,7 +108,10 @@ impl ToolManager {
         let bytes = data.to_vec();
 
         if bytes.len() < 2 || bytes[0] != 0x1f || bytes[1] != 0x8b {
-            tracing::warn!(size = bytes.len(), "Downloaded file is not a valid gzip archive");
+            tracing::warn!(
+                size = bytes.len(),
+                "Downloaded file is not a valid gzip archive"
+            );
             return Ok(());
         }
 
@@ -207,7 +218,9 @@ impl ToolManager {
             }
 
             paths
-        }).await.unwrap_or_default();
+        })
+        .await
+        .unwrap_or_default();
 
         let mut paths = self.tool_paths.write().await;
         paths.clear();
@@ -222,7 +235,10 @@ impl ToolManager {
 
     /// Scan a command string for known tool names and return a map of
     /// tool_name -> absolute_path for all tools found in the command.
-    pub async fn resolve_command_tools(&self, command: &str) -> HashMap<String, std::path::PathBuf> {
+    pub async fn resolve_command_tools(
+        &self,
+        command: &str,
+    ) -> HashMap<String, std::path::PathBuf> {
         let paths = self.tool_paths.read().await;
         let mut result = HashMap::new();
 
@@ -250,7 +266,9 @@ impl ToolManager {
         let nuclei_path = match self.resolve_tool_path("nuclei").await {
             Some(p) => p,
             None => {
-                tracing::warn!("nuclei binary not found in cache, skipping template initialization");
+                tracing::warn!(
+                    "nuclei binary not found in cache, skipping template initialization"
+                );
                 return Ok(());
             }
         };
@@ -317,7 +335,8 @@ impl ToolManager {
             }
 
             !found_executable
-        }).await;
+        })
+        .await;
 
         let needs_download = result.unwrap_or(true);
 

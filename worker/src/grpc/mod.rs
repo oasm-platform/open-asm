@@ -4,9 +4,9 @@ pub mod generated {
     tonic::include_proto!("jobs_registry");
 }
 
-use tonic::transport::{Channel, Endpoint};
 use crate::error::WorkerError;
 use tokio::time::{sleep, Duration};
+use tonic::transport::{Channel, Endpoint};
 
 #[derive(Clone)]
 pub struct GrpcClient {
@@ -39,10 +39,15 @@ impl GrpcClient {
                     let max_message_size = 64 * 1024 * 1024; // 64MB
 
                     return Ok(Self {
-                        workers: generated::workers_service_client::WorkersServiceClient::new(channel.clone())
-                            .max_decoding_message_size(max_message_size)
-                            .max_encoding_message_size(max_message_size),
-                        jobs: generated::jobs_registry_service_client::JobsRegistryServiceClient::new(channel)
+                        workers: generated::workers_service_client::WorkersServiceClient::new(
+                            channel.clone(),
+                        )
+                        .max_decoding_message_size(max_message_size)
+                        .max_encoding_message_size(max_message_size),
+                        jobs:
+                            generated::jobs_registry_service_client::JobsRegistryServiceClient::new(
+                                channel,
+                            )
                             .max_decoding_message_size(max_message_size)
                             .max_encoding_message_size(max_message_size),
                     });

@@ -50,25 +50,28 @@ impl JobExecutor {
     }
 
     /// Resolve tool paths from the tool manager and update the executor.
-    pub async fn with_resolved_tools(tool_manager: &crate::tools::ToolManager, timeout_secs: u64) -> Self {
+    pub async fn with_resolved_tools(
+        tool_manager: &crate::tools::ToolManager,
+        timeout_secs: u64,
+    ) -> Self {
         let paths = tool_manager.get_all_tool_paths().await;
         let executor = Self::new(timeout_secs, paths);
-        
+
         // Validate all tools at startup
         executor.validate_all_tools().await;
-        
+
         executor
     }
 
     /// Validate all tools and cache the results.
     pub async fn validate_all_tools(&self) {
         let mut validations = HashMap::new();
-        
+
         for (tool_name, tool_path) in self.tool_paths.iter() {
             let result = self.validate_tool(tool_name, tool_path).await;
             validations.insert(tool_name.clone(), result);
         }
-        
+
         let mut cache = self.tool_validations.lock().await;
         *cache = Some(validations);
     }
@@ -106,7 +109,7 @@ impl JobExecutor {
 
         // Check for missing shared library dependencies using ldd
         let missing_deps = self.check_missing_dependencies(tool_path).await;
-        
+
         ToolValidationResult {
             tool_name: tool_name.to_string(),
             path: tool_path.clone(),
@@ -120,15 +123,11 @@ impl JobExecutor {
     #[allow(unused_mut)]
     async fn check_missing_dependencies(&self, tool_path: &PathBuf) -> Vec<String> {
         let mut missing = Vec::new();
-        
+
         // Only check on Linux
         #[cfg(target_os = "linux")]
         {
-            match Command::new("ldd")
-                .arg(tool_path)
-                .output()
-                .await
-            {
+            match Command::new("ldd").arg(tool_path).output().await {
                 Ok(output) => {
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     for line in stdout.lines() {
@@ -145,7 +144,7 @@ impl JobExecutor {
                 }
             }
         }
-        
+
         // Suppress unused variable warning on non-linux platforms
         #[cfg(not(target_os = "linux"))]
         {
@@ -177,7 +176,7 @@ impl JobExecutor {
 
         let validations = self.tool_validations.lock().await;
         let validations = match validations.as_ref() {
-            Some(v) => v.clone(), // Clone to avoid borrow issues
+            Some(v) => v.clone(),  // Clone to avoid borrow issues
             None => return Ok(()), // Should not happen, but be lenient
         };
 
@@ -187,14 +186,19 @@ impl JobExecutor {
                 if !validation.is_valid {
                     let missing = validation.missing_deps.join(", ");
                     let error_msg = if missing.is_empty() {
-                        validation.error_message.clone().unwrap_or_else(|| "Unknown error".to_string())
+                        validation
+                            .error_message
+                            .clone()
+                            .unwrap_or_else(|| "Unknown error".to_string())
                     } else {
                         format!("Missing dependencies: {}", missing)
                     };
 
                     tracing::error!(
                         "Tool '{}' is not functional: {} (path: {:?})",
-                        tool_name, error_msg, validation.path
+                        tool_name,
+                        error_msg,
+                        validation.path
                     );
 
                     return Err(WorkerError::ToolDependencyMissing {
@@ -269,7 +273,10 @@ impl JobExecutor {
         result
     }
 
-    pub async fn execute(&self, input: JobExecutionInput) -> Result<JobExecutionOutput, WorkerError> {
+    pub async fn execute(
+        &self,
+        input: JobExecutionInput,
+    ) -> Result<JobExecutionOutput, WorkerError> {
         let timeout = tokio::time::Duration::from_secs(self.timeout_secs);
 
         // Validate that tools used in the command have all dependencies met
@@ -384,7 +391,10 @@ impl JobExecutor {
             let enhanced_error = if stderr_output.is_empty() {
                 "Command not found or missing dependencies (stderr empty)".to_string()
             } else {
-                format!("Command not found or missing dependencies: {}", stderr_output)
+                format!(
+                    "Command not found or missing dependencies: {}",
+                    stderr_output
+                )
             };
 
             tracing::error!(
@@ -441,7 +451,7 @@ mod tests {
         let executor = JobExecutor::new(300, tool_paths);
 
         let result = executor.resolve_command(
-            "(echo example.com && subfinder -duc -d example.com) | dnsx -duc -a -resp"
+            "(echo example.com && subfinder -duc -d example.com) | dnsx -duc -a -resp",
         );
         assert!(result.contains("/tools/subfinder"));
         assert!(result.contains("/tools/dnsx"));
@@ -456,7 +466,10 @@ mod tests {
         let executor = JobExecutor::new(300, tool_paths);
 
         let result = executor.resolve_command("httpx -duc -u {{value}} -status-code -silent");
-        assert_eq!(result, "/tools/httpx -duc -u {{value}} -status-code -silent");
+        assert_eq!(
+            result,
+            "/tools/httpx -duc -u {{value}} -status-code -silent"
+        );
     }
 
     #[test]
