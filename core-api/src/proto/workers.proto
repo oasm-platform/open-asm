@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package workers;
 
+option go_package = "./workers";
+
 service WorkersService {
   rpc Join(JoinRequest) returns (JoinResponse);
   rpc Alive(AliveRequest) returns (stream AliveResponse);
