@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rand = "0.10.1"
 tonic = "0.14.5"
 tonic-prost = "0.14"
 prost = "0.14.3"
