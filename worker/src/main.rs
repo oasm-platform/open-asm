@@ -455,7 +455,16 @@ impl Worker {
 
                 let result = match execution {
                     Ok(output) => {
-                        tracing::info!(success = output.success, "Job completed");
+                        if output.success {
+                            tracing::info!(success = true, "Job completed");
+                        } else {
+                            tracing::error!(
+                                success = false,
+                                stderr = %output.stderr,
+                                exit_code = ?output.exit_code,
+                                "Job failed"
+                            );
+                        }
                         JobResultRequest {
                             worker_id: worker_id.clone(),
                             data: Some(UpdateResultDto {
@@ -540,6 +549,8 @@ async fn shutdown_signal() {
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing with RUST_LOG environment variable support
     tracing_subscriber::fmt()
+        .with_file(true)
+        .with_line_number(true)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
