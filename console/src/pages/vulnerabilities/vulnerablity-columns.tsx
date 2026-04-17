@@ -13,6 +13,7 @@ import type { Vulnerability } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { BellOff, CircleCheck, ExternalLink, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import BadgeList from '../assets/components/badge-list';
 
 export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
   {
@@ -73,13 +74,9 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
         <div className="flex flex-col gap-2 py-2 justify-center min-h-[60px]">
           <div className="flex items-center gap-2">
             <div className="font-medium">{value}</div>
-            {Array.isArray(cveIds) &&
-              cveIds.length > 0 &&
-              cveIds.map((id, idx) => (
-                <Badge key={id || idx} variant="outline" className="text-xs">
-                  {id}
-                </Badge>
-              ))}
+            {Array.isArray(cveIds) && cveIds.length > 0 && (
+              <BadgeList list={cveIds} maxDisplay={2} />
+            )}
             {data.description && (
               <TooltipProvider>
                 <Tooltip>
