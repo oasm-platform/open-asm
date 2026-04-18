@@ -96,10 +96,12 @@ export class WorkersController {
   async grpcJoin(requests: {
     apiKey: string;
     signature: string;
+    token?: string;
   }): Promise<{ workerId: string; workerToken: string }> {
     const worker = await this.workersService.join({
       apiKey: requests.apiKey,
       signature: requests.signature,
+      token: requests.token,
     });
     return {
       workerId: worker.id,

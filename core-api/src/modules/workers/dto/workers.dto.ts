@@ -18,6 +18,11 @@ export class WorkerJoinDto {
   @ApiProperty({ required: false })
   @IsString()
   signature: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  token?: string;
 }
 
 export class WorkerAliveDto {

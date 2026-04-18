@@ -12,6 +12,7 @@ service WorkersService {
 message JoinRequest {
   string api_key = 1;
   string signature = 2;
+  optional string token = 3;
 }
 
 message JoinResponse {

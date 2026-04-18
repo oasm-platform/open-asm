@@ -286,7 +286,17 @@ export class WorkersService {
    * @returns A promise that resolves to the created worker instance.
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
-    const { apiKey, signature } = dto;
+    const { apiKey, signature, token } = dto;
+
+    if (token) {
+      const existingWorker = await this.repo.findOne({
+        where: { token },
+      });
+      if (existingWorker) {
+        return existingWorker;
+      }
+    }
+
     const workerSignature =
       this.configService.get<string>('WORKER_SIGNATURE') || '';
 
