@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -43,7 +44,7 @@ func printBanner() {
 func Execute() {
 	var config Config
 
-	var rootCmd = &cobra.Command{
+	rootCmd := &cobra.Command{
 		Use:   "oasm-worker",
 		Short: "OASM Worker is an attack surface management agent",
 		Long:  `OASM Worker is a high-performance agent used for attack surface management tasks.`,
@@ -81,6 +82,8 @@ func Execute() {
 				case Params.GrpcPort.Key:
 					i, _ := strconv.Atoi(val)
 					config.GrpcPort = i
+				case Params.ToolPath.Key:
+					config.ToolPath = val
 				}
 			}
 
@@ -88,7 +91,8 @@ func Execute() {
 			fmt.Printf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\n",
 				config.ApiKey, config.MaxConcurrency, config.GrpcHost, config.GrpcPort)
 
-			Connect(config)
+			ctx := context.Background()
+			Connect(ctx, config)
 			return nil
 		},
 	}

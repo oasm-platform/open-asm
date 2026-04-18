@@ -14,6 +14,7 @@ type AppParams struct {
 	MaxConcurrency Parameter
 	GrpcHost       Parameter
 	GrpcPort       Parameter
+	ToolPath       Parameter
 }
 
 func (a AppParams) All() map[string]Parameter {
@@ -22,6 +23,7 @@ func (a AppParams) All() map[string]Parameter {
 		a.MaxConcurrency.Key: a.MaxConcurrency,
 		a.GrpcHost.Key:       a.GrpcHost,
 		a.GrpcPort.Key:       a.GrpcPort,
+		a.ToolPath.Key:       a.ToolPath,
 	}
 }
 
@@ -41,6 +43,13 @@ var Params = AppParams{
 		Description:  "Maximum number of concurrent tasks",
 		Required:     false,
 		Type:         "int",
+	},
+	ToolPath: Parameter{
+		Key:          "tool-path",
+		DefaultValue: "oasm-tools",
+		Description:  "Tool path",
+		Required:     false,
+		Type:         "string",
 	},
 	GrpcHost: Parameter{
 		Key:          "grpc-host",
@@ -65,4 +74,5 @@ type Config struct {
 	MaxConcurrency int
 	GrpcHost       string
 	GrpcPort       int
+	ToolPath       string
 }
