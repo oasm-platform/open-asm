@@ -25,6 +25,7 @@ type JoinRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ApiKey        string                 `protobuf:"bytes,1,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
 	Signature     string                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+	Token         *string                `protobuf:"bytes,3,opt,name=token,proto3,oneof" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -69,6 +70,13 @@ func (x *JoinRequest) GetApiKey() string {
 func (x *JoinRequest) GetSignature() string {
 	if x != nil {
 		return x.Signature
+	}
+	return ""
+}
+
+func (x *JoinRequest) GetToken() string {
+	if x != nil && x.Token != nil {
+		return *x.Token
 	}
 	return ""
 }
@@ -417,10 +425,12 @@ var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
 	"\n" +
-	"\rworkers.proto\x12\aworkers\"D\n" +
+	"\rworkers.proto\x12\aworkers\"i\n" +
 	"\vJoinRequest\x12\x17\n" +
 	"\aapi_key\x18\x01 \x01(\tR\x06apiKey\x12\x1c\n" +
-	"\tsignature\x18\x02 \x01(\tR\tsignature\"N\n" +
+	"\tsignature\x18\x02 \x01(\tR\tsignature\x12\x19\n" +
+	"\x05token\x18\x03 \x01(\tH\x00R\x05token\x88\x01\x01B\b\n" +
+	"\x06_token\"N\n" +
 	"\fJoinResponse\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12!\n" +
 	"\fworker_token\x18\x02 \x01(\tR\vworkerToken\"1\n" +
@@ -490,6 +500,7 @@ func file_workers_proto_init() {
 	if File_workers_proto != nil {
 		return
 	}
+	file_workers_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

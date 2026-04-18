@@ -23,6 +23,10 @@ export interface JoinRequest {
      * @generated from protobuf field: string signature = 2
      */
     signature: string;
+    /**
+     * @generated from protobuf field: optional string token = 3
+     */
+    token?: string;
 }
 /**
  * @generated from protobuf message workers.JoinResponse
@@ -108,7 +112,8 @@ class JoinRequest$Type extends MessageType<JoinRequest> {
     constructor() {
         super("workers.JoinRequest", [
             { no: 1, name: "api_key", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "signature", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+            { no: 2, name: "signature", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "token", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
         ]);
     }
     create(value?: PartialMessage<JoinRequest>): JoinRequest {
@@ -130,6 +135,9 @@ class JoinRequest$Type extends MessageType<JoinRequest> {
                 case /* string signature */ 2:
                     message.signature = reader.string();
                     break;
+                case /* optional string token */ 3:
+                    message.token = reader.string();
+                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -148,6 +156,9 @@ class JoinRequest$Type extends MessageType<JoinRequest> {
         /* string signature = 2; */
         if (message.signature !== "")
             writer.tag(2, WireType.LengthDelimited).string(message.signature);
+        /* optional string token = 3; */
+        if (message.token !== undefined)
+            writer.tag(3, WireType.LengthDelimited).string(message.token);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
