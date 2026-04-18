@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
 	"github.com/common-nighthawk/go-figure"
 	"github.com/fatih/color"
+	"github.com/spf13/cobra"
 )
 
 func printBanner() {
@@ -15,44 +15,43 @@ func printBanner() {
 	fmt.Print(green(myFigure.String()))
 }
 
-func Parse() *Config {
-	fs := flag.NewFlagSet("oasm-worker", flag.ExitOnError)
+func Execute() {
+	var config Config
+	config.Values = make(map[string]string)
 
-	values := make(map[string]string)
-	tempValues := make(map[string]*string)
+	var rootCmd = &cobra.Command{
+		Use:   "oasm-worker",
+		Short: "OASM Worker is an attack surface management agent",
+		Long:  `OASM Worker is a high-performance agent used for attack surface management tasks.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			for _, p := range Params {
+				val, _ := cmd.Flags().GetString(p.Name)
+				config.Values[p.Name] = val
+
+				if p.Required && val == "" {
+					printBanner()
+					return fmt.Errorf("missing required parameter --%s", p.Name)
+				}
+			}
+
+			fmt.Println("Worker started successfully!")
+			for k, v := range config.Values {
+				fmt.Printf("%s: %s\n", k, v)
+			}
+			return nil
+		},
+	}
+
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		printBanner()
+		cmd.Help()
+	})
 
 	for _, p := range Params {
-		val := fs.String(p.Name, p.DefaultValue, p.Description)
-		tempValues[p.Name] = val
+		rootCmd.PersistentFlags().String(p.Name, p.DefaultValue, p.Description)
 	}
 
-	fs.Usage = func() {
-		printBanner()
-		fmt.Println("Usage of oasm-worker:")
-		fs.PrintDefaults()
-		os.Exit(0)
-	}
-
-	if len(os.Args) < 2 || os.Args[1] == "-h" || os.Args[1] == "--help" {
-		fs.Usage()
-	}
-
-	if err := fs.Parse(os.Args[1:]); err != nil {
-		fmt.Printf("Error parsing flags: %v\n", err)
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-
-	for name, ptr := range tempValues {
-		values[name] = *ptr
-	}
-
-	for _, p := range Params {
-		if p.Required && values[p.Name] == "" {
-			printBanner()
-			fmt.Printf("Error: missing required parameter --%s\n", p.Name)
-			fs.Usage()
-		}
-	}
-
-	return &Config{Values: values}
 }
