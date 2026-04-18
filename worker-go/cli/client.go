@@ -16,10 +16,11 @@ import (
 func Connect(ctx context.Context, cfg Config) {
 	client, err := oasm.NewClient(
 		oasm.WithApiKey(cfg.ApiKey),
-		oasm.WithGRPCHost(fmt.Sprintf("%s:%s", cfg.GrpcHost, cfg.GrpcPort)),
+		oasm.WithGRPCHost(fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort)),
 		oasm.WithToolPath(cfg.ToolPath),
 	)
 	if err != nil {
+		log.Printf("Error creating OASM client: %v", err)
 		return
 	}
 	ready := make(chan bool, 1)
