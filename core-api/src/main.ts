@@ -94,8 +94,6 @@ async function bootstrap() {
 
   fs.writeFileSync(pathOutputOpenApi, JSON.stringify(documentFactory()));
   const grpcPort = process.env.GRPC_PORT ?? DEFAULT_GRPC_PORT;
-  console.log(process.env.GRPC_PORT);
-  console.log('grpcPort', grpcPort);
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
