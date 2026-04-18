@@ -1,0 +1,59 @@
+# ========================
+# Go (Golang)
+# ========================
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+worker
+main
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Dependency directories
+# vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# ========================
+# Open ASM & Worker Runtime
+# ========================
+# Local state and config files (Do not commit secrets)
+worker-state.json
+config.json
+config.yaml
+.env
+
+# Downloaded tools and temporary archives
+*.tar.gz
+*.gz
+*.zip
+oasm-tools/
+tools/
+tmp/
+
+# ========================
+# Nix & Local Environments
+# ========================
+result
+result-*
+.direnv/
+
+# ========================
+# IDEs & OS
+# ========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
