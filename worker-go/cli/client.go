@@ -16,7 +16,7 @@ import (
 func Connect(ctx context.Context, cfg Config) {
 	client, err := oasm.NewClient(
 		oasm.WithApiKey(cfg.ApiKey),
-		oasm.WithGRPCHost("localhost:50051"),
+		oasm.WithGRPCHost(fmt.Sprintf("%s:%s", cfg.GrpcHost, cfg.GrpcPort)),
 		oasm.WithToolPath(cfg.ToolPath),
 	)
 	if err != nil {
