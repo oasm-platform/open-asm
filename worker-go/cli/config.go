@@ -2,6 +2,7 @@ package cli
 
 type Parameter struct {
 	Key          string
+	KeyEnv       string
 	DefaultValue string
 	Description  string
 	Required     bool
@@ -27,6 +28,7 @@ func (a AppParams) All() map[string]Parameter {
 var Params = AppParams{
 	ApiKey: Parameter{
 		Key:          "apikey",
+		KeyEnv:       "WORKER_API_KEY",
 		DefaultValue: "",
 		Description:  "API key for authentication",
 		Required:     true,
@@ -34,6 +36,7 @@ var Params = AppParams{
 	},
 	MaxConcurrency: Parameter{
 		Key:          "max-concurrency",
+		KeyEnv:       "WORKER_MAX_CONCURRENCY",
 		DefaultValue: "10",
 		Description:  "Maximum number of concurrent tasks",
 		Required:     false,
@@ -41,6 +44,7 @@ var Params = AppParams{
 	},
 	GrpcHost: Parameter{
 		Key:          "grpc-host",
+		KeyEnv:       "WORKER_GRPC_HOST",
 		DefaultValue: "localhost",
 		Description:  "gRPC server host",
 		Required:     false,
@@ -48,6 +52,7 @@ var Params = AppParams{
 	},
 	GrpcPort: Parameter{
 		Key:          "grpc-port",
+		KeyEnv:       "WORKER_GRPC_PORT",
 		DefaultValue: "16276",
 		Description:  "gRPC server port",
 		Required:     false,
