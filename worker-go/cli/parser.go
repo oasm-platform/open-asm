@@ -44,7 +44,7 @@ func Execute() {
 
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		printBanner()
-		cmd.Help()
+		cmd.Usage()
 	})
 
 	for _, p := range Params {
