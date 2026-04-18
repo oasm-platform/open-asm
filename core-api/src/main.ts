@@ -19,6 +19,7 @@ import {
   APP_NAME,
   AUTH_INSTANCE_KEY,
   CACHE_STATIC_RESOURCE,
+  DEFAULT_GRPC_PORT,
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
@@ -92,7 +93,9 @@ async function bootstrap() {
   }
 
   fs.writeFileSync(pathOutputOpenApi, JSON.stringify(documentFactory()));
-
+  const grpcPort = process.env.GRPC_PORT ?? DEFAULT_GRPC_PORT;
+  console.log(process.env.GRPC_PORT);
+  console.log('grpcPort', grpcPort);
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
@@ -101,7 +104,7 @@ async function bootstrap() {
         join(__dirname, 'proto/workers.proto'),
         join(__dirname, 'proto/jobs_registry.proto'),
       ],
-      url: '0.0.0.0:50051',
+      url: `0.0.0.0:${grpcPort}`,
       loader: {
         keepCase: false,
         longs: String,
@@ -118,12 +121,14 @@ async function bootstrap() {
     },
   });
 
+  const logger = new Logger('Application');
+
   // Start server
   await app.startAllMicroservices();
+
   const port = process.env.PORT ?? DEFAULT_PORT;
   await app.listen(port);
-
-  const logger = new Logger('Application');
+  logger.log(`gRPC server is running on port ${grpcPort}`);
   logger.log(`Application is running on port ${port}`);
 }
 

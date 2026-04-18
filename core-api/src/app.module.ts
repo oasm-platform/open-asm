@@ -12,7 +12,6 @@ import {
 } from 'nestjs-i18n';
 import * as path from 'path';
 import { DatabaseModule } from './database/database.module';
-import { GrpcClientModule } from './grpc-client/grpc-client.module';
 import { CombineModule } from './modules/combine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { StorageModule } from './modules/storage/storage.module';
@@ -47,7 +46,6 @@ import { ServicesModule } from './services/services.module';
       inject: [ConfigService],
     }),
     DatabaseModule,
-    GrpcClientModule,
     CombineModule,
     NotificationsModule,
     StorageModule,

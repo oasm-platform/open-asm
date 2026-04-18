@@ -13,21 +13,25 @@
 ## Agents
 
 ### 1. Performance Optimization Agent
+
 - **Focus**: Identify performance bottlenecks in async job execution, tool management, and gRPC communication.
 - **Key files**: `src/main.rs`, `src/executor/mod.rs`, `src/tools/mod.rs`.
 - **Typical tasks**: Profile with `tokio-console`, optimize semaphore usage, reduce allocation overhead.
 
 ### 2. Rust Best Practices Agent
+
 - **Focus**: Enforce idiomatic Rust, proper error handling, and module organization.
 - **Key files**: Entire `src/` directory.
 - **Typical tasks**: Refactor large functions, replace `unwrap`/`expect` with proper error propagation, ensure `Send + Sync` where needed.
 
 ### 3. Integration Agent
+
 - **Focus**: Verify correct interaction with the gRPC server, tool manager, and shared state.
 - **Key files**: `src/grpc/`, `src/state.rs`, `src/tools/`.
 - **Typical tasks**: Ensure metadata handling is correct, test reconnection logic, validate token parsing.
 
 ### 4. Testing Agent
+
 - **Focus**: Write unit and integration tests for job execution, tool download, and alive loop.
 - **Key files**: `tests/` (create if missing), mock implementations for gRPC client.
 - **Typical tasks**: Achieve >80% coverage, use `tokio::test` for async tests.
@@ -42,7 +46,7 @@
    ```
 2. **Run**
    ```bash
-   cargo run -- --grpc-host localhost --grpc-port 50051 --api-key <key>
+   cargo run -- --grpc-host localhost --grpc-port 16276 --api-key <key>
    ```
 3. **Lint & Format**
    ```bash
@@ -51,5 +55,6 @@
    ```
 
 ## Documentation
+
 - Keep this `AGENTS.md` up‑to‑date with any new agents or responsibilities.
 - Document public structs and functions with Rustdoc comments.

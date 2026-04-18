@@ -26,7 +26,7 @@ struct Cli {
     grpc_host: String,
 
     /// gRPC server port
-    #[arg(long, env = "GRPC_PORT", default_value = "50051")]
+    #[arg(long, env = "GRPC_PORT", default_value = "16276")]
     grpc_port: u16,
 
     /// API key for worker authentication
