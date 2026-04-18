@@ -1,6 +1,7 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, IsObject, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class WorkerManifestResponseDto {
   @ApiProperty({
@@ -8,6 +9,18 @@ export class WorkerManifestResponseDto {
     example: '/static/archived/tools.tar.gz',
   })
   downloadToolsUrl: string;
+}
+
+export class WorkerMetadataDto {
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  os?: string;
 }
 
 export class WorkerJoinDto {
@@ -23,6 +36,13 @@ export class WorkerJoinDto {
   @IsString()
   @IsOptional()
   token?: string;
+
+  @ApiProperty({ required: false, type: () => WorkerMetadataDto })
+  @IsObject()
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => WorkerMetadataDto)
+  metadata?: WorkerMetadataDto;
 }
 
 export class WorkerAliveDto {

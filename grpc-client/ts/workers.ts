@@ -27,6 +27,23 @@ export interface JoinRequest {
      * @generated from protobuf field: optional string token = 3
      */
     token?: string;
+    /**
+     * @generated from protobuf field: optional workers.WorkerMetadata metadata = 4
+     */
+    metadata?: WorkerMetadata;
+}
+/**
+ * @generated from protobuf message workers.WorkerMetadata
+ */
+export interface WorkerMetadata {
+    /**
+     * @generated from protobuf field: optional string name = 1
+     */
+    name?: string;
+    /**
+     * @generated from protobuf field: optional string os = 2
+     */
+    os?: string;
 }
 /**
  * @generated from protobuf message workers.JoinResponse
@@ -113,7 +130,8 @@ class JoinRequest$Type extends MessageType<JoinRequest> {
         super("workers.JoinRequest", [
             { no: 1, name: "api_key", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "signature", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "token", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
+            { no: 3, name: "token", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 4, name: "metadata", kind: "message", T: () => WorkerMetadata }
         ]);
     }
     create(value?: PartialMessage<JoinRequest>): JoinRequest {
@@ -138,6 +156,9 @@ class JoinRequest$Type extends MessageType<JoinRequest> {
                 case /* optional string token */ 3:
                     message.token = reader.string();
                     break;
+                case /* optional workers.WorkerMetadata metadata */ 4:
+                    message.metadata = WorkerMetadata.internalBinaryRead(reader, reader.uint32(), options, message.metadata);
+                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -159,6 +180,9 @@ class JoinRequest$Type extends MessageType<JoinRequest> {
         /* optional string token = 3; */
         if (message.token !== undefined)
             writer.tag(3, WireType.LengthDelimited).string(message.token);
+        /* optional workers.WorkerMetadata metadata = 4; */
+        if (message.metadata)
+            WorkerMetadata.internalBinaryWrite(message.metadata, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -169,6 +193,59 @@ class JoinRequest$Type extends MessageType<JoinRequest> {
  * @generated MessageType for protobuf message workers.JoinRequest
  */
 export const JoinRequest = new JoinRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class WorkerMetadata$Type extends MessageType<WorkerMetadata> {
+    constructor() {
+        super("workers.WorkerMetadata", [
+            { no: 1, name: "name", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "os", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<WorkerMetadata>): WorkerMetadata {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<WorkerMetadata>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: WorkerMetadata): WorkerMetadata {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* optional string name */ 1:
+                    message.name = reader.string();
+                    break;
+                case /* optional string os */ 2:
+                    message.os = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: WorkerMetadata, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* optional string name = 1; */
+        if (message.name !== undefined)
+            writer.tag(1, WireType.LengthDelimited).string(message.name);
+        /* optional string os = 2; */
+        if (message.os !== undefined)
+            writer.tag(2, WireType.LengthDelimited).string(message.os);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.WorkerMetadata
+ */
+export const WorkerMetadata = new WorkerMetadata$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class JoinResponse$Type extends MessageType<JoinResponse> {
     constructor() {

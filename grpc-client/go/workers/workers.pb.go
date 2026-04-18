@@ -26,6 +26,7 @@ type JoinRequest struct {
 	ApiKey        string                 `protobuf:"bytes,1,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
 	Signature     string                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	Token         *string                `protobuf:"bytes,3,opt,name=token,proto3,oneof" json:"token,omitempty"`
+	Metadata      *WorkerMetadata        `protobuf:"bytes,4,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -81,6 +82,65 @@ func (x *JoinRequest) GetToken() string {
 	return ""
 }
 
+func (x *JoinRequest) GetMetadata() *WorkerMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type WorkerMetadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          *string                `protobuf:"bytes,1,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Os            *string                `protobuf:"bytes,2,opt,name=os,proto3,oneof" json:"os,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkerMetadata) Reset() {
+	*x = WorkerMetadata{}
+	mi := &file_workers_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkerMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkerMetadata) ProtoMessage() {}
+
+func (x *WorkerMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkerMetadata.ProtoReflect.Descriptor instead.
+func (*WorkerMetadata) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *WorkerMetadata) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *WorkerMetadata) GetOs() string {
+	if x != nil && x.Os != nil {
+		return *x.Os
+	}
+	return ""
+}
+
 type JoinResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
@@ -91,7 +151,7 @@ type JoinResponse struct {
 
 func (x *JoinResponse) Reset() {
 	*x = JoinResponse{}
-	mi := &file_workers_proto_msgTypes[1]
+	mi := &file_workers_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -103,7 +163,7 @@ func (x *JoinResponse) String() string {
 func (*JoinResponse) ProtoMessage() {}
 
 func (x *JoinResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[1]
+	mi := &file_workers_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -116,7 +176,7 @@ func (x *JoinResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinResponse.ProtoReflect.Descriptor instead.
 func (*JoinResponse) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{1}
+	return file_workers_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *JoinResponse) GetWorkerId() string {
@@ -142,7 +202,7 @@ type AliveRequest struct {
 
 func (x *AliveRequest) Reset() {
 	*x = AliveRequest{}
-	mi := &file_workers_proto_msgTypes[2]
+	mi := &file_workers_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -154,7 +214,7 @@ func (x *AliveRequest) String() string {
 func (*AliveRequest) ProtoMessage() {}
 
 func (x *AliveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[2]
+	mi := &file_workers_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -167,7 +227,7 @@ func (x *AliveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AliveRequest.ProtoReflect.Descriptor instead.
 func (*AliveRequest) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{2}
+	return file_workers_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AliveRequest) GetWorkerToken() string {
@@ -188,7 +248,7 @@ type AliveResponse struct {
 
 func (x *AliveResponse) Reset() {
 	*x = AliveResponse{}
-	mi := &file_workers_proto_msgTypes[3]
+	mi := &file_workers_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -200,7 +260,7 @@ func (x *AliveResponse) String() string {
 func (*AliveResponse) ProtoMessage() {}
 
 func (x *AliveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[3]
+	mi := &file_workers_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -213,7 +273,7 @@ func (x *AliveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AliveResponse.ProtoReflect.Descriptor instead.
 func (*AliveResponse) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{3}
+	return file_workers_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AliveResponse) GetAlive() bool {
@@ -245,7 +305,7 @@ type GetManifestRequest struct {
 
 func (x *GetManifestRequest) Reset() {
 	*x = GetManifestRequest{}
-	mi := &file_workers_proto_msgTypes[4]
+	mi := &file_workers_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -257,7 +317,7 @@ func (x *GetManifestRequest) String() string {
 func (*GetManifestRequest) ProtoMessage() {}
 
 func (x *GetManifestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[4]
+	mi := &file_workers_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -270,7 +330,7 @@ func (x *GetManifestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetManifestRequest.ProtoReflect.Descriptor instead.
 func (*GetManifestRequest) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{4}
+	return file_workers_proto_rawDescGZIP(), []int{5}
 }
 
 type GetManifestResponse struct {
@@ -282,7 +342,7 @@ type GetManifestResponse struct {
 
 func (x *GetManifestResponse) Reset() {
 	*x = GetManifestResponse{}
-	mi := &file_workers_proto_msgTypes[5]
+	mi := &file_workers_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -294,7 +354,7 @@ func (x *GetManifestResponse) String() string {
 func (*GetManifestResponse) ProtoMessage() {}
 
 func (x *GetManifestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[5]
+	mi := &file_workers_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -307,7 +367,7 @@ func (x *GetManifestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetManifestResponse.ProtoReflect.Descriptor instead.
 func (*GetManifestResponse) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{5}
+	return file_workers_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetManifestResponse) GetDownloadToolsUrl() string {
@@ -326,7 +386,7 @@ type DownloadToolsRequest struct {
 
 func (x *DownloadToolsRequest) Reset() {
 	*x = DownloadToolsRequest{}
-	mi := &file_workers_proto_msgTypes[6]
+	mi := &file_workers_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -338,7 +398,7 @@ func (x *DownloadToolsRequest) String() string {
 func (*DownloadToolsRequest) ProtoMessage() {}
 
 func (x *DownloadToolsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[6]
+	mi := &file_workers_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -351,7 +411,7 @@ func (x *DownloadToolsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadToolsRequest.ProtoReflect.Descriptor instead.
 func (*DownloadToolsRequest) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{6}
+	return file_workers_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DownloadToolsRequest) GetUrl() string {
@@ -372,7 +432,7 @@ type DownloadToolsResponse struct {
 
 func (x *DownloadToolsResponse) Reset() {
 	*x = DownloadToolsResponse{}
-	mi := &file_workers_proto_msgTypes[7]
+	mi := &file_workers_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -384,7 +444,7 @@ func (x *DownloadToolsResponse) String() string {
 func (*DownloadToolsResponse) ProtoMessage() {}
 
 func (x *DownloadToolsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_workers_proto_msgTypes[7]
+	mi := &file_workers_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -397,7 +457,7 @@ func (x *DownloadToolsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadToolsResponse.ProtoReflect.Descriptor instead.
 func (*DownloadToolsResponse) Descriptor() ([]byte, []int) {
-	return file_workers_proto_rawDescGZIP(), []int{7}
+	return file_workers_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DownloadToolsResponse) GetChunk() []byte {
@@ -425,12 +485,19 @@ var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
 	"\n" +
-	"\rworkers.proto\x12\aworkers\"i\n" +
+	"\rworkers.proto\x12\aworkers\"\xb0\x01\n" +
 	"\vJoinRequest\x12\x17\n" +
 	"\aapi_key\x18\x01 \x01(\tR\x06apiKey\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\tR\tsignature\x12\x19\n" +
-	"\x05token\x18\x03 \x01(\tH\x00R\x05token\x88\x01\x01B\b\n" +
-	"\x06_token\"N\n" +
+	"\x05token\x18\x03 \x01(\tH\x00R\x05token\x88\x01\x01\x128\n" +
+	"\bmetadata\x18\x04 \x01(\v2\x17.workers.WorkerMetadataH\x01R\bmetadata\x88\x01\x01B\b\n" +
+	"\x06_tokenB\v\n" +
+	"\t_metadata\"N\n" +
+	"\x0eWorkerMetadata\x12\x17\n" +
+	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x13\n" +
+	"\x02os\x18\x02 \x01(\tH\x01R\x02os\x88\x01\x01B\a\n" +
+	"\x05_nameB\x05\n" +
+	"\x03_os\"N\n" +
 	"\fJoinResponse\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12!\n" +
 	"\fworker_token\x18\x02 \x01(\tR\vworkerToken\"1\n" +
@@ -468,31 +535,33 @@ func file_workers_proto_rawDescGZIP() []byte {
 	return file_workers_proto_rawDescData
 }
 
-var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_workers_proto_goTypes = []any{
 	(*JoinRequest)(nil),           // 0: workers.JoinRequest
-	(*JoinResponse)(nil),          // 1: workers.JoinResponse
-	(*AliveRequest)(nil),          // 2: workers.AliveRequest
-	(*AliveResponse)(nil),         // 3: workers.AliveResponse
-	(*GetManifestRequest)(nil),    // 4: workers.GetManifestRequest
-	(*GetManifestResponse)(nil),   // 5: workers.GetManifestResponse
-	(*DownloadToolsRequest)(nil),  // 6: workers.DownloadToolsRequest
-	(*DownloadToolsResponse)(nil), // 7: workers.DownloadToolsResponse
+	(*WorkerMetadata)(nil),        // 1: workers.WorkerMetadata
+	(*JoinResponse)(nil),          // 2: workers.JoinResponse
+	(*AliveRequest)(nil),          // 3: workers.AliveRequest
+	(*AliveResponse)(nil),         // 4: workers.AliveResponse
+	(*GetManifestRequest)(nil),    // 5: workers.GetManifestRequest
+	(*GetManifestResponse)(nil),   // 6: workers.GetManifestResponse
+	(*DownloadToolsRequest)(nil),  // 7: workers.DownloadToolsRequest
+	(*DownloadToolsResponse)(nil), // 8: workers.DownloadToolsResponse
 }
 var file_workers_proto_depIdxs = []int32{
-	0, // 0: workers.WorkersService.Join:input_type -> workers.JoinRequest
-	2, // 1: workers.WorkersService.Alive:input_type -> workers.AliveRequest
-	4, // 2: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
-	6, // 3: workers.WorkersService.DownloadTools:input_type -> workers.DownloadToolsRequest
-	1, // 4: workers.WorkersService.Join:output_type -> workers.JoinResponse
-	3, // 5: workers.WorkersService.Alive:output_type -> workers.AliveResponse
-	5, // 6: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
-	7, // 7: workers.WorkersService.DownloadTools:output_type -> workers.DownloadToolsResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
+	0, // 1: workers.WorkersService.Join:input_type -> workers.JoinRequest
+	3, // 2: workers.WorkersService.Alive:input_type -> workers.AliveRequest
+	5, // 3: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
+	7, // 4: workers.WorkersService.DownloadTools:input_type -> workers.DownloadToolsRequest
+	2, // 5: workers.WorkersService.Join:output_type -> workers.JoinResponse
+	4, // 6: workers.WorkersService.Alive:output_type -> workers.AliveResponse
+	6, // 7: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
+	8, // 8: workers.WorkersService.DownloadTools:output_type -> workers.DownloadToolsResponse
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_workers_proto_init() }
@@ -501,13 +570,14 @@ func file_workers_proto_init() {
 		return
 	}
 	file_workers_proto_msgTypes[0].OneofWrappers = []any{}
+	file_workers_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workers_proto_rawDesc), len(file_workers_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

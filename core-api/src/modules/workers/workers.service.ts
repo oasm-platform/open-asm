@@ -286,7 +286,7 @@ export class WorkersService {
    * @returns A promise that resolves to the created worker instance.
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
-    const { apiKey, signature, token } = dto;
+    const { apiKey, signature, token, metadata } = dto;
 
     if (token) {
       const existingWorker = await this.repo.findOne({
@@ -307,17 +307,18 @@ export class WorkersService {
     const cloudApiKey = this.configService.get<string>('OASM_CLOUD_APIKEY');
 
     if (cloudApiKey === apiKey) {
-      return this.createCloudWorker();
+      return this.createCloudWorker(metadata);
     }
 
-    return this.createRegularWorker(apiKey);
+    return this.createRegularWorker(apiKey, metadata);
   }
 
   /**
    * Creates a cloud worker instance.
+   * @param metadata - The worker metadata.
    * @returns A promise that resolves to the created cloud worker.
    */
-  private async createCloudWorker(): Promise<WorkerInstance> {
+  private async createCloudWorker(metadata?: WorkerJoinDto['metadata']): Promise<WorkerInstance> {
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
 
@@ -326,6 +327,8 @@ export class WorkersService {
       token: generateToken(TOKEN_LENGTH),
       type: WorkerType.BUILT_IN,
       scope: WorkerScope.CLOUD,
+      name: metadata?.name,
+      os: metadata?.os,
     };
 
     await this.repo.save(data);
@@ -344,9 +347,10 @@ export class WorkersService {
   /**
    * Creates a regular worker instance based on the provided API key.
    * @param apiKey - The API key to validate and use for worker creation.
+   * @param metadata - The worker metadata.
    * @returns A promise that resolves to the created worker.
    */
-  private async createRegularWorker(apiKey: string): Promise<WorkerInstance> {
+  private async createRegularWorker(apiKey: string, metadata?: WorkerJoinDto['metadata']): Promise<WorkerInstance> {
     const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
       where: { key: apiKey },
     });
@@ -370,6 +374,8 @@ export class WorkersService {
       type,
       scope,
       ...association,
+      name: metadata?.name,
+      os: metadata?.os,
     };
 
     await this.repo.save(data);

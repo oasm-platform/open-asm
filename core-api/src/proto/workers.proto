@@ -15,6 +15,12 @@ message JoinRequest {
   string          api_key   = 1;
   string          signature = 2;
   optional string token     = 3;
+  optional WorkerMetadata metadata = 4;
+}
+
+message WorkerMetadata {
+  optional string name = 1;
+  optional string os = 2;
 }
 
 message JoinResponse {

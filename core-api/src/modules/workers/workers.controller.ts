@@ -97,11 +97,13 @@ export class WorkersController {
     apiKey: string;
     signature: string;
     token?: string;
+    metadata?: { name?: string; os?: string };
   }): Promise<{ workerId: string; workerToken: string }> {
     const worker = await this.workersService.join({
       apiKey: requests.apiKey,
       signature: requests.signature,
       token: requests.token,
+      metadata: requests.metadata,
     });
     return {
       workerId: worker.id,

@@ -15,6 +15,14 @@ export class WorkerInstance extends BaseEntity {
   @Column({ nullable: true })
   token: string;
 
+  @ApiProperty({ required: false })
+  @Column({ nullable: true })
+  name: string;
+
+  @ApiProperty({ required: false })
+  @Column({ nullable: true })
+  os: string;
+
   @ApiProperty()
   currentJobsCount?: number;
 
