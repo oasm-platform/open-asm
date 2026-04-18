@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/common-nighthawk/go-figure"
 	"github.com/fatih/color"
@@ -17,27 +18,41 @@ func printBanner() {
 
 func Execute() {
 	var config Config
-	config.Values = make(map[string]string)
 
 	var rootCmd = &cobra.Command{
 		Use:   "oasm-worker",
 		Short: "OASM Worker is an attack surface management agent",
 		Long:  `OASM Worker is a high-performance agent used for attack surface management tasks.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			for _, p := range Params {
-				val, _ := cmd.Flags().GetString(p.Name)
-				config.Values[p.Name] = val
+			paramMap := Params.All()
+
+			for name, p := range paramMap {
+				val, _ := cmd.Flags().GetString(name)
 
 				if p.Required && val == "" {
 					printBanner()
-					return fmt.Errorf("missing required parameter --%s", p.Name)
+					return fmt.Errorf("missing required parameter --%s", name)
+				}
+
+				switch name {
+				case Params.ApiKey.Key:
+					config.ApiKey = val
+				case Params.MaxConcurrency.Key:
+					i, _ := strconv.Atoi(val)
+					config.MaxConcurrency = i
+				case Params.GrpcHost.Key:
+					config.GrpcHost = val
+				case Params.GrpcPort.Key:
+					i, _ := strconv.Atoi(val)
+					config.GrpcPort = i
 				}
 			}
 
 			fmt.Println("Worker started successfully!")
-			for k, v := range config.Values {
-				fmt.Printf("%s: %s\n", k, v)
-			}
+			fmt.Printf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\n",
+				config.ApiKey, config.MaxConcurrency, config.GrpcHost, config.GrpcPort)
+
+			Connect(config)
 			return nil
 		},
 	}
@@ -47,8 +62,10 @@ func Execute() {
 		cmd.Usage()
 	})
 
-	for _, p := range Params {
-		rootCmd.PersistentFlags().String(p.Name, p.DefaultValue, p.Description)
+	paramMap := Params.All()
+
+	for name, p := range paramMap {
+		rootCmd.PersistentFlags().String(name, p.DefaultValue, p.Description)
 	}
 
 	if err := rootCmd.Execute(); err != nil {

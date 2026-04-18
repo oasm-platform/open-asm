@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be
 	github.com/fatih/color v1.19.0
-	github.com/oasm-platform/oasm-sdk-go v0.1.4
+	github.com/oasm-platform/oasm-sdk-go v0.1.1-0.20260418093139-a1db513bfd13
 	github.com/spf13/cobra v1.10.2
 )
 
