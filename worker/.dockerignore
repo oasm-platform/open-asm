@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts
+oasm-worker.exe
+*.exe
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test coverage
+coverage.out
+coverage.html
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation (optional - uncomment if not needed in image)
+# README.md
+# docs/
+
+# Taskfile
+Taskfile.yml
+taskfile.yml
+
+# Environment files (keep .example.env if needed)
+.env
+*.env
+!.example.env
+
+# Docker files (to avoid recursion)
+Dockerfile
+.dockerignore
