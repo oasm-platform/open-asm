@@ -13,50 +13,44 @@ tasks:
       - |
         for i in $(seq 1 {{.replicas}}); do
            echo "Starting worker instance $i"
-          cargo run -- \
-            --api-key {{.apiKey}} \
-            --max-concurrent-jobs {{.maxJobs}} &
+          go run . \
+            --apikey {{.apiKey}} \
+            --max-concurrency {{.maxJobs}} &
         done
         wait
     silent: false
 
-   # Build the worker project
+    # Build the worker project
   # Creates optimized production build
   build:
     cmds:
-      - cargo build --release
+      - go build -o worker .
 
-  # Install dependencies (Rust crates)
+  # Install dependencies (Go modules)
   install:
     cmds:
-      - cargo fetch
-
-  # Clean build artifacts
-  # Removes all compiled outputs and temporary files
-  clean:
-    cmds:
-      - cargo clean
+      - go mod download
 
   # Run tests
-  # Executes unit and integration tests
+  # Executes all tests in the project
   test:
     cmds:
-      - cargo test
+      - go test ./...
 
-  # Check code without building
-  # Runs compiler checks to catch errors early
+  # Check code without building binary
+  # Verifies compilation of all packages
   check:
     cmds:
-      - cargo check
+      - go build ./...
 
   # Format code
-  # Applies Rust formatter to all source files
+  # Applies gofmt to all source files
   format:
     cmds:
-      - cargo fmt
+      - go fmt ./...
 
   # Run linter
-  # Executes clippy for code quality checks
+  # Executes go vet for code quality checks
   lint:
     cmds:
-      - cargo clippy -- -D warnings
+      - go vet ./...
