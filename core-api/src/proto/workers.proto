@@ -41,7 +41,8 @@ message AliveResponse {
 message GetManifestRequest {}
 
 message GetManifestResponse {
-  string download_tools_url = 1;
+  string               download_tools_url = 1;
+  repeated string      init_commands      = 2;
 }
 
 message DownloadToolsRequest {
