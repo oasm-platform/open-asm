@@ -286,13 +286,16 @@ export class WorkersService {
    * @returns A promise that resolves to the created worker instance.
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
-    const { apiKey, signature, token, metadata } = dto;
+    const { apiKey, signature, token, metadata, ipAddress } = dto;
 
     if (token) {
       const existingWorker = await this.repo.findOne({
         where: { token },
       });
       if (existingWorker) {
+        if (ipAddress) {
+          await this.repo.update({ id: existingWorker.id }, { ipAddress });
+        }
         return existingWorker;
       }
     }
@@ -307,18 +310,19 @@ export class WorkersService {
     const cloudApiKey = this.configService.get<string>('OASM_CLOUD_APIKEY');
 
     if (cloudApiKey === apiKey) {
-      return this.createCloudWorker(metadata);
+      return this.createCloudWorker(metadata, ipAddress);
     }
 
-    return this.createRegularWorker(apiKey, metadata);
+    return this.createRegularWorker(apiKey, metadata, ipAddress);
   }
 
   /**
    * Creates a cloud worker instance.
    * @param metadata - The worker metadata.
+   * @param ipAddress - The IP address of the worker.
    * @returns A promise that resolves to the created cloud worker.
    */
-  private async createCloudWorker(metadata?: WorkerJoinDto['metadata']): Promise<WorkerInstance> {
+  private async createCloudWorker(metadata?: WorkerJoinDto['metadata'], ipAddress?: string): Promise<WorkerInstance> {
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
 
@@ -329,6 +333,7 @@ export class WorkersService {
       scope: WorkerScope.CLOUD,
       name: metadata?.name,
       os: metadata?.os,
+      ipAddress,
     };
 
     await this.repo.save(data);
@@ -348,9 +353,10 @@ export class WorkersService {
    * Creates a regular worker instance based on the provided API key.
    * @param apiKey - The API key to validate and use for worker creation.
    * @param metadata - The worker metadata.
+   * @param ipAddress - The IP address of the worker.
    * @returns A promise that resolves to the created worker.
    */
-  private async createRegularWorker(apiKey: string, metadata?: WorkerJoinDto['metadata']): Promise<WorkerInstance> {
+  private async createRegularWorker(apiKey: string, metadata?: WorkerJoinDto['metadata'], ipAddress?: string): Promise<WorkerInstance> {
     const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
       where: { key: apiKey },
     });
@@ -376,6 +382,7 @@ export class WorkersService {
       ...association,
       name: metadata?.name,
       os: metadata?.os,
+      ipAddress,
     };
 
     await this.repo.save(data);

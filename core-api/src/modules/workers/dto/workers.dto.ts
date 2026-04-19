@@ -37,6 +37,11 @@ export class WorkerJoinDto {
   @IsOptional()
   token?: string;
 
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  ipAddress?: string;
+
   @ApiProperty({ required: false, type: () => WorkerMetadataDto })
   @IsObject()
   @IsOptional()

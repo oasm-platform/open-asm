@@ -16,6 +16,10 @@ import {
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
 
+interface GrpcCall {
+  getPeer?(): string | undefined;
+}
+
 @ApiTags('Workers')
 @Controller('workers')
 export class WorkersController {
@@ -93,17 +97,24 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'Join')
-  async grpcJoin(requests: {
-    apiKey: string;
-    signature: string;
-    token?: string;
-    metadata?: { name?: string; os?: string };
-  }): Promise<{ workerId: string; workerToken: string }> {
+  async grpcJoin(
+    requests: {
+      apiKey: string;
+      signature: string;
+      token?: string;
+      metadata?: { name?: string; os?: string };
+    },
+    call: GrpcCall,
+  ): Promise<{ workerId: string; workerToken: string }> {
+    const peer = call?.getPeer?.();
+    const ipAddress = typeof peer === 'string' ? peer.split(':')[0] : undefined;
+
     const worker = await this.workersService.join({
       apiKey: requests.apiKey,
       signature: requests.signature,
       token: requests.token,
       metadata: requests.metadata,
+      ipAddress,
     });
     return {
       workerId: worker.id,

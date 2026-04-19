@@ -23,6 +23,10 @@ export class WorkerInstance extends BaseEntity {
   @Column({ nullable: true })
   os: string;
 
+  @ApiProperty({ required: false })
+  @Column({ nullable: true })
+  ipAddress: string;
+
   @ApiProperty()
   currentJobsCount?: number;
 
