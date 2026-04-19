@@ -1,30 +1,30 @@
-version: '3'
+version: "3"
 
 vars:
-  replicas: '{{.replicas | default 1}}'
-  apiKey: '{{.apiKey | default .API_KEY}}'
-  maxJobs: '{{.maxJobs | default .MAX_JOBS}}'
+  replicas: "{{.replicas | default 1}}"
+  apiKey: "{{.apiKey | default .API_KEY}}"
+  maxJobs: "{{.maxJobs | default .MAX_JOBS}}"
 
 tasks:
-  # Run worker in development mode with hot-reload
-  # Usage: task worker:dev replicas=1 maxJobs=10 apiKey=your_api_key
+  # Run worker in development mode
+  # Usage: task dev replicas=1 maxJobs=10 apiKey=your_api_key
   dev:
     cmds:
       - |
         for i in $(seq 1 {{.replicas}}); do
            echo "Starting worker instance $i"
-          go run . \
-            --apikey {{.apiKey}} \
+          go run ./cmd/oasm-worker \
+            --api-key {{.apiKey}} \
             --max-concurrency {{.maxJobs}} &
         done
         wait
     silent: false
 
-    # Build the worker project
+  # Build the worker project
   # Creates optimized production build
   build:
     cmds:
-      - go build -o worker .
+      - go build -o oasm-worker ./cmd/oasm-worker
 
   # Install dependencies (Go modules)
   install:
