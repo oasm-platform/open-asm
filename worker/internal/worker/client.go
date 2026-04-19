@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-co-op/gocron"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
 )
 
@@ -25,8 +26,15 @@ func Start(ctx context.Context, cfg *config.Config) {
 	}
 
 	log.Println("Initializing headless browser for screenshots...")
-	browser := rod.New().MustConnect()
+	l := launcher.New().
+		Leakless(false). // Disable leakless to avoid Windows Defender false positive
+		Headless(true)   // Explicit headless mode
+
+	browser := rod.New().
+		ControlURL(l.MustLaunch()).
+		MustConnect()
 	defer browser.MustClose()
+	defer l.Cleanup() // Remove user data directory
 
 	ready := make(chan bool, 1)
 	go client.WorkerConnect(ctx, ready)
