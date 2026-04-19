@@ -104,22 +104,7 @@ export class WorkersService {
     }
 
     // Update both in_progress jobs with missing workers and failed jobs
-    await this.repo.manager.query(`
-      UPDATE jobs j
-      SET status = CASE 
-          WHEN j.status = '${JobStatus.IN_PROGRESS}' AND j."workerId"::uuid NOT IN (
-            SELECT id FROM workers
-          ) THEN '${JobStatus.PENDING}'
-          WHEN j.status = '${JobStatus.FAILED}' AND j."retryCount" < 4 THEN '${JobStatus.PENDING}'
-          ELSE j.status
-        END,
-        "workerId" = NULL
-      WHERE j.status = '${JobStatus.IN_PROGRESS}'
-        AND j."workerId"::uuid NOT IN (
-          SELECT id FROM workers
-        )
-        OR j.status = '${JobStatus.FAILED}'
-    `);
+    await this.resetStuckAndFailedJobs();
   }
 
   /**
@@ -293,6 +278,7 @@ export class WorkersService {
         where: { token },
       });
       if (existingWorker) {
+        await this.fallbackWorkerRejoin(existingWorker.id);
         if (ipAddress) {
           await this.repo.update({ id: existingWorker.id }, { ipAddress });
         }
@@ -322,7 +308,10 @@ export class WorkersService {
    * @param ipAddress - The IP address of the worker.
    * @returns A promise that resolves to the created cloud worker.
    */
-  private async createCloudWorker(metadata?: WorkerJoinDto['metadata'], ipAddress?: string): Promise<WorkerInstance> {
+  private async createCloudWorker(
+    metadata?: WorkerJoinDto['metadata'],
+    ipAddress?: string,
+  ): Promise<WorkerInstance> {
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
 
@@ -356,7 +345,11 @@ export class WorkersService {
    * @param ipAddress - The IP address of the worker.
    * @returns A promise that resolves to the created worker.
    */
-  private async createRegularWorker(apiKey: string, metadata?: WorkerJoinDto['metadata'], ipAddress?: string): Promise<WorkerInstance> {
+  private async createRegularWorker(
+    apiKey: string,
+    metadata?: WorkerJoinDto['metadata'],
+    ipAddress?: string,
+  ): Promise<WorkerInstance> {
     const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
       where: { key: apiKey },
     });
@@ -420,5 +413,43 @@ export class WorkersService {
       this.logger.error('Error validating worker token', error);
       return false;
     }
+  }
+
+  /**
+   * Resets stuck in_progress jobs (missing workers) and failed jobs (retryable) back to pending.
+   * This ensures jobs can be picked up by available workers.
+   */
+  private async resetStuckAndFailedJobs() {
+    await this.repo.manager.query(`
+      UPDATE jobs j
+      SET status = CASE 
+          WHEN j.status = '${JobStatus.IN_PROGRESS}' AND j."workerId"::uuid NOT IN (
+            SELECT id FROM workers
+          ) THEN '${JobStatus.PENDING}'
+          WHEN j.status = '${JobStatus.FAILED}' AND j."retryCount" < 4 THEN '${JobStatus.PENDING}'
+          ELSE j.status
+        END,
+        "workerId" = NULL
+      WHERE j.status = '${JobStatus.IN_PROGRESS}'
+        AND j."workerId"::uuid NOT IN (
+          SELECT id FROM workers
+        )
+        OR j.status = '${JobStatus.FAILED}'
+    `);
+  }
+
+  /**
+   * Resets all IN_PROGRESS jobs assigned to a specific worker back to PENDING.
+   * Used when a worker rejoins after disconnection to reclaim pending work.
+   * @param workerId - The ID of the worker whose jobs should be reset.
+   */
+  private async fallbackWorkerRejoin(workerId: string) {
+    await this.jobsRegistryService.repo
+      .createQueryBuilder()
+      .update()
+      .set({ status: JobStatus.PENDING })
+      .where('workerId = :workerId', { workerId })
+      .andWhere('status = :status', { status: JobStatus.IN_PROGRESS })
+      .execute();
   }
 }

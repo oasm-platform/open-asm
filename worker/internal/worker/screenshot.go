@@ -74,9 +74,13 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 	})
 
 	err := rod.Try(func() {
-		page.Timeout(15 * time.Second).MustNavigate(url).MustWaitLoad()
+		page.Timeout(5 * time.Second).MustNavigate(url).MustWaitLoad()
 	})
 	if err != nil {
+		// Return empty string on timeout
+		if strings.Contains(err.Error(), "timeout") {
+			return "", nil
+		}
 		return "", fmt.Errorf("failed to load page %s: %v", url, err)
 	}
 
