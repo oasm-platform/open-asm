@@ -336,6 +336,7 @@ func (*GetManifestRequest) Descriptor() ([]byte, []int) {
 type GetManifestResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	DownloadToolsUrl string                 `protobuf:"bytes,1,opt,name=download_tools_url,json=downloadToolsUrl,proto3" json:"download_tools_url,omitempty"`
+	InitCommands     []string               `protobuf:"bytes,2,rep,name=init_commands,json=initCommands,proto3" json:"init_commands,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -375,6 +376,13 @@ func (x *GetManifestResponse) GetDownloadToolsUrl() string {
 		return x.DownloadToolsUrl
 	}
 	return ""
+}
+
+func (x *GetManifestResponse) GetInitCommands() []string {
+	if x != nil {
+		return x.InitCommands
+	}
+	return nil
 }
 
 type DownloadToolsRequest struct {
@@ -508,9 +516,10 @@ const file_workers_proto_rawDesc = "" +
 	"\flast_seen_at\x18\x02 \x01(\tR\n" +
 	"lastSeenAt\x12\x1b\n" +
 	"\tworker_id\x18\x03 \x01(\tR\bworkerId\"\x14\n" +
-	"\x12GetManifestRequest\"C\n" +
+	"\x12GetManifestRequest\"h\n" +
 	"\x13GetManifestResponse\x12,\n" +
-	"\x12download_tools_url\x18\x01 \x01(\tR\x10downloadToolsUrl\"(\n" +
+	"\x12download_tools_url\x18\x01 \x01(\tR\x10downloadToolsUrl\x12#\n" +
+	"\rinit_commands\x18\x02 \x03(\tR\finitCommands\"(\n" +
 	"\x14DownloadToolsRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\"W\n" +
 	"\x15DownloadToolsResponse\x12\x14\n" +

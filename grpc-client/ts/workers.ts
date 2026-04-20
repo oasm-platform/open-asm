@@ -97,6 +97,10 @@ export interface GetManifestResponse {
      * @generated from protobuf field: string download_tools_url = 1
      */
     downloadToolsUrl: string;
+    /**
+     * @generated from protobuf field: repeated string init_commands = 2
+     */
+    initCommands: string[];
 }
 /**
  * @generated from protobuf message workers.DownloadToolsRequest
@@ -453,12 +457,14 @@ export const GetManifestRequest = new GetManifestRequest$Type();
 class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
     constructor() {
         super("workers.GetManifestResponse", [
-            { no: 1, name: "download_tools_url", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+            { no: 1, name: "download_tools_url", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "init_commands", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ }
         ]);
     }
     create(value?: PartialMessage<GetManifestResponse>): GetManifestResponse {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.downloadToolsUrl = "";
+        message.initCommands = [];
         if (value !== undefined)
             reflectionMergePartial<GetManifestResponse>(this, message, value);
         return message;
@@ -470,6 +476,9 @@ class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
             switch (fieldNo) {
                 case /* string download_tools_url */ 1:
                     message.downloadToolsUrl = reader.string();
+                    break;
+                case /* repeated string init_commands */ 2:
+                    message.initCommands.push(reader.string());
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -486,6 +495,9 @@ class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
         /* string download_tools_url = 1; */
         if (message.downloadToolsUrl !== "")
             writer.tag(1, WireType.LengthDelimited).string(message.downloadToolsUrl);
+        /* repeated string init_commands = 2; */
+        for (let i = 0; i < message.initCommands.length; i++)
+            writer.tag(2, WireType.LengthDelimited).string(message.initCommands[i]);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
