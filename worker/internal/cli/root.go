@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"oasm-worker/internal/config"
 	"oasm-worker/internal/worker"
@@ -42,7 +44,8 @@ func Execute() {
 			fmt.Printf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\n",
 				cfg.ApiKey, cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort)
 
-			ctx := context.Background()
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
 
 			worker.Start(ctx, cfg)
 			return nil

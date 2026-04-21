@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"oasm-worker/internal/config"
@@ -42,6 +43,8 @@ func Start(ctx context.Context, cfg *config.Config) {
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
 	scheduler := gocron.NewScheduler(time.UTC)
 	cronStarted := false
+
+	var wg sync.WaitGroup
 
 	_, err = scheduler.Every(1).Second().Do(func() {
 		select {
@@ -82,10 +85,18 @@ func Start(ctx context.Context, cfg *config.Config) {
 			}
 
 		case <-ctx.Done():
-			log.Println("Worker shutting down...")
+			log.Println("Received shutdown signal. Initiating graceful shutdown...")
+
 			if cronStarted {
 				scheduler.Stop()
+				log.Println("Job scheduler stopped.")
 			}
+
+			log.Println("Waiting for running jobs to finish...")
+			wg.Wait()
+
+			log.Println("All running jobs have completed successfully.")
+			log.Println("Worker shut down safely.")
 			return
 		}
 	}
