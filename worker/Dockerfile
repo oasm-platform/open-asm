@@ -25,8 +25,8 @@ FROM alpine:3.20
 
 WORKDIR /app
 
-# Install ca-certificates for TLS and bash for entrypoint
-RUN apk add --no-cache ca-certificates bash
+# Install ca-certificates for TLS, bash for entrypoint, and chromium for browser tasks
+RUN apk add --no-cache ca-certificates bash chromium nss freetype harfbuzz ttf-freefont
 
 # Copy binary, config and entrypoint from builder
 COPY --from=builder /app/oasm-worker .

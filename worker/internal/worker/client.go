@@ -26,8 +26,9 @@ func Start(ctx context.Context, cfg *config.Config) {
 		return
 	}
 
-	log.Println("Initializing headless browser for screenshots...")
+	log.Println("Initializing headless browser...")
 	l := launcher.New().
+		Bin("/usr/bin/chromium-browser").
 		Leakless(false). // Disable leakless to avoid Windows Defender false positive
 		Headless(true)   // Explicit headless mode
 

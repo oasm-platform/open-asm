@@ -17,8 +17,8 @@ import (
 )
 
 func printBanner() {
-	green := color.New(color.FgGreen).SprintFunc()
-	myFigure := figure.NewFigure("OASM Agent", "standard", true)
+	green := color.New(color.FgHiCyan).SprintFunc()
+	myFigure := figure.NewFigure("OASM Agent", "slant", true)
 	fmt.Print(green(myFigure.String()))
 }
 
@@ -35,7 +35,6 @@ func Execute() {
 				return fmt.Errorf("fail to load config: %v", err)
 			}
 
-			// Validate bắt buộc
 			if cfg.ApiKey == "" {
 				return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
 			}
