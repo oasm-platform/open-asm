@@ -75,8 +75,8 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		outStr := string(output)
 
 		if err != nil {
-			log.Printf("Job %s failed: %v", job.Id, err)
 			errMsg := fmt.Sprintf("Exec error: %v\nOutput: %s", err, outStr)
+			log.Printf("Job %s failed: %s", job.Id, errMsg)
 			payload = oasm.NewErrorResult(errMsg)
 		} else {
 			log.Printf("Job %s completed successfully", job.Id)
