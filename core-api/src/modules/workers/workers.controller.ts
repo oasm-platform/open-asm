@@ -119,6 +119,7 @@ export class WorkersController {
       metadata: requests.metadata,
       ipAddress,
     });
+
     return {
       workerId: worker.id,
       workerToken: worker.token,

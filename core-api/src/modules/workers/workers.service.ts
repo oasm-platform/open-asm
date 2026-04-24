@@ -13,10 +13,10 @@ import {
   Inject,
   Injectable,
   Logger,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { RpcException } from '@nestjs/microservices';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -355,7 +355,7 @@ export class WorkersService {
     });
 
     if (!apiKeyRecord) {
-      throw new NotFoundException(`API key not found: ${apiKey}`);
+      throw new RpcException(`API key not found: ${apiKey}`);
     }
 
     const workerId = randomUUID();

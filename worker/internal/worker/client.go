@@ -38,11 +38,28 @@ func Start(ctx context.Context, cfg *config.Config) {
 	defer l.Cleanup() // Remove user data directory
 
 	ready := make(chan bool, 1)
-	go client.WorkerConnect(ctx, ready)
+	workerCtx, workerCancel := context.WithCancel(ctx)
+	defer workerCancel()
+
+	go client.WorkerConnect(workerCtx, ready)
+
+	// Wait for worker connection result
+	isConnected, ok := <-ready
+	if !ok || !isConnected {
+		log.Println("Worker failed to join. Shutting down...")
+		workerCancel() // Dừng goroutine WorkerConnect
+		return
+	}
+
+	log.Println("Core is ready, syncing tools...")
+	if err := client.WorkerDownloadTools(ctx); err != nil {
+		log.Printf("Download tools error: %v", err)
+		workerCancel()
+		return
+	}
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
 	scheduler := gocron.NewScheduler(time.UTC)
-	cronStarted := false
 
 	var wg sync.WaitGroup
 
@@ -60,37 +77,16 @@ func Start(ctx context.Context, cfg *config.Config) {
 		log.Fatalf("Failed to schedule job: %v", err)
 	}
 
+	scheduler.StartAsync()
+	log.Printf("Gocron poller started (Max Concurrency: %d)\n", cfg.MaxConcurrency)
+
 	for {
 		select {
-		case isConnected := <-ready:
-			if isConnected {
-				log.Println("Core is ready, syncing tools...")
-				if err := client.WorkerDownloadTools(ctx); err != nil {
-					log.Printf("Download tools error: %v", err)
-					continue
-				}
-
-				if !cronStarted {
-					scheduler.StartAsync()
-					cronStarted = true
-					log.Printf("Gocron poller started (Max Concurrency: %d)\n", cfg.MaxConcurrency)
-				}
-			} else {
-				log.Println("Waiting for stable connection to Core...")
-				if cronStarted {
-					scheduler.Stop()
-					cronStarted = false
-					log.Println("Gocron poller paused due to network loss.")
-				}
-			}
-
 		case <-ctx.Done():
 			log.Println("Received shutdown signal. Initiating graceful shutdown...")
 
-			if cronStarted {
-				scheduler.Stop()
-				log.Println("Job scheduler stopped.")
-			}
+			scheduler.Stop()
+			log.Println("Job scheduler stopped.")
 
 			log.Println("Waiting for running jobs to finish...")
 			wg.Wait()
