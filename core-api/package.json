@@ -44,7 +44,7 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/multer": "^2.0.0",
     "ai": "^6.0.137",
-    "axios": "^1.13.5",
+    "axios": "^1.15.2",
     "better-auth": "^1.6.1",
     "bullmq": "^5.65.1",
     "class-transformer": "^0.5.1",
