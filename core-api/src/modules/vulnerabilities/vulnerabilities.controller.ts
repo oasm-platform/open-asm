@@ -1,11 +1,12 @@
 import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -125,6 +126,28 @@ export class VulnerabilitiesController {
       workspaceId,
       user.id,
       dto.forceRerun ?? false,
+    );
+  }
+
+  @Doc({
+    summary: 'Delete vulnerability analysis result',
+    description:
+      'Removes the AI analysis result from a vulnerability and resets its status to not analyzed.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Delete(':id/analyze')
+  async deleteVulnerabilityAnalysis(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.vulnerabilitiesService.deleteVulnerabilityAnalysis(
+      id,
+      workspaceId,
     );
   }
 

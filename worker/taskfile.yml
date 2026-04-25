@@ -1,9 +1,9 @@
-version: "3"
+version: '3'
 
 vars:
-  replicas: "{{.replicas | default 1}}"
-  apiKey: "{{.apiKey | default .API_KEY}}"
-  maxJobs: "{{.maxJobs | default .MAX_JOBS}}"
+  replicas: '{{.replicas | default 1}}'
+  apiKey: '{{.apiKey | default .API_KEY}}'
+  maxJobs: '{{.maxJobs | default .MAX_JOBS}}'
 
 tasks:
   # Run worker in development mode
@@ -29,7 +29,7 @@ tasks:
   # Install dependencies (Go modules)
   install:
     cmds:
-      - go mod download
+      - go mod tidy
 
   # Run tests
   # Executes all tests in the project
