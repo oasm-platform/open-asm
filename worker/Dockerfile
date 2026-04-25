@@ -28,10 +28,9 @@ WORKDIR /app
 # Install ca-certificates for TLS, bash for entrypoint, and chromium for browser tasks
 RUN apk add --no-cache ca-certificates bash chromium nss freetype harfbuzz ttf-freefont
 
-# Copy binary, config and entrypoint from builder
-COPY --from=builder /app/oasm-worker .
-COPY --from=builder /app/config.json .
-COPY --from=builder /app/entrypoint.sh .
+# Copy binary and entrypoint from builder
+    COPY --from=builder /app/oasm-worker .
+    COPY --from=builder /app/entrypoint.sh .
 
 # Make entrypoint executable
 RUN chmod +x /app/entrypoint.sh
