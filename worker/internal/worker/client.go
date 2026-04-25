@@ -1,3 +1,4 @@
+// Package worker
 package worker
 
 import (
@@ -38,7 +39,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 	defer l.Cleanup() // Remove user data directory
 
 	ready := make(chan bool, 1)
-	workerCtx, workerCancel := context.WithCancel(ctx)
+	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 
 	go client.WorkerConnect(workerCtx, ready)
@@ -47,7 +48,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 	isConnected, ok := <-ready
 	if !ok || !isConnected {
 		log.Println("Worker failed to join. Shutting down...")
-		workerCancel() // Dừng goroutine WorkerConnect
+		workerCancel()
 		return
 	}
 
@@ -66,10 +67,10 @@ func Start(ctx context.Context, cfg *config.Config) {
 	_, err = scheduler.Every(1).Second().Do(func() {
 		select {
 		case semaphore <- struct{}{}:
-			go func() {
+			wg.Go(func() {
 				defer func() { <-semaphore }()
-				processJob(ctx, client, browser, cfg.ToolPath)
-			}()
+				processJob(workerCtx, client, browser, cfg.ToolPath)
+			})
 		default:
 		}
 	})
@@ -80,20 +81,16 @@ func Start(ctx context.Context, cfg *config.Config) {
 	scheduler.StartAsync()
 	log.Printf("Gocron poller started (Max Concurrency: %d)\n", cfg.MaxConcurrency)
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("Received shutdown signal. Initiating graceful shutdown...")
+	<-ctx.Done()
+	log.Println("Received shutdown signal. Initiating graceful shutdown...")
 
-			scheduler.Stop()
-			log.Println("Job scheduler stopped.")
+	scheduler.Stop()
+	log.Println("Job scheduler stopped.")
 
-			log.Println("Waiting for running jobs to finish...")
-			wg.Wait()
+	log.Println("Waiting for running jobs to finish...")
+	wg.Wait()
+	workerCancel()
 
-			log.Println("All running jobs have completed successfully.")
-			log.Println("Worker shut down safely.")
-			return
-		}
-	}
+	log.Println("All running jobs have completed successfully.")
+	log.Println("Worker shut down safely.")
 }

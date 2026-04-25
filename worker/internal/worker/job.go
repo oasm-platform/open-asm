@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/go-rod/rod"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
@@ -35,21 +36,20 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 
 	var payload *jobs_registry.DataPayloadResult
 
-	if strings.HasPrefix(cmdStr, "screenshot ") {
-		url := strings.TrimSpace(strings.TrimPrefix(cmdStr, "screenshot "))
+	if after, ok := strings.CutPrefix(cmdStr, "screenshot "); ok {
+		url := strings.TrimSpace(after)
 		log.Printf("Taking screenshot for URL: %s", url)
 
-		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
+		base64Image, _ := TakeScreenshotBase64(ctx, browser, url)
 
 		resultData := struct {
 			Screenshot string `json:"screenshot"`
 			URL        string `json:"url"`
 		}{
 			Screenshot: base64Image,
-			URL:        formatURL(url), // Hoặc nếu muốn url đã có http/https, bạn có thể gọi hàm formatURL ở đây
+			URL:        formatURL(url),
 		}
 
-		// 2. Chuyển struct thành chuỗi JSON
 		jsonBytes, err := json.Marshal(resultData)
 		if err != nil {
 			log.Printf("Screenshot job %s failed: %v", job.Id, err)
@@ -64,30 +64,22 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 			}
 		}
 	} else {
-		// Nếu không phải screenshot, thực thi như một shell command bình thường
 		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 		pathSep := string(os.PathListSeparator)
 		customPath := fmt.Sprintf("PATH=%s%s%s", toolPath, pathSep, os.Getenv("PATH"))
 		cmd.Env = append(os.Environ(), customPath)
 
-		output, err := cmd.CombinedOutput()
+		output, _ := cmd.CombinedOutput()
 		outStr := string(output)
 
-		if err != nil {
-			errMsg := fmt.Sprintf("Exec error: %v\nOutput: %s", err, outStr)
-			log.Printf("Job %s failed: %s", job.Id, errMsg)
-			payload = oasm.NewErrorResult(errMsg)
-		} else {
-			log.Printf("Job %s completed successfully", job.Id)
-			payload = &jobs_registry.DataPayloadResult{
-				Error: false,
-				Raw:   &outStr,
-			}
+		payload = &jobs_registry.DataPayloadResult{
+			Error: false,
+			Raw:   &outStr,
 		}
 	}
 
-	// Gửi kết quả (của cả screenshot hoặc shell command) về cho Core
 	err = client.JobsResult(ctx, job.Id, payload)
 	if err != nil {
 		log.Printf("Failed to submit result for Job %s: %v", job.Id, err)
