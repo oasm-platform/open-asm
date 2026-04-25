@@ -65,7 +65,11 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		}
 	} else {
 		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		// Setpgid is only available on Unix systems
+		// On Windows, we don't set SysProcAttr as Setpgid doesn't exist
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+		// Note: Setpgid field would be set here on Unix systems
+		// but is not available on Windows
 
 		pathSep := string(os.PathListSeparator)
 		customPath := fmt.Sprintf("PATH=%s%s%s", toolPath, pathSep, os.Getenv("PATH"))

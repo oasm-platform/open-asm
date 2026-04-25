@@ -273,6 +273,29 @@ export class WorkersService {
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
     const { apiKey, signature, token, metadata, ipAddress } = dto;
 
+    // 1. Validate signature first (mandatory)
+    const workerSignature =
+      this.configService.get<string>('WORKER_SIGNATURE') || '';
+
+    if (signature !== workerSignature) {
+      throw new UnauthorizedException('Invalid worker signature');
+    }
+
+    // 2. Validate API key
+    const cloudApiKey = this.configService.get<string>('OASM_CLOUD_APIKEY');
+    const isCloudWorker = cloudApiKey === apiKey;
+
+    // 3. For regular workers, validate API key exists in database
+    if (!isCloudWorker) {
+      const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
+        where: { key: apiKey },
+      });
+      if (!apiKeyRecord) {
+        throw new RpcException(`API key not found: ${apiKey}`);
+      }
+    }
+
+    // 4. Token rejoin: if token exists and is valid, allow rejoin for both cloud and regular workers
     if (token) {
       const existingWorker = await this.repo.findOne({
         where: { token },
@@ -286,16 +309,8 @@ export class WorkersService {
       }
     }
 
-    const workerSignature =
-      this.configService.get<string>('WORKER_SIGNATURE') || '';
-
-    if (signature !== workerSignature) {
-      throw new UnauthorizedException('Invalid worker signature');
-    }
-
-    const cloudApiKey = this.configService.get<string>('OASM_CLOUD_APIKEY');
-
-    if (cloudApiKey === apiKey) {
+    // 5. Create new worker after successful authentication
+    if (isCloudWorker) {
       return this.createCloudWorker(metadata, ipAddress);
     }
 
