@@ -1,187 +1,122 @@
-# AI Agents Coding Rules and Guidelines for Open-ASM
+# Open-ASM Agent Quick Reference
 
-## Code Quality Standards
+**Critical**: This file contains only non-obvious, repo-specific facts agents would likely miss. Generic language/framework advice is intentionally omitted.
 
-### ESLint Rules
+## Repository Layout
 
-- No explicit `any` types (warn in regular code, off in tests)
-- No floating promises: `error`
-- No unsafe arguments: `off` (for tests only)
-- Consistent type imports: `error`
-- No console.log: `error`
-- Strict equality: `always`
-- Semi-colons required
-- Single quotes for strings
-- Object curly spacing required
-- No eval: `error`
-- No new Function: `error`
+Monorepo with 3 services:
+- `core-api/` — NestJS backend (TypeScript). REST API, DB layer, auth.
+- `console/` — React frontend (TypeScript/Vite). Uses Vite env `VITE_API_URL`.
+- `worker/` — Go-based scanning workers. gRPC client to core-api (via `oasm-sdk-go`).
 
-### Prettier Rules
+Shared infra expected: PostgreSQL, Redis (see `.env` files).
 
-- Single quotes: `true`
-- Trailing commas: `all`
-- Tab width: `2`
-- End of line: `auto`
-
-### Testing Standards
-
-- 80%+ coverage target for business logic
-- Unit tests and E2E tests
-- Separate ESLint config for test files (relaxed rules for testing)
-
-## How to Start for Different AI Agents
-
-### 1. Code Review Agent
-
-**How to start**:
-
-- Check configuration files: `core-api/eslint.config.mjs`, `console/.prettierrc`
-- Review TypeScript configuration in `tsconfig.json` files
-- Evaluate code following ESLint and Prettier rules
-- Focus on type safety and consistent patterns
-
-**Key files**:
-
-```
-core-api/eslint.config.mjs
-console/.prettierrc
-tsconfig.json
-```
-
-### 2. Security Analysis Agent
-
-**How to start**:
-
-- Review authentication modules: `core-api/src/modules/auth/`
-- Check guards and middleware: `core-api/src/common/guards/`
-- Examine API keys management: `core-api/src/modules/apikeys/`
-- Review MCP security: `core-api/src/mcp/`
-
-**Key files**:
-
-```
-core-api/src/modules/auth/
-core-api/src/common/guards/
-core-api/src/modules/apikeys/
-core-api/src/mcp/
-console/src/utils/authClient.ts
-```
-
-### 3. Performance Optimization Agent
-
-**How to start**:
-
-- Review database queries: `core-api/src/database/`
-- Check job processing: `core-api/src/modules/jobs-registry/`
-- Analyze worker services: `worker/services/`
-- Examine Redis caching: `core-api/src/services/redis/`
-
-**Key files**:
-
-```
-core-api/src/database/
-core-api/src/modules/jobs-registry/
-core-api/src/services/redis/
-worker/services/
-```
-
-### 4. UI/UX Enhancement Agent
-
-**How to start**:
-
-- Follow Prettier configuration: `console/.prettierrc`
-- Review React components: `console/src/components/`
-- Check UI components: `console/src/components/ui/`
-- Maintain accessibility standards
-
-**Key files**:
-
-```
-console/.prettierrc
-console/src/components/
-console/src/components/ui/
-console/src/App.css
-```
-
-### 5. Integration Agent
-
-**How to start**:
-
-- Review MCP implementation: `core-api/src/mcp/`
-- Check tools integration: `core-api/src/modules/tools/`
-- Examine data adapters: `core-api/src/modules/data-adapter/`
-- Follow API structure: `core-api/src/common/dtos/`
-- Review API workflow guidelines: `.clinerules/workflows/api.md`
-
-**Key files**:
-
-```
-core-api/src/mcp/
-core-api/src/modules/tools/
-core-api/src/modules/data-adapter/
-core-api/src/common/dtos/
-.clinerules/workflows/api.md
-```
-
-### 6. Documentation Agent
-
-**How to start**:
-
-- Review existing docs: `README.md`, `DEVELOPER_GUIDE.md`
-- Check API documentation: `core-api/src/common/doc/`
-- Follow ESLint comments rules
-- Maintain JSDoc for public APIs
-- Review API workflow for documentation standards
-
-**Key files**:
-
-```
-README.md
-DEVELOPER_GUIDE.md
-core-api/src/common/doc/
-.clinerules/workflows/api.md
-```
-
-### 7. Testing Agent
-
-**How to start**:
-
-- Review test structure: `core-api/test/`
-- Follow testing ESLint rules
-- Focus on business logic coverage (80%+)
-- Maintain separate test configurations
-- Include API contract testing and performance testing per global rules
-
-**Key files**:
-
-```
-core-api/test/
-core-api/eslint.config.mjs
-```
-
-## Development Workflow
-
-### Environment Setup
+## Key Commands (Use taskfile)
 
 ```bash
-# Install dependencies
-cd core-api && npm install
-cd ../console && npm install
-cd ../worker && npm install
+# Full project
+task init          # Install all deps + worker tools
+task dev           # API + Console dev servers (hot reload)
+task test          # Run API tests (console tests commented out)
+task lint          # Lint core-api + console
+task build         # Build all
 
-# Run with Docker Compose
-docker-compose up
+# Per-service (also available via task deps)
+task api:test      # core-api tests only
+task console:gen-api  # Regenerate worker API client + console types
+
+# Database (run from repo root)
+task migration:generate MIGRATION_NAME=Name
+task migration:run
+task migration:revert
 ```
 
-### Best Practices
+**Important**: `task console:gen-api` must be run after **any** API contract change (new endpoints, DTO shape changes). It regenerates:
+- `worker/services/core-api/` — Go API client (via `oasm-sdk-go`)
+- Console API hooks/types
 
-- Follow conventional commits
-- Use TypeScript strict mode
-- Apply SOLID principles
-- Write tests for business logic (80%+ coverage)
-- Use async/await for asynchronous operations
-- Follow ESLint and Prettier configurations
-- Maintain consistent code style
-- Document public APIs and complex logic
-- Integrate with automated validation and testing pipelines
-- Consider performance implications and security best practices
+## Local Dev Setup
+
+1. `task init` (copies `.env` templates, installs deps, worker tools)
+2. Ensure PostgreSQL + Redis running (or `task docker-compose` for full stack)
+3. `task dev` starts API (`:6276`) + Console dev server
+
+## Configuration Files & Linting
+
+### core-api (NestJS/TypeScript)
+- `eslint.config.mjs` — Strict TS rules. `no-console: error` in prod code.
+- `.prettierrc` — Single quotes, semicolons, 2-space indent.
+- `no-explicit-any` is `warn` (not error). Tests get relaxed rules.
+- Imports: `@/` alias configured in `tsconfig.json`.
+
+### console (React/TypeScript)
+- `eslint.config.js` — React hooks + refresh plugin rules.
+- `.prettierrc` — Same as core-api.
+- `src/services/apis/gen/` — **Generated code, do not edit manually** (regenerated by `task console:gen-api`).
+
+### worker (Go)
+- `task worker:format` — Run `go fmt ./...`.
+- `task worker:lint` — Run `go vet ./...`.
+- `task worker:tools` installs worker CLI tools during `task init`.
+- Uses `tracing`-style logging via standard `log` package. `cobra` CLI, `viper` config.
+
+## Environment Variables
+
+Each service has its own `.env` (not committed):
+- `core-api/.env` — DB, Redis, PORT, OASM_CLOUD_APIKEY, AI_ASSISTANT_URL, MCP config
+- `console/.env` — `VITE_API_URL` (dev: `http://localhost:6276`)
+- `worker/.env` — `WORKER_API_KEY`, `WORKER_MAX_CONCURRENCY`, gRPC settings
+
+**Agents**: Never commit `.env` files. `.gitignore` blocks them.
+
+## Architecture Patterns
+
+### Backend (core-api)
+- **Controller** → **Service** → **Repository/Entity**. Controllers do validation + mapping only.
+- DTOs required for all request/response types (use `class-validator`).
+- Entities in module folders or `src/common/entity/`.
+- **User data responses**: Only `id`, `name`, `image` fields (enforce in services).
+- Use `getWorkspaceId: true` on controllers needing workspace context.
+
+### Worker (Go)
+- Business logic in `worker/internal/`.
+- Auto-generated API client in `worker/services/core-api/` (from `task console:gen-api`).
+- Multi-instance workers supported: `task dev replicas=N maxJobs=M`.
+- CLI via `cobra`, config via `viper`.
+
+### Frontend (console)
+- Components: `components/common/` (shared), `components/ui/` (primitives), `components/[feature]/` (feature-specific).
+- Page-specific logic: `pages/[page]/components/`.
+- API hooks: `use<ControllerName><FunctionName>` pattern.
+
+## Testing
+
+- **core-api**: Jest, AAA pattern. Mock all external deps. Tests in `*.spec.ts` alongside source.
+- **console**: Tests exist but `task test` currently only runs API tests (console line commented in root taskfile).
+- **worker**: `go test ./...`. Target >80% coverage for business logic.
+- CI runs lint + test on PRs (see `.github/workflows/`).
+
+## Git Hooks
+
+Husky configured:
+- `pre-commit` — Lint checks (currently commented out, but may be enabled).
+- `commit-msg` — Conventional commits enforced: `feat(scope):`, `fix(scope):`, `chore(scope):`, etc.
+
+## Docker
+
+`task docker-compose` starts full stack (API, Console, 3 workers, DB, Redis) via `docker compose --scale worker=3`.
+
+## MCP Server
+
+MCP server provides AI context over core-api. Config in `core-api/.env`:
+- `OASM_CORE_API_URL`, `SEARXNG_URL`
+- Runs on `ASSISTANT_HOST:ASSISTANT_PORT` (see `.env`).
+
+## Common Gotchas
+
+1. **API contract changes** → Always run `task console:gen-api` or worker/client types will be stale.
+2. **Console tests disabled** in root `task test` — run `cd console && npm run test` explicitly.
+3. **Migrations** use TypeORM CLI via `task migration:*`. DB config in `core-api/src/database/database-config.ts`.
+4. **Worker API key** must match core-api expected key (set in worker `.env`).
+5. **No direct commits to main** — protected by branch policy (see husky commit-msg).
+6. **Generated code** in `console/src/services/apis/gen/` and `worker/services/core-api/` — edit via regeneration, not manually.

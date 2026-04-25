@@ -29,6 +29,7 @@ services:
       - ./core-api/.env
     ports:
       - '6276:6276'
+      - '16276:16276'
     environment:
       - POSTGRES_HOST=postgres
       - REDIS_URL=redis://:password@redis:6379/0
@@ -59,11 +60,13 @@ services:
     env_file:
       - ./worker/.env
     environment:
-      - API=http://core-api:6276/
-      - MAX_JOBS=10
-      - OASM_CLOUD_APIKEY=change_me
+      - WORKER_API_KEY=change_me
+      - WORKER_GRPC_HOST=core-api
+      - WORKER_GRPC_PORT=16276
+      - WORKER_MAX_CONCURRENCY=10
+      - WORKER_TOOL_PATH=/app/oasm-tools
     volumes:
-      - nuclei-templates:/root/nuclei-templates:rw
+      - worker-tools-cache:/app/oasm-tools:rw
     networks:
       - oasm
     restart: 'always'
@@ -153,62 +156,8 @@ services:
     command: >
       sh -c "node node_modules/typeorm/cli.js migration:run -d dist/database/database-config.js"
 
-  assistant:
-    container_name: assistant
-    image: oasm/oasm-assistant:dev
-    restart: on-failure
-    env_file:
-      - ./core-api/.env
-    environment:
-      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - POSTGRES_USER=${POSTGRES_USERNAME:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_ASSISTANT_DB:-open_asm}
-      - REDIS_URL=${REDIS_URL:-redis://:password@redis:6379/1}
-      - ASSISTANT_HOST=${ASSISTANT_HOST:-0.0.0.0}
-      - ASSISTANT_PORT=${ASSISTANT_PORT:-8000}
-      - SEARXNG_URL=http://searxng:8080
-      - OASM_CORE_API_URL=${OASM_CORE_API_URL:-http://host.docker.internal:6276}
-      - OASM_CLOUD_APIKEY=${OASM_CLOUD_APIKEY:-change_me}
-    volumes:
-      - assistant-logs:/app/logs
-      - assistant-knowledge:/app/knowledge
-    ports:
-      - '${ASSISTANT_PORT:-8000}:8000'
-    networks:
-      - oasm
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    depends_on:
-      - searxng
-
-  searxng:
-    container_name: searxng
-    image: docker.io/searxng/searxng:latest
-    restart: unless-stopped
-    networks:
-      - oasm
-    ports:
-      - '8080:8080'
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    volumes:
-      - ./searxng:/etc/searxng:rw
-      - searxng-data:/var/cache/searxng:rw
-    environment:
-      - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME:-localhost}/
-      - SEARXNG_PORT=8080
-    logging:
-      driver: 'json-file'
-      options:
-        max-size: '1m'
-        max-file: '1'
-
 volumes:
   pgdata:
-  nuclei-templates:
   redis-data:
   redpanda-data:
   geoip-data:
@@ -216,6 +165,7 @@ volumes:
   assistant-logs:
   assistant-knowledge:
   searxng-data:
+  worker-tools-cache:
 
 networks:
   oasm:

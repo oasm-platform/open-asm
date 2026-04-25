@@ -13,10 +13,10 @@ import {
   Inject,
   Injectable,
   Logger,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { RpcException } from '@nestjs/microservices';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -68,20 +68,17 @@ export class WorkersService {
    * @param workerId The worker's unique identifier.
    */
   public async alive(dto: WorkerAliveDto) {
-    const result = await this.repo.update(
-      {
-        token: dto.token,
-      },
-      {
-        lastSeenAt: new Date(),
-      },
-    );
-    if (result.affected === 0) {
+    const worker = await this.repo.findOne({
+      where: { token: dto.token },
+    });
+
+    if (!worker) {
       throw new UnauthorizedException('Invalid token');
     }
-    return {
-      alive: 'OK',
-    };
+
+    await this.repo.update({ token: dto.token }, { lastSeenAt: new Date() });
+
+    return this.repo.findOne({ where: { token: dto.token } });
   }
 
   /**
@@ -107,22 +104,7 @@ export class WorkersService {
     }
 
     // Update both in_progress jobs with missing workers and failed jobs
-    await this.repo.manager.query(`
-      UPDATE jobs j
-      SET status = CASE 
-          WHEN j.status = '${JobStatus.IN_PROGRESS}' AND j."workerId"::uuid NOT IN (
-            SELECT id FROM workers
-          ) THEN '${JobStatus.PENDING}'
-          WHEN j.status = '${JobStatus.FAILED}' AND j."retryCount" < 4 THEN '${JobStatus.PENDING}'
-          ELSE j.status
-        END,
-        "workerId" = NULL
-      WHERE j.status = '${JobStatus.IN_PROGRESS}'
-        AND j."workerId"::uuid NOT IN (
-          SELECT id FROM workers
-        )
-        OR j.status = '${JobStatus.FAILED}'
-    `);
+    await this.resetStuckAndFailedJobs();
   }
 
   /**
@@ -289,7 +271,9 @@ export class WorkersService {
    * @returns A promise that resolves to the created worker instance.
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
-    const { apiKey, signature } = dto;
+    const { apiKey, signature, token, metadata, ipAddress } = dto;
+
+    // 1. Validate signature first (mandatory)
     const workerSignature =
       this.configService.get<string>('WORKER_SIGNATURE') || '';
 
@@ -297,20 +281,52 @@ export class WorkersService {
       throw new UnauthorizedException('Invalid worker signature');
     }
 
+    // 2. Validate API key
     const cloudApiKey = this.configService.get<string>('OASM_CLOUD_APIKEY');
+    const isCloudWorker = cloudApiKey === apiKey;
 
-    if (cloudApiKey === apiKey) {
-      return this.createCloudWorker();
+    // 3. For regular workers, validate API key exists in database
+    if (!isCloudWorker) {
+      const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
+        where: { key: apiKey },
+      });
+      if (!apiKeyRecord) {
+        throw new RpcException(`API key not found: ${apiKey}`);
+      }
     }
 
-    return this.createRegularWorker(apiKey);
+    // 4. Token rejoin: if token exists and is valid, allow rejoin for both cloud and regular workers
+    if (token) {
+      const existingWorker = await this.repo.findOne({
+        where: { token },
+      });
+      if (existingWorker) {
+        await this.fallbackWorkerRejoin(existingWorker.id);
+        if (ipAddress) {
+          await this.repo.update({ id: existingWorker.id }, { ipAddress });
+        }
+        return existingWorker;
+      }
+    }
+
+    // 5. Create new worker after successful authentication
+    if (isCloudWorker) {
+      return this.createCloudWorker(metadata, ipAddress);
+    }
+
+    return this.createRegularWorker(apiKey, metadata, ipAddress);
   }
 
   /**
    * Creates a cloud worker instance.
+   * @param metadata - The worker metadata.
+   * @param ipAddress - The IP address of the worker.
    * @returns A promise that resolves to the created cloud worker.
    */
-  private async createCloudWorker(): Promise<WorkerInstance> {
+  private async createCloudWorker(
+    metadata?: WorkerJoinDto['metadata'],
+    ipAddress?: string,
+  ): Promise<WorkerInstance> {
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
 
@@ -319,6 +335,9 @@ export class WorkersService {
       token: generateToken(TOKEN_LENGTH),
       type: WorkerType.BUILT_IN,
       scope: WorkerScope.CLOUD,
+      name: metadata?.name,
+      os: metadata?.os,
+      ipAddress,
     };
 
     await this.repo.save(data);
@@ -337,15 +356,21 @@ export class WorkersService {
   /**
    * Creates a regular worker instance based on the provided API key.
    * @param apiKey - The API key to validate and use for worker creation.
+   * @param metadata - The worker metadata.
+   * @param ipAddress - The IP address of the worker.
    * @returns A promise that resolves to the created worker.
    */
-  private async createRegularWorker(apiKey: string): Promise<WorkerInstance> {
+  private async createRegularWorker(
+    apiKey: string,
+    metadata?: WorkerJoinDto['metadata'],
+    ipAddress?: string,
+  ): Promise<WorkerInstance> {
     const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
       where: { key: apiKey },
     });
 
     if (!apiKeyRecord) {
-      throw new NotFoundException(`API key not found: ${apiKey}`);
+      throw new RpcException(`API key not found: ${apiKey}`);
     }
 
     const workerId = randomUUID();
@@ -363,6 +388,9 @@ export class WorkersService {
       type,
       scope,
       ...association,
+      name: metadata?.name,
+      os: metadata?.os,
+      ipAddress,
     };
 
     await this.repo.save(data);
@@ -400,5 +428,43 @@ export class WorkersService {
       this.logger.error('Error validating worker token', error);
       return false;
     }
+  }
+
+  /**
+   * Resets stuck in_progress jobs (missing workers) and failed jobs (retryable) back to pending.
+   * This ensures jobs can be picked up by available workers.
+   */
+  private async resetStuckAndFailedJobs() {
+    await this.repo.manager.query(`
+      UPDATE jobs j
+      SET status = CASE 
+          WHEN j.status = '${JobStatus.IN_PROGRESS}' AND j."workerId"::uuid NOT IN (
+            SELECT id FROM workers
+          ) THEN '${JobStatus.PENDING}'
+          WHEN j.status = '${JobStatus.FAILED}' AND j."retryCount" < 4 THEN '${JobStatus.PENDING}'
+          ELSE j.status
+        END,
+        "workerId" = NULL
+      WHERE j.status = '${JobStatus.IN_PROGRESS}'
+        AND j."workerId"::uuid NOT IN (
+          SELECT id FROM workers
+        )
+        OR j.status = '${JobStatus.FAILED}'
+    `);
+  }
+
+  /**
+   * Resets all IN_PROGRESS jobs assigned to a specific worker back to PENDING.
+   * Used when a worker rejoins after disconnection to reclaim pending work.
+   * @param workerId - The ID of the worker whose jobs should be reset.
+   */
+  private async fallbackWorkerRejoin(workerId: string) {
+    await this.jobsRegistryService.repo
+      .createQueryBuilder()
+      .update()
+      .set({ status: JobStatus.PENDING })
+      .where('workerId = :workerId', { workerId })
+      .andWhere('status = :status', { status: JobStatus.IN_PROGRESS })
+      .execute();
   }
 }

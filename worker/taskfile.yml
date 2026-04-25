@@ -6,32 +6,51 @@ vars:
   maxJobs: '{{.maxJobs | default .MAX_JOBS}}'
 
 tasks:
+  # Run worker in development mode
+  # Usage: task dev replicas=1 maxJobs=10 apiKey=your_api_key
   dev:
-    env:
-      API_KEY: '{{.apiKey}}'
-      MAX_JOBS: '{{.maxJobs}}'
     cmds:
       - |
         for i in $(seq 1 {{.replicas}}); do
-          echo "Starting worker $i"
-          bun --watch index.ts &
+           echo "Starting worker instance $i"
+          go run ./cmd/oasm-worker \
+            --api-key {{.apiKey}} \
+            --max-concurrency {{.maxJobs}} &
         done
         wait
     silent: false
 
-  install:
-    cmds:
-      - bun install
-  clean:
-    cmds:
-      - rm -rf ./husky
-      - rm -rf ./node_modules
-      - rm -rf ./dist
-
-  tools:
-    cmds:
-      - go install -v github.com/projectdiscovery/pdtm/cmd/pdtm@latest
-      - pdtm -duc -dc -install-go-path -install httpx,subfinder,nuclei,dnsx,naabu
+  # Build the worker project
+  # Creates optimized production build
   build:
     cmds:
-      - bun run build
+      - go build -o oasm-worker ./cmd/oasm-worker
+
+  # Install dependencies (Go modules)
+  install:
+    cmds:
+      - go mod tidy
+
+  # Run tests
+  # Executes all tests in the project
+  test:
+    cmds:
+      - go test ./...
+
+  # Check code without building binary
+  # Verifies compilation of all packages
+  check:
+    cmds:
+      - go build ./...
+
+  # Format code
+  # Applies gofmt to all source files
+  format:
+    cmds:
+      - go fmt ./...
+
+  # Run linter
+  # Executes go vet for code quality checks
+  lint:
+    cmds:
+      - go vet ./...

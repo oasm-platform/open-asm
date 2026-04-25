@@ -1,0 +1,91 @@
+package worker
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"strings"
+	"syscall"
+
+	"github.com/go-rod/rod"
+	"github.com/oasm-platform/oasm-sdk-go/oasm"
+	"github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
+)
+
+func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string) {
+	job, err := client.JobsNext(ctx)
+	if err != nil {
+		log.Printf("Failed to pull job: %v", err)
+		return
+	}
+	if job == nil || job.Id == "" {
+		return
+	}
+
+	cmdStr := job.GetCommand()
+	if cmdStr == "" {
+		log.Printf("Job %s has no command to execute", job.Id)
+		client.JobsResult(ctx, job.Id, oasm.NewErrorResult("No command provided by Core"))
+		return
+	}
+
+	log.Printf("Executing Job ID: %s | Command: %s", job.Id, cmdStr)
+
+	var payload *jobs_registry.DataPayloadResult
+
+	if after, ok := strings.CutPrefix(cmdStr, "screenshot "); ok {
+		url := strings.TrimSpace(after)
+		log.Printf("Taking screenshot for URL: %s", url)
+
+		base64Image, _ := TakeScreenshotBase64(ctx, browser, url)
+
+		resultData := struct {
+			Screenshot string `json:"screenshot"`
+			URL        string `json:"url"`
+		}{
+			Screenshot: base64Image,
+			URL:        formatURL(url),
+		}
+
+		jsonBytes, err := json.Marshal(resultData)
+		if err != nil {
+			log.Printf("Screenshot job %s failed: %v", job.Id, err)
+			errMsg := fmt.Sprintf("Screenshot error: %v", err)
+			payload = oasm.NewErrorResult(errMsg)
+		} else {
+			log.Printf("Screenshot job %s completed successfully", job.Id)
+			jsonStr := string(jsonBytes)
+			payload = &jobs_registry.DataPayloadResult{
+				Error: false,
+				Raw:   &jsonStr,
+			}
+		}
+	} else {
+		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
+		// Setpgid is only available on Unix systems
+		// On Windows, we don't set SysProcAttr as Setpgid doesn't exist
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+		// Note: Setpgid field would be set here on Unix systems
+		// but is not available on Windows
+
+		pathSep := string(os.PathListSeparator)
+		customPath := fmt.Sprintf("PATH=%s%s%s", toolPath, pathSep, os.Getenv("PATH"))
+		cmd.Env = append(os.Environ(), customPath)
+
+		output, _ := cmd.CombinedOutput()
+		outStr := string(output)
+
+		payload = &jobs_registry.DataPayloadResult{
+			Error: false,
+			Raw:   &outStr,
+		}
+	}
+
+	err = client.JobsResult(ctx, job.Id, payload)
+	if err != nil {
+		log.Printf("Failed to submit result for Job %s: %v", job.Id, err)
+	}
+}

@@ -1,5 +1,8 @@
+import { ReflectionService } from '@grpc/reflection';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
+import type { MicroserviceOptions } from '@nestjs/microservices';
+import { Transport } from '@nestjs/microservices';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
@@ -8,6 +11,7 @@ import 'dotenv/config';
 import type { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { join } from 'path';
 import 'reflect-metadata';
 import { AppModule } from './app.module';
 import {
@@ -15,12 +19,10 @@ import {
   APP_NAME,
   AUTH_INSTANCE_KEY,
   CACHE_STATIC_RESOURCE,
+  DEFAULT_GRPC_PORT,
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { AuthGuard } from './common/guards/auth.guard';
-import type { MicroserviceOptions } from '@nestjs/microservices';
-import { Transport } from '@nestjs/microservices';
-import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
@@ -91,7 +93,7 @@ async function bootstrap() {
   }
 
   fs.writeFileSync(pathOutputOpenApi, JSON.stringify(documentFactory()));
-
+  const grpcPort = process.env.GRPC_PORT ?? DEFAULT_GRPC_PORT;
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
@@ -100,16 +102,31 @@ async function bootstrap() {
         join(__dirname, 'proto/workers.proto'),
         join(__dirname, 'proto/jobs_registry.proto'),
       ],
-      url: '0.0.0.0:5000',
+      url: `0.0.0.0:${grpcPort}`,
+      loader: {
+        keepCase: false,
+        longs: String,
+        enums: String,
+        defaults: true,
+        oneofs: true,
+      },
+      onLoadPackageDefinition: (pkg, server) => {
+        const reflection = new ReflectionService(pkg);
+        reflection.addToServer(server);
+      },
+      maxReceiveMessageLength: 64 * 1024 * 1024,
+      maxSendMessageLength: 64 * 1024 * 1024,
     },
   });
 
+  const logger = new Logger('Application');
+
   // Start server
   await app.startAllMicroservices();
+
   const port = process.env.PORT ?? DEFAULT_PORT;
   await app.listen(port);
-
-  const logger = new Logger('Application');
+  logger.log(`gRPC server is running on port ${grpcPort}`);
   logger.log(`Application is running on port ${port}`);
 }
 

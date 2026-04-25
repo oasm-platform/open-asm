@@ -3,8 +3,11 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { GrpcMethod, GrpcStreamMethod } from '@nestjs/microservices';
+import { GrpcMethod } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
+import { createReadStream } from 'fs';
+import { join } from 'path';
+import { Observable } from 'rxjs';
 import {
   GetManyWorkersDto,
   WorkerAliveDto,
@@ -12,7 +15,10 @@ import {
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
-import { mergeMap, Observable } from 'rxjs';
+
+interface GrpcCall {
+  getPeer?(): string | undefined;
+}
 
 @ApiTags('Workers')
 @Controller('workers')
@@ -60,36 +66,101 @@ export class WorkersController {
     return this.workersService.getWorkers(query);
   }
 
+  @GrpcMethod('WorkersService', 'GetManifest')
+  grpcGetManifest(): { downloadToolsUrl: string; initCommands: string[] } {
+    return {
+      downloadToolsUrl: '/public/archived/tools.tar.gz',
+      initCommands: ['nuclei -ut'],
+    };
+  }
+
+  @GrpcMethod('WorkersService', 'DownloadTools')
+  grpcDownloadTools(request: {
+    url: string;
+  }): Observable<{ chunk: Buffer; offset: number; eof: boolean }> {
+    return new Observable((subscriber) => {
+      const filePath = join(process.cwd(), request.url);
+      const stream = createReadStream(filePath, { highWaterMark: 1024 * 1024 }); // 1MB chunks
+      let offset = 0;
+
+      stream.on('data', (chunk: Buffer) => {
+        subscriber.next({ chunk, offset, eof: false });
+        offset += chunk.length;
+      });
+
+      stream.on('end', () => {
+        subscriber.next({ chunk: Buffer.alloc(0), offset, eof: true });
+        subscriber.complete();
+      });
+
+      stream.on('error', (err) => {
+        subscriber.error(err);
+      });
+    });
+  }
+
   @GrpcMethod('WorkersService', 'Join')
-  async grpcJoin(requests: {
-    apiKey: string;
-    signature: string;
-  }): Promise<{ workerId: string; workerToken: string }> {
+  async grpcJoin(
+    requests: {
+      apiKey: string;
+      signature: string;
+      token?: string;
+      metadata?: { name?: string; os?: string };
+    },
+    call: GrpcCall,
+  ): Promise<{ workerId: string; workerToken: string }> {
+    const peer = call?.getPeer?.();
+    const ipAddress = typeof peer === 'string' ? peer.split(':')[0] : undefined;
+
     const worker = await this.workersService.join({
       apiKey: requests.apiKey,
       signature: requests.signature,
+      token: requests.token,
+      metadata: requests.metadata,
+      ipAddress,
     });
+
     return {
       workerId: worker.id,
       workerToken: worker.token,
     };
   }
 
-  @GrpcStreamMethod('WorkersService', 'Alive')
-  grpcAlive$(
-    requests$: Observable<{ workerToken: string }>,
-  ): Observable<{ alive: boolean }> {
-    return requests$.pipe(
-      mergeMap(async (request) => {
+  @GrpcMethod('WorkersService', 'Alive')
+  grpcAlive(request: {
+    workerToken: string;
+  }): Observable<{ alive: boolean; lastSeenAt: string; workerId: string }> {
+    return new Observable((subscriber) => {
+      let intervalId: NodeJS.Timeout;
+
+      const updateAlive = async () => {
         try {
-          const result = await this.workersService.alive({
+          const worker = await this.workersService.alive({
             token: request.workerToken,
           });
-          return { alive: result.alive === 'OK' };
-        } catch {
-          return { alive: false };
+          if (worker) {
+            subscriber.next({
+              alive: true,
+              lastSeenAt: worker.lastSeenAt.toISOString(),
+              workerId: worker.id,
+            });
+          } else {
+            subscriber.error(new Error('Worker not found after update.'));
+          }
+        } catch (err) {
+          subscriber.error(err);
         }
-      }),
-    );
+      };
+
+      void updateAlive().then(() => {
+        intervalId = setInterval(() => {
+          void updateAlive();
+        }, 10000);
+      });
+
+      return () => {
+        if (intervalId) clearInterval(intervalId);
+      };
+    });
   }
 }

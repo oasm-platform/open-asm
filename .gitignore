@@ -53,6 +53,10 @@ pids
 *.seed
 *.pid.lock
 
+# Worktrees
+.worktrees/
+worktrees/
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .vscode/*
@@ -70,6 +74,8 @@ core-api/.storage/*
 # .agents/*
 .windsurf/*
 .claude/*
-.kilocode/plans/*
-.clinerules/*
 docs/superpowers/*
+core-api/public/tools/*
+.qwen/
+.kilo/plans/*
+worker/.configs.json
