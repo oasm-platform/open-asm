@@ -16,6 +16,12 @@ import (
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
 )
 
+// Track active jobs for logging
+var (
+	activeJobsMu sync.Mutex
+	activeJobs   = make(map[string]struct{})
+)
+
 func Start(ctx context.Context, cfg *config.Config) {
 	client, err := oasm.NewClient(
 		oasm.WithApiKey(cfg.ApiKey),
@@ -63,13 +69,23 @@ func Start(ctx context.Context, cfg *config.Config) {
 	scheduler := gocron.NewScheduler(time.UTC)
 
 	var wg sync.WaitGroup
+	var lastLogged int // Track last logged running count for change detection
+
+	// Helper function to log job status
+	logJobStatus := func(running, maxConcurrency int) {
+		log.Printf("Jobs running: %d/%d", running, maxConcurrency)
+	}
+
+	// Log initial state before starting scheduler
+	logJobStatus(0, cfg.MaxConcurrency)
+	lastLogged = 0
 
 	_, err = scheduler.Every(1).Second().Do(func() {
 		select {
 		case semaphore <- struct{}{}:
 			wg.Go(func() {
 				defer func() { <-semaphore }()
-				processJob(workerCtx, client, browser, cfg.ToolPath)
+				processJob(workerCtx, client, browser, cfg.ToolPath, &activeJobsMu, &activeJobs)
 			})
 		default:
 		}
@@ -80,6 +96,23 @@ func Start(ctx context.Context, cfg *config.Config) {
 
 	scheduler.StartAsync()
 	log.Printf("Gocron poller started (Max Concurrency: %d)\n", cfg.MaxConcurrency)
+
+	ticker := time.NewTicker(time.Second)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				running := len(semaphore)
+				if running != lastLogged {
+					logJobStatus(running, cfg.MaxConcurrency)
+					lastLogged = running
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	<-ctx.Done()
 	log.Println("Received shutdown signal. Initiating graceful shutdown...")

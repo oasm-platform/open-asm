@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/go-rod/rod"
@@ -15,7 +16,7 @@ import (
 	"github.com/oasm-platform/open-asm/grpc-client/go/jobs_registry"
 )
 
-func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string) {
+func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, toolPath string, activeJobsMu *sync.Mutex, activeJobs *map[string]struct{}) {
 	job, err := client.JobsNext(ctx)
 	if err != nil {
 		log.Printf("Failed to pull job: %v", err)
@@ -24,6 +25,18 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 	if job == nil || job.Id == "" {
 		return
 	}
+
+	// Track this job as active
+	(*activeJobsMu).Lock()
+	(*activeJobs)[job.Id] = struct{}{}
+	(*activeJobsMu).Unlock()
+
+	// Ensure we remove the job from tracking when done
+	defer func() {
+		(*activeJobsMu).Lock()
+		delete(*activeJobs, job.Id)
+		(*activeJobsMu).Unlock()
+	}()
 
 	cmdStr := job.GetCommand()
 	if cmdStr == "" {
