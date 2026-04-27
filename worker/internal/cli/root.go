@@ -13,6 +13,7 @@ import (
 
 	"github.com/common-nighthawk/go-figure"
 	"github.com/fatih/color"
+	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,9 +41,8 @@ func Execute() {
 				return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
 			}
 
-			fmt.Println("Worker started successfully!")
-			fmt.Printf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\n",
-				cfg.ApiKey, cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort)
+			oasm.Logger("Worker").Verbose(fmt.Sprintf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\n",
+				cfg.ApiKey, cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort))
 
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer stop()

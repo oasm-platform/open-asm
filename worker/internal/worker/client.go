@@ -33,7 +33,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 		return
 	}
 
-	log.Println("Initializing headless browser...")
+	oasm.Logger("Jobs").Verbose("Initializing headless browser...")
 	l := launcher.New().
 		Leakless(false). // Disable leakless to avoid Windows Defender false positive
 		Headless(true)   // Explicit headless mode
@@ -58,9 +58,9 @@ func Start(ctx context.Context, cfg *config.Config) {
 		return
 	}
 
-	log.Println("Core is ready, syncing tools...")
+	oasm.Logger("Sync").Verbose("Core is ready, syncing tools...")
 	if err := client.WorkerDownloadTools(ctx); err != nil {
-		log.Printf("Download tools error: %v", err)
+		oasm.Logger("Sync").Error(fmt.Sprintf("Download tools error: %v", err))
 		workerCancel()
 		return
 	}
@@ -73,7 +73,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 
 	// Helper function to log job status
 	logJobStatus := func(running, maxConcurrency int) {
-		log.Printf("Jobs running: %d/%d", running, maxConcurrency)
+		oasm.Logger("Jobs").Verbose(fmt.Sprintf("Jobs running: %d/%d", running, maxConcurrency))
 	}
 
 	// Log initial state before starting scheduler
@@ -95,7 +95,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 	}
 
 	scheduler.StartAsync()
-	log.Printf("Gocron poller started (Max Concurrency: %d)\n", cfg.MaxConcurrency)
+	oasm.Logger("Jobs").Verbose(fmt.Sprintf("Gocron poller started (Max Concurrency: %d)\n", cfg.MaxConcurrency))
 
 	ticker := time.NewTicker(time.Second)
 	go func() {
