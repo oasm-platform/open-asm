@@ -15,6 +15,7 @@ import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
 import InternalNetworks from '@/pages/internal-networks/internal-networks';
+import CreateInternalNetwork from '@/pages/internal-networks/create-internal-network';
 import CreateIssue from '@/pages/issues/create-issue';
 import IssueDetail from '@/pages/issues/issue-detail';
 import Issues from '@/pages/issues/issues';
@@ -271,11 +272,24 @@ export const router = createBrowserRouter([
           },
           {
             path: 'internal-networks',
-            element: (
-              <RequireWorkspace>
-                <InternalNetworks />
-              </RequireWorkspace>
-            ),
+            children: [
+              {
+                path: '',
+                element: (
+                  <RequireWorkspace>
+                    <InternalNetworks />
+                  </RequireWorkspace>
+                ),
+              },
+              {
+                path: 'create',
+                element: (
+                  <RequireWorkspace>
+                    <CreateInternalNetwork />
+                  </RequireWorkspace>
+                ),
+              },
+            ],
           },
           {
             path: 'assets',

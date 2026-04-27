@@ -20,7 +20,7 @@ import ExportDataButton from '@/components/ui/export-button';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { GetManyTargetResponseDto } from '@/services/apis/gen/queries';
-import { Target } from 'lucide-react';
+import { Target, Network } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { TargetTypeFilter } from './components/target-type-filter';
@@ -237,6 +237,14 @@ export function ListTargets() {
         >
           <Target className="shrink-0" />
           <span>Start discovery</span>
+        </Button>,
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => navigate('/internal-networks/create')}
+        >
+          <Network className="shrink-0" />
+          <span>Create network</span>
         </Button>,
       ]}
       totalItems={total}
