@@ -1,0 +1,35 @@
+import { BaseEntity } from '@/common/entities/base.entity';
+import { User } from '@/modules/auth/entities/user.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
+import { Target } from '@/modules/targets/entities/target.entity';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString } from 'class-validator';
+import { Column, Entity, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+
+@Entity('internal_networks')
+export class InternalNetwork extends BaseEntity {
+  @ApiProperty({
+    example: 'Internal Network 1',
+    description: 'The name of the internal network',
+  })
+  @IsString()
+  @Column('text')
+  name: string;
+
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
+  @ManyToOne(() => Workspace, (workspace) => workspace.internalNetworks, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'workspaceId' })
+  workspace: Workspace;
+
+  @Column({ type: 'uuid' })
+  createdBy: string;
+
+  @ManyToOne(() => User, (user) => user.createdInternalNetworks, { nullable: true })
+  @JoinColumn({ name: 'createdBy' })
+  creator?: User;
+
+  @OneToMany(() => Target, (target) => target.internalNetwork)
+  targets: Target[];
+}
