@@ -86,7 +86,7 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 
 	quality := 80
 
-	imgBytes, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
+	imgBytes, err := page.Timeout(5 * time.Second).Screenshot(true, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
 		Quality: &quality,
 		Clip: &proto.PageViewport{
