@@ -5,42 +5,44 @@ dayjs.extend(relativeTime);
 
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
-import { useInternalNetworksControllerGetManyInternalNetworks } from '@/services/apis/gen/queries';
+import { useInternalNetworksControllerGetManyInternalNetworks, useInternalNetworksControllerDeleteInternalNetwork } from '@/services/apis/gen/queries';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { GetManyInternalNetworksResponseDtoDataItem } from '@/services/apis/gen/queries';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { Button } from '@/components/ui/button';
-import { Network } from 'lucide-react';
+import { Network, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
-const internalNetworkColumns: ColumnDef<GetManyInternalNetworksResponseDtoDataItem>[] = [
-  {
-    accessorKey: 'id',
-    header: 'ID',
-    cell: ({ row }) => (
-      <div className="font-medium">{row.getValue('id')}</div>
-    ),
-  },
-  {
-    accessorKey: 'name',
-    header: 'Name',
-    cell: ({ row }) => (
-      <div className="font-medium">{row.getValue('name')}</div>
-    ),
-  },
-  {
-    accessorKey: 'createdAt',
-    header: 'Created',
-    cell: ({ row }) => {
-      const value: string = row.getValue('createdAt');
-      return (
-        <div className="text-gray-400 font-semibold">
-          {dayjs(value).fromNow()}
-        </div>
-      );
+interface DeleteButtonProps {
+  id: string;
+  name: string;
+  onDeleteSuccess?: () => void;
+}
+
+const DeleteButton = ({ id, name, onDeleteSuccess }: DeleteButtonProps) => {
+  const deleteMutation = useInternalNetworksControllerDeleteInternalNetwork({
+    mutation: {
+      onSuccess: () => {
+        onDeleteSuccess?.();
+      },
     },
-  },
-];
+  });
+
+  return (
+    <ConfirmDialog
+      title="Delete Internal Network"
+      description={`Are you sure you want to delete "${name}"? This action cannot be undone.`}
+      onConfirm={() => deleteMutation.mutate({ id })}
+      trigger={
+        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800">
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      }
+      confirmText="Delete"
+    />
+  );
+};
 
 export function ListInternalNetworks() {
   const {
@@ -79,6 +81,42 @@ export function ListInternalNetworks() {
   const internalNetworks = data?.data ?? [];
   const total = data?.total ?? 0;
 
+  const columns: ColumnDef<GetManyInternalNetworksResponseDtoDataItem>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue('name')}</div>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Created',
+      cell: ({ row }) => {
+        const value: string = row.getValue('createdAt');
+        return (
+          <div className="text-gray-400 font-semibold">
+            {dayjs(value).fromNow()}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => {
+        const network = row.original;
+        return (
+          <DeleteButton
+            id={network.id as string}
+            name={network.name as string}
+            onDeleteSuccess={refetch}
+          />
+        );
+      },
+    },
+  ];
+
   if (!data && !isLoading)
     return (
       <DataTableError message="Failed to load internal networks." onRetry={refetch} />
@@ -87,7 +125,7 @@ export function ListInternalNetworks() {
   return (
     <DataTable
       data={internalNetworks}
-      columns={internalNetworkColumns}
+      columns={columns}
       isLoading={isLoading}
       page={page}
       pageSize={pageSize}
