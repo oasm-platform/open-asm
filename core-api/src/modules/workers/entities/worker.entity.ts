@@ -60,7 +60,11 @@ export class WorkerInstance extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   internalNetworkId?: string;
 
-  @ManyToOne(() => InternalNetwork, (internalNetwork) => internalNetwork.workers, { nullable: true })
+  @ManyToOne(
+    () => InternalNetwork,
+    (internalNetwork) => internalNetwork.workers,
+    { nullable: true },
+  )
   @JoinColumn({ name: 'internalNetworkId' })
   internalNetwork?: InternalNetwork;
 

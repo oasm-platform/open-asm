@@ -83,7 +83,10 @@ export class Workspace extends BaseEntity {
   @OneToMany(() => Workflow, (workflow) => workflow.workspace)
   workflows: Workflow[];
 
-  @OneToMany(() => InternalNetwork, (internalNetwork) => internalNetwork.workspace)
+  @OneToMany(
+    () => InternalNetwork,
+    (internalNetwork) => internalNetwork.workspace,
+  )
   internalNetworks: InternalNetwork[];
 
   @ApiProperty({

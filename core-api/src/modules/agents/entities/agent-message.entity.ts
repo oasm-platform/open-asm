@@ -1,6 +1,12 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { MessageRole, MessageType } from '../enums/agent.enums';
 import { AgentConversation } from './agent-conversation.entity';
@@ -22,12 +28,19 @@ export class AgentMessage extends BaseEntity {
   @Column('text')
   content: string;
 
-  @ApiProperty({ enum: MessageType, example: MessageType.TEXT, default: MessageType.TEXT })
+  @ApiProperty({
+    enum: MessageType,
+    example: MessageType.TEXT,
+    default: MessageType.TEXT,
+  })
   @IsEnum(MessageType)
   @Column({ type: 'enum', enum: MessageType, default: MessageType.TEXT })
   messageType: MessageType;
 
-  @ApiProperty({ required: false, description: 'Token usage, model info, etc.' })
+  @ApiProperty({
+    required: false,
+    description: 'Token usage, model info, etc.',
+  })
   @IsOptional()
   @IsObject()
   @Column({ type: 'jsonb', nullable: true })

@@ -257,9 +257,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(
-        `Failed to increment key ${key}: ${errorMessage}`,
-      );
+      throw new Error(`Failed to increment key ${key}: ${errorMessage}`);
     }
   }
 
@@ -275,9 +273,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(
-        `Failed to decrement key ${key}: ${errorMessage}`,
-      );
+      throw new Error(`Failed to decrement key ${key}: ${errorMessage}`);
     }
   }
 
@@ -293,9 +289,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(
-        `Failed to get key ${key}: ${errorMessage}`,
-      );
+      throw new Error(`Failed to get key ${key}: ${errorMessage}`);
     }
   }
 
@@ -306,15 +300,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * @param value - Value to set
    * @returns OK if successful
    */
-  public async set(key: string, value: string | number): Promise<string | null> {
+  public async set(
+    key: string,
+    value: string | number,
+  ): Promise<string | null> {
     try {
       return await this.cacheClient.set(key, value.toString());
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(
-        `Failed to set key ${key}: ${errorMessage}`,
-      );
+      throw new Error(`Failed to set key ${key}: ${errorMessage}`);
     }
   }
 
@@ -336,9 +331,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(
-        `Failed to setex key ${key}: ${errorMessage}`,
-      );
+      throw new Error(`Failed to setex key ${key}: ${errorMessage}`);
     }
   }
 
@@ -354,9 +347,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(
-        `Failed to delete key ${key}: ${errorMessage}`,
-      );
+      throw new Error(`Failed to delete key ${key}: ${errorMessage}`);
     }
   }
 }

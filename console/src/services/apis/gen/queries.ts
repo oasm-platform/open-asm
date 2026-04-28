@@ -1924,6 +1924,37 @@ export type CreateInternalNetworkDto = {
   name: string;
 };
 
+export type GetManyNetworkInterfacesResponseDtoDataItem = {
+  [key: string]: unknown;
+};
+
+export type GetManyNetworkInterfacesResponseDto = {
+  data: GetManyNetworkInterfacesResponseDtoDataItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+/**
+ * The user who created this internal network
+ */
+export type GetInternalNetworkResponseDtoCreatedBy = { [key: string]: unknown };
+
+export type GetInternalNetworkResponseDto = {
+  /** The unique identifier of the internal network */
+  id: string;
+  /** The name of the internal network */
+  name: string;
+  /** When the internal network was created */
+  createdAt: string;
+  /** When the internal network was last updated */
+  updatedAt: string;
+  /** The user who created this internal network */
+  createdBy: GetInternalNetworkResponseDtoCreatedBy;
+};
+
 export type UpdateInternalNetworkDto = {
   /** The updated name of the internal network */
   name?: string;
@@ -2367,6 +2398,14 @@ export type IssuesControllerGetCommentsByIssueIdParams = {
 };
 
 export type InternalNetworksControllerGetManyInternalNetworksParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type InternalNetworksControllerGetManyNetworkInterfacesParams = {
   search?: string;
   page?: number;
   limit?: number;
@@ -26660,6 +26699,726 @@ export const useInternalNetworksControllerCreateInternalNetwork = <
 
   return useMutation(mutationOptions, queryClient);
 };
+
+/**
+ * Retrieves a paginated list of network interfaces for the specified internal network.
+ * @summary Get many network interfaces for an internal network
+ */
+export const internalNetworksControllerGetManyNetworkInterfaces = (
+  id: string,
+  params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyNetworkInterfacesResponseDto>(
+    {
+      url: `/api/internal-networks/${id}/network-interfaces`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getInternalNetworksControllerGetManyNetworkInterfacesInfiniteQueryKey =
+  (
+    id?: string,
+    params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+  ) => {
+    return [
+      'infinite',
+      `/api/internal-networks/${id}/network-interfaces`,
+      ...(params ? [params] : []),
+    ] as const;
+  };
+
+export const getInternalNetworksControllerGetManyNetworkInterfacesQueryKey = (
+  id?: string,
+  params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+) => {
+  return [
+    `/api/internal-networks/${id}/network-interfaces`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getInternalNetworksControllerGetManyNetworkInterfacesInfiniteQueryOptions =
+  <
+    TData = InfiniteData<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+      >,
+      InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+    >,
+    TError = unknown,
+  >(
+    id: string,
+    params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+    options?: {
+      query?: Partial<
+        UseInfiniteQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >,
+          TError,
+          TData,
+          QueryKey,
+          InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getInternalNetworksControllerGetManyNetworkInterfacesInfiniteQueryKey(
+        id,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+      >,
+      QueryKey,
+      InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+    > = ({ signal, pageParam }) =>
+      internalNetworksControllerGetManyNetworkInterfaces(
+        id,
+        { ...params, page: pageParam || params?.['page'] },
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!id,
+      ...queryOptions,
+    } as UseInfiniteQueryOptions<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+      >,
+      TError,
+      TData,
+      QueryKey,
+      InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type InternalNetworksControllerGetManyNetworkInterfacesInfiniteQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+    >
+  >;
+export type InternalNetworksControllerGetManyNetworkInterfacesInfiniteQueryError =
+  unknown;
+
+export function useInternalNetworksControllerGetManyNetworkInterfacesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+    >,
+    InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | InternalNetworksControllerGetManyNetworkInterfacesParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useInternalNetworksControllerGetManyNetworkInterfacesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+    >,
+    InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useInternalNetworksControllerGetManyNetworkInterfacesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+    >,
+    InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many network interfaces for an internal network
+ */
+
+export function useInternalNetworksControllerGetManyNetworkInterfacesInfinite<
+  TData = InfiniteData<
+    Awaited<
+      ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+    >,
+    InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+        >,
+        TError,
+        TData,
+        QueryKey,
+        InternalNetworksControllerGetManyNetworkInterfacesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getInternalNetworksControllerGetManyNetworkInterfacesInfiniteQueryOptions(
+      id,
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+export const getInternalNetworksControllerGetManyNetworkInterfacesQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+    >,
+    TError = unknown,
+  >(
+    id: string,
+    params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof orvalClient>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getInternalNetworksControllerGetManyNetworkInterfacesQueryKey(id, params);
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+      >
+    > = ({ signal }) =>
+      internalNetworksControllerGetManyNetworkInterfaces(
+        id,
+        params,
+        requestOptions,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!id,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type InternalNetworksControllerGetManyNetworkInterfacesQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+    >
+  >;
+export type InternalNetworksControllerGetManyNetworkInterfacesQueryError =
+  unknown;
+
+export function useInternalNetworksControllerGetManyNetworkInterfaces<
+  TData = Awaited<
+    ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | InternalNetworksControllerGetManyNetworkInterfacesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useInternalNetworksControllerGetManyNetworkInterfaces<
+  TData = Awaited<
+    ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof internalNetworksControllerGetManyNetworkInterfaces
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useInternalNetworksControllerGetManyNetworkInterfaces<
+  TData = Awaited<
+    ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get many network interfaces for an internal network
+ */
+
+export function useInternalNetworksControllerGetManyNetworkInterfaces<
+  TData = Awaited<
+    ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: InternalNetworksControllerGetManyNetworkInterfacesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetManyNetworkInterfaces>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getInternalNetworksControllerGetManyNetworkInterfacesQueryOptions(
+      id,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Retrieves a single internal network by its ID.
+ * @summary Get an internal network by ID
+ */
+export const internalNetworksControllerGetInternalNetworkById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetInternalNetworkResponseDto>(
+    { url: `/api/internal-networks/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getInternalNetworksControllerGetInternalNetworkByIdQueryKey = (
+  id?: string,
+) => {
+  return [`/api/internal-networks/${id}`] as const;
+};
+
+export const getInternalNetworksControllerGetInternalNetworkByIdQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getInternalNetworksControllerGetInternalNetworkByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof internalNetworksControllerGetInternalNetworkById>>
+  > = ({ signal }) =>
+    internalNetworksControllerGetInternalNetworkById(
+      id,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<
+      ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+    >,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type InternalNetworksControllerGetInternalNetworkByIdQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof internalNetworksControllerGetInternalNetworkById>>
+  >;
+export type InternalNetworksControllerGetInternalNetworkByIdQueryError =
+  unknown;
+
+export function useInternalNetworksControllerGetInternalNetworkById<
+  TData = Awaited<
+    ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useInternalNetworksControllerGetInternalNetworkById<
+  TData = Awaited<
+    ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useInternalNetworksControllerGetInternalNetworkById<
+  TData = Awaited<
+    ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get an internal network by ID
+ */
+
+export function useInternalNetworksControllerGetInternalNetworkById<
+  TData = Awaited<
+    ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof internalNetworksControllerGetInternalNetworkById>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getInternalNetworksControllerGetInternalNetworkByIdQueryOptions(
+      id,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * Updates the name of an existing internal network. Only the workspace owner can perform this action.

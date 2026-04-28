@@ -414,7 +414,7 @@ export class JobsRegistryService {
       const toolDataSource = worker.tool?.category
         ? CATEGORY_DATA_SOURCE_MAP[worker.tool.category]
         : ToolDataSource.ASSET;
-      
+
       if (toolDataSource === ToolDataSource.ASSET_SERVICE) {
         // For tools operating on asset services (e.g., HTTP_PROBE, SCREENSHOT)
         // Join assetService and filter by category

@@ -17,17 +17,28 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CreateInternalNetworkDto } from './dtos/create-internal-network.dto';
-import { GetManyInternalNetworksQueryDto, GetManyInternalNetworksResponseDto } from './dtos/get-many-internal-networks.dto';
+import {
+  GetInternalNetworkResponseDto,
+  GetManyInternalNetworksQueryDto,
+  GetManyInternalNetworksResponseDto,
+} from './dtos/get-many-internal-networks.dto';
+import {
+  GetManyNetworkInterfacesQueryDto,
+  GetManyNetworkInterfacesResponseDto,
+} from './dtos/get-many-network-interfaces.dto';
 import { UpdateInternalNetworkDto } from './dtos/update-internal-network.dto';
 import { InternalNetworksService } from './internal-networks.service';
 
 @Controller('internal-networks')
 export class InternalNetworksController {
-  constructor(private readonly internalNetworksService: InternalNetworksService) {}
+  constructor(
+    private readonly internalNetworksService: InternalNetworksService,
+  ) {}
 
   @Doc({
     summary: 'Get many internal networks',
-    description: 'Retrieves a paginated list of internal networks for the specified workspace.',
+    description:
+      'Retrieves a paginated list of internal networks for the specified workspace.',
     response: {
       serialization: GetManyInternalNetworksResponseDto,
     },
@@ -40,12 +51,16 @@ export class InternalNetworksController {
     @Query() query: GetManyInternalNetworksQueryDto,
     @WorkspaceId() workspaceId: string,
   ): Promise<GetManyInternalNetworksResponseDto> {
-    return this.internalNetworksService.getManyInternalNetworks(query, workspaceId);
+    return this.internalNetworksService.getManyInternalNetworks(
+      query,
+      workspaceId,
+    );
   }
 
   @Doc({
     summary: 'Create an internal network',
-    description: 'Creates a new internal network for the specified workspace. Only the workspace owner can perform this action.',
+    description:
+      'Creates a new internal network for the specified workspace. Only the workspace owner can perform this action.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -60,13 +75,55 @@ export class InternalNetworksController {
     @WorkspaceId() workspaceId: string,
     @UserContext() user: UserContextPayload,
   ): Promise<DefaultMessageResponseDto> {
+    return this.internalNetworksService.createInternalNetwork(
+      dto,
+      workspaceId,
+      user,
+    );
+  }
 
-    return this.internalNetworksService.createInternalNetwork(dto, workspaceId, user);
+  @Doc({
+    summary: 'Get many network interfaces for an internal network',
+    description:
+      'Retrieves a paginated list of network interfaces for the specified internal network.',
+    response: {
+      serialization: GetManyNetworkInterfacesResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get(':id/network-interfaces')
+  getManyNetworkInterfaces(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: GetManyNetworkInterfacesQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetManyNetworkInterfacesResponseDto> {
+    return this.internalNetworksService.getManyNetworkInterfaces(id, query, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get an internal network by ID',
+    description: 'Retrieves a single internal network by its ID.',
+    response: {
+      serialization: GetInternalNetworkResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get(':id')
+  getInternalNetworkById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetInternalNetworkResponseDto> {
+    return this.internalNetworksService.getInternalNetworkById(id, workspaceId);
   }
 
   @Doc({
     summary: 'Update an internal network by ID',
-    description: 'Updates the name of an existing internal network. Only the workspace owner can perform this action.',
+    description:
+      'Updates the name of an existing internal network. Only the workspace owner can perform this action.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -81,13 +138,17 @@ export class InternalNetworksController {
     @Body() dto: UpdateInternalNetworkDto,
     @UserContext() user: UserContextPayload,
   ): Promise<DefaultMessageResponseDto> {
-     
-    return this.internalNetworksService.updateInternalNetworkById(id, dto, user);
+    return this.internalNetworksService.updateInternalNetworkById(
+      id,
+      dto,
+      user,
+    );
   }
 
   @Doc({
     summary: 'Delete an internal network',
-    description: 'Deletes an existing internal network. Only the workspace owner can perform this action.',
+    description:
+      'Deletes an existing internal network. Only the workspace owner can perform this action.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -101,7 +162,6 @@ export class InternalNetworksController {
     @Param('id', ParseUUIDPipe) id: string,
     @UserContext() user: UserContextPayload,
   ): Promise<DefaultMessageResponseDto> {
-     
     return this.internalNetworksService.deleteInternalNetwork(id, user);
   }
 }

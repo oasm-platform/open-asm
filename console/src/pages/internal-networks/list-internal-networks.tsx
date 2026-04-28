@@ -11,7 +11,7 @@ import type { GetManyInternalNetworksResponseDtoDataItem } from '@/services/apis
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { Button } from '@/components/ui/button';
 import { Network, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface DeleteButtonProps {
@@ -86,7 +86,12 @@ export function ListInternalNetworks() {
       accessorKey: 'name',
       header: 'Name',
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('name')}</div>
+        <Link
+          to={`/internal-networks/${row.original.id}`}
+          className="font-medium text-blue-600 hover:text-blue-800"
+        >
+          {row.getValue('name')}
+        </Link>
       ),
     },
     {

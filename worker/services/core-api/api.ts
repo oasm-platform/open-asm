@@ -1795,12 +1795,49 @@ export interface UpdateIssueCommentDto {
 
 export type Object = object;
 
+export interface GetManyInternalNetworksResponseDto {
+  data: object[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
 export interface CreateInternalNetworkDto {
   /**
    * The name of the internal network
    * @example "Internal Network 1"
    */
   name: string;
+}
+
+export interface GetManyNetworkInterfacesResponseDto {
+  data: object[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+}
+
+export interface GetInternalNetworkResponseDto {
+  /** The unique identifier of the internal network */
+  id: string;
+  /** The name of the internal network */
+  name: string;
+  /**
+   * When the internal network was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the internal network was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The user who created this internal network */
+  createdBy: object;
 }
 
 export interface UpdateInternalNetworkDto {
@@ -5274,6 +5311,36 @@ export class Api<
     });
 
   /**
+   * @description Retrieves a paginated list of internal networks for the specified workspace.
+   *
+   * @tags InternalNetworks
+   * @name InternalNetworksControllerGetManyInternalNetworks
+   * @summary Get many internal networks
+   * @request GET:/api/internal-networks
+   */
+  internalNetworksControllerGetManyInternalNetworks = (
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/internal-networks`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Creates a new internal network for the specified workspace. Only the workspace owner can perform this action.
    *
    * @tags InternalNetworks
@@ -5290,6 +5357,56 @@ export class Api<
       method: "POST",
       body: data,
       type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a paginated list of network interfaces for the specified internal network.
+   *
+   * @tags InternalNetworks
+   * @name InternalNetworksControllerGetManyNetworkInterfaces
+   * @summary Get many network interfaces for an internal network
+   * @request GET:/api/internal-networks/{id}/network-interfaces
+   */
+  internalNetworksControllerGetManyNetworkInterfaces = (
+    id: string,
+    query?: {
+      search?: string;
+      /** @example 1 */
+      page?: number;
+      /** @example 10 */
+      limit?: number;
+      /** @example "createdAt" */
+      sortBy?: string;
+      /** @example "DESC" */
+      sortOrder?: string;
+    },
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/internal-networks/${id}/network-interfaces`,
+      method: "GET",
+      query: query,
+      format: "json",
+      ...params,
+    });
+
+  /**
+   * @description Retrieves a single internal network by its ID.
+   *
+   * @tags InternalNetworks
+   * @name InternalNetworksControllerGetInternalNetworkById
+   * @summary Get an internal network by ID
+   * @request GET:/api/internal-networks/{id}
+   */
+  internalNetworksControllerGetInternalNetworkById = (
+    id: string,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/internal-networks/${id}`,
+      method: "GET",
       format: "json",
       ...params,
     });

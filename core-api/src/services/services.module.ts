@@ -11,4 +11,4 @@ const services = [RedisService, GeoIpService];
   providers: [...services],
   exports: [...services],
 })
-export class ServicesModule { }
+export class ServicesModule {}

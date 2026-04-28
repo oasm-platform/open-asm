@@ -105,7 +105,11 @@ export class Target extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   internalNetworkId: string;
 
-  @ManyToOne(() => InternalNetwork, (internalNetwork) => internalNetwork.targets, { onDelete: 'SET NULL' })
+  @ManyToOne(
+    () => InternalNetwork,
+    (internalNetwork) => internalNetwork.targets,
+    { onDelete: 'SET NULL' },
+  )
   @JoinColumn({ name: 'internalNetworkId' })
   internalNetwork: InternalNetwork;
 }

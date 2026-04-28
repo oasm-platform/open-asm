@@ -1,4 +1,7 @@
-import { GetManyBaseQueryParams, GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import {
+  GetManyBaseQueryParams,
+  GetManyBaseResponseDto,
+} from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsUUID } from 'class-validator';
 
@@ -37,3 +40,8 @@ export class InternalNetworkResponseDto {
  * Response DTO for getting many internal networks
  */
 export class GetManyInternalNetworksResponseDto extends GetManyBaseResponseDto<InternalNetworkResponseDto> {}
+
+/**
+ * Response DTO for getting a single internal network
+ */
+export class GetInternalNetworkResponseDto extends InternalNetworkResponseDto {}

@@ -162,7 +162,8 @@ export class TargetsService implements OnModuleInit {
     if (firstOctet === 10) return true;
 
     // 172.16.0.0/12 - Private (172.16.0.0 - 172.31.255.255)
-    if (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) return true;
+    if (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31)
+      return true;
 
     // 192.168.0.0/16 - Private
     if (firstOctet === 192 && secondOctet === 168) return true;
@@ -189,7 +190,9 @@ export class TargetsService implements OnModuleInit {
    * @returns Array of 256 IP addresses
    */
   private expandCIDRToIPs(cidr: string): string[] {
-    const match = cidr.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/24$/);
+    const match = cidr.match(
+      /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/24$/,
+    );
     if (!match) {
       throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
     }

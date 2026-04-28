@@ -142,7 +142,8 @@ export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
     required: false,
     enum: JobStatus,
     enumName: 'JobStatus',
-    description: 'Filter by scan status (pending, in_progress, completed, failed, cancelled)',
+    description:
+      'Filter by scan status (pending, in_progress, completed, failed, cancelled)',
   })
   @IsEnum(JobStatus)
   @IsOptional()

@@ -27,57 +27,71 @@ type interfaceCandidate struct {
 	score int
 }
 
-// GetNetworkInfo returns the best network interface information
-func GetNetworkInfo() (NetworkInfo, error) {
+// GetNetworkInfos returns all suitable network interface information
+func GetNetworkInfos() ([]NetworkInfo, error) {
 	log.Println("Starting network interface detection")
 
 	// Get all interfaces
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return NetworkInfo{}, fmt.Errorf("failed to get interfaces: %w", err)
+		return nil, fmt.Errorf("failed to get interfaces: %w", err)
 	}
 
-	// Select best interface
-	candidate, err := selectBestInterface(ifaces)
+	// Select all suitable interfaces
+	candidates, err := selectAllInterfaces(ifaces)
 	if err != nil {
-		return NetworkInfo{}, fmt.Errorf("failed to select best interface: %w", err)
+		return nil, fmt.Errorf("failed to select interfaces: %w", err)
 	}
 
-	log.Printf("Selected interface: %s with IP: %s", candidate.iface.Name, candidate.ip.String())
-
-	// Normalize CIDR to /24
-	normalizedCIDR := normalizeCIDR(candidate.ipNet)
-	log.Printf("Normalized CIDR: %s", normalizedCIDR)
-
-	// Get gateway IP
+	// Get gateway IP (shared for all interfaces)
 	gatewayIP, err := getGatewayIP()
 	if err != nil {
-		return NetworkInfo{}, fmt.Errorf("failed to get gateway IP: %w", err)
+		log.Printf("Warning: failed to get gateway IP: %v", err)
+		gatewayIP = nil
 	}
 
-	// Validate gateway is in same subnet
-	if !candidate.ipNet.Contains(gatewayIP) {
-		log.Printf("Warning: gateway %s not in interface subnet %s", gatewayIP.String(), candidate.ipNet.String())
+	// Deduplicate by CIDR, keep the highest scoring candidate per CIDR
+	cidrMap := make(map[string]interfaceCandidate)
+	for _, candidate := range candidates {
+		normalizedCIDR := normalizeCIDR(candidate.ipNet)
+		if existing, exists := cidrMap[normalizedCIDR]; !exists || candidate.score > existing.score {
+			cidrMap[normalizedCIDR] = candidate
+		}
 	}
 
-	// Resolve gateway MAC
-	gatewayMAC, err := resolveARP(gatewayIP)
-	if err != nil {
-		log.Printf("Failed to resolve gateway MAC: %v", err)
-		gatewayMAC = ""
+	var networkInfos []NetworkInfo
+	for normalizedCIDR, candidate := range cidrMap {
+		log.Printf("Selected interface: %s with IP: %s", candidate.iface.Name, candidate.ip.String())
+		log.Printf("Normalized CIDR: %s", normalizedCIDR)
+
+		// Validate gateway is in same subnet
+		if gatewayIP != nil && !candidate.ipNet.Contains(gatewayIP) {
+			log.Printf("Warning: gateway %s not in interface subnet %s", gatewayIP.String(), candidate.ipNet.String())
+		}
+
+		// Resolve gateway MAC
+		gatewayMAC := ""
+		if gatewayIP != nil {
+			gatewayMAC, err = resolveARP(gatewayIP)
+			if err != nil {
+				log.Printf("Failed to resolve gateway MAC: %v", err)
+			}
+		}
+
+		networkInfos = append(networkInfos, NetworkInfo{
+			Interface:  candidate.iface.Name,
+			IP:         candidate.ip.String(),
+			CIDR:       normalizedCIDR,
+			GatewayIP:  gatewayIP.String(),
+			GatewayMAC: gatewayMAC,
+		})
 	}
 
-	return NetworkInfo{
-		Interface:  candidate.iface.Name,
-		IP:         candidate.ip.String(),
-		CIDR:       normalizedCIDR,
-		GatewayIP:  gatewayIP.String(),
-		GatewayMAC: gatewayMAC,
-	}, nil
+	return networkInfos, nil
 }
 
-// selectBestInterface selects the best network interface based on scoring
-func selectBestInterface(ifaces []net.Interface) (interfaceCandidate, error) {
+// selectAllInterfaces returns all suitable network interfaces based on scoring
+func selectAllInterfaces(ifaces []net.Interface) ([]interfaceCandidate, error) {
 	var candidates []interfaceCandidate
 
 	for _, iface := range ifaces {
@@ -160,24 +174,17 @@ func selectBestInterface(ifaces []net.Interface) (interfaceCandidate, error) {
 	}
 
 	if len(candidates) == 0 {
-		return interfaceCandidate{}, fmt.Errorf("no suitable interface found")
+		return nil, fmt.Errorf("no suitable interface found")
 	}
 
-	// Select highest score
-	best := candidates[0]
-	for _, c := range candidates[1:] {
-		if c.score > best.score {
-			best = c
-		}
-	}
-
-	return best, nil
+	// Return all suitable candidates
+	return candidates, nil
 }
 
 // isVirtualInterface checks if interface name indicates virtual
 func isVirtualInterface(name string) bool {
 	lower := strings.ToLower(name)
-	virtualPatterns := []string{"vEthernet", "docker", "wsl", "br-", "bridge", "vm", "virtual"}
+	virtualPatterns := []string{"vEthernet", "docker", "wsl", "br-", "bridge", "vm", "virtual", "tailscale"}
 	for _, pattern := range virtualPatterns {
 		if strings.Contains(lower, pattern) {
 			return true
@@ -243,14 +250,15 @@ func resolveARP(ip net.IP) (string, error) {
 
 // resolveARPWindows for Windows
 func resolveARPWindows(ip net.IP) (string, error) {
-	cmd := exec.Command("arp", "-a", ip.String())
+	cmd := exec.Command("arp", "-a")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("arp command failed: %w", err)
 	}
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
-		if strings.Contains(line, ip.String()) {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, ip.String()) {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
 				mac := fields[1]

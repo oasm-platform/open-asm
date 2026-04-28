@@ -21,14 +21,18 @@ export class InternalNetwork extends BaseEntity {
   @Column({ type: 'uuid' })
   workspaceId: string;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.internalNetworks, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Workspace, (workspace) => workspace.internalNetworks, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Workspace;
 
   @Column({ type: 'uuid' })
   createdBy: string;
 
-  @ManyToOne(() => User, (user) => user.createdInternalNetworks, { nullable: true })
+  @ManyToOne(() => User, (user) => user.createdInternalNetworks, {
+    nullable: true,
+  })
   @JoinColumn({ name: 'createdBy' })
   creator?: User;
 

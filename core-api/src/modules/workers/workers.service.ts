@@ -531,7 +531,8 @@ export class WorkersService {
       gatewayMac: ni.gatewayMac,
     }));
 
-    await this.networkInterfaceRepo.createQueryBuilder()
+    await this.networkInterfaceRepo
+      .createQueryBuilder()
       .insert()
       .into(NetworkInterface)
       .values(interfacesToSave)

@@ -67,7 +67,10 @@ export class User extends BaseEntity {
   @OneToMany(() => Workflow, (workflow) => workflow.createdBy)
   createdWorkflows: Workflow[];
 
-  @OneToMany(() => InternalNetwork, (internalNetwork) => internalNetwork.creator)
+  @OneToMany(
+    () => InternalNetwork,
+    (internalNetwork) => internalNetwork.creator,
+  )
   createdInternalNetworks: InternalNetwork[];
 
   @OneToMany(

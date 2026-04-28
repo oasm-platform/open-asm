@@ -13,7 +13,7 @@ export class ProvidersService {
   constructor(
     @InjectRepository(ToolProvider)
     private readonly providersRepository: Repository<ToolProvider>,
-  ) { }
+  ) {}
 
   /**
    * Get all providers with pagination, filtered by owner
