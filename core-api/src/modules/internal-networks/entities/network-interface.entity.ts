@@ -1,16 +1,19 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
+import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 
 @Entity('network_interfaces')
+@Unique(['internalNetworkId', 'gatewayMac'])
 export class NetworkInterface extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'uuid' })
   workerId: string;
 
-  @ManyToOne(() => WorkerInstance, (worker) => worker.networkInterfaces, { onDelete: 'CASCADE' })
+  @ManyToOne(() => WorkerInstance, (worker) => worker.networkInterfaces, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workerId' })
   worker: WorkerInstance;
 
@@ -37,7 +40,9 @@ export class NetworkInterface extends BaseEntity {
   @Column({ type: 'uuid' })
   internalNetworkId: string;
 
-  @ManyToOne(() => InternalNetwork, (network) => network.networkInterfaces, { onDelete: 'CASCADE' })
+  @ManyToOne(() => InternalNetwork, (network) => network.networkInterfaces, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'internalNetworkId' })
   internalNetwork: InternalNetwork;
 }

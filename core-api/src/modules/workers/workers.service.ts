@@ -520,7 +520,7 @@ export class WorkersService {
       );
     }
 
-    // Insert network interfaces
+    // Insert network interfaces, ignoring duplicates
     const interfacesToSave = networkInterfaces.map((ni) => ({
       workerId,
       internalNetworkId: networkId,
@@ -531,7 +531,12 @@ export class WorkersService {
       gatewayMac: ni.gatewayMac,
     }));
 
-    await this.networkInterfaceRepo.insert(interfacesToSave);
+    await this.networkInterfaceRepo.createQueryBuilder()
+      .insert()
+      .into(NetworkInterface)
+      .values(interfacesToSave)
+      .orIgnore()
+      .execute();
 
     return { message: 'Connect success' };
   }

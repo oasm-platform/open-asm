@@ -4,6 +4,8 @@
 import type { RpcTransport } from "@protobuf-ts/runtime-rpc";
 import type { ServiceInfo } from "@protobuf-ts/runtime-rpc";
 import { WorkersService } from "./workers";
+import type { ConnectInternalNetworkResponse } from "./workers";
+import type { ConnectInternalNetworkRequest } from "./workers";
 import type { DownloadToolsResponse } from "./workers";
 import type { DownloadToolsRequest } from "./workers";
 import type { GetManifestResponse } from "./workers";
@@ -36,6 +38,10 @@ export interface IWorkersServiceClient {
      * @generated from protobuf rpc: DownloadTools
      */
     downloadTools(input: DownloadToolsRequest, options?: RpcOptions): ServerStreamingCall<DownloadToolsRequest, DownloadToolsResponse>;
+    /**
+     * @generated from protobuf rpc: ConnectInternalNetwork
+     */
+    connectInternalNetwork(input: ConnectInternalNetworkRequest, options?: RpcOptions): UnaryCall<ConnectInternalNetworkRequest, ConnectInternalNetworkResponse>;
 }
 /**
  * @generated from protobuf service workers.WorkersService
@@ -73,5 +79,12 @@ export class WorkersServiceClient implements IWorkersServiceClient, ServiceInfo 
     downloadTools(input: DownloadToolsRequest, options?: RpcOptions): ServerStreamingCall<DownloadToolsRequest, DownloadToolsResponse> {
         const method = this.methods[3], opt = this._transport.mergeOptions(options);
         return stackIntercept<DownloadToolsRequest, DownloadToolsResponse>("serverStreaming", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: ConnectInternalNetwork
+     */
+    connectInternalNetwork(input: ConnectInternalNetworkRequest, options?: RpcOptions): UnaryCall<ConnectInternalNetworkRequest, ConnectInternalNetworkResponse> {
+        const method = this.methods[4], opt = this._transport.mergeOptions(options);
+        return stackIntercept<ConnectInternalNetworkRequest, ConnectInternalNetworkResponse>("unary", this._transport, method, opt, input);
     }
 }
