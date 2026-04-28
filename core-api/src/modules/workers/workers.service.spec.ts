@@ -6,6 +6,8 @@ import type { Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
+import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from './entities/worker.entity';
@@ -16,6 +18,8 @@ describe('WorkersService', () => {
   let mockWorkerInstanceRepository: Partial<Repository<WorkerInstance>>;
   let mockAssetRepository: Partial<Repository<any>>;
   let mockWorkspaceToolRepository: Partial<Repository<any>>;
+  let mockInternalNetworkRepository: Partial<Repository<any>>;
+  let mockNetworkInterfaceRepository: Partial<Repository<any>>;
   let mockJobsRegistryService: Partial<JobsRegistryService>;
   let mockApiKeysService: Partial<ApiKeysService>;
   let mockConfigService: Partial<ConfigService>;
@@ -48,6 +52,14 @@ describe('WorkersService', () => {
 
     mockWorkspaceToolRepository = {
       findOne: jest.fn(),
+    } as any;
+
+    mockInternalNetworkRepository = {
+      findOne: jest.fn(),
+    } as any;
+
+    mockNetworkInterfaceRepository = {
+      insert: jest.fn(),
     } as any;
 
     mockJobsRegistryService = {
@@ -89,6 +101,14 @@ describe('WorkersService', () => {
         {
           provide: getRepositoryToken(WorkspaceTool),
           useValue: mockWorkspaceToolRepository,
+        },
+        {
+          provide: getRepositoryToken(InternalNetwork),
+          useValue: mockInternalNetworkRepository,
+        },
+        {
+          provide: getRepositoryToken(NetworkInterface),
+          useValue: mockNetworkInterfaceRepository,
         },
         {
           provide: JobsRegistryService,

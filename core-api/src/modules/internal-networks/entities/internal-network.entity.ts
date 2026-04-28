@@ -2,6 +2,8 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
+import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
+import { NetworkInterface } from '@/modules/internal-networks/entities/network-interface.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
 import { Column, Entity, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
@@ -32,4 +34,10 @@ export class InternalNetwork extends BaseEntity {
 
   @OneToMany(() => Target, (target) => target.internalNetwork)
   targets: Target[];
+
+  @OneToMany(() => WorkerInstance, (worker) => worker.internalNetwork)
+  workers: WorkerInstance[];
+
+  @OneToMany(() => NetworkInterface, (ni) => ni.internalNetwork)
+  networkInterfaces: NetworkInterface[];
 }
