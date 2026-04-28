@@ -7,8 +7,8 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-rod/rod v0.116.2
-	github.com/oasm-platform/oasm-sdk-go v0.1.1-0.20260427052238-36b3c39ce574
-	github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260420142520-e7b146d8dac5
+	github.com/oasm-platform/oasm-sdk-go v0.1.1-0.20260428114300-b30669a4e6d6
+	github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260428111953-044d56938cef
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 )

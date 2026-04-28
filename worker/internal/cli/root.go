@@ -24,6 +24,7 @@ func printBanner() {
 	fmt.Print(green(myFigure.String()))
 }
 
+
 func Execute() {
 	rootCmd := &cobra.Command{
 		Use:   "oasm-worker",
@@ -41,13 +42,15 @@ func Execute() {
 				return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
 			}
 
-			oasm.Logger("Worker").Verbose(fmt.Sprintf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\n",
-				cfg.ApiKey, cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort))
+			network := cmd.Flag("network").Value.String()
+
+			oasm.Logger("Worker").Verbose(fmt.Sprintf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\nNetwork: %s\n",
+				cfg.ApiKey, cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort, network))
 
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 
-			worker.Start(ctx, cfg)
+			worker.Start(ctx, cfg, network)
 			return nil
 		},
 	}
@@ -66,6 +69,9 @@ func Execute() {
 
 	rootCmd.Flags().String("tool-path", "oasm-tools", "Tool path")
 	viper.BindPFlag("tool_path", rootCmd.Flags().Lookup("tool-path"))
+
+	rootCmd.Flags().String("network", "", "Network ID for internal network connection")
+	viper.BindPFlag("network", rootCmd.Flags().Lookup("network"))
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
