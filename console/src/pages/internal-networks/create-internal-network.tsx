@@ -21,7 +21,8 @@ type FormData = {
 
 const CreateInternalNetwork = () => {
   const navigate = useNavigate();
-  const { mutate, isPending } = useInternalNetworksControllerCreateInternalNetwork();
+  const { mutate, isPending } =
+    useInternalNetworksControllerCreateInternalNetwork();
 
   const {
     register,
