@@ -5,7 +5,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 
 @Entity('network_interfaces')
-@Unique(['internalNetworkId', 'gatewayMac'])
+@Unique(['internalNetworkId', 'gatewayMac', 'cidr'])
 export class NetworkInterface extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'uuid' })
