@@ -590,6 +590,102 @@ export class TargetsService implements OnModuleInit {
    * @param targetId - The ID of the target to update the scan schedule job for
    * @param scanSchedule - The new scan schedule for the target (can be null/undefined)
    */
+  /**
+   * Creates targets from a list of interface data, including association with internal networks.
+   * 
+   * @param targetsData - Array of targets with their CIDR and internal network association.
+   * @param userContext - The user's context data.
+   * @returns A promise that resolves to the created targets.
+   */
+  public async createTargetsFromInterfaces(
+    targetsData: Array<{ cidr: string; internalNetworkId: string; workspaceId: string }>,
+  ): Promise<Target[]> {
+    const targetValues = targetsData.map((t) => t.cidr);
+
+    // We use a transaction to ensure atomicity across Target, WorkspaceTarget, and Asset tables
+    return await this.repo.manager.transaction(
+      async (transactionalEntityManager) => {
+        // 1. Identify existing targets to avoid duplicates
+        const existingTargets = await transactionalEntityManager
+          .getRepository(Target)
+          .createQueryBuilder('target')
+          .where('target.value IN (:...values)', { values: targetValues })
+          .getMany();
+
+        const existingValues = new Set(existingTargets.map((t) => t.value));
+        const newTargetsData = targetsData.filter((t) => !existingValues.has(t.cidr));
+
+        if (newTargetsData.length === 0) {
+          return [];
+        }
+
+        // 2. Batch insert new targets
+        const insertResult = await transactionalEntityManager
+          .createQueryBuilder()
+          .insert()
+          .into(Target)
+          .values(
+            newTargetsData.map((t) => ({
+              value: t.cidr,
+              type: TargetType.CIDR,
+              internalNetworkId: t.internalNetworkId,
+            })),
+          )
+          .execute();
+
+        const targetIds = insertResult.identifiers.map((id) => id.id as string);
+        const createdTargetEntities = await transactionalEntityManager
+          .getRepository(Target)
+          .findByIds(targetIds);
+
+        // 3. Create workspace target associations
+        const workspaceTargetValues = newTargetsData.map((t, index) => ({
+          workspace: { id: t.workspaceId },
+          target: { id: createdTargetEntities[index].id },
+        }));
+
+        await transactionalEntityManager
+          .getRepository(WorkspaceTarget)
+          .save(workspaceTargetValues);
+
+        // 4. Create assets for CIDR /24
+        const assetValues: Array<{
+          id: string;
+          target: { id: string };
+          value: string;
+          isPrimary: boolean;
+        }> = [];
+
+        for (const target of createdTargetEntities) {
+          const ips = this.expandCIDRToIPs(target.value);
+          ips.forEach((ip, index) => {
+            assetValues.push({
+              id: randomUUID(),
+              target: { id: target.id },
+              value: ip,
+              isPrimary: index === 0,
+            });
+          });
+        }
+
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .insert()
+          .into(Asset)
+          .values(assetValues)
+          .orIgnore()
+          .execute();
+
+        return createdTargetEntities;
+      },
+    ).then((createdTargets) => {
+      // Emit events for created targets
+      for (const target of createdTargets) {
+        this.eventEmitter.emit(`target.cidr.create`, target);
+      }
+      return createdTargets;
+    });
+  }
   private async updateTargetScanScheduleJob(
     target: Target,
     scanSchedule: CronSchedule,

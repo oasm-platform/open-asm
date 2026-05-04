@@ -17,6 +17,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CreateInternalNetworkDto } from './dtos/create-internal-network.dto';
+import { CreateTargetsFromInterfacesDto } from './dtos/create-targets-from-interfaces.dto';
 import {
   GetInternalNetworkResponseDto,
   GetManyInternalNetworksQueryDto,
@@ -80,6 +81,26 @@ export class InternalNetworksController {
       workspaceId,
       user,
     );
+  }
+
+  @Doc({
+    summary: 'Create targets from network interfaces',
+    description:
+      'Creates new targets from the CIDRs of the specified network interfaces.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('targets')
+  @UseGuards(WorkspaceOwnerGuard)
+  createTargetsFromInterfaces(
+    @Body() dto: CreateTargetsFromInterfacesDto,
+    @UserContext() user: UserContextPayload,
+  ): Promise<DefaultMessageResponseDto> {
+    return this.internalNetworksService.createTargetsFromInterfaces(dto, user);
   }
 
   @Doc({

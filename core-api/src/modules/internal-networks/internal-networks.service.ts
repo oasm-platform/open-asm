@@ -4,7 +4,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOperator, Like, Repository } from 'typeorm';
 import { WorkspacesService } from '../workspaces/workspaces.service';
+import { TargetsService } from '../targets/targets.service';
 import { CreateInternalNetworkDto } from './dtos/create-internal-network.dto';
+import { CreateTargetsFromInterfacesDto } from './dtos/create-targets-from-interfaces.dto';
 import {
   GetInternalNetworkResponseDto,
   GetManyInternalNetworksQueryDto,
@@ -26,6 +28,7 @@ export class InternalNetworksService {
     @InjectRepository(NetworkInterface)
     private readonly networkInterfaceRepository: Repository<NetworkInterface>,
     private readonly workspacesService: WorkspacesService,
+    private readonly targetsService: TargetsService,
   ) {}
 
   async getManyInternalNetworks(
@@ -233,5 +236,47 @@ export class InternalNetworksService {
         image: network.creator?.image || '',
       },
     };
+  }
+
+  async createTargetsFromInterfaces(
+    dto: CreateTargetsFromInterfacesDto,
+    user: UserContextPayload,
+  ): Promise<DefaultMessageResponseDto> {
+    const interfaces = await this.networkInterfaceRepository.findByIds(
+      dto.networkInterfaceIds,
+    );
+
+    if (interfaces.length === 0) {
+      throw new NotFoundException('No network interfaces found');
+    }
+
+    const networkIds = [...new Set(interfaces.map((i) => i.internalNetworkId))];
+    const networks = await this.internalNetworkRepository.findByIds(networkIds);
+    
+    if (networks.length !== networkIds.length) {
+       throw new NotFoundException('One or more internal networks not found');
+    }
+
+    const networkMap = new Map(networks.map((n) => [n.id, n]));
+    const workspaceIds = new Set(networks.map((n) => n.workspaceId));
+
+    for (const workspaceId of workspaceIds) {
+      await this.workspacesService.getWorkspaceByIdAndOwner(workspaceId, user);
+    }
+
+    const targetsData = interfaces.map((iface) => {
+      const network = networkMap.get(iface.internalNetworkId);
+      return {
+        cidr: iface.cidr,
+        internalNetworkId: iface.internalNetworkId,
+        workspaceId: network!.workspaceId,
+      };
+    });
+
+    await this.targetsService.createTargetsFromInterfaces(
+      targetsData,
+    );
+
+    return { message: 'Targets created successfully from network interfaces' };
   }
 }
