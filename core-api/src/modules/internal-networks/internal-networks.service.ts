@@ -12,6 +12,7 @@ import {
   GetManyInternalNetworksQueryDto,
   GetManyInternalNetworksResponseDto,
 } from './dtos/get-many-internal-networks.dto';
+import { Target } from '../targets/entities/target.entity';
 import {
   GetManyNetworkInterfacesQueryDto,
   GetManyNetworkInterfacesResponseDto,
@@ -172,32 +173,61 @@ export class InternalNetworksService {
     const { page, limit, sortBy, sortOrder, search } = query;
     const skip = (page - 1) * limit;
 
-    const where: { internalNetworkId: string; interfaceName?: FindOperator<string> } = {
-      internalNetworkId,
-    };
+    const queryBuilder = this.networkInterfaceRepository
+      .createQueryBuilder('iface')
+      .leftJoin(Target, 'target', 'target.value = iface.cidr AND target.internalNetworkId = :internalNetworkId', {
+        internalNetworkId,
+      })
+      .where('iface.internalNetworkId = :internalNetworkId', { internalNetworkId })
+      .select('iface.id', 'id')
+      .addSelect('iface.interfaceName', 'interfaceName')
+      .addSelect('iface.ipAddress', 'ipAddress')
+      .addSelect('iface.cidr', 'cidr')
+      .addSelect('iface.gatewayIp', 'gatewayIp')
+      .addSelect('iface.gatewayMac', 'gatewayMac')
+      .addSelect('iface.workerId', 'workerId')
+      .addSelect('iface.createdAt', 'createdAt')
+      .addSelect('iface.updatedAt', 'updatedAt')
+      .addSelect('target.id', 'targetId');
+
     if (search) {
-      where.interfaceName = Like(`%${search}%`);
+      queryBuilder.andWhere('iface.interfaceName LIKE :search', {
+        search: `%${search}%`,
+      });
     }
 
-    const [interfaces, total] = await this.networkInterfaceRepository.findAndCount(
-      {
-        where,
-        order: { [sortBy]: sortOrder },
-        skip,
-        take: limit,
-      },
-    );
+    queryBuilder.orderBy(`iface.${sortBy}`, sortOrder);
+    queryBuilder.skip(skip).take(limit);
 
-    const data = interfaces.map((iface) => ({
-      id: iface.id,
-      interfaceName: iface.interfaceName,
-      ipAddress: iface.ipAddress,
-      cidr: iface.cidr,
-      gatewayIp: iface.gatewayIp,
-      gatewayMac: iface.gatewayMac,
-      workerId: iface.workerId,
-      createdAt: iface.createdAt,
-      updatedAt: iface.updatedAt,
+    const [rawResults, total] = await Promise.all([
+      queryBuilder.getRawMany(),
+      queryBuilder.getCount(),
+    ]);
+
+    interface RawNetworkInterface {
+      id: string;
+      interfaceName: string;
+      ipAddress: string;
+      cidr: string;
+      gatewayIp: string;
+      gatewayMac: string;
+      workerId: string;
+      createdAt: Date;
+      updatedAt: Date;
+      targetId: string | null;
+    }
+
+    const data = (rawResults as RawNetworkInterface[]).map((row) => ({
+      id: row.id,
+      interfaceName: row.interfaceName,
+      ipAddress: row.ipAddress,
+      cidr: row.cidr,
+      gatewayIp: row.gatewayIp,
+      gatewayMac: row.gatewayMac,
+      workerId: row.workerId,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+      targetId: row.targetId || null,
     }));
 
     const pageCount = Math.ceil(total / limit);

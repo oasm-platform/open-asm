@@ -32,12 +32,13 @@ axiosInstance.interceptors.response.use(
  * Used as the custom client instance for Orval API generation
  */
 export const orvalClient = <T>(
-  config: AxiosRequestConfig,
+  config: AxiosRequestConfig | string,
   options?: AxiosRequestConfig,
 ): Promise<T> & { cancel: () => void } => {
   const source = Axios.CancelToken.source();
+  const finalConfig = typeof config === 'string' ? { url: config } : config;
   const promise = axiosInstance<T>({
-    ...config,
+    ...finalConfig,
     ...options,
     cancelToken: source.token,
   });

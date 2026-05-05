@@ -3,7 +3,7 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 /**
  * Query parameters for getting many network interfaces
@@ -45,6 +45,14 @@ export class NetworkInterfaceResponseDto {
   })
   @IsUUID('4')
   workerId: string;
+
+  @ApiProperty({
+    description: 'The ID of the target associated with this network interface, if any',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID('4')
+  targetId: string | null;
 
   @ApiProperty({ description: 'When the network interface was created' })
   createdAt: Date;
