@@ -108,7 +108,7 @@ export class Target extends BaseEntity {
   @ManyToOne(
     () => InternalNetwork,
     (internalNetwork) => internalNetwork.targets,
-    { onDelete: 'SET NULL' },
+    { onDelete: 'CASCADE' },
   )
   @JoinColumn({ name: 'internalNetworkId' })
   internalNetwork: InternalNetwork;

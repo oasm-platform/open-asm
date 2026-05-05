@@ -16,9 +16,9 @@ import {
   type GetManyNetworkInterfacesResponseDtoDataItem,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface NetworkInterfaceItem extends GetManyNetworkInterfacesResponseDtoDataItem {
   id: string;
@@ -45,6 +45,11 @@ export function NetworkInterfacesTable({
     {
       limit: 50,
       page: 1,
+    },
+    {
+      query: {
+        refetchInterval: 5000,
+      },
     },
   );
 
@@ -151,10 +156,14 @@ export function NetworkInterfacesTable({
               const item = iface as NetworkInterfaceItem;
               const isDisabled = !!item.targetId;
               return (
-                <TableRow 
-                  key={item.id} 
-                  className={item.targetId ? 'cursor-pointer hover:bg-muted/50' : ''}
-                  onClick={() => item.targetId && navigate(`/targets/${item.targetId}`)}
+                <TableRow
+                  key={item.id}
+                  className={
+                    item.targetId ? 'cursor-pointer hover:bg-muted/50' : ''
+                  }
+                  onClick={() =>
+                    item.targetId && navigate(`/targets/${item.targetId}`)
+                  }
                 >
                   <TableCell>
                     <Checkbox
