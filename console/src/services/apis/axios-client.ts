@@ -14,6 +14,50 @@ axiosInstance.interceptors.request.use((config) => {
   if (workspaceId) {
     config.headers.set('X-Workspace-Id', workspaceId);
   }
+
+  const cleanValue = (v: any) => v !== null && v !== undefined && v !== '';
+
+  if (config.params) {
+    const cleanedParams = { ...config.params };
+    for (const key in cleanedParams) {
+      const value = cleanedParams[key];
+      if (Array.isArray(value)) {
+        const filtered = value.filter(cleanValue);
+        if (filtered.length === 0) delete cleanedParams[key];
+        else cleanedParams[key] = filtered;
+      } else if (!cleanValue(value)) {
+        delete cleanedParams[key];
+      }
+    }
+    config.params = cleanedParams;
+  }
+
+  if (config.url && config.url.includes('?')) {
+    const [baseUrl, queryString] = config.url.split('?');
+    const searchParams = new URLSearchParams(queryString);
+    let modified = false;
+
+    const keys = Array.from(searchParams.keys());
+    for (const key of keys) {
+      const values = searchParams.getAll(key);
+      const filtered = values.filter(cleanValue);
+      
+      if (filtered.length === 0) {
+        searchParams.delete(key);
+        modified = true;
+      } else if (filtered.length !== values.length) {
+        searchParams.delete(key);
+        filtered.forEach(v => searchParams.append(key, v));
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      const newQuery = searchParams.toString();
+      config.url = newQuery ? `${baseUrl}?${newQuery}` : baseUrl;
+    }
+  }
+
   return config;
 });
 
@@ -33,13 +77,14 @@ axiosInstance.interceptors.response.use(
  */
 export const orvalClient = <T>(
   config: AxiosRequestConfig | string,
-  options?: AxiosRequestConfig,
+  options?: any,
 ): Promise<T> & { cancel: () => void } => {
   const source = Axios.CancelToken.source();
   const finalConfig = typeof config === 'string' ? { url: config } : config;
   const promise = axiosInstance<T>({
     ...finalConfig,
     ...options,
+    data: options?.body ?? options?.data,
     cancelToken: source.token,
   });
 
