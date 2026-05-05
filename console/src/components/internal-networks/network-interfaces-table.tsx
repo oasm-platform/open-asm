@@ -55,10 +55,12 @@ export function NetworkInterfacesTable({
 
   const { mutate: createTargets, isPending } =
     useInternalNetworksControllerCreateTargetsFromInterfaces({
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: ['/api/internal-networks'],
-        });
+      mutation: {
+        onSuccess: () => {
+          queryClient.invalidateQueries({
+            queryKey: ['/api/internal-networks'],
+          });
+        },
       },
     });
 
@@ -77,23 +79,6 @@ export function NetworkInterfacesTable({
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
-  };
-
-  const toggleAll = () => {
-    if (!data?.data) return;
-    const allEnabledIds = data.data
-      .filter((iface) => !(iface as NetworkInterfaceItem).targetId)
-      .map((iface) => (iface as NetworkInterfaceItem).id);
-
-    const allSelected = allEnabledIds.every((id) => selectedIds.includes(id));
-
-    if (allSelected) {
-      setSelectedIds((prev) =>
-        prev.filter((id) => !allEnabledIds.includes(id)),
-      );
-    } else {
-      setSelectedIds((prev) => [...new Set([...prev, ...allEnabledIds])]);
-    }
   };
 
   const handleStartDiscovery = () => {
@@ -132,17 +117,7 @@ export function NetworkInterfacesTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10">
-                <Checkbox
-                  onCheckedChange={toggleAll}
-                  checked={
-                    data?.data?.length > 0 &&
-                    data.data.every((iface) =>
-                      selectedIds.includes((iface as NetworkInterfaceItem).id),
-                    )
-                  }
-                />
-              </TableHead>
+              <TableHead className="w-10"></TableHead>
               <TableHead>Interface Name</TableHead>
               <TableHead>IP Address</TableHead>
               <TableHead>CIDR</TableHead>

@@ -84,7 +84,7 @@ export const orvalClient = <T>(
   const promise = axiosInstance<T>({
     ...finalConfig,
     ...options,
-    data: options?.body ?? options?.data,
+    ...(options?.body || options?.data ? { data: options?.body ?? options?.data } : {}),
     cancelToken: source.token,
   });
 
