@@ -1812,6 +1812,11 @@ export interface CreateInternalNetworkDto {
   name: string;
 }
 
+export interface CreateTargetsFromInterfacesDto {
+  /** Array of network interface IDs to create targets from */
+  networkInterfaceIds: string[];
+}
+
 export interface GetManyNetworkInterfacesResponseDto {
   data: object[];
   total: number;
@@ -5362,6 +5367,27 @@ export class Api<
     });
 
   /**
+   * @description Creates new targets from the CIDRs of the specified network interfaces.
+   *
+   * @tags InternalNetworks
+   * @name InternalNetworksControllerCreateTargetsFromInterfaces
+   * @summary Create targets from network interfaces
+   * @request POST:/api/internal-networks/targets
+   */
+  internalNetworksControllerCreateTargetsFromInterfaces = (
+    data: CreateTargetsFromInterfacesDto,
+    params: RequestParams = {},
+  ) =>
+    this.request<AppResponseSerialization, any>({
+      path: `/api/internal-networks/targets`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+
+  /**
    * @description Retrieves a paginated list of network interfaces for the specified internal network.
    *
    * @tags InternalNetworks
@@ -5528,7 +5554,7 @@ export class Api<
     path: string,
     params: RequestParams = {},
   ) =>
-    this.request<Blob, any>({
+    this.request<File, any>({
       path: `/api/storage/${bucket}/${path}`,
       method: "GET",
       ...params,
@@ -5549,7 +5575,7 @@ export class Api<
     },
     params: RequestParams = {},
   ) =>
-    this.request<Blob, any>({
+    this.request<File, any>({
       path: `/api/storage/forward`,
       method: "GET",
       query: query,
