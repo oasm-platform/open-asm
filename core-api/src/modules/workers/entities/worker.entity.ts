@@ -63,7 +63,7 @@ export class WorkerInstance extends BaseEntity {
   @ManyToOne(
     () => InternalNetwork,
     (internalNetwork) => internalNetwork.workers,
-    { nullable: true },
+    { nullable: true, onDelete: 'CASCADE' },
   )
   @JoinColumn({ name: 'internalNetworkId' })
   internalNetwork?: InternalNetwork;

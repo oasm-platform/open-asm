@@ -54,7 +54,11 @@ export class TargetsService implements OnModuleInit {
    * @param type - The type of target (DOMAIN, CIDR, or IP).
    * @throws BadRequestException if validation fails.
    */
-  private validateTargetValue(value: string, type: TargetType): void {
+  private validateTargetValue(
+    value: string,
+    type: TargetType,
+    isInternalNetwork: boolean = false,
+  ): void {
     if (type === TargetType.DOMAIN) {
       // Validate root domain: must not be an IP address
       const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -106,8 +110,8 @@ export class TargetsService implements OnModuleInit {
         );
       }
 
-      // Validate IP is public (not private/localhost/reserved)
-      if (this.isPrivateIP(octets[0], octets[1])) {
+      // Validate IP is public (not private/localhost/reserved) unless it's an internal network
+      if (!isInternalNetwork && this.isPrivateIP(octets[0], octets[1])) {
         throw new BadRequestException(
           `Invalid CIDR: "${value}" is a private/reserved IP range. Only public IP ranges are allowed.`,
         );
@@ -138,8 +142,8 @@ export class TargetsService implements OnModuleInit {
         }
       }
 
-      // Validate IP is public (not private/localhost/reserved)
-      if (this.isPrivateIP(octets[0], octets[1])) {
+      // Validate IP is public (not private/localhost/reserved) unless it's an internal network
+      if (!isInternalNetwork && this.isPrivateIP(octets[0], octets[1])) {
         throw new BadRequestException(
           `Invalid IP: "${value}" is a private/reserved IP address. Only public IP addresses are allowed.`,
         );
@@ -269,7 +273,7 @@ export class TargetsService implements OnModuleInit {
     // Validate all targets before processing
     for (const target of targets) {
       const type = target.type || TargetType.DOMAIN;
-      this.validateTargetValue(target.value, type);
+      this.validateTargetValue(target.value, type, !!internalNetworkId);
     }
 
     // Check if the workspace exists and the user is the owner
@@ -290,7 +294,10 @@ export class TargetsService implements OnModuleInit {
           .innerJoin('wt.target', 'target')
           .where('wt.workspace = :workspaceId', { workspaceId })
           .andWhere('target.value IN (:...values)', { values: targetValues })
-          .select(['target.value AS value', 'target.internalNetworkId AS internalNetworkId'])
+          .select([
+            'target.value AS value',
+            'target.internalNetworkId AS internalNetworkId',
+          ])
           .getRawMany<{ value: string; internalNetworkId: string | null }>();
 
         const existingTargetsMap = new Map<string, Set<string | null>>();
@@ -595,110 +602,6 @@ export class TargetsService implements OnModuleInit {
    * The BullMQ job will trigger a rescan of the target every time it runs according to its cron schedule.
    */
 
-  /**
-   * Updates the scan schedule job for a specific target in BullMQ.
-   * If the target has a scan schedule, a new job will be added to the queue.
-   * If the target previously had a scan schedule but now doesn't, the job will be removed.
-   *
-   * @param targetId - The ID of the target to update the scan schedule job for
-   * @param scanSchedule - The new scan schedule for the target (can be null/undefined)
-   */
-  /**
-   * Creates targets from a list of interface data, including association with internal networks.
-   * 
-   * @param targetsData - Array of targets with their CIDR and internal network association.
-   * @param userContext - The user's context data.
-   * @returns A promise that resolves to the created targets.
-   */
-  public async createTargetsFromInterfaces(
-    targetsData: Array<{ cidr: string; internalNetworkId: string; workspaceId: string }>,
-  ): Promise<Target[]> {
-    const targetValues = targetsData.map((t) => t.cidr);
-
-    // We use a transaction to ensure atomicity across Target, WorkspaceTarget, and Asset tables
-    return await this.repo.manager.transaction(
-      async (transactionalEntityManager) => {
-        // 1. Identify existing targets to avoid duplicates
-        const existingTargets = await transactionalEntityManager
-          .getRepository(Target)
-          .createQueryBuilder('target')
-          .where('target.value IN (:...values)', { values: targetValues })
-          .getMany();
-
-        const existingValues = new Set(existingTargets.map((t) => t.value));
-        const newTargetsData = targetsData.filter((t) => !existingValues.has(t.cidr));
-
-        if (newTargetsData.length === 0) {
-          return [];
-        }
-
-        // 2. Batch insert new targets
-        const insertResult = await transactionalEntityManager
-          .createQueryBuilder()
-          .insert()
-          .into(Target)
-          .values(
-            newTargetsData.map((t) => ({
-              value: t.cidr,
-              type: TargetType.CIDR,
-              internalNetworkId: t.internalNetworkId,
-            })),
-          )
-          .execute();
-
-        const targetIds = insertResult.identifiers.map((id) => id.id as string);
-        const createdTargetEntities = await transactionalEntityManager
-          .getRepository(Target)
-          .findByIds(targetIds);
-
-        // 3. Create workspace target associations
-        const workspaceTargetValues = newTargetsData.map((t, index) => ({
-          workspace: { id: t.workspaceId },
-          target: { id: createdTargetEntities[index].id },
-        }));
-
-        await transactionalEntityManager
-          .getRepository(WorkspaceTarget)
-          .save(workspaceTargetValues);
-
-        // 4. Create assets for CIDR /24
-        const assetValues: Array<{
-          id: string;
-          target: { id: string };
-          value: string;
-          isPrimary: boolean;
-        }> = [];
-
-        for (const target of createdTargetEntities) {
-          const ips = this.expandCIDRToIPs(target.value);
-          ips.forEach((ip, index) => {
-            assetValues.push({
-              id: randomUUID(),
-              target: { id: target.id },
-              value: ip,
-              isPrimary: index === 0,
-            });
-          });
-        }
-
-        await transactionalEntityManager
-          .createQueryBuilder()
-          .insert()
-          .into(Asset)
-          .values(assetValues)
-          .orIgnore()
-          .execute();
-
-        return createdTargetEntities;
-      },
-    ).then((createdTargets) => {
-      // Emit events for created targets
-      for (const target of createdTargets) {
-        this.eventEmitter.emit(`target.cidr.create`, target);
-      }
-      return createdTargets;
-    });
-  }
   private async updateTargetScanScheduleJob(
     target: Target,
     scanSchedule: CronSchedule,

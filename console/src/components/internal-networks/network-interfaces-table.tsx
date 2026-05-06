@@ -16,9 +16,12 @@ import {
   type GetManyNetworkInterfacesResponseDtoDataItem,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 import { format } from 'date-fns';
+import { TargetIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface NetworkInterfaceItem extends GetManyNetworkInterfacesResponseDtoDataItem {
   id: string;
@@ -61,6 +64,9 @@ export function NetworkInterfacesTable({
             queryKey: ['/api/internal-networks'],
           });
         },
+        onError: (error: AxiosError<{ message: string }>) => {
+          toast.error(error.response?.data.message);
+        },
       },
     });
 
@@ -90,7 +96,7 @@ export function NetworkInterfacesTable({
     });
 
     if (idsToCreate.length === 0) return;
-    console.log(idsToCreate);
+
     createTargets({
       data: {
         networkInterfaceIds: idsToCreate,
@@ -107,11 +113,14 @@ export function NetworkInterfacesTable({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Network Interfaces</CardTitle>
-        {hasSelectableItems && (
-          <Button onClick={handleStartDiscovery} disabled={isPending} size="sm">
-            {isPending ? 'Starting...' : 'Start Discovery'}
-          </Button>
-        )}
+        <Button
+          onClick={handleStartDiscovery}
+          disabled={isPending || !hasSelectableItems}
+          variant={'outline'}
+          size="sm"
+        >
+          <TargetIcon /> {isPending ? 'Starting...' : 'Start discovery'}
+        </Button>
       </CardHeader>
       <CardContent>
         <Table>

@@ -1842,7 +1842,9 @@ export interface GetInternalNetworkResponseDto {
    */
   updatedAt: string;
   /** The user who created this internal network */
-  createdBy: object;
+  createdBy: User;
+  /** The number of agents connected to this internal network */
+  agents: number;
 }
 
 export interface UpdateInternalNetworkDto {

@@ -2,14 +2,29 @@ import Page from '@/components/common/page';
 import { NetworkInterfacesTable } from '@/components/internal-networks/network-interfaces-table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConnectWorker } from '@/components/ui/connect-worker';
-import { useInternalNetworksControllerGetInternalNetworkById } from '@/services/apis/gen/queries';
+import {
+  useInternalNetworksControllerDeleteInternalNetwork,
+  useInternalNetworksControllerGetInternalNetworkById,
+} from '@/services/apis/gen/queries';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 export default function InternalNetworkDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { data: network, isLoading: networkLoading } =
     useInternalNetworksControllerGetInternalNetworkById(id!);
+
+  const deleteMutation = useInternalNetworksControllerDeleteInternalNetwork({
+    mutation: {
+      onSuccess: () => {
+        navigate('/internal-networks');
+      },
+    },
+  });
 
   if (networkLoading) {
     return <Page title="Internal Network Detail">Loading...</Page>;
@@ -20,7 +35,24 @@ export default function InternalNetworkDetail() {
   }
 
   return (
-    <Page title={`Internal network: ${network.name}`}>
+    <Page
+      title={network.name}
+      isShowButtonGoBack
+      action={
+        <ConfirmDialog
+          title="Delete Internal Network"
+          description={`Are you sure you want to delete "${network.name}"? This action cannot be undone.`}
+          onConfirm={() => deleteMutation.mutate({ id: network.id })}
+          confirmText="Delete"
+          trigger={
+            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800">
+              <Trash2 className="h-4 w-4 mr-2" />
+              <span>Delete</span>
+            </Button>
+          }
+        />
+      }
+    >
       <div className="space-y-6">
         <Card>
           <CardHeader>

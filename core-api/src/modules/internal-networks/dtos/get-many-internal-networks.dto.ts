@@ -2,6 +2,7 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
+import { User } from '@/modules/auth/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsUUID } from 'class-validator';
 
@@ -28,12 +29,20 @@ export class InternalNetworkResponseDto {
   @ApiProperty({ description: 'When the internal network was last updated' })
   updatedAt: Date;
 
-  @ApiProperty({ description: 'The user who created this internal network' })
+  @ApiProperty({
+    description: 'The user who created this internal network',
+    type: () => User,
+  })
   createdBy: {
     id: string;
     name: string;
     image?: string;
   };
+
+  @ApiProperty({
+    description: 'The number of agents connected to this internal network',
+  })
+  agents: number;
 }
 
 /**

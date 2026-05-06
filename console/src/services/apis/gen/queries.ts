@@ -1905,11 +1905,6 @@ export type GetManyNetworkInterfacesResponseDto = {
   pageCount: number;
 };
 
-/**
- * The user who created this internal network
- */
-export type GetInternalNetworkResponseDtoCreatedBy = { [key: string]: unknown };
-
 export type GetInternalNetworkResponseDto = {
   /** The unique identifier of the internal network */
   id: string;
@@ -1920,7 +1915,9 @@ export type GetInternalNetworkResponseDto = {
   /** When the internal network was last updated */
   updatedAt: string;
   /** The user who created this internal network */
-  createdBy: GetInternalNetworkResponseDtoCreatedBy;
+  createdBy: User;
+  /** The number of agents connected to this internal network */
+  agents: number;
 };
 
 export type UpdateInternalNetworkDto = {

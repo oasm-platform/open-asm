@@ -505,6 +505,7 @@ export class WorkersService {
     if (!worker) {
       throw new RpcException(`Worker not found: ${workerId}`);
     }
+    await this.repo.update(workerId, { internalNetwork: { id: networkId } });
     const workerWorkspaceId = worker.workspace.id;
 
     // Find network and check workspace

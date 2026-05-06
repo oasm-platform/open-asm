@@ -2,7 +2,7 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOperator, Like, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { TargetsService } from '../targets/targets.service';
 import { CreateInternalNetworkDto } from './dtos/create-internal-network.dto';
@@ -20,6 +20,7 @@ import {
 import { UpdateInternalNetworkDto } from './dtos/update-internal-network.dto';
 import { InternalNetwork } from './entities/internal-network.entity';
 import { NetworkInterface } from './entities/network-interface.entity';
+import { WorkerInstance } from '../workers/entities/worker.entity';
 
 @Injectable()
 export class InternalNetworksService {
@@ -39,34 +40,46 @@ export class InternalNetworksService {
     const { page, limit, sortBy, sortOrder, search } = query;
     const skip = (page - 1) * limit;
 
-    const where: { workspaceId: string; name?: FindOperator<string> } = {
-      workspaceId,
-    };
+    const queryBuilder = this.internalNetworkRepository
+      .createQueryBuilder('network')
+      .leftJoinAndSelect('network.creator', 'creator')
+      .addSelect(
+        (subQuery) => {
+          return subQuery
+            .select('COUNT(worker.id)', 'agentCount')
+            .from(WorkerInstance, 'worker')
+            .where('worker.internalNetworkId = network.id');
+        },
+        'agents',
+      )
+      .where('network.workspaceId = :workspaceId', { workspaceId });
+
     if (search) {
-      where.name = Like(`%${search}%`);
+      queryBuilder.andWhere('network.name LIKE :search', {
+        search: `%${search}%`,
+      });
     }
 
-    const [networks, total] = await this.internalNetworkRepository.findAndCount(
-      {
-        where,
-        relations: ['creator'],
-        order: { [sortBy]: sortOrder },
-        skip,
-        take: limit,
-      },
-    );
+    queryBuilder.orderBy(`network.${sortBy}`, sortOrder).skip(skip).take(limit);
 
-    const data = networks.map((network) => ({
-      id: network.id,
-      name: network.name,
-      createdAt: network.createdAt,
-      updatedAt: network.updatedAt,
-      createdBy: {
-        id: network.creator?.id || '',
-        name: network.creator?.name || '',
-        image: network.creator?.image || '',
-      },
-    }));
+    const { entities, raw } = await queryBuilder.getRawAndEntities();
+    const total = await queryBuilder.getCount();
+
+    const data = entities.map((network, index) => {
+      const rawData = raw[index] as { agents: string | number };
+      return {
+        id: network.id,
+        name: network.name,
+        createdAt: network.createdAt,
+        updatedAt: network.updatedAt,
+        agents: parseInt(String(rawData.agents), 10) || 0,
+        createdBy: {
+          id: network.creator?.id || '',
+          name: network.creator?.name || '',
+          image: network.creator?.image || '',
+        },
+      };
+    });
 
     const pageCount = Math.ceil(total / limit);
     const hasNextPage = page * limit < total;
@@ -175,10 +188,17 @@ export class InternalNetworksService {
 
     const queryBuilder = this.networkInterfaceRepository
       .createQueryBuilder('iface')
-      .leftJoin(Target, 'target', 'target.value = iface.cidr AND target.internalNetworkId = :internalNetworkId', {
+      .leftJoin(
+        Target,
+        'target',
+        'target.value = iface.cidr AND target.internalNetworkId = :internalNetworkId',
+        {
+          internalNetworkId,
+        },
+      )
+      .where('iface.internalNetworkId = :internalNetworkId', {
         internalNetworkId,
       })
-      .where('iface.internalNetworkId = :internalNetworkId', { internalNetworkId })
       .select('iface.id', 'id')
       .addSelect('iface.interfaceName', 'interfaceName')
       .addSelect('iface.ipAddress', 'ipAddress')
@@ -249,7 +269,7 @@ export class InternalNetworksService {
   ): Promise<GetInternalNetworkResponseDto> {
     const network = await this.internalNetworkRepository.findOne({
       where: { id, workspaceId },
-      relations: ['creator'],
+      relations: ['creator', 'workers'],
     });
     if (!network) {
       throw new NotFoundException('Internal network not found');
@@ -260,6 +280,7 @@ export class InternalNetworksService {
       name: network.name,
       createdAt: network.createdAt,
       updatedAt: network.updatedAt,
+      agents: network.workers?.length || 0,
       createdBy: {
         id: network.creator?.id || '',
         name: network.creator?.name || '',
@@ -282,9 +303,9 @@ export class InternalNetworksService {
 
     const networkIds = [...new Set(interfaces.map((i) => i.internalNetworkId))];
     const networks = await this.internalNetworkRepository.findByIds(networkIds);
-    
+
     if (networks.length !== networkIds.length) {
-       throw new NotFoundException('One or more internal networks not found');
+      throw new NotFoundException('One or more internal networks not found');
     }
 
     const networkMap = new Map(networks.map((n) => [n.id, n]));
