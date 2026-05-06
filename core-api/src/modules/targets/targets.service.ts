@@ -262,6 +262,7 @@ export class TargetsService implements OnModuleInit {
     dto: CreateMultipleTargetsDto,
     workspaceId: string,
     userContext: UserContextPayload,
+    internalNetworkId?: string,
   ): Promise<BulkTargetResultDto> {
     const { targets } = dto;
 
@@ -289,17 +290,28 @@ export class TargetsService implements OnModuleInit {
           .innerJoin('wt.target', 'target')
           .where('wt.workspace = :workspaceId', { workspaceId })
           .andWhere('target.value IN (:...values)', { values: targetValues })
-          .select('target.value', 'value')
-          .getRawMany<{ value: string }>();
+          .select(['target.value AS value', 'target.internalNetworkId AS internalNetworkId'])
+          .getRawMany<{ value: string; internalNetworkId: string | null }>();
 
-        const existingValues = new Set(
-          existingWorkspaceTargets.map((et) => et.value),
-        );
+        const existingTargetsMap = new Map<string, Set<string | null>>();
+        existingWorkspaceTargets.forEach((et) => {
+          if (!existingTargetsMap.has(et.value)) {
+            existingTargetsMap.set(et.value, new Set());
+          }
+          existingTargetsMap.get(et.value)!.add(et.internalNetworkId);
+        });
 
-        // Filter out duplicates
-        const newTargets = targets.filter((t) => !existingValues.has(t.value));
+        // Filter out duplicates (same value AND same internalNetworkId)
+        const newTargets = targets.filter((t) => {
+          const networks = existingTargetsMap.get(t.value);
+          if (!networks) return true;
+          return !networks.has(internalNetworkId || null);
+        });
         const skippedValues = targets
-          .filter((t) => existingValues.has(t.value))
+          .filter((t) => {
+            const networks = existingTargetsMap.get(t.value);
+            return networks && networks.has(internalNetworkId || null);
+          })
           .map((t) => t.value);
 
         const createdTargets: Target[] = [];
@@ -323,6 +335,7 @@ export class TargetsService implements OnModuleInit {
             newTargets.map((t) => ({
               value: t.value,
               type: t.type || TargetType.DOMAIN,
+              internalNetworkId: internalNetworkId,
             })),
           )
           .execute();

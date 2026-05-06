@@ -12,7 +12,7 @@ import {
   GetManyInternalNetworksQueryDto,
   GetManyInternalNetworksResponseDto,
 } from './dtos/get-many-internal-networks.dto';
-import { Target } from '../targets/entities/target.entity';
+import { Target, TargetType } from '../targets/entities/target.entity';
 import {
   GetManyNetworkInterfacesQueryDto,
   GetManyNetworkInterfacesResponseDto,
@@ -294,18 +294,37 @@ export class InternalNetworksService {
       await this.workspacesService.getWorkspaceByIdAndOwner(workspaceId, user);
     }
 
-    const targetsData = interfaces.map((iface) => {
+    const grouped = new Map<string, Map<string, string[]>>();
+    for (const iface of interfaces) {
       const network = networkMap.get(iface.internalNetworkId);
-      return {
-        cidr: iface.cidr,
-        internalNetworkId: iface.internalNetworkId,
-        workspaceId: network!.workspaceId,
-      };
-    });
+      const workspaceId = network!.workspaceId;
+      const internalNetworkId = iface.internalNetworkId;
 
-    await this.targetsService.createTargetsFromInterfaces(
-      targetsData,
-    );
+      if (!grouped.has(workspaceId)) {
+        grouped.set(workspaceId, new Map());
+      }
+      const networksInWorkspace = grouped.get(workspaceId)!;
+      if (!networksInWorkspace.has(internalNetworkId)) {
+        networksInWorkspace.set(internalNetworkId, []);
+      }
+      networksInWorkspace.get(internalNetworkId)!.push(iface.cidr);
+    }
+
+    for (const [workspaceId, networksInWorkspace] of grouped) {
+      for (const [internalNetworkId, cidrs] of networksInWorkspace) {
+        await this.targetsService.createMultipleTargets(
+          {
+            targets: cidrs.map((cidr) => ({
+              value: cidr,
+              type: TargetType.CIDR,
+            })),
+          },
+          workspaceId,
+          user,
+          internalNetworkId,
+        );
+      }
+    }
 
     return { message: 'Targets created successfully from network interfaces' };
   }
