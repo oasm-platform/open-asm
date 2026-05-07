@@ -58,7 +58,6 @@ tasks:
   # Waits for API server health check before generating docs
   gen-api:
     cmds:
-      - npx swagger-typescript-api generate -n api.ts -p ./.open-api/open-api.json -o ./worker/services/core-api --route-types --axios --extract-enums --unwrap-response-data --default-response any --module-name-index 1000
       - cd console && task gen-api
 
   # Docker Compose orchestration
