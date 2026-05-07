@@ -45,14 +45,16 @@ export function AssetTrends() {
     query: {
       enabled: !!selectedWorkspaceId,
       queryKey: [selectedWorkspaceId],
-      refetchInterval: 3600,
+      refetchInterval: 60 * 60 * 1000,
     },
   });
 
   const chartData =
     data?.data?.map((item) => ({
       ...item,
-      createdAt: format(new Date(item.createdAt), 'MMM dd'),
+      createdAt: item.createdAt
+        ? format(new Date(item.createdAt), 'MMM dd')
+        : 'N/A',
     })) || [];
 
   const [visibleMetrics, setVisibleMetrics] = useState<

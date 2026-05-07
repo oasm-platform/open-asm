@@ -45,7 +45,7 @@ export default function IssuesTimeline() {
   const chartData =
     data?.data?.map((item) => ({
       ...item,
-      date: format(new Date(item.createdAt), 'MMM dd'),
+      date: item.createdAt ? format(new Date(item.createdAt), 'MMM dd') : 'N/A',
     })) || [];
 
   const hasData = chartData.length > 0;
