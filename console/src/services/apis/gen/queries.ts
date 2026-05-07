@@ -129,6 +129,7 @@ export type GetManyTargetResponseDto = {
   totalAssetServices: number;
   duration: number;
   lastDiscoveredAt: string;
+  internalNetworkId: string;
 };
 
 export type GetManyGetManyTargetResponseDtoDto = {
@@ -139,6 +140,14 @@ export type GetManyGetManyTargetResponseDtoDto = {
   hasNextPage: boolean;
   pageCount: number;
 };
+
+export type TargetScopeType =
+  (typeof TargetScopeType)[keyof typeof TargetScopeType];
+
+export const TargetScopeType = {
+  INTERNAL: 'INTERNAL',
+  EXTERNAL: 'EXTERNAL',
+} as const;
 
 export type DefaultMessageResponseDto = {
   message: string;
@@ -1941,6 +1950,10 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
    * Filter by scan status (pending, in_progress, completed, failed, cancelled)
    */
   status?: JobStatus;
+  /**
+   * Filter by target scope (INTERNAL or EXTERNAL)
+   */
+  scope?: TargetScopeType;
 };
 
 export type WorkspacesControllerGetWorkspacesParams = {

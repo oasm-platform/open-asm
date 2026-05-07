@@ -9,6 +9,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import {
   JobStatus,
+  TargetScopeType,
   TargetType,
   useTargetsControllerGetTargetsInWorkspace,
 } from '@/services/apis/gen/queries';
@@ -24,6 +25,7 @@ import { Target } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { TargetTypeFilter } from './components/target-type-filter';
+import { ScopeFilter } from './components/scope-filter';
 
 const targetTypeColor: Record<string, string> = {
   DOMAIN: 'border-blue-500 text-blue-500',
@@ -36,7 +38,14 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     accessorKey: 'value',
     header: 'Target',
     cell: ({ row }) => (
-      <div className="font-medium">{row.getValue('value')}</div>
+      <div className="flex items-center gap-2">
+        <span className="font-medium">{row.getValue('value')}</span>
+        {row.original.internalNetworkId && (
+          <Badge variant="secondary" className="text-xs">
+            Internal
+          </Badge>
+        )}
+      </div>
     ),
   },
   {
@@ -128,6 +137,12 @@ export function ListTargets() {
     urlStatus ?? undefined,
   );
 
+  // Initialize scope filter from URL params
+  const urlScope = searchParams.get('scope') as TargetScopeType | null;
+  const [scopeFilter, setScopeFilter] = useState<TargetScopeType | undefined>(
+    urlScope as TargetScopeType ?? undefined,
+  );
+
   /** Sync type filter to URL search params */
   const handleTypeFilterChange = (newType: TargetType | undefined) => {
     setTypeFilter(newType);
@@ -154,6 +169,19 @@ export function ListTargets() {
     setSearchParams(newParams, { replace: true });
   };
 
+  /** Sync scope filter to URL search params */
+  const handleScopeFilterChange = (newValue: TargetScopeType | undefined) => {
+    setScopeFilter(newValue);
+
+    const newParams = new URLSearchParams(searchParams);
+    if (newValue) {
+      newParams.set('scope', newValue);
+    } else {
+      newParams.delete('scope');
+    }
+    setSearchParams(newParams, { replace: true });
+  };
+
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setFilter, setParams },
@@ -169,6 +197,7 @@ export function ListTargets() {
         value: filter,
         type: typeFilter,
         status: statusFilter,
+        scope: scopeFilter,
       },
       {
         query: {
@@ -183,6 +212,7 @@ export function ListTargets() {
             filter,
             typeFilter,
             statusFilter,
+            scopeFilter,
           ],
         },
       },
@@ -227,6 +257,11 @@ export function ListTargets() {
           key="status-filter"
           value={statusFilter}
           onValueChange={handleStatusFilterChange}
+        />,
+        <ScopeFilter
+          key="scope-filter"
+          value={scopeFilter}
+          onValueChange={handleScopeFilterChange}
         />,
         // <ExportDataButton api="api/targets/export" prefix="targets" />,
         <Button

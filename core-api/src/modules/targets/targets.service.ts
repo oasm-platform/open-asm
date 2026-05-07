@@ -1,5 +1,5 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { BullMQName, CronSchedule, JobStatus } from '@/common/enums/enum';
+import { BullMQName, CronSchedule, JobStatus, TargetScopeType } from '@/common/enums/enum';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -446,7 +446,7 @@ export class TargetsService implements OnModuleInit {
       Target & { totalAssetServices: number; status: string; duration: number }
     >
   > {
-    const { limit, page, sortBy, sortOrder, value, type, status } = query;
+    const { limit, page, sortBy, sortOrder, value, type, status, scope } = query;
 
     const offset = (page - 1) * limit;
 
@@ -466,6 +466,7 @@ export class TargetsService implements OnModuleInit {
         'targets.lastDiscoveredAt as "lastDiscoveredAt"',
         'targets.reScanCount as "reScanCount"',
         'targets.scanSchedule as "scanSchedule"',
+        'targets.internalNetworkId as "internalNetworkId"',
         `CAST(COUNT(DISTINCT CASE WHEN "assetService"."isErrorPage" = false THEN "assetService"."id" END) AS INTEGER) AS "totalAssetServices"`,
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -486,7 +487,7 @@ export class TargetsService implements OnModuleInit {
       queryBuilder.andWhere('targets.type = :type', { type });
     }
 
-    if (status) {
+if (status) {
       // Filter by computed status using HAVING clause
       const statusCase = `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
@@ -496,13 +497,20 @@ export class TargetsService implements OnModuleInit {
       END`;
 
       if (status === JobStatus.COMPLETED) {
-        // For completed status, match both explicit COMPLETED and default (no jobs)
         queryBuilder.having(
           `(${statusCase}) = :status OR (COUNT(job.id) = 0 AND :status = '${JobStatus.COMPLETED}')`,
           { status },
         );
       } else {
         queryBuilder.having(`(${statusCase}) = :status`, { status });
+      }
+    }
+
+if (scope !== undefined) {
+      if (scope === TargetScopeType.INTERNAL) {
+        queryBuilder.andWhere('targets.internalNetworkId IS NOT NULL');
+      } else {
+        queryBuilder.andWhere('targets.internalNetworkId IS NULL');
       }
     }
 
