@@ -22,13 +22,8 @@ export default function Dashboard() {
           <div className="col-span-1 2xl:col-span-3 gap-4 space-y-4 2xl:order-1">
             <Statistic />
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
-              <div className="col-span-1">
-                <IssuesTimeline />
-              </div>
-              <div className="col-span-1">
-                <AssetTrends />
-              </div>
-
+              <IssuesTimeline />
+              <AssetTrends />
               <TlsExpirationTable />
               <TopAssetsVulnerabilitiesChart />
             </div>

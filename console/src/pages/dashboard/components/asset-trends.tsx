@@ -73,12 +73,10 @@ export function AssetTrends() {
   };
 
   return (
-    <Card>
+    <Card className="flex flex-col h-full">
       <CardHeader>
         <CardTitle>Asset trend</CardTitle>
-        <CardDescription>
-          Trend overtime
-        </CardDescription>
+        <CardDescription>Trend overtime</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig}>

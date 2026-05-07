@@ -102,7 +102,7 @@ export default function Statistic() {
       {statsCards.map((card, index) => (
         <Card
           key={index}
-          className="cursor-pointer transition-colors hover:bg-accent/70 overflow-hidden relative group flex flex-col"
+          className="cursor-pointer transition-colors hover:bg-accent/70 overflow-hidden relative group flex flex-col pb-0"
           onClick={() => card.path && navigate(card.path)}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 z-10">
