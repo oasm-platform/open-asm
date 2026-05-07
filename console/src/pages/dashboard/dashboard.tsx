@@ -8,6 +8,7 @@ import TlsExpirationTable from './components/tls-expiration-table';
 import TopAssetsVulnerabilitiesChart from './components/top-assets-vulnerabilities-chart';
 import TopTagsAssets from './components/top-tags-assets';
 import VulnerabilityStatistic from './components/vulnerabilities-statistic';
+import { AssetTrends } from './components/asset-trends';
 
 export default function Dashboard() {
   const { workspaces, isLoading } = useWorkspaceSelector();
@@ -20,13 +21,14 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 2xl:grid-cols-4 gap-4">
           <div className="col-span-1 2xl:col-span-3 gap-4 space-y-4 2xl:order-1">
             <Statistic />
-            <div className="grid grid-cols-1 min-h-96 2xl:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
               <div className="col-span-1">
                 <IssuesTimeline />
               </div>
               <div className="col-span-1">
-                <AssetLocationsMap />
+                <AssetTrends />
               </div>
+
               <TlsExpirationTable />
               <TopAssetsVulnerabilitiesChart />
             </div>
@@ -36,6 +38,9 @@ export default function Dashboard() {
               <VulnerabilityStatistic />
               <TopTagsAssets />
             </div>
+          </div>
+          <div className="col-span-1 2xl:col-span-4 space-y-4 min-h-96 order-last">
+            <AssetLocationsMap />
           </div>
         </div>
       )}

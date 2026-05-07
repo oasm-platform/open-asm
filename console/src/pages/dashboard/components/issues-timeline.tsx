@@ -22,7 +22,7 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 const chartConfig = {
   vuls: {
     label: 'Vulnerabilities: ',
-    color: 'hsl(var(--chart-1))',
+    color: 'var(--chart-1)',
   },
   createdAt: {
     label: 'Date',
