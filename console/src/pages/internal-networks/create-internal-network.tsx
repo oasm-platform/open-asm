@@ -74,6 +74,7 @@ const CreateInternalNetwork = () => {
                 {...register('name', {
                   required: 'Network name is required',
                 })}
+                autoFocus
                 placeholder="Network Name"
               />
               {errors.name && (

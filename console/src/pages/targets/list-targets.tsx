@@ -16,15 +16,14 @@ import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import ExportDataButton from '@/components/ui/export-button';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { GetManyTargetResponseDto } from '@/services/apis/gen/queries';
-import { Target, Network } from 'lucide-react';
+import { Target } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { TargetTypeFilter } from './components/target-type-filter';
-import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 const targetTypeColor: Record<string, string> = {
   DOMAIN: 'border-blue-500 text-blue-500',
@@ -229,7 +228,7 @@ export function ListTargets() {
           value={statusFilter}
           onValueChange={handleStatusFilterChange}
         />,
-        <ExportDataButton api="api/targets/export" prefix="targets" />,
+        // <ExportDataButton api="api/targets/export" prefix="targets" />,
         <Button
           variant="outline"
           className="gap-2"
@@ -237,14 +236,6 @@ export function ListTargets() {
         >
           <Target className="shrink-0" />
           <span>Start discovery</span>
-        </Button>,
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => navigate('/internal-networks/create')}
-        >
-          <Network className="shrink-0" />
-          <span>Create network</span>
         </Button>,
       ]}
       totalItems={total}

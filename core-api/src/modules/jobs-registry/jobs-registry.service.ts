@@ -446,8 +446,6 @@ export class JobsRegistryService {
         return null;
       }
 
-      console.log(job, 'job');
-
       job.workerId = workerId;
       job.status = JobStatus.IN_PROGRESS;
       job.pickJobAt = new Date();
