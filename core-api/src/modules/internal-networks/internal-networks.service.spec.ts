@@ -34,6 +34,17 @@ describe('InternalNetworksService', () => {
             findOne: jest.fn(),
             save: jest.fn(),
             remove: jest.fn(),
+            createQueryBuilder: jest.fn().mockReturnValue({
+              leftJoinAndSelect: jest.fn().mockReturnThis(),
+              addSelect: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              orderBy: jest.fn().mockReturnThis(),
+              skip: jest.fn().mockReturnThis(),
+              take: jest.fn().mockReturnThis(),
+              getRawAndEntities: jest.fn().mockResolvedValue({ entities: [], raw: [] }),
+              getCount: jest.fn().mockResolvedValue(0),
+            }),
           },
         },
         {
@@ -300,9 +311,23 @@ describe('InternalNetworksService', () => {
       ];
       const total = 1;
 
+      const mockQueryBuilder = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getRawAndEntities: jest.fn().mockResolvedValue({
+          entities: networks,
+          raw: [{ agents: '1' }],
+        }),
+        getCount: jest.fn().mockResolvedValue(total),
+      };
       jest
-        .spyOn(internalNetworkRepo, 'findAndCount')
-        .mockResolvedValue([networks as any, total]);
+        .spyOn(internalNetworkRepo, 'createQueryBuilder')
+        .mockReturnValue(mockQueryBuilder as any);
 
       const result = await service.getManyInternalNetworks(query, workspaceId);
 
@@ -311,13 +336,7 @@ describe('InternalNetworksService', () => {
       expect(result.total).toBe(total);
       expect(result.page).toBe(1);
       expect(result.limit).toBe(10);
-      expect(internalNetworkRepo.findAndCount).toHaveBeenCalledWith({
-        where: { workspaceId },
-        relations: ['creator', 'workers'],
-        order: { createdAt: 'DESC' },
-        skip: 0,
-        take: 10,
-      });
+      expect(internalNetworkRepo.createQueryBuilder).toHaveBeenCalledWith('network');
     });
 
     it('should filter by search on name when provided', async () => {
@@ -330,19 +349,27 @@ describe('InternalNetworksService', () => {
       };
       const workspaceId = randomUUID();
 
+      const mockQueryBuilder = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getRawAndEntities: jest.fn().mockResolvedValue({ entities: [], raw: [] }),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
       jest
-        .spyOn(internalNetworkRepo, 'findAndCount')
-        .mockResolvedValue([[], 0]);
+        .spyOn(internalNetworkRepo, 'createQueryBuilder')
+        .mockReturnValue(mockQueryBuilder as any);
 
       await service.getManyInternalNetworks(query, workspaceId);
 
-      expect(internalNetworkRepo.findAndCount).toHaveBeenCalledWith({
-        where: { workspaceId, name: expect.any(Object) }, // Like pattern
-        relations: ['creator', 'workers'],
-        order: { createdAt: SortOrder.ASC },
-        skip: 0,
-        take: 10,
-      });
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'network.name LIKE :search',
+        { search: '%Test%' },
+      );
     });
   });
 

@@ -150,9 +150,9 @@ describe('TargetsService', () => {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
-        getRawMany: jest
-          .fn()
-          .mockResolvedValue(existingTargets.map((value) => ({ value }))),
+        getRawMany: jest.fn().mockResolvedValue(
+          existingTargets.map((value) => ({ value, internalNetworkId: null })),
+        ),
         save: jest.fn().mockResolvedValue(undefined),
       };
 
