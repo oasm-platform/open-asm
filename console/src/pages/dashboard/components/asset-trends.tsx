@@ -75,9 +75,9 @@ export function AssetTrends() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Asset Trend</CardTitle>
+        <CardTitle>Asset trend</CardTitle>
         <CardDescription className="text-gray-400">
-          Trend overtime - Click legend to hide/show
+          Trend overtime
         </CardDescription>
       </CardHeader>
       <CardContent>
