@@ -21,11 +21,11 @@ import { useStatisticControllerGetTimelineStatistics } from '@/services/apis/gen
 import { format } from 'date-fns';
 
 const chartConfig = {
-  services: { label: 'Services', color: 'var(--chart-1)' },
-  techs: { label: 'Technologies', color: 'var(--chart-2)' },
-  ports: { label: 'Ports', color: 'var(--chart-3)' },
-  assets: { label: 'Assets', color: 'var(--chart-4)' },
-  targets: { label: 'Targets', color: 'var(--chart-5)' },
+  assets: { label: 'Assets', color: '#8b5cf6' },
+  techs: { label: 'Technologies', color: '#3b82f6' },
+  ports: { label: 'Ports', color: '#14b8a6' },
+  services: { label: 'Services', color: '#f59e0b' },
+  targets: { label: 'Targets', color: '#f43f5e' },
 } satisfies ChartConfig;
 
 const metricsOrder = [
