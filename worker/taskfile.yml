@@ -14,10 +14,11 @@ tasks:
       - |
         for i in $(seq 1 {{.replicas}}); do
            echo "Starting worker instance $i"
-          go run ./cmd/oasm-worker \
-            --api-key {{.apiKey}} \
-            --max-concurrency {{.maxJobs}} \
-            --network {{.network}} &
+           CMD="go run ./cmd/oasm-worker --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}"
+           {{- if .network}}
+           CMD="$CMD --network {{.network}}"
+           {{- end}}
+           $CMD &
         done
         wait
     silent: false
