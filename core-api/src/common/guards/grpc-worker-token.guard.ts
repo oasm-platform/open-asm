@@ -1,9 +1,9 @@
+import { WorkersService } from '@/modules/workers/workers.service';
+import { Metadata } from '@grpc/grpc-js';
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Inject, Injectable } from '@nestjs/common';
-import { WORKER_TOKEN_HEADER } from '../constants/app.constants';
-import { Metadata } from '@grpc/grpc-js';
-import { WorkersService } from '@/modules/workers/workers.service';
 import { RpcException } from '@nestjs/microservices';
+import { WORKER_TOKEN_HEADER } from '../constants/app.constants';
 
 /**
  * Guard to validate the presence and validity of a worker token in gRPC metadata.
@@ -33,10 +33,10 @@ export class GrpcWorkerTokenGuard implements CanActivate {
     }
 
     // Validate the worker token against the database
-    const isValidToken =
+    const workerInstance =
       await this.workersService.validateWorkerToken(workerToken);
 
-    if (!isValidToken) {
+    if (!workerInstance) {
       throw new RpcException('Invalid worker token');
     }
 

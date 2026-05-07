@@ -1,6 +1,6 @@
 import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { TriggerWorkflowService } from '../workflows/trigger-workflow.service';
@@ -10,6 +10,7 @@ import { WorkspaceTarget } from './entities/workspace-target.entity';
 import { TargetsController } from './targets.controller';
 import { TargetsService } from './targets.service';
 
+@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([Target, WorkspaceTarget, Asset]),

@@ -8,14 +8,14 @@ import { WorkerTokenGuard } from '../guards/worker-token.guard';
  * This decorator:
  * 1. Applies the WorkerTokenGuard to validate the 'worker-token' header
  * 2. Adds Swagger documentation for the 'worker-token' header
- * 
+ *
  * @returns A decorator function that can be applied to controllers or methods
  */
 export const WorkerTokenAuth = () => {
   return applyDecorators(
     // Apply the WorkerTokenGuard to validate the worker token
     UseGuards(WorkerTokenGuard),
-    
+
     // Add Swagger documentation for the worker token header
     ApiHeader({
       name: WORKER_TOKEN_HEADER,

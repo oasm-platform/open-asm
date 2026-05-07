@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WorkersService_Join_FullMethodName          = "/workers.WorkersService/Join"
-	WorkersService_Alive_FullMethodName         = "/workers.WorkersService/Alive"
-	WorkersService_GetManifest_FullMethodName   = "/workers.WorkersService/GetManifest"
-	WorkersService_DownloadTools_FullMethodName = "/workers.WorkersService/DownloadTools"
+	WorkersService_Join_FullMethodName                   = "/workers.WorkersService/Join"
+	WorkersService_Alive_FullMethodName                  = "/workers.WorkersService/Alive"
+	WorkersService_GetManifest_FullMethodName            = "/workers.WorkersService/GetManifest"
+	WorkersService_DownloadTools_FullMethodName          = "/workers.WorkersService/DownloadTools"
+	WorkersService_ConnectInternalNetwork_FullMethodName = "/workers.WorkersService/ConnectInternalNetwork"
 )
 
 // WorkersServiceClient is the client API for WorkersService service.
@@ -33,6 +34,7 @@ type WorkersServiceClient interface {
 	Alive(ctx context.Context, in *AliveRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[AliveResponse], error)
 	GetManifest(ctx context.Context, in *GetManifestRequest, opts ...grpc.CallOption) (*GetManifestResponse, error)
 	DownloadTools(ctx context.Context, in *DownloadToolsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadToolsResponse], error)
+	ConnectInternalNetwork(ctx context.Context, in *ConnectInternalNetworkRequest, opts ...grpc.CallOption) (*ConnectInternalNetworkResponse, error)
 }
 
 type workersServiceClient struct {
@@ -101,6 +103,16 @@ func (c *workersServiceClient) DownloadTools(ctx context.Context, in *DownloadTo
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkersService_DownloadToolsClient = grpc.ServerStreamingClient[DownloadToolsResponse]
 
+func (c *workersServiceClient) ConnectInternalNetwork(ctx context.Context, in *ConnectInternalNetworkRequest, opts ...grpc.CallOption) (*ConnectInternalNetworkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConnectInternalNetworkResponse)
+	err := c.cc.Invoke(ctx, WorkersService_ConnectInternalNetwork_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkersServiceServer is the server API for WorkersService service.
 // All implementations must embed UnimplementedWorkersServiceServer
 // for forward compatibility.
@@ -109,6 +121,7 @@ type WorkersServiceServer interface {
 	Alive(*AliveRequest, grpc.ServerStreamingServer[AliveResponse]) error
 	GetManifest(context.Context, *GetManifestRequest) (*GetManifestResponse, error)
 	DownloadTools(*DownloadToolsRequest, grpc.ServerStreamingServer[DownloadToolsResponse]) error
+	ConnectInternalNetwork(context.Context, *ConnectInternalNetworkRequest) (*ConnectInternalNetworkResponse, error)
 	mustEmbedUnimplementedWorkersServiceServer()
 }
 
@@ -130,6 +143,9 @@ func (UnimplementedWorkersServiceServer) GetManifest(context.Context, *GetManife
 }
 func (UnimplementedWorkersServiceServer) DownloadTools(*DownloadToolsRequest, grpc.ServerStreamingServer[DownloadToolsResponse]) error {
 	return status.Error(codes.Unimplemented, "method DownloadTools not implemented")
+}
+func (UnimplementedWorkersServiceServer) ConnectInternalNetwork(context.Context, *ConnectInternalNetworkRequest) (*ConnectInternalNetworkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConnectInternalNetwork not implemented")
 }
 func (UnimplementedWorkersServiceServer) mustEmbedUnimplementedWorkersServiceServer() {}
 func (UnimplementedWorkersServiceServer) testEmbeddedByValue()                        {}
@@ -210,6 +226,24 @@ func _WorkersService_DownloadTools_Handler(srv interface{}, stream grpc.ServerSt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkersService_DownloadToolsServer = grpc.ServerStreamingServer[DownloadToolsResponse]
 
+func _WorkersService_ConnectInternalNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConnectInternalNetworkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkersServiceServer).ConnectInternalNetwork(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkersService_ConnectInternalNetwork_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkersServiceServer).ConnectInternalNetwork(ctx, req.(*ConnectInternalNetworkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WorkersService_ServiceDesc is the grpc.ServiceDesc for WorkersService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -224,6 +258,10 @@ var WorkersService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetManifest",
 			Handler:    _WorkersService_GetManifest_Handler,
+		},
+		{
+			MethodName: "ConnectInternalNetwork",
+			Handler:    _WorkersService_ConnectInternalNetwork_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

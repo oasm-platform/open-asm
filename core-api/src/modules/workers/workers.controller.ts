@@ -1,8 +1,9 @@
 import { Public } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
 import { createReadStream } from 'fs';
@@ -162,5 +163,21 @@ export class WorkersController {
         if (intervalId) clearInterval(intervalId);
       };
     });
+  }
+
+  @GrpcMethod('WorkersService', 'ConnectInternalNetwork')
+  @UseGuards(GrpcWorkerTokenGuard)
+  async grpcConnectInternalNetwork(request: {
+    workerId: string;
+    networkId: string;
+    networkInterfaces: Array<{
+      interfaceName: string;
+      ipAddress: string;
+      cidr: string;
+      gatewayIp: string;
+      gatewayMac: string;
+    }>;
+  }): Promise<{ message: string }> {
+    return this.workersService.connectInternalNetwork(request);
   }
 }

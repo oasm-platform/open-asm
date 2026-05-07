@@ -1,6 +1,12 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, IsObject, ValidateNested } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsObject,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class WorkerManifestResponseDto {

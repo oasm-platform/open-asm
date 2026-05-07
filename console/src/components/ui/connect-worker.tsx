@@ -18,7 +18,10 @@ import { Copy, SquareTerminal } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from './confirm-dialog';
-export function ConnectWorker() {
+interface ConnectWorkerProps {
+  networkId?: string;
+}
+export function ConnectWorker({ networkId }: ConnectWorkerProps) {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -32,7 +35,7 @@ export function ConnectWorker() {
 
   const rawCommand = import.meta.env.PROD
     ? `docker run -d --name open-asm-worker -e API_KEY=${data?.apiKey} -e API=${window.location.origin} -e MAX_JOBS=10 open-asm-worker:latest`
-    : `task worker:dev replicas=1 maxJobs=10 apiKey=${data?.apiKey}`;
+    : `task worker:dev replicas=1 maxJobs=10 apiKey=${data?.apiKey} ${networkId ? `network=${networkId}` : ''}`;
 
   const { mutate } = useWorkspacesControllerRotateApiKey({
     mutation: {

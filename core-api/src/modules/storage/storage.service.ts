@@ -192,7 +192,10 @@ export class StorageService {
     const resolvedPath = resolve(fullPath);
     const resolvedBucketPath = resolve(bucketPath);
 
-    if (!resolvedPath.startsWith(resolvedBucketPath) || !existsSync(resolvedPath)) {
+    if (
+      !resolvedPath.startsWith(resolvedBucketPath) ||
+      !existsSync(resolvedPath)
+    ) {
       throw new NotFoundException('File not found');
     }
 

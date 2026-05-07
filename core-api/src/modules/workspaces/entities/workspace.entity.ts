@@ -7,6 +7,7 @@ import { Template } from '@/modules/templates/entities/templates.entity';
 import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
+import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
 import {
@@ -81,6 +82,12 @@ export class Workspace extends BaseEntity {
 
   @OneToMany(() => Workflow, (workflow) => workflow.workspace)
   workflows: Workflow[];
+
+  @OneToMany(
+    () => InternalNetwork,
+    (internalNetwork) => internalNetwork.workspace,
+  )
+  internalNetworks: InternalNetwork[];
 
   @ApiProperty({
     example: true,

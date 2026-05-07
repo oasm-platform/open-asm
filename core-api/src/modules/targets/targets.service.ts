@@ -54,7 +54,11 @@ export class TargetsService implements OnModuleInit {
    * @param type - The type of target (DOMAIN, CIDR, or IP).
    * @throws BadRequestException if validation fails.
    */
-  private validateTargetValue(value: string, type: TargetType): void {
+  private validateTargetValue(
+    value: string,
+    type: TargetType,
+    isInternalNetwork: boolean = false,
+  ): void {
     if (type === TargetType.DOMAIN) {
       // Validate root domain: must not be an IP address
       const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -106,8 +110,8 @@ export class TargetsService implements OnModuleInit {
         );
       }
 
-      // Validate IP is public (not private/localhost/reserved)
-      if (this.isPrivateIP(octets[0], octets[1])) {
+      // Validate IP is public (not private/localhost/reserved) unless it's an internal network
+      if (!isInternalNetwork && this.isPrivateIP(octets[0], octets[1])) {
         throw new BadRequestException(
           `Invalid CIDR: "${value}" is a private/reserved IP range. Only public IP ranges are allowed.`,
         );
@@ -138,8 +142,8 @@ export class TargetsService implements OnModuleInit {
         }
       }
 
-      // Validate IP is public (not private/localhost/reserved)
-      if (this.isPrivateIP(octets[0], octets[1])) {
+      // Validate IP is public (not private/localhost/reserved) unless it's an internal network
+      if (!isInternalNetwork && this.isPrivateIP(octets[0], octets[1])) {
         throw new BadRequestException(
           `Invalid IP: "${value}" is a private/reserved IP address. Only public IP addresses are allowed.`,
         );
@@ -162,7 +166,8 @@ export class TargetsService implements OnModuleInit {
     if (firstOctet === 10) return true;
 
     // 172.16.0.0/12 - Private (172.16.0.0 - 172.31.255.255)
-    if (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) return true;
+    if (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31)
+      return true;
 
     // 192.168.0.0/16 - Private
     if (firstOctet === 192 && secondOctet === 168) return true;
@@ -189,7 +194,9 @@ export class TargetsService implements OnModuleInit {
    * @returns Array of 256 IP addresses
    */
   private expandCIDRToIPs(cidr: string): string[] {
-    const match = cidr.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/24$/);
+    const match = cidr.match(
+      /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/24$/,
+    );
     if (!match) {
       throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
     }
@@ -259,13 +266,14 @@ export class TargetsService implements OnModuleInit {
     dto: CreateMultipleTargetsDto,
     workspaceId: string,
     userContext: UserContextPayload,
+    internalNetworkId?: string,
   ): Promise<BulkTargetResultDto> {
     const { targets } = dto;
 
     // Validate all targets before processing
     for (const target of targets) {
       const type = target.type || TargetType.DOMAIN;
-      this.validateTargetValue(target.value, type);
+      this.validateTargetValue(target.value, type, !!internalNetworkId);
     }
 
     // Check if the workspace exists and the user is the owner
@@ -286,17 +294,31 @@ export class TargetsService implements OnModuleInit {
           .innerJoin('wt.target', 'target')
           .where('wt.workspace = :workspaceId', { workspaceId })
           .andWhere('target.value IN (:...values)', { values: targetValues })
-          .select('target.value', 'value')
-          .getRawMany<{ value: string }>();
+          .select([
+            'target.value AS value',
+            'target.internalNetworkId AS internalNetworkId',
+          ])
+          .getRawMany<{ value: string; internalNetworkId: string | null }>();
 
-        const existingValues = new Set(
-          existingWorkspaceTargets.map((et) => et.value),
-        );
+        const existingTargetsMap = new Map<string, Set<string | null>>();
+        existingWorkspaceTargets.forEach((et) => {
+          if (!existingTargetsMap.has(et.value)) {
+            existingTargetsMap.set(et.value, new Set());
+          }
+          existingTargetsMap.get(et.value)!.add(et.internalNetworkId);
+        });
 
-        // Filter out duplicates
-        const newTargets = targets.filter((t) => !existingValues.has(t.value));
+        // Filter out duplicates (same value AND same internalNetworkId)
+        const newTargets = targets.filter((t) => {
+          const networks = existingTargetsMap.get(t.value);
+          if (!networks) return true;
+          return !networks.has(internalNetworkId || null);
+        });
         const skippedValues = targets
-          .filter((t) => existingValues.has(t.value))
+          .filter((t) => {
+            const networks = existingTargetsMap.get(t.value);
+            return networks && networks.has(internalNetworkId || null);
+          })
           .map((t) => t.value);
 
         const createdTargets: Target[] = [];
@@ -320,6 +342,7 @@ export class TargetsService implements OnModuleInit {
             newTargets.map((t) => ({
               value: t.value,
               type: t.type || TargetType.DOMAIN,
+              internalNetworkId: internalNetworkId,
             })),
           )
           .execute();
@@ -579,14 +602,6 @@ export class TargetsService implements OnModuleInit {
    * The BullMQ job will trigger a rescan of the target every time it runs according to its cron schedule.
    */
 
-  /**
-   * Updates the scan schedule job for a specific target in BullMQ.
-   * If the target has a scan schedule, a new job will be added to the queue.
-   * If the target previously had a scan schedule but now doesn't, the job will be removed.
-   *
-   * @param targetId - The ID of the target to update the scan schedule job for
-   * @param scanSchedule - The new scan schedule for the target (can be null/undefined)
-   */
   private async updateTargetScanScheduleJob(
     target: Target,
     scanSchedule: CronSchedule,

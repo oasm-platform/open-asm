@@ -9,9 +9,7 @@ import {
 import { AssetGroupWorkflow } from './asset-groups-workflows.entity';
 
 @EventSubscriber()
-export class AssetGroupWorkflowSubscriber
-  implements EntitySubscriberInterface<AssetGroupWorkflow>
-{
+export class AssetGroupWorkflowSubscriber implements EntitySubscriberInterface<AssetGroupWorkflow> {
   private readonly logger = new Logger(AssetGroupWorkflowSubscriber.name);
 
   /**

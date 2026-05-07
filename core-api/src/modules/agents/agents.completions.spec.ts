@@ -203,7 +203,9 @@ describe('AgentsCompletionsService', () => {
 
   describe('streamMessage', () => {
     it('should throw BadRequestException when no preferred config exists', async () => {
-      jest.spyOn(service as any, 'getPreferredLLMConfig').mockResolvedValue(null);
+      jest
+        .spyOn(service as any, 'getPreferredLLMConfig')
+        .mockResolvedValue(null);
 
       await expect(
         service.streamMessage(
@@ -215,13 +217,21 @@ describe('AgentsCompletionsService', () => {
     });
 
     it('should create new conversation when conversationId not provided', async () => {
-      jest.spyOn(service as any, 'getPreferredLLMConfig').mockResolvedValue(mockLlmConfig);
-      jest.spyOn(conversationRepository, 'create').mockReturnValue(mockConversation);
-      jest.spyOn(conversationRepository, 'save').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(service as any, 'getPreferredLLMConfig')
+        .mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(conversationRepository, 'create')
+        .mockReturnValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'save')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
       jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
       jest.spyOn(messageRepository, 'find').mockResolvedValue([]);
-      jest.spyOn(llmConfigRepository, 'findOne').mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(llmConfigRepository, 'findOne')
+        .mockResolvedValue(mockLlmConfig);
 
       const stream = await service.streamMessage(
         { question: 'Hello' },
@@ -235,11 +245,15 @@ describe('AgentsCompletionsService', () => {
     });
 
     it('should use existing conversation when conversationId provided', async () => {
-      jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'findOne')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
       jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
       jest.spyOn(messageRepository, 'find').mockResolvedValue([]);
-      jest.spyOn(llmConfigRepository, 'findOne').mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(llmConfigRepository, 'findOne')
+        .mockResolvedValue(mockLlmConfig);
 
       const stream = await service.streamMessage(
         { question: 'Hello', conversationId: mockConversation.id },
@@ -253,9 +267,15 @@ describe('AgentsCompletionsService', () => {
 
     it('should create new conversation when conversationId provided but not found', async () => {
       jest.spyOn(conversationRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(llmConfigRepository, 'findOne').mockResolvedValue(mockLlmConfig);
-      jest.spyOn(conversationRepository, 'create').mockReturnValue(mockConversation);
-      jest.spyOn(conversationRepository, 'save').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(llmConfigRepository, 'findOne')
+        .mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(conversationRepository, 'create')
+        .mockReturnValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'save')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
       jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
       jest.spyOn(messageRepository, 'find').mockResolvedValue([]);
@@ -276,9 +296,15 @@ describe('AgentsCompletionsService', () => {
     });
 
     it('should throw NotFoundException when LLM config not found', async () => {
-      jest.spyOn(service as any, 'getPreferredLLMConfig').mockResolvedValue(mockLlmConfig);
-      jest.spyOn(conversationRepository, 'create').mockReturnValue(mockConversation);
-      jest.spyOn(conversationRepository, 'save').mockResolvedValue(mockConversation);
+      jest
+        .spyOn(service as any, 'getPreferredLLMConfig')
+        .mockResolvedValue(mockLlmConfig);
+      jest
+        .spyOn(conversationRepository, 'create')
+        .mockReturnValue(mockConversation);
+      jest
+        .spyOn(conversationRepository, 'save')
+        .mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'create').mockReturnValue(mockMessage);
       jest.spyOn(messageRepository, 'save').mockResolvedValue(mockMessage);
       jest.spyOn(messageRepository, 'find').mockResolvedValue([]);

@@ -20,6 +20,7 @@ tasks:
   install:
     cmds:
       - npm install
+  lint: npm run lint
   # Run tests
   # Executes unit and integration tests for the console application
   test:

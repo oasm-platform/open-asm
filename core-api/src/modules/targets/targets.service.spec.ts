@@ -150,9 +150,9 @@ describe('TargetsService', () => {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
-        getRawMany: jest
-          .fn()
-          .mockResolvedValue(existingTargets.map((value) => ({ value }))),
+        getRawMany: jest.fn().mockResolvedValue(
+          existingTargets.map((value) => ({ value, internalNetworkId: null })),
+        ),
         save: jest.fn().mockResolvedValue(undefined),
       };
 
@@ -276,8 +276,18 @@ describe('TargetsService', () => {
       ];
       const dto = { targets: targetValues.map((value) => ({ value })) };
       const newTargets = [
-        { id: randomUUID(), value: 'new1.com', type: TargetType.DOMAIN, scanSchedule: 'DISABLED' },
-        { id: randomUUID(), value: 'new2.com', type: TargetType.DOMAIN, scanSchedule: 'DISABLED' },
+        {
+          id: randomUUID(),
+          value: 'new1.com',
+          type: TargetType.DOMAIN,
+          scanSchedule: 'DISABLED',
+        },
+        {
+          id: randomUUID(),
+          value: 'new2.com',
+          type: TargetType.DOMAIN,
+          scanSchedule: 'DISABLED',
+        },
       ] as unknown as Target[];
 
       const mockManager = createMockEntityManager({
@@ -407,7 +417,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for IP address as domain', async () => {
       // Arrange
-      const dto = { targets: [{ value: '192.168.1.1', type: TargetType.DOMAIN }] };
+      const dto = {
+        targets: [{ value: '192.168.1.1', type: TargetType.DOMAIN }],
+      };
 
       // Act & Assert
       await expect(
@@ -419,7 +431,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for invalid domain format', async () => {
       // Arrange
-      const dto = { targets: [{ value: 'invalid-domain', type: TargetType.DOMAIN }] };
+      const dto = {
+        targets: [{ value: 'invalid-domain', type: TargetType.DOMAIN }],
+      };
 
       // Act & Assert
       await expect(
@@ -431,7 +445,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for CIDR with invalid prefix', async () => {
       // Arrange
-      const dto = { targets: [{ value: '192.168.1.0/16', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '192.168.1.0/16', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -443,7 +459,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for invalid CIDR format', async () => {
       // Arrange
-      const dto = { targets: [{ value: '192.168.1.0/24/32', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '192.168.1.0/24/32', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -455,7 +473,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for CIDR with invalid octet', async () => {
       // Arrange
-      const dto = { targets: [{ value: '256.168.1.0/24', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '256.168.1.0/24', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -467,7 +487,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for localhost CIDR (127.0.0.0/24)', async () => {
       // Arrange
-      const dto = { targets: [{ value: '127.0.0.0/24', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '127.0.0.0/24', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -479,7 +501,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for private IP CIDR (10.0.0.0/24)', async () => {
       // Arrange
-      const dto = { targets: [{ value: '10.0.0.0/24', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '10.0.0.0/24', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -491,7 +515,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for private IP CIDR (172.16.0.0/24)', async () => {
       // Arrange
-      const dto = { targets: [{ value: '172.16.0.0/24', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '172.16.0.0/24', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -503,7 +529,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for private IP CIDR (192.168.0.0/24)', async () => {
       // Arrange
-      const dto = { targets: [{ value: '192.168.0.0/24', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '192.168.0.0/24', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -515,7 +543,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for link-local CIDR (169.254.0.0/24)', async () => {
       // Arrange
-      const dto = { targets: [{ value: '169.254.0.0/24', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '169.254.0.0/24', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -527,7 +557,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for multicast CIDR (224.0.0.0/24)', async () => {
       // Arrange
-      const dto = { targets: [{ value: '224.0.0.0/24', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '224.0.0.0/24', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -539,7 +571,9 @@ describe('TargetsService', () => {
 
     it('should throw BadRequestException for reserved CIDR (240.0.0.0/24)', async () => {
       // Arrange
-      const dto = { targets: [{ value: '240.0.0.0/24', type: TargetType.CIDR }] };
+      const dto = {
+        targets: [{ value: '240.0.0.0/24', type: TargetType.CIDR }],
+      };
 
       // Act & Assert
       await expect(
@@ -576,8 +610,18 @@ describe('TargetsService', () => {
         ],
       };
       const createdTargets = [
-        { id: randomUUID(), value: 'example.com', type: TargetType.DOMAIN, scanSchedule: 'DISABLED' },
-        { id: randomUUID(), value: '8.8.8.0/24', type: TargetType.CIDR, scanSchedule: 'DISABLED' },
+        {
+          id: randomUUID(),
+          value: 'example.com',
+          type: TargetType.DOMAIN,
+          scanSchedule: 'DISABLED',
+        },
+        {
+          id: randomUUID(),
+          value: '8.8.8.0/24',
+          type: TargetType.CIDR,
+          scanSchedule: 'DISABLED',
+        },
       ] as unknown as Target[];
 
       const mockManager = createMockEntityManager({
@@ -612,7 +656,12 @@ describe('TargetsService', () => {
         targets: [{ value: '8.8.8.0/24', type: TargetType.CIDR }],
       };
       const createdTargets = [
-        { id: randomUUID(), value: '8.8.8.0/24', type: TargetType.CIDR, scanSchedule: 'DISABLED' },
+        {
+          id: randomUUID(),
+          value: '8.8.8.0/24',
+          type: TargetType.CIDR,
+          scanSchedule: 'DISABLED',
+        },
       ] as unknown as Target[];
 
       const mockManager = createMockEntityManager({
@@ -657,7 +706,12 @@ describe('TargetsService', () => {
       // Arrange
       const dto = { targets: [{ value: 'example.com' }] };
       const createdTargets = [
-        { id: randomUUID(), value: 'example.com', type: TargetType.DOMAIN, scanSchedule: 'DISABLED' },
+        {
+          id: randomUUID(),
+          value: 'example.com',
+          type: TargetType.DOMAIN,
+          scanSchedule: 'DISABLED',
+        },
       ] as unknown as Target[];
 
       const mockManager = createMockEntityManager({
@@ -690,7 +744,12 @@ describe('TargetsService', () => {
         targets: [{ value: '8.8.8.8', type: TargetType.IP }],
       };
       const createdTargets = [
-        { id: randomUUID(), value: '8.8.8.8', type: TargetType.IP, scanSchedule: 'DISABLED' },
+        {
+          id: randomUUID(),
+          value: '8.8.8.8',
+          type: TargetType.IP,
+          scanSchedule: 'DISABLED',
+        },
       ] as unknown as Target[];
 
       const mockManager = createMockEntityManager({

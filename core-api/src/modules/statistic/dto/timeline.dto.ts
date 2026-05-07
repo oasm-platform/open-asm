@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Statistic } from '../entities/statistic.entity';
 
-
 export class TimelineResponseDto {
   @ApiProperty({
     description: 'List of statistics over time',

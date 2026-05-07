@@ -2,6 +2,8 @@ import { forwardRef, Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ApiKeysModule } from '../apikeys/apikeys.module';
 import { Asset } from '../assets/entities/assets.entity';
+import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
+import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsModule } from '../tools/tools.module';
@@ -12,7 +14,14 @@ import { WorkersService } from './workers.service';
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WorkerInstance, Job, Asset, WorkspaceTool]),
+    TypeOrmModule.forFeature([
+      WorkerInstance,
+      Job,
+      Asset,
+      WorkspaceTool,
+      NetworkInterface,
+      InternalNetwork,
+    ]),
     ApiKeysModule,
     forwardRef(() => ToolsModule),
   ],
