@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class Migrations1776960340581 implements MigrationInterface {
-    name = 'Migrations1776960340581'
+    name = 'Migrations1776960340581';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE "vulnerabilities" DROP CONSTRAINT "FK_f7e68acbb73cc61c0496f67d851"`);
@@ -54,11 +54,11 @@ export class Migrations1776960340581 implements MigrationInterface {
     WHERE hr.tls IS NOT NULL
     ORDER BY hr.tls->>'host', hr."assetServiceId", hr."createdAt" DESC
   `);
-        await queryRunner.query(`INSERT INTO "typeorm_metadata"("database", "schema", "table", "type", "name", "value") VALUES (DEFAULT, $1, DEFAULT, $2, $3, $4)`, ["public","VIEW","tls_assets_view","SELECT DISTINCT ON (hr.tls->>'host', hr.\"assetServiceId\")\n      hr.\"assetServiceId\",\n      hr.tls->>'host'           AS host,\n      hr.tls->>'sni'            AS sni,\n      hr.tls->>'subject_dn'     AS subject_dn,\n      hr.tls->>'subject_cn'     AS subject_cn,\n      hr.tls->>'issuer_dn'      AS issuer_dn,\n      hr.tls->>'not_before'     AS not_before,\n      hr.tls->>'not_after'      AS not_after,\n      hr.tls->>'tls_version'    AS tls_version,\n      hr.tls->>'cipher'         AS cipher,\n      hr.tls->>'tls_connection' AS tls_connection,\n      (hr.tls->'subject_an')::text AS subject_an\n    FROM http_responses hr\n    WHERE hr.tls IS NOT NULL\n    ORDER BY hr.tls->>'host', hr.\"assetServiceId\", hr.\"createdAt\" DESC"]);
+        await queryRunner.query(`INSERT INTO "typeorm_metadata"("database", "schema", "table", "type", "name", "value") VALUES (DEFAULT, $1, DEFAULT, $2, $3, $4)`, ['public','VIEW','tls_assets_view',"SELECT DISTINCT ON (hr.tls->>'host', hr.\"assetServiceId\")\n      hr.\"assetServiceId\",\n      hr.tls->>'host'           AS host,\n      hr.tls->>'sni'            AS sni,\n      hr.tls->>'subject_dn'     AS subject_dn,\n      hr.tls->>'subject_cn'     AS subject_cn,\n      hr.tls->>'issuer_dn'      AS issuer_dn,\n      hr.tls->>'not_before'     AS not_before,\n      hr.tls->>'not_after'      AS not_after,\n      hr.tls->>'tls_version'    AS tls_version,\n      hr.tls->>'cipher'         AS cipher,\n      hr.tls->>'tls_connection' AS tls_connection,\n      (hr.tls->'subject_an')::text AS subject_an\n    FROM http_responses hr\n    WHERE hr.tls IS NOT NULL\n    ORDER BY hr.tls->>'host', hr.\"assetServiceId\", hr.\"createdAt\" DESC"]);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DELETE FROM "typeorm_metadata" WHERE "type" = $1 AND "name" = $2 AND "schema" = $3`, ["VIEW","tls_assets_view","public"]);
+        await queryRunner.query(`DELETE FROM "typeorm_metadata" WHERE "type" = $1 AND "name" = $2 AND "schema" = $3`, ['VIEW','tls_assets_view','public']);
         await queryRunner.query(`DROP VIEW "tls_assets_view"`);
         await queryRunner.query(`ALTER TABLE "issues" DROP CONSTRAINT "FK_53edb5e14a09491261b628e0401"`);
         await queryRunner.query(`ALTER TABLE "issue_comments" DROP CONSTRAINT "FK_94b28cbe4b8110d9fedcb44c489"`);

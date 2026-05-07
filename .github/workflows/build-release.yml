@@ -16,6 +16,54 @@ env:
   IMAGE_NAME: oasm/oasm
 
 jobs:
+  build-worker-binaries:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Build worker binaries (multi-platform)
+        run: |
+          platforms=(
+            "linux/amd64"
+            "linux/arm64"
+            "windows/amd64"
+            "darwin/amd64"
+            "darwin/arm64"
+          )
+
+          mkdir -p dist
+
+          for platform in "${platforms[@]}"; do
+            GOOS=${platform%/*}
+            GOARCH=${platform#*/}
+            EXT=""
+            if [ "$GOOS" = "windows" ]; then
+              EXT=".exe"
+            fi
+            OUTPUT="dist/oasm-worker-${GOOS}-${GOARCH}${EXT}"
+            GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -ldflags='-s -w' -o "$OUTPUT" ./cmd/oasm-worker
+          done
+
+          ls -la dist/
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
     #    runs-on: self-hosted
     runs-on: ubuntu-latest

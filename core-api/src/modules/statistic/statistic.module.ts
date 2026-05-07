@@ -22,4 +22,4 @@ import { StatisticService } from './statistic.service';
   providers: [StatisticService, StatisticCronService],
   exports: [StatisticService],
 })
-export class StatisticModule { }
+export class StatisticModule {}

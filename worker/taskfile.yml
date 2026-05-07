@@ -4,18 +4,21 @@ vars:
   replicas: '{{.replicas | default 1}}'
   apiKey: '{{.apiKey | default .API_KEY}}'
   maxJobs: '{{.maxJobs | default .MAX_JOBS}}'
+  network: '{{.network | default ""}}'
 
 tasks:
   # Run worker in development mode
-  # Usage: task dev replicas=1 maxJobs=10 apiKey=your_api_key
+  # Usage: task dev replicas=1 maxJobs=10 apiKey=your_api_key network=your_network_id
   dev:
     cmds:
       - |
         for i in $(seq 1 {{.replicas}}); do
            echo "Starting worker instance $i"
-          go run ./cmd/oasm-worker \
-            --api-key {{.apiKey}} \
-            --max-concurrency {{.maxJobs}} &
+           CMD="go run ./cmd/oasm-worker --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}"
+           {{- if .network}}
+           CMD="$CMD --network {{.network}}"
+           {{- end}}
+           $CMD &
         done
         wait
     silent: false

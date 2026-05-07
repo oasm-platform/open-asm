@@ -14,6 +14,8 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
+	"github.com/oasm-platform/open-asm/grpc-client/go/workers"
+	"google.golang.org/grpc/metadata"
 )
 
 // Track active jobs for logging
@@ -22,7 +24,41 @@ var (
 	activeJobs   = make(map[string]struct{})
 )
 
-func Start(ctx context.Context, cfg *config.Config) {
+func connectInternalNetwork(client *oasm.Client, network string, workerID string, token string) error {
+	networkInfos, err := GetNetworkInfos()
+	if err != nil {
+		return fmt.Errorf("failed to get network infos: %v", err)
+	}
+
+	var networkInterfaces []*workers.NetworkInterfaceMessage
+	for _, info := range networkInfos {
+		networkInterfaces = append(networkInterfaces, &workers.NetworkInterfaceMessage{
+			InterfaceName: info.Interface,
+			IpAddress:     info.IP,
+			Cidr:          info.CIDR,
+			GatewayIp:     info.GatewayIP,
+			GatewayMac:    info.GatewayMAC,
+		})
+	}
+
+	req := &workers.ConnectInternalNetworkRequest{
+		WorkerId:         workerID,
+		NetworkId:        network,
+		NetworkInterfaces: networkInterfaces,
+	}
+
+	ctx := context.Background()
+	md := metadata.Pairs("worker-token", token)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+	_, err = client.Workers().ConnectInternalNetwork(ctx, req)
+	if err != nil {
+		return fmt.Errorf("error connecting internal network: %v", err)
+	}
+
+	return nil
+}
+
+func Start(ctx context.Context, cfg *config.Config, network string) {
 	client, err := oasm.NewClient(
 		oasm.WithApiKey(cfg.ApiKey),
 		oasm.WithGRPCHost(fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort)),
@@ -32,6 +68,15 @@ func Start(ctx context.Context, cfg *config.Config) {
 		log.Printf("Error creating OASM client: %v", err)
 		return
 	}
+
+	// Get worker ID by joining first
+	joinResp, err := client.WorkerJoin(context.Background())
+	if err != nil {
+		log.Printf("Error joining worker: %v", err)
+		return
+	}
+	workerID := joinResp.WorkerId
+	token := joinResp.WorkerToken
 
 	oasm.Logger("Jobs").Verbose("Initializing headless browser...")
 	l := launcher.New().
@@ -56,6 +101,16 @@ func Start(ctx context.Context, cfg *config.Config) {
 		log.Println("Worker failed to join. Shutting down...")
 		workerCancel()
 		return
+	}
+
+	// Handle network connection if network is specified
+	if network != "" {
+		if err := connectInternalNetwork(client, network, workerID, token); err != nil {
+			log.Printf("Failed to connect internal network: %v", err)
+			workerCancel()
+			return
+		}
+		log.Printf("Connected internal network successfully")
 	}
 
 	oasm.Logger("Sync").Verbose("Core is ready, syncing tools...")

@@ -24,10 +24,11 @@ import {
   CirclePlay,
   CloudCheck,
   Cpu,
+  GlobeLock,
   Group,
   LayoutDashboard,
+  Server,
   Sparkles,
-  SquareTerminal,
   Target,
   User,
 } from 'lucide-react';
@@ -102,6 +103,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: <CloudCheck />,
           url: '/assets',
         },
+        {
+          title: 'Internal networks',
+          icon: <GlobeLock />,
+          url: '/internal-networks',
+        },
       ],
     },
     {
@@ -132,7 +138,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         },
         {
           title: 'Workers',
-          icon: <SquareTerminal />,
+          icon: <Server />,
           url: '/workers',
         },
         {

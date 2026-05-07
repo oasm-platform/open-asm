@@ -1,5 +1,10 @@
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
-import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 import type { getSession } from 'better-auth/api';
@@ -11,7 +16,10 @@ import {
   ROLE_METADATA_KEY,
 } from '../constants/app.constants';
 import { Role } from '../enums/enum';
-import { RequestWithMetadata, UserContextPayload } from '../interfaces/app.interface';
+import {
+  RequestWithMetadata,
+  UserContextPayload,
+} from '../interfaces/app.interface';
 
 /**
  * Type representing a valid user session after authentication
@@ -32,7 +40,7 @@ export class AuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     @Inject(AUTH_INSTANCE_KEY)
     private readonly auth: Auth,
-  ) { }
+  ) {}
 
   /**
    * Validates if the current request is authenticated
@@ -52,12 +60,15 @@ export class AuthGuard implements CanActivate {
       headers: fromNodeHeaders(request.headers),
     });
 
-    const isDisabledAuth = this.auth.options.disabledPaths?.map(path => `/${API_GLOBAL_PREFIX}/${path}`)?.includes(request.path);
+    const isDisabledAuth = this.auth.options.disabledPaths
+      ?.map((path) => `/${API_GLOBAL_PREFIX}/${path}`)
+      ?.includes(request.path);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const isPublic = this.reflector.get('PUBLIC', context.getHandler());
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const isOptional = this.reflector.get('OPTIONAL', context.getHandler());
-    if (isPublic || isDisabledAuth || (isOptional && !currentSession)) return true;
+    if (isPublic || isDisabledAuth || (isOptional && !currentSession))
+      return true;
 
     if (!currentSession) {
       throw new UnauthorizedException();

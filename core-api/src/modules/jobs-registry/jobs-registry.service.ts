@@ -6,11 +6,11 @@ import {
 import {
   BullMQName,
   CATEGORY_DATA_SOURCE_MAP,
-  DataSource as ToolDataSource,
   JobPriority,
   JobRunType,
   JobStatus,
   ToolCategory,
+  DataSource as ToolDataSource,
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
@@ -379,6 +379,7 @@ export class JobsRegistryService {
           },
           relations: ['workspace', 'tool'],
         });
+
       if (!worker) {
         throw new NotFoundException('Worker not found');
       }
@@ -410,11 +411,17 @@ export class JobsRegistryService {
         queryBuilder.andWhere('tool.id = :toolId', { toolId: worker.tool.id });
       }
 
+      if (worker.internalNetworkId) {
+        queryBuilder.andWhere('target.internalNetworkId = :internalNetworkId', {
+          internalNetworkId: worker.internalNetworkId,
+        });
+      }
+
       // Determine data source from category mapping and configure query accordingly
       const toolDataSource = worker.tool?.category
         ? CATEGORY_DATA_SOURCE_MAP[worker.tool.category]
         : ToolDataSource.ASSET;
-      
+
       if (toolDataSource === ToolDataSource.ASSET_SERVICE) {
         // For tools operating on asset services (e.g., HTTP_PROBE, SCREENSHOT)
         // Join assetService and filter by category
