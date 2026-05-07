@@ -124,7 +124,7 @@ export function AssetTrends() {
                 <Line
                   key={key}
                   dataKey={key}
-                  type="natural"
+                  type="monotone"
                   name={label}
                   stroke={color}
                   strokeWidth={2}
