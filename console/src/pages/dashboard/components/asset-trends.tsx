@@ -126,7 +126,7 @@ export function AssetTrends() {
                 <Line
                   key={key}
                   dataKey={key}
-                  type="monotone"
+                  type="natural"
                   name={label}
                   stroke={color}
                   strokeWidth={2}
@@ -154,7 +154,7 @@ export function AssetTrends() {
                   className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: color }}
                 />
-                <span className="text-gray-300">{label}</span>
+                <span>{label}</span>
               </button>
             );
           })}
