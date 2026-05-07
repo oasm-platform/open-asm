@@ -61,7 +61,7 @@ export function NetworkInterfacesTable({
       mutation: {
         onSuccess: () => {
           queryClient.invalidateQueries({
-            queryKey: ['/api/internal-networks'],
+            queryKey: ['internal-networks'],
           });
         },
         onError: (error: AxiosError<{ message: string }>) => {

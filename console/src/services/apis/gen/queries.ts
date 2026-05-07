@@ -956,6 +956,7 @@ export type WorkerInstance = {
   type: string;
   scope: string;
   tool: Tool;
+  internalNetworkId: string;
   tools: Tool[];
 };
 

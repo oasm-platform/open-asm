@@ -1,11 +1,12 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { WorkerScope, WorkerType } from '@/common/enums/enum';
-import { Tool } from '@/modules/tools/entities/tools.entity';
-import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '@/modules/internal-networks/entities/network-interface.entity';
+import { Tool } from '@/modules/tools/entities/tools.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { IsUUID } from 'class-validator';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('workers')
 export class WorkerInstance extends BaseEntity {
@@ -57,6 +58,8 @@ export class WorkerInstance extends BaseEntity {
   @JoinColumn({ name: 'toolId' })
   tool: Tool;
 
+  @ApiProperty()
+  @IsUUID()
   @Column({ type: 'uuid', nullable: true })
   internalNetworkId?: string;
 
