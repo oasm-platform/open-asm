@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 
 import {
@@ -131,6 +131,7 @@ export function AssetTrends() {
                   stroke={color}
                   strokeWidth={2}
                   dot={false}
+                  isAnimationActive={true}
                   // strokeOpacity={visibleMetrics[key] ? 1 : 0.1}
                 />
               );

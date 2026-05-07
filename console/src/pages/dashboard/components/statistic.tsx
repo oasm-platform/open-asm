@@ -105,7 +105,7 @@ export default function Statistic() {
           className="cursor-pointer transition-colors hover:bg-accent/70 overflow-hidden relative group flex flex-col pb-0"
           onClick={() => card.path && navigate(card.path)}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 z-10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {card.title}
             </CardTitle>
