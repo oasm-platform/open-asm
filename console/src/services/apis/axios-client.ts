@@ -15,7 +15,7 @@ axiosInstance.interceptors.request.use((config) => {
     config.headers.set('X-Workspace-Id', workspaceId);
   }
 
-  const cleanValue = (v: any) => v !== null && v !== undefined && v !== '';
+  const cleanValue = (v: unknown) => v !== null && v !== undefined && v !== '';
 
   if (config.params) {
     const cleanedParams = { ...config.params };
@@ -77,7 +77,7 @@ axiosInstance.interceptors.response.use(
  */
 export const orvalClient = <T>(
   config: AxiosRequestConfig | string,
-  options?: any,
+  options?: Record<string, unknown>,
 ): Promise<T> & { cancel: () => void } => {
   const source = Axios.CancelToken.source();
   const finalConfig = typeof config === 'string' ? { url: config } : config;

@@ -53,6 +53,13 @@ tasks:
       - task: console:install
       - task: worker:install
 
+  # Run linter
+  # Executes ESLint for both core-api and console
+  lint:
+    deps:
+      - api:lint
+      - console:lint
+
   # API documentation generation
   # Generates API documentation after ensuring API server is ready
   # Waits for API server health check before generating docs
