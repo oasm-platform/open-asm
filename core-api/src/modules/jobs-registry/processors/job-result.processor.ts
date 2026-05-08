@@ -91,12 +91,12 @@ export class JobResultProcessor extends WorkerHost {
         completedAt: new Date(),
       });
 
-      // Decrement counter and check completion
-      await this.jobsRegistryService.decrementAndCheckCompletion(
-        job.jobHistory.id,
-      );
+      const nextStepJobCount =
+        await this.jobsRegistryService.getNextStepForJob(completedJob);
 
-      await this.jobsRegistryService.getNextStepForJob(completedJob);
+      if (nextStepJobCount === 0) {
+        await this.jobsRegistryService.markWorkflowDone(job.jobHistory.id);
+      }
 
       if (job.isPublishEvent) {
         await this.redis.publish(
