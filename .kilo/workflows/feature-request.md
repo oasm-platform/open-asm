@@ -75,7 +75,7 @@ Use the GitHub CLI (`gh`) to create the issue.
 
 ```bash
 # Create a feature request
-gh issue create --title "Feature: New capability" --label "enhancement,feature" --body "$(cat <<'EOF'
+gh issue create --title "[Feature]: New capability" --label "enhancement,feature" --body "$(cat <<'EOF'
 ## Feature Description
 ...
 ## Problem or Need

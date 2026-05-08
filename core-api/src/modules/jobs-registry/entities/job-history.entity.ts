@@ -29,6 +29,11 @@ export class JobHistory extends BaseEntity {
   })
   httpResponses?: HttpResponse[];
 
+  /**
+   * @deprecated Counter-based completion tracking is deprecated.
+   * Workflow completion is now determined by whether the last job spawns any new jobs.
+   * This column is kept for backward compatibility and will be removed in a future migration.
+   */
   @Column({ default: 0 })
   pendingJobsCount: number;
 

@@ -249,9 +249,6 @@ export class JobsRegistryService {
     // Step 4: save all jobs
     if (jobsToInsert.length > 0) {
       await jobRepo.save(jobsToInsert);
-
-      // Increment pending jobs counter (hybrid Redis + DB)
-      await this.incrementJobHistoryCounter(jobHistory.id, jobsToInsert.length);
     }
 
     return jobsToInsert;
@@ -700,40 +697,88 @@ export class JobsRegistryService {
   }
 
   /**
-   * Updates the result of a job with the given worker ID.
-   * @param job
+   * Gets the next step for a job based on workflow definition.
+   * @param job the completed job
+   * @returns number of new jobs created (0 means no more steps in workflow)
    */
-  public async getNextStepForJob(job: Job) {
+  public async getNextStepForJob(job: Job): Promise<number> {
     const workflow = job.jobHistory.workflow;
-    if (!workflow) return;
+    if (!workflow) return 0;
 
     const currentTool = job.tool.name;
     const { jobs } = workflow.content;
 
-    const curretJobMetadata = jobs.find((j) => j.run === currentTool);
-    if (!curretJobMetadata) return null;
+    const currentJobMetadata = jobs.find((j) => j.run === currentTool);
+    if (!currentJobMetadata) return 0;
 
     const indexCurrentTool = workflow?.content.jobs.findIndex(
-      (j) => j.name === curretJobMetadata.name,
+      (j) => j.name === currentJobMetadata.name,
     );
     const nextTool = workflow?.content.jobs[indexCurrentTool + 1]?.run;
-    if (nextTool) {
-      const tools = await this.toolsService.getToolByNames({
-        names: [nextTool],
+    if (!nextTool) return 0;
+
+    const tools = await this.toolsService.getToolByNames({
+      names: [nextTool],
+    });
+
+    const createPromises = tools.map((tool) =>
+      this.createNewJob({
+        tool,
+        targetIds: [job.asset.target.id],
+        assetIds: [job.asset.id],
+        workflow: job.jobHistory.workflow,
+        jobHistory: job.jobHistory,
+        priority: tool.priority,
+        workspaceId: workflow.workspace.id,
+      }),
+    );
+
+    const results = await Promise.all(createPromises);
+    return results.reduce((total, jobs) => total + jobs.length, 0);
+  }
+
+  /**
+   * Marks a workflow as completed when the last job finishes without spawning new jobs.
+   * Uses optimistic locking to prevent race conditions from multiple completions.
+   * Only marks as completed if no more pending/in-progress jobs exist.
+   * @param jobHistoryId the ID of the job history to mark as completed
+   */
+  public async markWorkflowDone(jobHistoryId: string): Promise<void> {
+    const logger = new Logger('JobHistoryCompletion');
+
+    const pendingCount = await this.repo.count({
+      where: {
+        jobHistory: { id: jobHistoryId },
+        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
+      },
+    });
+
+    if (pendingCount > 0) {
+      return;
+    }
+
+    const updateResult = await this.jobHistoryRepo.update(
+      {
+        id: jobHistoryId,
+        isCompleted: false,
+      },
+      {
+        isCompleted: true,
+      },
+    );
+
+    if (updateResult.affected && updateResult.affected > 0) {
+      const jobHistory = await this.jobHistoryRepo.findOne({
+        where: { id: jobHistoryId },
+        relations: { workflow: true },
       });
-      await Promise.all(
-        tools.map((tool) =>
-          this.createNewJob({
-            tool,
-            targetIds: [job.asset.target.id],
-            assetIds: [job.asset.id],
-            workflow: job.jobHistory.workflow,
-            jobHistory: job.jobHistory,
-            priority: tool.priority,
-            workspaceId: workflow.workspace.id,
-          }),
-        ),
-      );
+
+      if (jobHistory) {
+        logger.log(
+          `🎉 JobHistory ${jobHistoryId} completed! ` +
+            `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
+        );
+      }
     }
   }
 
@@ -1042,304 +1087,5 @@ export class JobsRegistryService {
     } finally {
       await queryRunner.release();
     }
-  }
-
-  /**
-   * Helper to get Redis pending jobs counter key
-   */
-  private getRedisPendingKey(jobHistoryId: string): string {
-    return `jh:${jobHistoryId}:pending`;
-  }
-
-  /**
-   * Increment pending jobs counter for a job history (hybrid Redis + DB)
-   * Redis is used for fast atomic operations, DB is backup for durability
-   */
-  private async incrementJobHistoryCounter(
-    jobHistoryId: string,
-    count: number = 1,
-  ): Promise<void> {
-    const redisKey = this.getRedisPendingKey(jobHistoryId);
-
-    // Increment Redis counter for each job (atomic)
-    for (let i = 0; i < count; i++) {
-      await this.redis.client.incr(redisKey);
-    }
-
-    // Increment DB counter async (non-blocking)
-    setImmediate(() => {
-      void (async () => {
-        try {
-          await this.jobHistoryRepo.increment(
-            { id: jobHistoryId },
-            'pendingJobsCount',
-            count,
-          );
-        } catch (error) {
-          Logger.error(
-            `Failed to increment DB counter for JobHistory ${jobHistoryId}`,
-            error instanceof Error ? error : new Error(String(error)),
-          );
-        }
-      })();
-    });
-  }
-
-  /**
-   * Decrement counter and check if JobHistory is completed
-   * Uses Redis for performance + DB for durability
-   */
-  public async decrementAndCheckCompletion(
-    jobHistoryId: string,
-  ): Promise<void> {
-    const logger = new Logger('JobHistoryCompletion');
-    const redisKey = this.getRedisPendingKey(jobHistoryId);
-
-    try {
-      // 1. Decrement Redis counter (atomic)
-      const remaining = await this.redis.client.decr(redisKey);
-
-      // 2. Decrement DB counter async
-      setImmediate(() => {
-        void (async () => {
-          try {
-            await this.jobHistoryRepo.decrement(
-              { id: jobHistoryId },
-              'pendingJobsCount',
-              1,
-            );
-          } catch (error) {
-            logger.error(
-              `Failed to decrement DB counter for JobHistory ${jobHistoryId}`,
-              error instanceof Error ? error : new Error(String(error)),
-            );
-          }
-        })();
-      });
-
-      // 3. If counter = 0, check completion
-      if (remaining === 0) {
-        await this.checkAndTriggerCompletion(jobHistoryId);
-      } else if (remaining < 0) {
-        // Counter error, rebuild from DB
-        logger.warn(
-          `Redis counter negative for JobHistory ${jobHistoryId}, rebuilding...`,
-        );
-        const realCount = await this.rebuildCounterFromDB(jobHistoryId);
-        // If real count = 0, it means completed but Redis was out of sync
-        if (realCount === 0) {
-          await this.checkAndTriggerCompletion(jobHistoryId);
-        }
-      }
-    } catch (error) {
-      logger.error(
-        `Error in decrementAndCheckCompletion for JobHistory ${jobHistoryId}`,
-        error instanceof Error ? error : new Error(String(error)),
-      );
-      // Fallback: check completion from DB
-      await this.checkAndTriggerCompletionFromDB(jobHistoryId);
-    }
-  }
-
-  /**
-   * Check and trigger completion event (ensures exactly-once execution)
-   */
-  private async checkAndTriggerCompletion(jobHistoryId: string): Promise<void> {
-    const logger = new Logger('JobHistoryCompletion');
-
-    // Double-check with DB to be sure
-    const actualPendingCount = await this.repo.count({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
-      },
-    });
-
-    if (actualPendingCount > 0) {
-      logger.warn(
-        `Redis counter = 0 but DB has ${actualPendingCount} pending jobs. Rebuilding counter.`,
-      );
-      await this.rebuildCounterFromDB(jobHistoryId);
-      return;
-    }
-
-    // Check for FAILED jobs
-    const hasFailedJobs = await this.repo.exists({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: JobStatus.FAILED,
-      },
-    });
-
-    if (hasFailedJobs) {
-      logger.log(
-        `JobHistory ${jobHistoryId} has failed jobs, not triggering completion`,
-      );
-      // Cleanup Redis counter even if failed (completed but failed)
-      const redisKey = this.getRedisPendingKey(jobHistoryId);
-      await this.redis.client.del(redisKey);
-      return;
-    }
-
-    // Update DB with optimistic locking (only 1 process succeeds)
-    const updateResult = await this.jobHistoryRepo.update(
-      {
-        id: jobHistoryId,
-        isCompleted: false,
-      },
-      {
-        isCompleted: true,
-        pendingJobsCount: 0,
-      },
-    );
-
-    // If update success, trigger event
-    if (updateResult.affected && updateResult.affected > 0) {
-      const jobHistory = await this.jobHistoryRepo.findOne({
-        where: { id: jobHistoryId },
-        relations: { workflow: true },
-      });
-
-      if (jobHistory) {
-        await this.triggerJobHistoryCompletedEvent(jobHistory);
-      }
-    } else {
-      // If update failed (maybe completed by another process), double check
-      const current = await this.jobHistoryRepo.findOne({
-        where: { id: jobHistoryId },
-        select: ['isCompleted'],
-      });
-      if (current?.isCompleted) {
-        // Already completed -> ensure key cleanup
-        const redisKey = this.getRedisPendingKey(jobHistoryId);
-        await this.redis.client.del(redisKey);
-      }
-    }
-  }
-
-  /**
-   * Trigger event when JobHistory completed
-   * (Simple logger implementation, custom logic can be added later)
-   */
-  private async triggerJobHistoryCompletedEvent(
-    jobHistory: JobHistory,
-  ): Promise<void> {
-    const logger = new Logger('JobHistoryCompletion');
-
-    logger.log(
-      `🎉 JobHistory ${jobHistory.id} completed! ` +
-        `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
-    );
-
-    // Cleanup Redis counter
-    const redisKey = this.getRedisPendingKey(jobHistory.id);
-    await this.redis.client.del(redisKey);
-
-    // TODO: Add custom logic here (webhook, notification, etc.)
-  }
-
-  /**
-   * Rebuild Redis counter from database (recovery mechanism)
-   */
-  private async rebuildCounterFromDB(jobHistoryId: string): Promise<number> {
-    const logger = new Logger('JobHistoryCompletion');
-
-    const pendingCount = await this.repo.count({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
-      },
-    });
-
-    const redisKey = this.getRedisPendingKey(jobHistoryId);
-
-    if (pendingCount > 0) {
-      await this.redis.client.set(redisKey, pendingCount);
-    } else {
-      // If count = 0, delete key to avoid "stuck at 0" state
-      await this.redis.client.del(redisKey);
-    }
-
-    logger.log(
-      `Rebuilt Redis counter for JobHistory ${jobHistoryId}: ${pendingCount}`,
-    );
-
-    return pendingCount;
-  }
-
-  /**
-   * Fallback: Check completion from DB when Redis fails
-   */
-  private async checkAndTriggerCompletionFromDB(
-    jobHistoryId: string,
-  ): Promise<void> {
-    const jobHistory = await this.jobHistoryRepo.findOne({
-      where: { id: jobHistoryId },
-      relations: { workflow: true },
-    });
-
-    if (!jobHistory || jobHistory.isCompleted) {
-      // If already completed, ensure key cleanup
-      if (jobHistory?.isCompleted) {
-        const redisKey = this.getRedisPendingKey(jobHistoryId);
-        await this.redis.client.del(redisKey);
-      }
-      return;
-    }
-
-    const pendingCount = await this.repo.count({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
-      },
-    });
-
-    if (pendingCount === 0) {
-      await this.checkAndTriggerCompletion(jobHistoryId);
-    } else {
-      // If not completed but fallback called, maybe sync redis again?
-      // But this is error handler path, safest to rebuild counter
-      await this.rebuildCounterFromDB(jobHistoryId);
-    }
-  }
-
-  /**
-   * Validate counters between Redis and DB (optional monitoring)
-   * Can be run via cron job
-   */
-  public async validateCounters(jobHistoryId: string): Promise<boolean> {
-    const logger = new Logger('CounterValidation');
-
-    // Get Redis counter
-    const redisKey = this.getRedisPendingKey(jobHistoryId);
-    const redisCount = parseInt(
-      (await this.redis.client.get(redisKey)) || '0',
-      10,
-    );
-
-    // Get actual count from DB
-    const actualCount = await this.repo.count({
-      where: {
-        jobHistory: { id: jobHistoryId },
-        status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
-      },
-    });
-
-    // Get DB counter
-    const jobHistory = await this.jobHistoryRepo.findOne({
-      where: { id: jobHistoryId },
-      select: ['pendingJobsCount'],
-    });
-
-    if (redisCount !== actualCount) {
-      logger.warn(
-        `Counter mismatch for JobHistory ${jobHistoryId}: ` +
-          `Redis=${redisCount}, Actual=${actualCount}, DB=${jobHistory?.pendingJobsCount}`,
-      );
-      await this.rebuildCounterFromDB(jobHistoryId);
-      return false;
-    }
-
-    return true;
   }
 }
