@@ -1,4 +1,3 @@
-import { getGlobalWorkspaceId } from '@/utils/workspaceState';
 import Axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 import Qs from 'qs';
 
@@ -10,10 +9,10 @@ export const axiosInstance = Axios.create({
 });
 
 axiosInstance.interceptors.request.use((config) => {
-  const workspaceId = getGlobalWorkspaceId();
-  if (workspaceId) {
-    config.headers.set('X-Workspace-Id', workspaceId);
-  }
+  // const workspaceId = getGlobalWorkspaceId();
+  // if (workspaceId) {
+  //   config.headers.set('X-Workspace-Id', workspaceId);
+  // }
 
   const cleanValue = (v: unknown) => v !== null && v !== undefined && v !== '';
 
@@ -41,13 +40,13 @@ axiosInstance.interceptors.request.use((config) => {
     for (const key of keys) {
       const values = searchParams.getAll(key);
       const filtered = values.filter(cleanValue);
-      
+
       if (filtered.length === 0) {
         searchParams.delete(key);
         modified = true;
       } else if (filtered.length !== values.length) {
         searchParams.delete(key);
-        filtered.forEach(v => searchParams.append(key, v));
+        filtered.forEach((v) => searchParams.append(key, v));
         modified = true;
       }
     }
@@ -84,7 +83,9 @@ export const orvalClient = <T>(
   const promise = axiosInstance<T>({
     ...finalConfig,
     ...options,
-    ...(options?.body || options?.data ? { data: options?.body ?? options?.data } : {}),
+    ...(options?.body || options?.data
+      ? { data: options?.body ?? options?.data }
+      : {}),
     cancelToken: source.token,
   });
 
