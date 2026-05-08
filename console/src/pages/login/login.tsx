@@ -44,8 +44,10 @@ export default function Login() {
       password: values.password,
       callbackURL: redirectUrl || '/',
     });
-    if (!res.data) {
-      form.setError('password', { message: 'Invalid email or password' });
+    if (res.error) {
+      form.setError('password', {
+        message: res.error?.message || 'Invalid email or password',
+      });
     }
     setLoading(false);
   }
