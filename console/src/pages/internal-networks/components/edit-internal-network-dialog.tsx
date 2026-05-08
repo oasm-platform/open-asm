@@ -50,7 +50,7 @@ export function EditInternalNetworkDialog({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: internalNetwork.name,
+      name: internalNetwork.name as string,
     },
   });
 
@@ -58,10 +58,12 @@ export function EditInternalNetworkDialog({
 
   const queryClient = useQueryClient();
 
-  function handleSubmit(data: z.infer<typeof formSchema>) {
+  type FormValues = z.infer<typeof formSchema>;
+
+  function handleSubmit(data: FormValues) {
     mutate(
       {
-        id: internalNetwork.id,
+        id: internalNetwork.id as string,
         data,
       },
       {

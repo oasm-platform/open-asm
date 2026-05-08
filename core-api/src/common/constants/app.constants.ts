@@ -18,6 +18,8 @@ export const AUTH_IGNORE_ROUTERS = ['mcp', 'messages'];
 export const WEBAPP_ANALYZER_SRC_URL =
   'https://raw.githubusercontent.com/oasm-platform/webappanalyzer/main/src';
 export const GET_WORKSPACE_MCP_TOOL_NAME = 'get_workspaces';
+export const WORKSPACE_COOKIE_NAME = 'wid';
+export const WORKSPACE_HEADER_NAME = 'X-Workspace-Id';
 export const CACHE_STATIC_RESOURCE = 14 * 24 * 60 * 60; // 14 days in seconds
 export const BOT_ID = '019b3ae4-189e-7dfe-b10e-20d847717733';
 export const BOT_EMAIL = 'bot@oasm.local';

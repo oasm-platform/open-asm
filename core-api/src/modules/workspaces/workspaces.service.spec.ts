@@ -1,6 +1,7 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Role } from '@/common/enums/enum';
 import type { TestingModule } from '@nestjs/testing';
+import type { Request, Response } from 'express';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -232,7 +233,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce(mockOwnerWorkspaceResult); // data query
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -259,7 +260,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce(mockMemberWorkspaceResult); // data query
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -302,7 +303,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce(adminRoleResult); // data query
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -326,7 +327,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce(mockMultipleWorkspacesResult); // data query
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -353,7 +354,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce(mockMultipleWorkspacesResult); // data query
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -384,7 +385,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce([]); // data query with isArchived filter
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -412,7 +413,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce(mockArchivedWorkspaceResult); // data query with isArchived filter
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -442,7 +443,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce([]); // data query without isArchived filter
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -469,7 +470,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce(mockOwnerWorkspaceResult); // data query
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result.data[0].targetCount).toBe(5);
@@ -492,7 +493,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce([]); // data query
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -515,7 +516,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce([]); // data query
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
@@ -538,7 +539,7 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce([]); // data query returns empty
 
       // Act
-      const result = await service.getWorkspaces(query, testUserContext);
+      const result = await service.getWorkspaces(query, testUserContext, { headers: {} } as Request, { cookie: jest.fn() } as unknown as Response);
 
       // Assert
       expect(result).toBeDefined();
