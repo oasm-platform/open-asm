@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -79,9 +80,21 @@ func Start(ctx context.Context, cfg *config.Config, network string) {
 	token := joinResp.WorkerToken
 
 	oasm.Logger("Jobs").Verbose("Initializing headless browser...")
+
 	l := launcher.New().
 		Leakless(false). // Disable leakless to avoid Windows Defender false positive
 		Headless(true)   // Explicit headless mode
+
+	// Use system chromium if available, otherwise go-rod will download Chrome
+	if _, err := os.Stat("/usr/bin/chromium"); err == nil {
+		oasm.Logger("Jobs").Verbose("Using system chromium at /usr/bin/chromium")
+		l = l.Bin("/usr/bin/chromium")
+	} else if _, err := os.Stat("/usr/bin/chromium-browser"); err == nil {
+		oasm.Logger("Jobs").Verbose("Using system chromium at /usr/bin/chromium-browser")
+		l = l.Bin("/usr/bin/chromium-browser")
+	} else {
+		oasm.Logger("Jobs").Verbose("No system chromium found, go-rod will download Chrome automatically")
+	}
 
 	browser := rod.New().
 		ControlURL(l.MustLaunch()).

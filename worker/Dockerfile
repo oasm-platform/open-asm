@@ -25,12 +25,12 @@ FROM alpine:3.20
 
 WORKDIR /app
 
-# Install ca-certificates for TLS, bash for entrypoint, and chromium for browser tasks
+# Install ca-certificates for TLS, bash, and chromium for browser tasks
 RUN apk add --no-cache ca-certificates bash chromium nss freetype harfbuzz ttf-freefont
 
 # Copy binary and entrypoint from builder
-    COPY --from=builder /app/oasm-worker .
-    COPY --from=builder /app/entrypoint.sh .
+COPY --from=builder /app/oasm-worker .
+COPY entrypoint.sh /app/entrypoint.sh
 
 # Make entrypoint executable
 RUN chmod +x /app/entrypoint.sh
@@ -39,8 +39,9 @@ RUN chmod +x /app/entrypoint.sh
 RUN addgroup -g 1000 -S worker && \
     adduser -u 1000 -S worker -G worker
 
-# Change ownership
-RUN chown -R worker:worker /app
+# Create tool directory and change ownership
+RUN mkdir -p /app/oasm-tools && \
+    chown -R worker:worker /app
 
 USER worker
 
@@ -63,4 +64,4 @@ LABEL org.opencontainers.image.description="Attack Surface Management worker age
 LABEL org.opencontainers.image.vendor="OASM Platform"
 
 # Entrypoint - automatically starts worker with environment configuration
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/app/entrypoint.sh"]

@@ -12,6 +12,11 @@ services:
     ports:
       - '3000:80'
     restart: 'always'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
     depends_on:
       core-api:
@@ -36,6 +41,11 @@ services:
       - GEO_IP_URL=geo-ip:4360
       - OASM_CLOUD_APIKEY=change_me
     restart: 'always'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     depends_on:
       migration:
         condition: service_completed_successfully
@@ -65,6 +75,11 @@ services:
       - WORKER_GRPC_PORT=16276
       - WORKER_MAX_CONCURRENCY=10
       - WORKER_TOOL_PATH=/app/oasm-tools
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     volumes:
       - worker-tools-cache:/app/oasm-tools:rw
     networks:
@@ -87,6 +102,11 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
       PGUSER: '${POSTGRES_USERNAME:-postgres}'
       PGPASSWORD: '${POSTGRES_PASSWORD:-postgres}'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     volumes:
       - pgdata:/var/lib/postgresql/data:rw
     ports:
@@ -107,6 +127,11 @@ services:
       - '6379:6379'
     networks:
       - oasm
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
     volumes:
       - redis-data:/data
     command: 'redis-server --requirepass password'
@@ -149,6 +174,11 @@ services:
       - POSTGRES_USERNAME=${POSTGRES_USERNAME:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-open_asm}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
     restart: 'no'
     depends_on:
       postgres:
@@ -162,9 +192,6 @@ volumes:
   redpanda-data:
   geoip-data:
   api-storage:
-  assistant-logs:
-  assistant-knowledge:
-  searxng-data:
   worker-tools-cache:
 
 networks:
