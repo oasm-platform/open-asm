@@ -31,6 +31,7 @@ jobs:
           go-version: '1.26'
 
       - name: Build worker binaries (multi-platform)
+        working-directory: worker
         run: |
           platforms=(
             "linux/amd64"
@@ -50,7 +51,7 @@ jobs:
               EXT=".exe"
             fi
             OUTPUT="dist/oasm-worker-${GOOS}-${GOARCH}${EXT}"
-            GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -ldflags='-s -w' -o "$OUTPUT" ./cmd/oasm-worker
+            GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -ldflags='-s -w' -o "$OUTPUT" ./cmd/app
           done
 
           ls -la dist/
