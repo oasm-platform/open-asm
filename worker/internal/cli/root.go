@@ -35,8 +35,8 @@ func App() error {
 		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
 	}
 
-	oasm.Logger("Worker").Verbose(fmt.Sprintf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\nNetwork: %s\n",
-		cfg.ApiKey, cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort, cfg.Network))
+	oasm.NewLogger("CLI").Verbose("Config loaded | MaxConcurrency: %d | Host: %s:%d | Network: %s",
+		cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort, cfg.Network)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

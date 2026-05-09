@@ -11,6 +11,7 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/go-rod/stealth"
+	"github.com/oasm-platform/oasm-sdk-go/oasm"
 )
 
 var userAgents = []string{
@@ -23,8 +24,7 @@ var userAgents = []string{
 }
 
 func getRandomUserAgent() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return userAgents[r.Intn(len(userAgents))]
+	return userAgents[rand.Intn(len(userAgents))]
 }
 
 func formatURL(target string) string {
@@ -41,13 +41,13 @@ func formatURL(target string) string {
 	return "http://" + target
 }
 
-// TakeScreenshotBase64 navigates to the provided URL, takes a screenshot,
-// and returns it as a Base64 encoded string.
 func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL string) (string, error) {
+	l := oasm.NewLogger("Worker.Screenshot")
 	url := formatURL(rawURL)
 
-	browserCtx := browser.Context(ctx)
-	page := stealth.MustPage(browserCtx)
+	l.Verbose("Preparing browser context for: %s", url)
+
+	page := stealth.MustPage(browser.Context(ctx))
 	defer page.MustClose()
 
 	_ = page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
@@ -57,9 +57,8 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 		Mobile:            false,
 	})
 
-	ua := getRandomUserAgent()
 	_ = page.SetUserAgent(&proto.NetworkSetUserAgentOverride{
-		UserAgent:      ua,
+		UserAgent:      getRandomUserAgent(),
 		AcceptLanguage: "en-US,en;q=0.9",
 	})
 
@@ -82,7 +81,7 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 		if strings.Contains(err.Error(), "timeout") {
 			return "", fmt.Errorf("timeout loading page %s", url)
 		}
-		return "", fmt.Errorf("failed to load page %s: %v", url, err)
+		return "", fmt.Errorf("failed to load page %s: %w", url, err)
 	}
 
 	quality := 80
@@ -94,8 +93,9 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to take screenshot: %v", err)
+		return "", fmt.Errorf("failed to take screenshot: %w", err)
 	}
 
+	l.Debug("Screenshot captured successfully: %s", url)
 	return base64.StdEncoding.EncodeToString(imgBytes), nil
 }
