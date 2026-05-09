@@ -92,6 +92,9 @@ func Start(ctx context.Context, cfg *config.Config, network string) {
 	} else if _, err := os.Stat("/usr/bin/chromium-browser"); err == nil {
 		oasm.Logger("Jobs").Verbose("Using system chromium at /usr/bin/chromium-browser")
 		l = l.Bin("/usr/bin/chromium-browser")
+	} else if _, err := os.Stat("/usr/bin/google-chrome"); err == nil {
+		oasm.Logger("Jobs").Verbose("Using system chromium at /usr/bin/google-chrome")
+		l = l.Bin("/usr/bin/google-chrome")
 	} else {
 		oasm.Logger("Jobs").Verbose("No system chromium found, go-rod will download Chrome automatically")
 	}
