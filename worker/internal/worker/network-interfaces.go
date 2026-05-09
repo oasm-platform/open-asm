@@ -2,15 +2,15 @@ package worker
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/oasm-platform/oasm-sdk-go/oasm"
 )
 
-// NetworkInfo represents the best network interface information
 type NetworkInfo struct {
 	Interface  string
 	IP         string
@@ -19,7 +19,6 @@ type NetworkInfo struct {
 	GatewayMAC string
 }
 
-// interfaceCandidate represents a candidate interface with score
 type interfaceCandidate struct {
 	iface net.Interface
 	ip    net.IP
@@ -27,30 +26,26 @@ type interfaceCandidate struct {
 	score int
 }
 
-// GetNetworkInfos returns all suitable network interface information
 func GetNetworkInfos() ([]NetworkInfo, error) {
-	log.Println("Starting network interface detection")
+	l := oasm.NewLogger("Network")
+	l.Verbose("Starting network interface detection")
 
-	// Get all interfaces
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get interfaces: %w", err)
 	}
 
-	// Select all suitable interfaces
 	candidates, err := selectAllInterfaces(ifaces)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select interfaces: %w", err)
 	}
 
-	// Get gateway IP (shared for all interfaces)
 	gatewayIP, err := getGatewayIP()
 	if err != nil {
-		log.Printf("Warning: failed to get gateway IP: %v", err)
+		l.Warning("Failed to get gateway IP: %v", err)
 		gatewayIP = nil
 	}
 
-	// Deduplicate by CIDR, keep the highest scoring candidate per CIDR
 	cidrMap := make(map[string]interfaceCandidate)
 	for _, candidate := range candidates {
 		normalizedCIDR := normalizeCIDR(candidate.ipNet)
@@ -61,20 +56,17 @@ func GetNetworkInfos() ([]NetworkInfo, error) {
 
 	var networkInfos []NetworkInfo
 	for normalizedCIDR, candidate := range cidrMap {
-		log.Printf("Selected interface: %s with IP: %s", candidate.iface.Name, candidate.ip.String())
-		log.Printf("Normalized CIDR: %s", normalizedCIDR)
+		l.Debug("Selected interface: %s | IP: %s | CIDR: %s", candidate.iface.Name, candidate.ip.String(), normalizedCIDR)
 
-		// Validate gateway is in same subnet
 		if gatewayIP != nil && !candidate.ipNet.Contains(gatewayIP) {
-			log.Printf("Warning: gateway %s not in interface subnet %s", gatewayIP.String(), candidate.ipNet.String())
+			l.Warning("Gateway %s not in interface subnet %s", gatewayIP.String(), candidate.ipNet.String())
 		}
 
-		// Resolve gateway MAC
 		gatewayMAC := ""
 		if gatewayIP != nil {
 			gatewayMAC, err = resolveARP(gatewayIP)
 			if err != nil {
-				log.Printf("Failed to resolve gateway MAC: %v", err)
+				l.Warning("Failed to resolve gateway MAC: %v", err)
 			}
 		}
 
@@ -90,22 +82,18 @@ func GetNetworkInfos() ([]NetworkInfo, error) {
 	return networkInfos, nil
 }
 
-// selectAllInterfaces returns all suitable network interfaces based on scoring
 func selectAllInterfaces(ifaces []net.Interface) ([]interfaceCandidate, error) {
 	var candidates []interfaceCandidate
 
 	for _, iface := range ifaces {
-		// Skip if not up and running
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagRunning == 0 {
 			continue
 		}
 
-		// Skip loopback
 		if iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
 
-		// Skip virtual interfaces
 		if isVirtualInterface(iface.Name) {
 			continue
 		}
@@ -128,40 +116,34 @@ func selectAllInterfaces(ifaces []net.Interface) ([]interfaceCandidate, error) {
 				continue
 			}
 
-			// Must be IPv4
 			if ip.To4() == nil {
 				continue
 			}
 
-			// Skip link-local
 			if ip.IsLinkLocalUnicast() {
 				continue
 			}
 
-			// Skip loopback
 			if ip.IsLoopback() {
 				continue
 			}
 
 			score := 0
 
-			// Prefer private IPv4
 			if isPrivateIP(ip) {
 				score += 3
 			}
 
-			// Prefer /24 subnet
 			if ipNet != nil {
 				if ones, _ := ipNet.Mask.Size(); ones == 24 {
 					score += 2
 				}
 			}
 
-			// Prefer physical interfaces
 			if isPhysicalInterface(iface.Name) {
 				score += 1
 			} else {
-				score -= 5 // Penalize virtual
+				score -= 5
 			}
 
 			candidates = append(candidates, interfaceCandidate{
@@ -177,14 +159,12 @@ func selectAllInterfaces(ifaces []net.Interface) ([]interfaceCandidate, error) {
 		return nil, fmt.Errorf("no suitable interface found")
 	}
 
-	// Return all suitable candidates
 	return candidates, nil
 }
 
-// isVirtualInterface checks if interface name indicates virtual
 func isVirtualInterface(name string) bool {
 	lower := strings.ToLower(name)
-	virtualPatterns := []string{"vEthernet", "docker", "wsl", "br-", "bridge", "vm", "virtual", "tailscale"}
+	virtualPatterns := []string{"vethernet", "docker", "wsl", "br-", "bridge", "vm", "virtual", "tailscale"}
 	for _, pattern := range virtualPatterns {
 		if strings.Contains(lower, pattern) {
 			return true
@@ -193,7 +173,6 @@ func isVirtualInterface(name string) bool {
 	return false
 }
 
-// isPhysicalInterface checks if interface is likely physical
 func isPhysicalInterface(name string) bool {
 	lower := strings.ToLower(name)
 	physicalPatterns := []string{"ethernet", "wi-fi", "wifi", "lan", "eth", "wlan"}
@@ -205,7 +184,6 @@ func isPhysicalInterface(name string) bool {
 	return false
 }
 
-// isPrivateIP checks if IP is in private ranges
 func isPrivateIP(ip net.IP) bool {
 	privateRanges := []string{
 		"10.0.0.0/8",
@@ -221,7 +199,6 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
-// normalizeCIDR normalizes subnet to /24
 func normalizeCIDR(ipNet *net.IPNet) string {
 	if ipNet == nil {
 		return ""
@@ -230,13 +207,11 @@ func normalizeCIDR(ipNet *net.IPNet) string {
 	if ip == nil {
 		return ipNet.String()
 	}
-	// Set mask to /24
 	newMask := net.CIDRMask(24, 32)
 	newIPNet := &net.IPNet{IP: ip, Mask: newMask}
 	return newIPNet.String()
 }
 
-// resolveARP resolves MAC address for IP
 func resolveARP(ip net.IP) (string, error) {
 	switch runtime.GOOS {
 	case "windows":
@@ -248,7 +223,6 @@ func resolveARP(ip net.IP) (string, error) {
 	}
 }
 
-// resolveARPWindows for Windows
 func resolveARPWindows(ip net.IP) (string, error) {
 	cmd := exec.Command("arp", "-a")
 	output, err := cmd.CombinedOutput()
@@ -262,7 +236,6 @@ func resolveARPWindows(ip net.IP) (string, error) {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
 				mac := fields[1]
-				// Normalize format
 				if strings.Contains(mac, "-") {
 					mac = strings.ReplaceAll(mac, "-", ":")
 				}
@@ -273,7 +246,6 @@ func resolveARPWindows(ip net.IP) (string, error) {
 	return "", fmt.Errorf("MAC not found for %s", ip.String())
 }
 
-// resolveARPUnix for Linux and macOS
 func resolveARPUnix(ip net.IP) (string, error) {
 	cmd := exec.Command("arp", "-n", ip.String())
 	output, err := cmd.CombinedOutput()
@@ -286,7 +258,6 @@ func resolveARPUnix(ip net.IP) (string, error) {
 			fields := strings.Fields(line)
 			if len(fields) >= 3 {
 				mac := fields[2]
-				// Normalize format
 				if strings.Contains(mac, "-") {
 					mac = strings.ReplaceAll(mac, "-", ":")
 				}
@@ -297,7 +268,6 @@ func resolveARPUnix(ip net.IP) (string, error) {
 	return "", fmt.Errorf("MAC not found for %s", ip.String())
 }
 
-// windowsRouteStruct represents a route entry from Windows route print
 type windowsRouteStruct struct {
 	Destination string
 	Netmask     string
@@ -306,7 +276,6 @@ type windowsRouteStruct struct {
 	Metric      int
 }
 
-// parseToWindowsRouteStruct parses the output of "route print 0.0.0.0"
 func parseToWindowsRouteStruct(output []byte) ([]windowsRouteStruct, error) {
 	lines := strings.Split(string(output), "\n")
 	defaultRoutes := make([]windowsRouteStruct, 0)
@@ -329,9 +298,6 @@ func parseToWindowsRouteStruct(output []byte) ([]windowsRouteStruct, error) {
 	return defaultRoutes, nil
 }
 
-
-
-// getGatewayIP returns the default gateway IP cross-platform
 func getGatewayIP() (net.IP, error) {
 	switch runtime.GOOS {
 	case "windows":
@@ -345,7 +311,6 @@ func getGatewayIP() (net.IP, error) {
 	}
 }
 
-// getGatewayIPWindows for Windows
 func getGatewayIPWindows() (net.IP, error) {
 	cmd := exec.Command("route", "print", "0.0.0.0")
 	output, err := cmd.CombinedOutput()
@@ -367,7 +332,6 @@ func getGatewayIPWindows() (net.IP, error) {
 	return nil, fmt.Errorf("no gateway found")
 }
 
-// getGatewayIPLinux for Linux
 func getGatewayIPLinux() (net.IP, error) {
 	cmd := exec.Command("ip", "route", "show", "default")
 	output, err := cmd.CombinedOutput()
@@ -391,7 +355,6 @@ func getGatewayIPLinux() (net.IP, error) {
 	return nil, fmt.Errorf("no gateway found")
 }
 
-// getGatewayIPDarwin for macOS
 func getGatewayIPDarwin() (net.IP, error) {
 	cmd := exec.Command("netstat", "-nr")
 	output, err := cmd.CombinedOutput()
@@ -412,6 +375,3 @@ func getGatewayIPDarwin() (net.IP, error) {
 	}
 	return nil, fmt.Errorf("no gateway found")
 }
-
-
-

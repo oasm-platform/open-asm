@@ -15,10 +15,10 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build static binary with optimizations
+# Build static binary with optimizations from the new APP entrypoint
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags='-w -s -extldflags "-static"' \
-    -o oasm-worker ./cmd/oasm-worker
+    -o oasm-worker ./cmd/app
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
@@ -36,12 +36,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create tool directory
 RUN mkdir -p /app/oasm-tools
 
-# Copy binary and entrypoint from builder
+# Copy binary from builder
 COPY --from=builder /app/oasm-worker .
-COPY entrypoint.sh /app/entrypoint.sh
-
-# Make entrypoint executable
-RUN chmod +x /app/entrypoint.sh
 
 # Create non-root user for security
 RUN groupadd -g 1000 worker && \
@@ -70,5 +66,5 @@ LABEL org.opencontainers.image.title="OASM Worker"
 LABEL org.opencontainers.image.description="Attack Surface Management worker agent"
 LABEL org.opencontainers.image.vendor="OASM Platform"
 
-# Entrypoint - automatically starts worker with environment configuration
-ENTRYPOINT ["/bin/bash", "/app/entrypoint.sh"]
+# Entrypoint
+ENTRYPOINT ["/app/oasm-worker"]
