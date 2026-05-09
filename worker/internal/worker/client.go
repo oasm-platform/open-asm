@@ -86,12 +86,12 @@ func Start(ctx context.Context, cfg *config.Config) {
 	browser := rod.New().
 		ControlURL(l.MustLaunch()).
 		MustConnect()
-	defer browser.MustClose()
-	defer l.Cleanup() // Remove user data directory
 
 	ready := make(chan bool, 1)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
+	jobsCtx, jobsCancel := context.WithCancel(context.Background())
+	defer jobsCancel()
 
 	go client.WorkerConnect(workerCtx, ready)
 
@@ -137,10 +137,16 @@ func Start(ctx context.Context, cfg *config.Config) {
 
 	_, err = scheduler.Every(1).Second().Do(func() {
 		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		select {
 		case semaphore <- struct{}{}:
 			wg.Go(func() {
 				defer func() { <-semaphore }()
-				processJob(workerCtx, client, browser, cfg.ToolPath, &activeJobsMu, &activeJobs)
+				processJob(jobsCtx, client, browser, cfg.ToolPath, &activeJobsMu, &activeJobs)
 			})
 		default:
 		}
@@ -170,15 +176,24 @@ func Start(ctx context.Context, cfg *config.Config) {
 	}()
 
 	<-ctx.Done()
-	log.Println("Received shutdown signal. Initiating graceful shutdown...")
+	log.Println("[SHUTDOWN] Signal received. Stopping scheduler...")
 
 	scheduler.Stop()
-	log.Println("Job scheduler stopped.")
+	log.Println("[SHUTDOWN] Scheduler stopped. No new jobs will be accepted.")
 
-	log.Println("Waiting for running jobs to finish...")
+	log.Println("[SHUTDOWN] Waiting for running jobs to finish...")
 	wg.Wait()
-	workerCancel()
 
-	log.Println("All running jobs have completed successfully.")
-	log.Println("Worker shut down safely.")
+	log.Println("[SHUTDOWN] All jobs completed. Cancelling job context...")
+	jobsCancel()
+
+	if err := browser.Close(); err != nil {
+		log.Printf("[SHUTDOWN] Browser close warning: %v", err)
+	}
+	l.Kill()
+	l.Cleanup()
+	log.Println("[SHUTDOWN] Browser killed.")
+
+	workerCancel()
+	log.Println("[SHUTDOWN] Worker shut down safely.")
 }

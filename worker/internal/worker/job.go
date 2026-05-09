@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/go-rod/rod"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
@@ -25,7 +24,6 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 	if job == nil || job.Id == "" {
 		return
 	}
-
 	// Track this job as active
 	(*activeJobsMu).Lock()
 	(*activeJobs)[job.Id] = struct{}{}
@@ -39,6 +37,8 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 	}()
 
 	cmdStr := job.GetCommand()
+	log.Printf("[JOB %s] Started: %s", job.Id, cmdStr)
+
 	if cmdStr == "" {
 		log.Printf("Job %s has no command to execute", job.Id)
 		client.JobsResult(ctx, job.Id, oasm.NewErrorResult("No command provided by Core"))
@@ -53,7 +53,10 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		url := strings.TrimSpace(after)
 		log.Printf("Taking screenshot for URL: %s", url)
 
-		base64Image, _ := TakeScreenshotBase64(ctx, browser, url)
+		base64Image, screenshotErr := TakeScreenshotBase64(ctx, browser, url)
+		if screenshotErr != nil {
+			log.Printf("[JOB %s] Screenshot error for %s: %v", job.Id, url, screenshotErr)
+		}
 
 		resultData := struct {
 			Screenshot string `json:"screenshot"`
@@ -77,12 +80,8 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 			}
 		}
 	} else {
-		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
-		// Setpgid is only available on Unix systems
-		// On Windows, we don't set SysProcAttr as Setpgid doesn't exist
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		// Note: Setpgid field would be set here on Unix systems
-		// but is not available on Windows
+		cmd := exec.Command("sh", "-c", cmdStr)
+		cmd.SysProcAttr = newSysProcAttr()
 
 		pathSep := string(os.PathListSeparator)
 		customPath := fmt.Sprintf("PATH=%s%s%s", toolPath, pathSep, os.Getenv("PATH"))
@@ -101,4 +100,5 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 	if err != nil {
 		log.Printf("Failed to submit result for Job %s: %v", job.Id, err)
 	}
+	log.Printf("[JOB %s] Completed", job.Id)
 }

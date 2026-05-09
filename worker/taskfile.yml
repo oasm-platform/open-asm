@@ -13,31 +13,40 @@ tasks:
   dev:
     cmds:
       - |
-        for i in $(seq 1 {{.replicas}}); do
-           echo "Starting CLI worker instance $i"
-           CMD="go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}"
-           {{- if .network}}
-           CMD="$CMD --network {{.network}}"
-           {{- end}}
-           $CMD &
-        done
-        wait
+        if [ "{{.replicas}}" = "1" ]; then
+          exec go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}{{if .network}} --network {{.network}}{{end}}
+        else
+          trap 'wait; exit 0' INT TERM
+          for i in $(seq 1 {{.replicas}}); do
+            echo "Starting CLI worker instance $i"
+            CMD="go run ./cmd/cli --api-key {{.apiKey}} --max-concurrency {{.maxJobs}}"
+            {{- if .network}}
+            CMD="$CMD --network {{.network}}"
+            {{- end}}
+            $CMD &
+          done
+          wait
+        fi
     silent: false
 
   dev-app:
     cmds:
       - |
-        for i in $(seq 1 {{.replicas}}); do
-           echo "Starting App worker instance $i (injecting env vars)"
-           ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}}"
-
-           {{- if .network}}
-           ENV_VARS="$ENV_VARS WORKER_NETWORK={{.network}}"
-           {{- end}}
-
-           env $ENV_VARS go run ./cmd/app &
-        done
-        wait
+        if [ "{{.replicas}}" = "1" ]; then
+          ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}}{{if .network}} WORKER_NETWORK={{.network}}{{end}}"
+          exec env $ENV_VARS go run ./cmd/app
+        else
+          trap 'wait; exit 0' INT TERM
+          for i in $(seq 1 {{.replicas}}); do
+            echo "Starting App worker instance $i"
+            ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_MAX_CONCURRENCY={{.maxJobs}}"
+            {{- if .network}}
+            ENV_VARS="$ENV_VARS WORKER_NETWORK={{.network}}"
+            {{- end}}
+            env $ENV_VARS go run ./cmd/app &
+          done
+          wait
+        fi
     silent: false
 
   # ==========================================

@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/go-rod/stealth"
 )
 
 var userAgents = []string{
@@ -45,10 +46,8 @@ func formatURL(target string) string {
 func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL string) (string, error) {
 	url := formatURL(rawURL)
 
-	// Create a new page (tab) using the shared browser, bound to the job's context
-	page := browser.Context(ctx).MustPage()
-
-	// CRITICAL: Must close the page after screenshot to prevent memory leaks
+	browserCtx := browser.Context(ctx)
+	page := stealth.MustPage(browserCtx)
 	defer page.MustClose()
 
 	_ = page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
@@ -74,19 +73,20 @@ func TakeScreenshotBase64(ctx context.Context, browser *rod.Browser, rawURL stri
 	})
 
 	err := rod.Try(func() {
-		page.Timeout(5 * time.Second).MustNavigate(url).MustWaitLoad()
+		page.Timeout(15 * time.Second).MustNavigate(url)
+		page.Timeout(10 * time.Second).MustWaitLoad()
+		waitIdle := page.Timeout(10 * time.Second).MustWaitRequestIdle()
+		waitIdle()
 	})
 	if err != nil {
-		// Return empty string on timeout
 		if strings.Contains(err.Error(), "timeout") {
-			return "", nil
+			return "", fmt.Errorf("timeout loading page %s", url)
 		}
 		return "", fmt.Errorf("failed to load page %s: %v", url, err)
 	}
 
 	quality := 80
-
-	imgBytes, err := page.Timeout(5*time.Second).Screenshot(true, &proto.PageCaptureScreenshot{
+	imgBytes, err := page.Timeout(10*time.Second).Screenshot(true, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
 		Quality: &quality,
 		Clip: &proto.PageViewport{
