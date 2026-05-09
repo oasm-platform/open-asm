@@ -21,23 +21,30 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o oasm-worker ./cmd/app
 
 # Stage 2: Runtime
-FROM alpine:3.20
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install ca-certificates for TLS, bash, and chromium for browser tasks
-RUN apk add --no-cache ca-certificates bash chromium nss freetype harfbuzz ttf-freefont
+# Install ca-certificates for TLS, bash, chromium for browser tasks, and libpcap for naabu
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    bash \
+    chromium \
+    libpcap0.8 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create tool directory
+RUN mkdir -p /app/oasm-tools
 
 # Copy binary from builder
 COPY --from=builder /app/oasm-worker .
 
 # Create non-root user for security
-RUN addgroup -g 1000 -S worker && \
-    adduser -u 1000 -S worker -G worker
+RUN groupadd -g 1000 worker && \
+    useradd -u 1000 -g worker -s /bin/bash -m worker
 
-# Create tool directory and change ownership
-RUN mkdir -p /app/oasm-tools && \
-    chown -R worker:worker /app
+# Change ownership of app directory
+RUN chown -R worker:worker /app
 
 USER worker
 

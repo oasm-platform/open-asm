@@ -77,6 +77,8 @@ interface DataTableProps<TData, TValue> {
   showCheckBox?: boolean;
   /** Callback fired when checkbox selection changes, returns array of selected row data */
   onCheck?: (selectedRows: TData[]) => void;
+  /** Minimum number of rows to display (fills with empty placeholder rows) */
+  minRows?: number;
 }
 
 export function DataTable<TData, TValue>({
@@ -109,6 +111,7 @@ export function DataTable<TData, TValue>({
   selectionHeader,
   showCheckBox = false,
   onCheck,
+  minRows,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -377,6 +380,24 @@ export function DataTable<TData, TValue>({
                 </TableCell>
               </TableRow>
             )}
+            {minRows !== undefined &&
+              table.getRowModel().rows.length < minRows &&
+              [...Array(minRows - table.getRowModel().rows.length)].map(
+                (_, idx) => (
+                  <TableRow key={`placeholder-${idx}`}>
+                    {showCheckBox && (
+                      <TableCell className="w-10" />
+                    )}
+                    {[...Array(table.getAllLeafColumns().length)].map(
+                      (_, colIndex) => (
+                        <TableCell key={`placeholder-cell-${colIndex}`}>
+                          <div className="h-4 w-full" />
+                        </TableCell>
+                      ),
+                    )}
+                  </TableRow>
+                ),
+              )}
           </TableBody>
         </Table>
       </div>
