@@ -15,7 +15,6 @@ import (
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	"github.com/oasm-platform/open-asm/grpc-client/go/workers"
-	"google.golang.org/grpc/metadata"
 )
 
 // Track active jobs for logging
@@ -24,7 +23,7 @@ var (
 	activeJobs   = make(map[string]struct{})
 )
 
-func connectInternalNetwork(client *oasm.Client, network string, workerID string, token string) error {
+func connectInternalNetwork(client *oasm.Client, network string) error {
 	networkInfos, err := GetNetworkInfos()
 	if err != nil {
 		return fmt.Errorf("failed to get network infos: %v", err)
@@ -42,15 +41,13 @@ func connectInternalNetwork(client *oasm.Client, network string, workerID string
 	}
 
 	req := &workers.ConnectInternalNetworkRequest{
-		WorkerId:          workerID,
+		WorkerId:          client.WorkerID(),
 		NetworkId:         network,
 		NetworkInterfaces: networkInterfaces,
 	}
 
 	ctx := context.Background()
-	md := metadata.Pairs("worker-token", token)
-	ctx = metadata.NewOutgoingContext(ctx, md)
-	_, err = client.Workers().ConnectInternalNetwork(ctx, req)
+	_, err = client.Workers().ConnectInternalNetwork(client.WithAuth(ctx), req)
 	if err != nil {
 		return fmt.Errorf("error connecting internal network: %v", err)
 	}
@@ -68,15 +65,6 @@ func Start(ctx context.Context, cfg *config.Config) {
 		log.Printf("Error creating OASM client: %v", err)
 		return
 	}
-
-	// Get worker ID by joining first
-	joinResp, err := client.WorkerJoin(context.Background())
-	if err != nil {
-		log.Printf("Error joining worker: %v", err)
-		return
-	}
-	workerID := joinResp.WorkerId
-	token := joinResp.WorkerToken
 
 	oasm.Logger("Jobs").Verbose("Initializing headless browser...")
 
@@ -117,7 +105,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 
 	// Handle network connection if network is specified
 	if cfg.Network != "" {
-		if err := connectInternalNetwork(client, cfg.Network, workerID, token); err != nil {
+		if err := connectInternalNetwork(client, cfg.Network); err != nil {
 			log.Printf("Failed to connect internal network: %v", err)
 			workerCancel()
 			return
