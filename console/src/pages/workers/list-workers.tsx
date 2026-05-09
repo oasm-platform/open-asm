@@ -88,14 +88,13 @@ const ListWorkers = () => {
                 <div className="flex items-center gap-2">
                   <div className="p-1 bg-muted rounded-lg">
                     {worker.os ? (
-                      <div>
-                        <img
-                          className="text-red-500"
-                          width={30}
-                          height={30}
-                          src={`/${worker.os}.svg`}
-                        />
-                      </div>
+                      <img
+                        style={{ filter: 'brightness(0) invert(1)' }}
+                        width={30}
+                        height={30}
+                        src={`/${worker.os}.svg`}
+                        alt={worker.os}
+                      />
                     ) : (
                       <Server />
                     )}

@@ -114,10 +114,11 @@ const TlsExpirationTable = () => {
           data={expiringSoon}
           isLoading={isLoading}
           page={1}
-          pageSize={expiringSoon.length}
+          pageSize={Math.max(expiringSoon.length, 10)}
           totalItems={expiringSoon.length}
           showPagination={false}
           isShowHeader={true}
+          minRows={10}
         />
       </CardContent>
     </Card>

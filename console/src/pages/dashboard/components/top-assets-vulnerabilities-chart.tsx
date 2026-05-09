@@ -108,23 +108,8 @@ const TopAssetsVulnerabilitiesTable = () => {
         low: item.low,
         info: item.info,
         total: item.total,
-        id: item.id, // assuming id is available
+        id: item.id,
       })) || [];
-
-  // Pad the data to ensure at least 10 rows
-  const tableData = [...filteredData];
-  while (tableData.length < 10) {
-    tableData.push({
-      asset: '',
-      critical: 0,
-      high: 0,
-      medium: 0,
-      low: 0,
-      info: 0,
-      total: 0,
-      id: '',
-    });
-  }
 
   if (error) {
     return (
@@ -151,13 +136,14 @@ const TopAssetsVulnerabilitiesTable = () => {
           }
           isShowBorder={false}
           columns={columns}
-          data={tableData}
+          data={filteredData}
           isLoading={isLoading}
           page={1}
           pageSize={10}
-          totalItems={10}
+          totalItems={filteredData.length}
           showPagination={false}
           isShowHeader={true}
+          minRows={10}
         />
       </CardContent>
     </Card>
