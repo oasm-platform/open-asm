@@ -157,7 +157,10 @@ func Start(ctx context.Context, cfg *config.Config) {
 		for {
 			select {
 			case <-ticker.C:
-				running := len(semaphore)
+				activeJobsMu.Lock()
+				running := len(activeJobs)
+				activeJobsMu.Unlock()
+
 				if running != lastLogged {
 					logJobStatus(running)
 					lastLogged = running
