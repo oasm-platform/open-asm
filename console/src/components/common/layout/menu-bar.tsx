@@ -24,7 +24,6 @@ import {
   CirclePlay,
   CloudCheck,
   Cpu,
-  GlobeLock,
   Group,
   LayoutDashboard,
   Server,
@@ -68,6 +67,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: 'Agents',
           icon: <Sparkles />,
           url: '/agents',
+          isNew: true,
         },
       ],
     },
@@ -103,11 +103,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           icon: <CloudCheck />,
           url: '/assets',
         },
-        {
-          title: 'Internal networks',
-          icon: <GlobeLock />,
-          url: '/internal-networks',
-        },
+        // {
+        //   title: 'Internal networks',
+        //   icon: <GlobeLock />,
+        //   url: '/internal-networks',
+        // },
       ],
     },
     {
