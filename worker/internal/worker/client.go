@@ -78,7 +78,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 		jobLog.Verbose("Using system chromium at /usr/bin/chromium-browser")
 		l = l.Bin("/usr/bin/chromium-browser")
 	} else if _, err := os.Stat("/usr/bin/google-chrome"); err == nil {
-		oasm.Logger("Jobs").Verbose("Using system chromium at /usr/bin/google-chrome")
+		jobLog.Verbose("Using system chromium at /usr/bin/google-chrome")
 		l = l.Bin("/usr/bin/google-chrome")
 	} else {
 		jobLog.Verbose("No system chromium found, go-rod will download Chrome automatically")
