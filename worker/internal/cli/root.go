@@ -4,12 +4,11 @@ package cli
 import (
 	"context"
 	"fmt"
+	"oasm-worker/internal/config"
+	"oasm-worker/internal/worker"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"oasm-worker/internal/config"
-	"oasm-worker/internal/worker"
 
 	"github.com/common-nighthawk/go-figure"
 	"github.com/fatih/color"
@@ -24,6 +23,27 @@ func printBanner() {
 	fmt.Print(green(myFigure.String()))
 }
 
+func App() error {
+	printBanner()
+
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("fail to load config: %v", err)
+	}
+
+	if cfg.ApiKey == "" {
+		return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
+	}
+
+	oasm.Logger("Worker").Verbose(fmt.Sprintf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\nNetwork: %s\n",
+		cfg.ApiKey, cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort, cfg.Network))
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	worker.Start(ctx, cfg)
+	return nil
+}
 
 func Execute() {
 	rootCmd := &cobra.Command{
@@ -31,27 +51,7 @@ func Execute() {
 		Short: "OASM Worker is an attack surface management agent",
 		Long:  `OASM Worker is a high-performance agent used for attack surface management tasks.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			printBanner()
-
-			cfg, err := config.LoadConfig()
-			if err != nil {
-				return fmt.Errorf("fail to load config: %v", err)
-			}
-
-			if cfg.ApiKey == "" {
-				return fmt.Errorf("missing required parameter --api-key (or env WORKER_API_KEY)")
-			}
-
-			network := cmd.Flag("network").Value.String()
-
-			oasm.Logger("Worker").Verbose(fmt.Sprintf("ApiKey: %s\nMaxConcurrency: %d\nGrpcHost: %s\nGrpcPort: %d\nNetwork: %s\n",
-				cfg.ApiKey, cfg.MaxConcurrency, cfg.GrpcHost, cfg.GrpcPort, network))
-
-			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-			defer stop()
-
-			worker.Start(ctx, cfg, network)
-			return nil
+			return App()
 		},
 	}
 

@@ -5,11 +5,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"oasm-worker/internal/config"
 	"os"
 	"sync"
 	"time"
-
-	"oasm-worker/internal/config"
 
 	"github.com/go-co-op/gocron"
 	"github.com/go-rod/rod"
@@ -43,8 +42,8 @@ func connectInternalNetwork(client *oasm.Client, network string, workerID string
 	}
 
 	req := &workers.ConnectInternalNetworkRequest{
-		WorkerId:         workerID,
-		NetworkId:        network,
+		WorkerId:          workerID,
+		NetworkId:         network,
 		NetworkInterfaces: networkInterfaces,
 	}
 
@@ -59,7 +58,7 @@ func connectInternalNetwork(client *oasm.Client, network string, workerID string
 	return nil
 }
 
-func Start(ctx context.Context, cfg *config.Config, network string) {
+func Start(ctx context.Context, cfg *config.Config) {
 	client, err := oasm.NewClient(
 		oasm.WithApiKey(cfg.ApiKey),
 		oasm.WithGRPCHost(fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort)),
@@ -117,8 +116,8 @@ func Start(ctx context.Context, cfg *config.Config, network string) {
 	}
 
 	// Handle network connection if network is specified
-	if network != "" {
-		if err := connectInternalNetwork(client, network, workerID, token); err != nil {
+	if cfg.Network != "" {
+		if err := connectInternalNetwork(client, cfg.Network, workerID, token); err != nil {
 			log.Printf("Failed to connect internal network: %v", err)
 			workerCancel()
 			return
