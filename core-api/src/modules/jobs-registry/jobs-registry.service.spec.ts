@@ -26,6 +26,7 @@ describe('JobsRegistryService', () => {
     findOne: jest.fn(),
     save: jest.fn(),
     count: jest.fn(),
+    exists: jest.fn(),
   };
 
   const mockJobHistoryRepository = {
@@ -599,7 +600,7 @@ describe('JobsRegistryService', () => {
     });
 
     it('should update job history isCompleted to true', async () => {
-      mockJobRepository.count.mockResolvedValue(0);
+      mockJobRepository.exists.mockResolvedValue(false);
       mockJobHistoryRepository.update.mockResolvedValue({ affected: 1 });
       mockJobHistoryRepository.findOne.mockResolvedValue({
         id: mockJobHistoryId,
@@ -608,7 +609,7 @@ describe('JobsRegistryService', () => {
 
       await service.markWorkflowDone(mockJobHistoryId);
 
-      expect(mockJobRepository.count).toHaveBeenCalled();
+      expect(mockJobRepository.exists).toHaveBeenCalled();
       expect(mockJobHistoryRepository.update).toHaveBeenCalledWith(
         { id: mockJobHistoryId, isCompleted: false },
         { isCompleted: true },
@@ -616,7 +617,7 @@ describe('JobsRegistryService', () => {
     });
 
     it('should not update when there are pending jobs', async () => {
-      mockJobRepository.count.mockResolvedValue(5);
+      mockJobRepository.exists.mockResolvedValue(true);
 
       await service.markWorkflowDone(mockJobHistoryId);
 
@@ -624,7 +625,7 @@ describe('JobsRegistryService', () => {
     });
 
     it('should not update when already completed', async () => {
-      mockJobRepository.count.mockResolvedValue(0);
+      mockJobRepository.exists.mockResolvedValue(false);
       mockJobHistoryRepository.update.mockResolvedValue({ affected: 0 });
 
       await service.markWorkflowDone(mockJobHistoryId);

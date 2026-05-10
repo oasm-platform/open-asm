@@ -51,7 +51,7 @@ export class RootService {
     const HOURS_PER_DAY = 24;
     const DAYS_PER_YEAR = 365;
 
-    const userCount = await this.usersService.usersRepository.count({
+    const isInit = await this.usersService.usersRepository.exists({
       where: {
         role: Role.ADMIN,
       },
@@ -72,7 +72,7 @@ export class RootService {
     const currentVersion = this.configService.get<string>('APP_VERSION');
 
     return {
-      isInit: userCount > 0,
+      isInit,
       isAssistant,
       name: systemConfig.name,
       logoPath: systemConfig.logoPath,

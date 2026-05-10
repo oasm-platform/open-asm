@@ -746,14 +746,14 @@ export class JobsRegistryService {
   public async markWorkflowDone(jobHistoryId: string): Promise<void> {
     const logger = new Logger('JobHistoryCompletion');
 
-    const pendingCount = await this.repo.count({
+    const pendingExists = await this.repo.exists({
       where: {
         jobHistory: { id: jobHistoryId },
         status: In([JobStatus.PENDING, JobStatus.IN_PROGRESS]),
       },
     });
 
-    if (pendingCount > 0) {
+    if (pendingExists) {
       return;
     }
 
