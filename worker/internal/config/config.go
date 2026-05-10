@@ -17,14 +17,14 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
-    _ = godotenv.Load(".env")
+	_ = godotenv.Load(".env")
 
 	viper.SetEnvPrefix("WORKER")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
 	viper.SetDefault("api_key", "")
-    viper.SetDefault("network", "")
+	viper.SetDefault("network", "")
 	viper.SetDefault("max_concurrency", 10)
 	viper.SetDefault("grpc_host", "localhost")
 	viper.SetDefault("grpc_port", 16276)

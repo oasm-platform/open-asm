@@ -1,11 +1,13 @@
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import type {
   LLMConfigWithProviderDto,
   ProviderModelDto,
 } from '@/services/apis/gen/queries';
-import { cn } from '@/lib/utils';
 import {
   CreateLLMConfigDtoProvider,
+  LLMConfigWithProviderDtoProviderId,
   useAgentsControllerCreateLLMConfig,
   useAgentsControllerDeleteLLMConfig,
   useAgentsControllerGetLLMConfigs,
@@ -13,7 +15,9 @@ import {
   useAgentsControllerSetPreferredLLMConfig,
   useAgentsControllerUpdateLLMConfig,
 } from '@/services/apis/gen/queries';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 import {
   Check,
   ChevronDown,
@@ -23,8 +27,10 @@ import {
   Star,
   Unplug,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { z } from 'zod';
 import {
   Command,
   CommandEmpty,
@@ -35,11 +41,30 @@ import {
 import Image from './ui/image';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
+
+
+function getConnectSchema(
+  isCustomProvider: boolean,
+  isAcceptCustomApiUrl: boolean,
+) {
+  const requiresApiKey = !isCustomProvider && !isAcceptCustomApiUrl;
+
+  return z
+    .object({
+      apiUrl: z.string().url('Invalid URL format').optional(),
+      apiKey: requiresApiKey
+        ? z.string().min(1, 'API key is required')
+        : z.string().optional(),
+    })
+    .refine((data) => requiresApiKey || data.apiUrl || data.apiKey, {
+      message: 'API key or URL is required',
+    });
+}
+
+type ConnectFormData = z.infer<ReturnType<typeof getConnectSchema>>;
+
 export default function LlmConnect() {
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Record<string, { apiKey: string }>>(
-    {},
-  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const queryClient = useQueryClient();
@@ -49,7 +74,15 @@ export default function LlmConnect() {
 
   const providersList = providers ?? [];
 
-  const createLLMConfig = useAgentsControllerCreateLLMConfig();
+  const createLLMConfig = useAgentsControllerCreateLLMConfig({
+    mutation: {
+      onError: (error: AxiosError<{ message: string }>) => {
+        toast.error(
+          error.response?.data.message || 'Failed to connect provider',
+        );
+      },
+    },
+  });
   const updateLLMConfig = useAgentsControllerUpdateLLMConfig();
   const deleteLLMConfig = useAgentsControllerDeleteLLMConfig();
   const setPreferredLLMConfig = useAgentsControllerSetPreferredLLMConfig();
@@ -76,13 +109,6 @@ export default function LlmConnect() {
     setExpandedProvider(expandedProvider === providerId ? null : providerId);
   };
 
-  const handleApiKeyChange = (providerId: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [providerId]: { apiKey: value },
-    }));
-  };
-
   const handleModelChange = async (providerId: string, modelId: string) => {
     const provider = providersList.find((p) => p.providerId === providerId);
     if (!provider?.configId) return;
@@ -104,17 +130,19 @@ export default function LlmConnect() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent, providerId: string) => {
-    e.preventDefault();
-    const data = formData[providerId];
-    if (!data?.apiKey.trim()) return;
+  const handleSubmit = async (data: ConnectFormData, providerId: string) => {
+    const hasApiKey = data.apiKey?.trim();
+    const hasApiUrl = data.apiUrl?.trim();
+
+    if (!hasApiUrl && !hasApiKey) return;
 
     setIsSubmitting(true);
     try {
       await createLLMConfig.mutateAsync({
         data: {
           provider: providerId as CreateLLMConfigDtoProvider,
-          apiKey: data.apiKey.trim(),
+          apiKey: hasApiKey || '',
+          apiUrl: hasApiUrl || undefined,
         },
       });
 
@@ -122,10 +150,6 @@ export default function LlmConnect() {
         queryKey: ['/api/agents/llm-configs'],
       });
 
-      setFormData((prev) => ({
-        ...prev,
-        [providerId]: { apiKey: '' },
-      }));
       setExpandedProvider(null);
     } catch {
       // Error handled by mutation
@@ -147,10 +171,6 @@ export default function LlmConnect() {
             queryKey: ['/api/agents/llm-configs'],
           });
           setExpandedProvider(null);
-          setFormData((prev) => ({
-            ...prev,
-            [providerId]: { apiKey: '' },
-          }));
         },
         onError: () => {
           toast.error('Failed to disconnect provider');
@@ -255,10 +275,8 @@ export default function LlmConnect() {
                 ) : (
                   <ConnectForm
                     provider={provider}
-                    formData={formData}
-                    isSubmitting={isSubmitting}
-                    onApiKeyChange={handleApiKeyChange}
                     onSubmit={handleSubmit}
+                    isSubmitting={isSubmitting}
                   />
                 )}
               </div>
@@ -388,42 +406,62 @@ function ModelSelectForm({
 
 function ConnectForm({
   provider,
-  formData,
-  isSubmitting,
-  onApiKeyChange,
   onSubmit,
+  isSubmitting,
 }: {
   provider: LLMConfigWithProviderDto;
-  formData: Record<string, { apiKey: string }>;
+  onSubmit: (data: ConnectFormData, providerId: string) => void;
   isSubmitting: boolean;
-  onApiKeyChange: (providerId: string, value: string) => void;
-  onSubmit: (e: React.FormEvent, providerId: string) => Promise<void>;
 }) {
+  const isCustomProvider =
+    provider.providerId === LLMConfigWithProviderDtoProviderId.custom;
+  const schema = useMemo(
+    () => getConnectSchema(isCustomProvider, provider.isAcceptCustomApiUrl),
+    [isCustomProvider, provider.isAcceptCustomApiUrl],
+  );
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors },
+  } = useForm<ConnectFormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { apiUrl: '', apiKey: '' },
+  });
+
+  const isApiKeyOptional = isCustomProvider || provider.isAcceptCustomApiUrl;
+
   return (
     <form
-      onSubmit={(e) => onSubmit(e, provider.providerId)}
+      onSubmit={handleFormSubmit((data) => onSubmit(data, provider.providerId))}
       className="flex flex-col gap-3"
     >
+      {provider.isAcceptCustomApiUrl && (
+        <div className="flex flex-col gap-1.5">
+          <Input
+            {...register('apiUrl')}
+            type="url"
+            placeholder="https://api.myprovider.com/v1"
+            autoComplete="off"
+            error={errors.apiUrl?.message}
+          />
+        </div>
+      )}
+
       <div className="flex flex-col gap-1.5">
-        <input
+        <Input
+          {...register('apiKey')}
           type="password"
-          value={formData[provider.providerId]?.apiKey || ''}
-          onChange={(e) => onApiKeyChange(provider.providerId, e.target.value)}
-          placeholder="Enter your API key"
+          placeholder={
+            isApiKeyOptional ? 'Optional API key' : 'Enter your API key'
+          }
           autoComplete="new-password"
-          className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring"
-          required
+          error={errors.apiKey?.message}
         />
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button
-          type="submit"
-          size="sm"
-          disabled={
-            isSubmitting || !formData[provider.providerId]?.apiKey?.trim()
-          }
-        >
+        <Button type="submit" size="sm" disabled={isSubmitting}>
           {isSubmitting ? 'Connecting...' : 'Connect'}
         </Button>
       </div>
