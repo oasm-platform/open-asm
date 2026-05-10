@@ -2216,6 +2216,10 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
    * Filter by creation date to (ISO 8601 format, e.g., 2026-01-31)
    */
   createdTo?: string;
+  /**
+   * Filter by vulnerability tags
+   */
+  tags?: string[];
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatus =
