@@ -106,6 +106,7 @@ export class VulnerabilitiesService {
       severity,
       createdFrom,
       createdTo,
+      tags,
     } = query;
 
     const { sortBy } = query;
@@ -170,6 +171,11 @@ export class VulnerabilitiesService {
       queryBuilder.andWhere('vulnerabilities.createdAt <= :createdTo', {
         createdTo: endDate,
       });
+    }
+
+    // Filter by tags
+    if (Array.isArray(tags) && tags.length > 0) {
+      queryBuilder.andWhere('vulnerabilities.tags && (:...tags)', { tags });
     }
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
