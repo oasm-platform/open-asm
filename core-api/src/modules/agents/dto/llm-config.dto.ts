@@ -41,6 +41,7 @@ export class CreateLLMConfigDto {
 
   @ApiProperty({})
   @IsString()
+  @IsOptional()
   apiKey: string;
 
   @ApiProperty({ required: false })
@@ -109,6 +110,9 @@ export class LLMConfigWithProviderDto {
 
   @ApiProperty({ description: 'Connection status' })
   isConnected: boolean;
+
+  @ApiProperty({ description: 'Whether provider accepts custom API URL' })
+  isAcceptCustomApiUrl?: boolean;
 
   @ApiProperty({ description: 'LLM config ID if connected', required: false })
   configId?: string;

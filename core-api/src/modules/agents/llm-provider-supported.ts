@@ -1,3 +1,4 @@
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import type { LanguageModel } from 'ai';
@@ -10,7 +11,10 @@ export type LLMHandler = (
   baseURL?: string,
 ) => LanguageModel;
 
-export type LLMModelsFetcher = (apiKey: string) => Promise<ProviderModelDto[]>;
+export type LLMModelsFetcher = (
+  apiKey: string,
+  baseUrl?: string,
+) => Promise<ProviderModelDto[]>;
 
 export interface LLMProviderSupported {
   id: LLMProvider;
@@ -18,109 +22,143 @@ export interface LLMProviderSupported {
   logo: string;
   handler: LLMHandler;
   fetchModels: LLMModelsFetcher;
+  isAcceptCustomApiUrl?: boolean;
 }
 
 const fetchOpenAIModels = async (
   apiKey: string,
 ): Promise<ProviderModelDto[]> => {
-  try {
-    const response = await fetch('https://api.openai.com/v1/models', {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+  const response = await fetch(`https://api.openai.com/v1/models`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
 
-    if (!response.ok) {
-      return [];
-    }
-
-    const data = (await response.json()) as {
-      data: Array<{ id: string }>;
-    };
-
-    return data.data
-      .filter(
-        (m) =>
-          m.id.startsWith('gpt-') ||
-          m.id.startsWith('o1') ||
-          m.id.startsWith('o3') ||
-          m.id.startsWith('o4'),
-      )
-      .map((m) => ({ id: m.id, name: m.id }))
-      .sort((a, b) => a.id.localeCompare(b.id));
-  } catch {
+  if (!response.ok) {
     return [];
   }
+
+  const data = (await response.json()) as {
+    data: Array<{ id: string }>;
+  };
+
+  return data.data
+    .filter(
+      (m) =>
+        m.id.startsWith('gpt-') ||
+        m.id.startsWith('o1') ||
+        m.id.startsWith('o3') ||
+        m.id.startsWith('o4'),
+    )
+    .map((m) => ({ id: m.id, name: m.id }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 };
 
 const fetchOpenRouterModels = async (): Promise<ProviderModelDto[]> => {
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/models');
+  const response = await fetch('https://openrouter.ai/api/v1/models');
 
-    if (!response.ok) {
-      return [];
-    }
-
-    const data = (await response.json()) as {
-      data: Array<{ id: string; name?: string }>;
-    };
-
-    return data.data
-      .map((m) => ({ id: m.id, name: m.name ?? m.id }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  } catch {
+  if (!response.ok) {
     return [];
   }
+
+  const data = (await response.json()) as {
+    data: Array<{ id: string; name?: string }>;
+  };
+
+  return data.data
+    .map((m) => ({ id: m.id, name: m.name ?? m.id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+};
+
+const fetchCustomProviderModels = async (
+  apiKey: string,
+  baseUrl?: string,
+): Promise<ProviderModelDto[]> => {
+  if (!baseUrl) return [];
+
+  const response = await fetch(`${baseUrl}/models`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = (await response.json()) as {
+    data: Array<{ id: string; name?: string }>;
+  };
+
+  return data.data
+    .map((m) => ({ id: m.id, name: m.name || m.id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 };
 
 const fetchGeminiModels = async (
   apiKey: string,
 ): Promise<ProviderModelDto[]> => {
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-    );
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+  );
 
-    if (!response.ok) {
-      return [];
-    }
-
-    const data = (await response.json()) as {
-      models: Array<{ name: string; displayName?: string }>;
-    };
-
-    return data.models
-      .filter((m) => m.name.startsWith('models/gemini'))
-      .map((m) => ({
-        id: m.name.replace('models/', ''),
-        name: m.displayName ?? m.name.replace('models/', ''),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  } catch {
+  if (!response.ok) {
     return [];
   }
+
+  const data = (await response.json()) as {
+    models: Array<{ name: string; displayName?: string }>;
+  };
+
+  return data.models
+    .filter((m) => m.name.startsWith('models/gemini'))
+    .map((m) => ({
+      id: m.name.replace('models/', ''),
+      name: m.displayName ?? m.name.replace('models/', ''),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 };
 
 const fetchKiloGatewayModels = async (
   apiKey: string,
 ): Promise<ProviderModelDto[]> => {
-  try {
-    const response = await fetch('https://api.kilo.ai/api/gateway/models', {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+  const response = await fetch('https://api.kilo.ai/api/gateway/models', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
 
-    if (!response.ok) {
-      return [];
-    }
-
-    const data = (await response.json()) as {
-      data: Array<{ id: string; name?: string }>;
-    };
-
-    return data.data
-      .map((m) => ({ id: m.id, name: m.name ?? m.id }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  } catch {
+  if (!response.ok) {
     return [];
   }
+
+  const data = (await response.json()) as {
+    data: Array<{ id: string; name?: string }>;
+  };
+
+  return data.data
+    .map((m) => ({ id: m.id, name: m.name ?? m.id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+};
+
+const fetchAnthropicModels = async (
+  apiKey: string,
+): Promise<ProviderModelDto[]> => {
+  const response = await fetch('https://api.anthropic.com/v1/models', {
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = (await response.json()) as {
+    data: Array<{ id: string; display_name?: string }>;
+  };
+
+  return data.data
+    .map((m) => ({
+      id: m.id,
+      name: m.display_name ?? m.id,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 };
 
 export const llmProviderSupported: LLMProviderSupported[] = [
@@ -158,6 +196,26 @@ export const llmProviderSupported: LLMProviderSupported[] = [
         model,
       ),
     fetchModels: fetchKiloGatewayModels,
+  },
+  {
+    id: LLMProvider.ANTHROPIC,
+    name: 'Anthropic',
+    logo: '/static/images/anthropic.svg',
+    handler: (apiKey, model) => createAnthropic({ apiKey }).chat(model),
+    fetchModels: fetchAnthropicModels,
+  },
+  {
+    id: LLMProvider.CUSTOM,
+    name: 'Custom provider (OpenAI-compatible)',
+    logo: '/static/images/llm.svg',
+    handler: (apiKey, model, baseURL) => {
+      return createOpenAI({
+        apiKey: apiKey === 'not_set' ? undefined : apiKey,
+        baseURL: baseURL,
+      }).chat(model);
+    },
+    fetchModels: fetchCustomProviderModels,
+    isAcceptCustomApiUrl: true,
   },
 ];
 

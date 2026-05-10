@@ -93,7 +93,7 @@ export class AgentsService {
       );
     }
 
-    const models = await provider.fetchModels(dto.apiKey);
+    const models = await provider.fetchModels(dto.apiKey, dto.apiUrl);
 
     if (models.length === 0) {
       throw new BadRequestException(
@@ -110,6 +110,10 @@ export class AgentsService {
     });
 
     const isPreferred = totalConfigs === 0;
+
+    if (!dto.apiKey) {
+      dto.apiKey = 'not_set';
+    }
 
     const config = this.llmConfigRepository.create({
       workspaceId,
@@ -172,6 +176,7 @@ export class AgentsService {
           apiKeyMasked: this.maskApiKey(decryptedKey),
           createdAt: config.createdAt,
           updatedAt: config.updatedAt,
+          isAcceptCustomApiUrl: provider.isAcceptCustomApiUrl ?? false,
         };
       }
 
@@ -180,6 +185,7 @@ export class AgentsService {
         providerName: provider.name,
         logo: provider.logo,
         isConnected: false,
+        isAcceptCustomApiUrl: provider.isAcceptCustomApiUrl ?? false,
       };
     });
 
@@ -314,7 +320,7 @@ export class AgentsService {
     }
 
     const apiKey = decrypt(config.apiKey);
-    const models = await provider.fetchModels(apiKey);
+    const models = await provider.fetchModels(apiKey, config.apiUrl);
 
     // Cache the result for 1 hour (3600 seconds)
     try {
