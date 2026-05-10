@@ -2201,29 +2201,33 @@ workspaceId: string;
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
-search?: string;
-page?: number;
-limit?: number;
-sortBy?: string;
-sortOrder?: string;
-targetIds?: string[];
-q?: string;
-/**
- * Filter by vulnerability status: open, dismissed, or all
- */
-status?: VulnerabilitiesControllerGetVulnerabilitiesStatus;
-/**
- * Filter by severity levels: info, low, medium, high, critical
- */
-severity?: VulnerabilitiesControllerGetVulnerabilitiesSeverityItem[];
-/**
- * Filter by creation date from (ISO 8601 format, e.g., 2026-01-01)
- */
-createdFrom?: string;
-/**
- * Filter by creation date to (ISO 8601 format, e.g., 2026-01-31)
- */
-createdTo?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  targetIds?: string[];
+  q?: string;
+  /**
+   * Filter by vulnerability status: open, dismissed, or all
+   */
+  status?: VulnerabilitiesControllerGetVulnerabilitiesStatus;
+  /**
+   * Filter by severity levels: info, low, medium, high, critical
+   */
+  severity?: VulnerabilitiesControllerGetVulnerabilitiesSeverityItem[];
+  /**
+   * Filter by creation date from (ISO 8601 format, e.g., 2026-01-01)
+   */
+  createdFrom?: string;
+  /**
+   * Filter by creation date to (ISO 8601 format, e.g., 2026-01-31)
+   */
+  createdTo?: string;
+  /**
+   * Filter by vulnerability tags
+   */
+  tags?: string[];
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatus = typeof VulnerabilitiesControllerGetVulnerabilitiesStatus[keyof typeof VulnerabilitiesControllerGetVulnerabilitiesStatus];

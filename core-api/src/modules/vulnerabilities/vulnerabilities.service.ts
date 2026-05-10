@@ -106,6 +106,7 @@ export class VulnerabilitiesService {
       severity,
       createdFrom,
       createdTo,
+      tags,
     } = query;
 
     const { sortBy } = query;
@@ -170,6 +171,16 @@ export class VulnerabilitiesService {
       queryBuilder.andWhere('vulnerabilities.createdAt <= :createdTo', {
         createdTo: endDate,
       });
+    }
+
+    // Filter by tags (using overlap operator with raw SQL)
+    if (Array.isArray(tags) && tags.length > 0) {
+      const conditions = tags.map((_, i) => `:tag${i} = ANY(vulnerabilities.tags)`).join(' OR ');
+      const params: Record<string, string> = {};
+      tags.forEach((tag, i) => {
+        params[`tag${i}`] = tag;
+      });
+      queryBuilder.andWhere(`(${conditions})`, params);
     }
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
