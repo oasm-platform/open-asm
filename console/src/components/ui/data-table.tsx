@@ -216,11 +216,11 @@ export function DataTable<TData, TValue>({
               <div key={i}>{c}</div>
             ))}
           </div>
-          <div className="flex items-center gap-4 w-full">
+          <div className="flex items-center gap-4 min-w-0 flex-1">
             {filterColumnKey && (
               <Input
                 placeholder={filterPlaceholder}
-                className="w-full lg:w-1/3 xl:w-1/4"
+                className="w-full min-w-0"
                 value={searchValue}
                 onChange={(e) => {
                   setSearchValue(e.target.value);
