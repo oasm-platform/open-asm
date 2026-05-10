@@ -141,7 +141,7 @@ export default function LlmConnect() {
       await createLLMConfig.mutateAsync({
         data: {
           provider: providerId as CreateLLMConfigDtoProvider,
-          apiKey: hasApiKey || undefined,
+          apiKey: hasApiKey || '',
           apiUrl: hasApiUrl || undefined,
         },
       });
@@ -171,10 +171,6 @@ export default function LlmConnect() {
             queryKey: ['/api/agents/llm-configs'],
           });
           setExpandedProvider(null);
-          setFormData((prev) => ({
-            ...prev,
-            [providerId]: { apiKey: '' },
-          }));
         },
         onError: () => {
           toast.error('Failed to disconnect provider');
