@@ -11,6 +11,12 @@ import { Issue } from './entities/issue.entity';
 import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
 import { IssuesService } from './issues.service';
 
+jest.mock('./handlers/vulnerability-source.handler', () => ({
+  VulnerabilitySourceHandler: class {
+    onStatusChange = jest.fn();
+  },
+}));
+
 describe('IssuesService', () => {
   let service: IssuesService;
   let repository: Repository<Issue>;
