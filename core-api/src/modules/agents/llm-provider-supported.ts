@@ -133,13 +133,12 @@ const fetchKiloGatewayModels = async (
   }
 };
 
-const fetchAnthropicModels = async (): Promise<ProviderModelDto[]> => {
-  return [
+const fetchAnthropicModels = (): Promise<ProviderModelDto[]> =>
+  Promise.resolve([
     { id: 'claude-opus-4-6', name: 'Claude Opus 4.6' },
     { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
     { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
-  ];
-};
+  ]);
 
 const fetchCustomProviderModels = async (
   apiKey: string,
@@ -217,7 +216,7 @@ export const llmProviderSupported: LLMProviderSupported[] = [
     logo: '/static/images/llm.svg',
     handler: (apiKey, model, baseURL) => {
       return createOpenAI({
-        apiKey: apiKey === 'not_set' ? undefined : apiKey,
+        apiKey: !apiKey || apiKey === 'not_set' ? 'not_required' : apiKey,
         baseURL: baseURL,
       }).chat(model);
     },

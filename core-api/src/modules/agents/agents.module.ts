@@ -6,6 +6,7 @@ import { Global, Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsController } from './agents.controller';
+import { AgentsMemoriesService } from './agents.memories';
 import { AgentsService } from './agents.service';
 import { AgentTool } from './agents.tools';
 import { AgentConversation } from './entities/agent-conversation.entity';
@@ -22,7 +23,7 @@ import { AgentMessage } from './entities/agent-message.entity';
     StatisticModule,
   ],
   controllers: [AgentsController],
-  providers: [AgentsService, AgentsCompletionsService, AgentTool],
-  exports: [AgentsService, AgentsCompletionsService],
+  providers: [AgentsService, AgentsCompletionsService, AgentTool, AgentsMemoriesService],
+  exports: [AgentsService, AgentsCompletionsService, AgentsMemoriesService],
 })
 export class AgentsModule {}
