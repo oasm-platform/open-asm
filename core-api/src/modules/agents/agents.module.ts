@@ -12,11 +12,12 @@ import { AgentTool } from './agents.tools';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
+import { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
 
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AgentLLMConfig, AgentConversation, AgentMessage]),
+    TypeOrmModule.forFeature([AgentLLMConfig, AgentConversation, AgentMessage, AgentWorkspaceMemory]),
     AssetsModule,
     TargetsModule,
     forwardRef(() => VulnerabilitiesModule),

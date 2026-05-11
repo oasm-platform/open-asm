@@ -466,18 +466,19 @@ export class AgentsCompletionsService {
 
     const now = new Date();
     const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
-    const stmContext = await this.agentsMemories.formatForPrompt(
-      conversation.id,
-    );
+    const [stmContext, ltmContext] = await Promise.all([
+      this.agentsMemories.stmFormatForPrompt(conversation.id),
+      this.agentsMemories.ltmFormatForPrompt(workspaceId),
+    ]);
+
+    const contextParts = [currentTimeContext, ltmContext, stmContext].filter(Boolean);
 
     const result = streamText({
       model,
       messages: [
         {
           role: 'system' as const,
-          content: stmContext
-            ? `${currentTimeContext}\n\n${stmContext}`
-            : currentTimeContext,
+          content: contextParts.join('\n\n'),
         },
         ...modelMessages,
       ],

@@ -412,7 +412,7 @@ export class AgentsService {
     }
 
     await this.conversationRepository.remove(conversation);
-    await this.agentsMemories.clear(id);
+    await this.agentsMemories.stmClear(id);
   }
 
   async deleteAllConversations(workspaceId: string): Promise<void> {
@@ -422,7 +422,7 @@ export class AgentsService {
     });
     await this.conversationRepository.delete({ workspaceId });
     await Promise.all(
-      conversations.map((c) => this.agentsMemories.clear(c.id)),
+      conversations.map((c) => this.agentsMemories.stmClear(c.id)),
     );
   }
 
