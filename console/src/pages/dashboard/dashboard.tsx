@@ -2,6 +2,7 @@ import Page from '@/components/common/page';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import CreateWorkspace from '../workspaces/create-workspace';
 import AssetLocationsMap from './components/asset-locations-map';
+import { AssetTrends } from './components/asset-trends';
 import IssuesTimeline from './components/issues-timeline';
 import Statistic from './components/statistic';
 import TlsExpirationTable from './components/tls-expiration-table';
@@ -20,13 +21,9 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 2xl:grid-cols-4 gap-4">
           <div className="col-span-1 2xl:col-span-3 gap-4 space-y-4 2xl:order-1">
             <Statistic />
-            <div className="grid grid-cols-1 min-h-96 2xl:grid-cols-2 gap-4">
-              <div className="col-span-1">
-                <IssuesTimeline />
-              </div>
-              <div className="col-span-1">
-                <AssetLocationsMap />
-              </div>
+            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
+              <IssuesTimeline />
+              <AssetTrends />
               <TlsExpirationTable />
               <TopAssetsVulnerabilitiesChart />
             </div>
@@ -36,6 +33,9 @@ export default function Dashboard() {
               <VulnerabilityStatistic />
               <TopTagsAssets />
             </div>
+          </div>
+          <div className="col-span-1 2xl:col-span-3 space-y-4 min-h-96 order-last">
+            <AssetLocationsMap />
           </div>
         </div>
       )}

@@ -14,6 +14,9 @@ import { AssetGroups } from '@/pages/asset-group/asset-groups';
 import Assets from '@/pages/assets/assets';
 import DetailAsset from '@/pages/assets/detail-asset';
 import Dashboard from '@/pages/dashboard/dashboard';
+import InternalNetworks from '@/pages/internal-networks/internal-networks';
+import CreateInternalNetwork from '@/pages/internal-networks/create-internal-network';
+import InternalNetworkDetail from '@/pages/internal-networks/internal-network-detail';
 import CreateIssue from '@/pages/issues/create-issue';
 import IssueDetail from '@/pages/issues/issue-detail';
 import Issues from '@/pages/issues/issues';
@@ -268,6 +271,35 @@ export const router = createBrowserRouter([
               },
             ],
           },
+           {
+             path: 'internal-networks',
+             children: [
+               {
+                 path: '',
+                 element: (
+                   <RequireWorkspace>
+                     <InternalNetworks />
+                   </RequireWorkspace>
+                 ),
+               },
+               {
+                 path: 'create',
+                 element: (
+                   <RequireWorkspace>
+                     <CreateInternalNetwork />
+                   </RequireWorkspace>
+                 ),
+               },
+               {
+                 path: ':id',
+                 element: (
+                   <RequireWorkspace>
+                     <InternalNetworkDetail />
+                   </RequireWorkspace>
+                 ),
+               },
+             ],
+           },
           {
             path: 'assets',
             children: [

@@ -1,11 +1,12 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { CronSchedule, JobStatus } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
+import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
 import { Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
 
 /**
@@ -100,4 +101,15 @@ export class Target extends BaseEntity {
 
   @Column({ nullable: true })
   jobId: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  internalNetworkId: string;
+
+  @ManyToOne(
+    () => InternalNetwork,
+    (internalNetwork) => internalNetwork.targets,
+    { onDelete: 'CASCADE' },
+  )
+  @JoinColumn({ name: 'internalNetworkId' })
+  internalNetwork: InternalNetwork;
 }

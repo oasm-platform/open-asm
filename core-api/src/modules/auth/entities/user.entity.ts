@@ -1,5 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { Role } from '@/common/enums/enum';
+import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
 import { ToolProvider } from '@/modules/providers/entities/provider.entity';
 import { SearchHistory } from '@/modules/search/entities/search-history.entity';
 import { VulnerabilityDismissal } from '@/modules/vulnerabilities/entities/vulnerability-dismissal.entity';
@@ -65,6 +66,12 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Workflow, (workflow) => workflow.createdBy)
   createdWorkflows: Workflow[];
+
+  @OneToMany(
+    () => InternalNetwork,
+    (internalNetwork) => internalNetwork.creator,
+  )
+  createdInternalNetworks: InternalNetwork[];
 
   @OneToMany(
     () => VulnerabilityDismissal,

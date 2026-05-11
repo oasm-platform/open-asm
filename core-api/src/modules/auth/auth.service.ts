@@ -10,7 +10,7 @@ export class AuthService<T extends { api: T['api'] } = Auth> {
   constructor(
     @Inject(AUTH_INSTANCE_KEY)
     private readonly auth: T,
-  ) { }
+  ) {}
 
   /**
    * Returns the API endpoints provided by the auth instance

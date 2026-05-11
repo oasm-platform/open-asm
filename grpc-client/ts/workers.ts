@@ -128,6 +128,57 @@ export interface DownloadToolsResponse {
      */
     eof: boolean;
 }
+/**
+ * @generated from protobuf message workers.NetworkInterfaceMessage
+ */
+export interface NetworkInterfaceMessage {
+    /**
+     * @generated from protobuf field: string interface_name = 1
+     */
+    interfaceName: string;
+    /**
+     * @generated from protobuf field: string ip_address = 2
+     */
+    ipAddress: string;
+    /**
+     * @generated from protobuf field: string cidr = 3
+     */
+    cidr: string;
+    /**
+     * @generated from protobuf field: string gateway_ip = 4
+     */
+    gatewayIp: string;
+    /**
+     * @generated from protobuf field: string gateway_mac = 5
+     */
+    gatewayMac: string;
+}
+/**
+ * @generated from protobuf message workers.ConnectInternalNetworkRequest
+ */
+export interface ConnectInternalNetworkRequest {
+    /**
+     * @generated from protobuf field: string worker_id = 1
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: string network_id = 2
+     */
+    networkId: string;
+    /**
+     * @generated from protobuf field: repeated workers.NetworkInterfaceMessage network_interfaces = 3
+     */
+    networkInterfaces: NetworkInterfaceMessage[];
+}
+/**
+ * @generated from protobuf message workers.ConnectInternalNetworkResponse
+ */
+export interface ConnectInternalNetworkResponse {
+    /**
+     * @generated from protobuf field: string message = 1
+     */
+    message: string;
+}
 // @generated message type with reflection information, may provide speed optimized methods
 class JoinRequest$Type extends MessageType<JoinRequest> {
     constructor() {
@@ -618,6 +669,195 @@ class DownloadToolsResponse$Type extends MessageType<DownloadToolsResponse> {
  * @generated MessageType for protobuf message workers.DownloadToolsResponse
  */
 export const DownloadToolsResponse = new DownloadToolsResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class NetworkInterfaceMessage$Type extends MessageType<NetworkInterfaceMessage> {
+    constructor() {
+        super("workers.NetworkInterfaceMessage", [
+            { no: 1, name: "interface_name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "ip_address", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "cidr", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 4, name: "gateway_ip", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "gateway_mac", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<NetworkInterfaceMessage>): NetworkInterfaceMessage {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.interfaceName = "";
+        message.ipAddress = "";
+        message.cidr = "";
+        message.gatewayIp = "";
+        message.gatewayMac = "";
+        if (value !== undefined)
+            reflectionMergePartial<NetworkInterfaceMessage>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: NetworkInterfaceMessage): NetworkInterfaceMessage {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string interface_name */ 1:
+                    message.interfaceName = reader.string();
+                    break;
+                case /* string ip_address */ 2:
+                    message.ipAddress = reader.string();
+                    break;
+                case /* string cidr */ 3:
+                    message.cidr = reader.string();
+                    break;
+                case /* string gateway_ip */ 4:
+                    message.gatewayIp = reader.string();
+                    break;
+                case /* string gateway_mac */ 5:
+                    message.gatewayMac = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: NetworkInterfaceMessage, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string interface_name = 1; */
+        if (message.interfaceName !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.interfaceName);
+        /* string ip_address = 2; */
+        if (message.ipAddress !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.ipAddress);
+        /* string cidr = 3; */
+        if (message.cidr !== "")
+            writer.tag(3, WireType.LengthDelimited).string(message.cidr);
+        /* string gateway_ip = 4; */
+        if (message.gatewayIp !== "")
+            writer.tag(4, WireType.LengthDelimited).string(message.gatewayIp);
+        /* string gateway_mac = 5; */
+        if (message.gatewayMac !== "")
+            writer.tag(5, WireType.LengthDelimited).string(message.gatewayMac);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.NetworkInterfaceMessage
+ */
+export const NetworkInterfaceMessage = new NetworkInterfaceMessage$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ConnectInternalNetworkRequest$Type extends MessageType<ConnectInternalNetworkRequest> {
+    constructor() {
+        super("workers.ConnectInternalNetworkRequest", [
+            { no: 1, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "network_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "network_interfaces", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => NetworkInterfaceMessage }
+        ]);
+    }
+    create(value?: PartialMessage<ConnectInternalNetworkRequest>): ConnectInternalNetworkRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.workerId = "";
+        message.networkId = "";
+        message.networkInterfaces = [];
+        if (value !== undefined)
+            reflectionMergePartial<ConnectInternalNetworkRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ConnectInternalNetworkRequest): ConnectInternalNetworkRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string worker_id */ 1:
+                    message.workerId = reader.string();
+                    break;
+                case /* string network_id */ 2:
+                    message.networkId = reader.string();
+                    break;
+                case /* repeated workers.NetworkInterfaceMessage network_interfaces */ 3:
+                    message.networkInterfaces.push(NetworkInterfaceMessage.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ConnectInternalNetworkRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string worker_id = 1; */
+        if (message.workerId !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.workerId);
+        /* string network_id = 2; */
+        if (message.networkId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.networkId);
+        /* repeated workers.NetworkInterfaceMessage network_interfaces = 3; */
+        for (let i = 0; i < message.networkInterfaces.length; i++)
+            NetworkInterfaceMessage.internalBinaryWrite(message.networkInterfaces[i], writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.ConnectInternalNetworkRequest
+ */
+export const ConnectInternalNetworkRequest = new ConnectInternalNetworkRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ConnectInternalNetworkResponse$Type extends MessageType<ConnectInternalNetworkResponse> {
+    constructor() {
+        super("workers.ConnectInternalNetworkResponse", [
+            { no: 1, name: "message", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<ConnectInternalNetworkResponse>): ConnectInternalNetworkResponse {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.message = "";
+        if (value !== undefined)
+            reflectionMergePartial<ConnectInternalNetworkResponse>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ConnectInternalNetworkResponse): ConnectInternalNetworkResponse {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string message */ 1:
+                    message.message = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ConnectInternalNetworkResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string message = 1; */
+        if (message.message !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.message);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.ConnectInternalNetworkResponse
+ */
+export const ConnectInternalNetworkResponse = new ConnectInternalNetworkResponse$Type();
 /**
  * @generated ServiceType for protobuf service workers.WorkersService
  */
@@ -625,5 +865,6 @@ export const WorkersService = new ServiceType("workers.WorkersService", [
     { name: "Join", options: {}, I: JoinRequest, O: JoinResponse },
     { name: "Alive", serverStreaming: true, options: {}, I: AliveRequest, O: AliveResponse },
     { name: "GetManifest", options: {}, I: GetManifestRequest, O: GetManifestResponse },
-    { name: "DownloadTools", serverStreaming: true, options: {}, I: DownloadToolsRequest, O: DownloadToolsResponse }
+    { name: "DownloadTools", serverStreaming: true, options: {}, I: DownloadToolsRequest, O: DownloadToolsResponse },
+    { name: "ConnectInternalNetwork", options: {}, I: ConnectInternalNetworkRequest, O: ConnectInternalNetworkResponse }
 ]);

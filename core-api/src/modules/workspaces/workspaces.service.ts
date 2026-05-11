@@ -1,4 +1,8 @@
-import { LIMIT_WORKSPACE_CREATE } from '@/common/constants/app.constants';
+import {
+  LIMIT_WORKSPACE_CREATE,
+  WORKSPACE_COOKIE_NAME,
+} from '@/common/constants/app.constants';
+import { getWorkspaceIdFromRequest } from '@/common/decorators/workspace-id.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { ApiKeyType, WorkspaceRole } from '@/common/enums/enum';
@@ -16,6 +20,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { Request, Response } from 'express';
 import { In, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -115,11 +120,12 @@ export class WorkspacesService implements OnModuleInit {
   public async getWorkspaces(
     query: GetManyWorkspacesDto,
     userContextPayload: UserContextPayload,
+    req: Request,
+    res: Response,
   ) {
     const { limit, page, sortOrder, isArchived } = query;
     let { sortBy } = query;
     const { id } = userContextPayload;
-
     if (!(sortBy in Workspace)) {
       sortBy = 'createdAt';
     }
@@ -213,7 +219,15 @@ export class WorkspacesService implements OnModuleInit {
       memberCount: Number(row.membercount) || 0,
       role: row.member_role as WorkspaceRole,
     }));
+    const defaultWorkspace = mappedData[0]?.id;
+    const workspaceId = getWorkspaceIdFromRequest(req);
+    const selectedWorkspaceId =
+      mappedData.findIndex((workspace) => workspace.id === workspaceId) >= 0
+        ? workspaceId
+        : defaultWorkspace;
 
+    // Set default
+    res.cookie(WORKSPACE_COOKIE_NAME, selectedWorkspaceId);
     return getManyResponse({ query, data: mappedData, total });
   }
 

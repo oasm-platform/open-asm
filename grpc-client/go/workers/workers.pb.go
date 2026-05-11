@@ -489,6 +489,186 @@ func (x *DownloadToolsResponse) GetEof() bool {
 	return false
 }
 
+type NetworkInterfaceMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	InterfaceName string                 `protobuf:"bytes,1,opt,name=interface_name,json=interfaceName,proto3" json:"interface_name,omitempty"`
+	IpAddress     string                 `protobuf:"bytes,2,opt,name=ip_address,json=ipAddress,proto3" json:"ip_address,omitempty"`
+	Cidr          string                 `protobuf:"bytes,3,opt,name=cidr,proto3" json:"cidr,omitempty"`
+	GatewayIp     string                 `protobuf:"bytes,4,opt,name=gateway_ip,json=gatewayIp,proto3" json:"gateway_ip,omitempty"`
+	GatewayMac    string                 `protobuf:"bytes,5,opt,name=gateway_mac,json=gatewayMac,proto3" json:"gateway_mac,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetworkInterfaceMessage) Reset() {
+	*x = NetworkInterfaceMessage{}
+	mi := &file_workers_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetworkInterfaceMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetworkInterfaceMessage) ProtoMessage() {}
+
+func (x *NetworkInterfaceMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetworkInterfaceMessage.ProtoReflect.Descriptor instead.
+func (*NetworkInterfaceMessage) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *NetworkInterfaceMessage) GetInterfaceName() string {
+	if x != nil {
+		return x.InterfaceName
+	}
+	return ""
+}
+
+func (x *NetworkInterfaceMessage) GetIpAddress() string {
+	if x != nil {
+		return x.IpAddress
+	}
+	return ""
+}
+
+func (x *NetworkInterfaceMessage) GetCidr() string {
+	if x != nil {
+		return x.Cidr
+	}
+	return ""
+}
+
+func (x *NetworkInterfaceMessage) GetGatewayIp() string {
+	if x != nil {
+		return x.GatewayIp
+	}
+	return ""
+}
+
+func (x *NetworkInterfaceMessage) GetGatewayMac() string {
+	if x != nil {
+		return x.GatewayMac
+	}
+	return ""
+}
+
+type ConnectInternalNetworkRequest struct {
+	state             protoimpl.MessageState     `protogen:"open.v1"`
+	WorkerId          string                     `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	NetworkId         string                     `protobuf:"bytes,2,opt,name=network_id,json=networkId,proto3" json:"network_id,omitempty"`
+	NetworkInterfaces []*NetworkInterfaceMessage `protobuf:"bytes,3,rep,name=network_interfaces,json=networkInterfaces,proto3" json:"network_interfaces,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConnectInternalNetworkRequest) Reset() {
+	*x = ConnectInternalNetworkRequest{}
+	mi := &file_workers_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnectInternalNetworkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnectInternalNetworkRequest) ProtoMessage() {}
+
+func (x *ConnectInternalNetworkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnectInternalNetworkRequest.ProtoReflect.Descriptor instead.
+func (*ConnectInternalNetworkRequest) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ConnectInternalNetworkRequest) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *ConnectInternalNetworkRequest) GetNetworkId() string {
+	if x != nil {
+		return x.NetworkId
+	}
+	return ""
+}
+
+func (x *ConnectInternalNetworkRequest) GetNetworkInterfaces() []*NetworkInterfaceMessage {
+	if x != nil {
+		return x.NetworkInterfaces
+	}
+	return nil
+}
+
+type ConnectInternalNetworkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConnectInternalNetworkResponse) Reset() {
+	*x = ConnectInternalNetworkResponse{}
+	mi := &file_workers_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnectInternalNetworkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnectInternalNetworkResponse) ProtoMessage() {}
+
+func (x *ConnectInternalNetworkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnectInternalNetworkResponse.ProtoReflect.Descriptor instead.
+func (*ConnectInternalNetworkResponse) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ConnectInternalNetworkResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
@@ -525,12 +705,29 @@ const file_workers_proto_rawDesc = "" +
 	"\x15DownloadToolsResponse\x12\x14\n" +
 	"\x05chunk\x18\x01 \x01(\fR\x05chunk\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x10\n" +
-	"\x03eof\x18\x03 \x01(\bR\x03eof2\x9b\x02\n" +
+	"\x03eof\x18\x03 \x01(\bR\x03eof\"\xb3\x01\n" +
+	"\x17NetworkInterfaceMessage\x12%\n" +
+	"\x0einterface_name\x18\x01 \x01(\tR\rinterfaceName\x12\x1d\n" +
+	"\n" +
+	"ip_address\x18\x02 \x01(\tR\tipAddress\x12\x12\n" +
+	"\x04cidr\x18\x03 \x01(\tR\x04cidr\x12\x1d\n" +
+	"\n" +
+	"gateway_ip\x18\x04 \x01(\tR\tgatewayIp\x12\x1f\n" +
+	"\vgateway_mac\x18\x05 \x01(\tR\n" +
+	"gatewayMac\"\xac\x01\n" +
+	"\x1dConnectInternalNetworkRequest\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x1d\n" +
+	"\n" +
+	"network_id\x18\x02 \x01(\tR\tnetworkId\x12O\n" +
+	"\x12network_interfaces\x18\x03 \x03(\v2 .workers.NetworkInterfaceMessageR\x11networkInterfaces\":\n" +
+	"\x1eConnectInternalNetworkResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage2\x86\x03\n" +
 	"\x0eWorkersService\x123\n" +
 	"\x04Join\x12\x14.workers.JoinRequest\x1a\x15.workers.JoinResponse\x128\n" +
 	"\x05Alive\x12\x15.workers.AliveRequest\x1a\x16.workers.AliveResponse0\x01\x12H\n" +
 	"\vGetManifest\x12\x1b.workers.GetManifestRequest\x1a\x1c.workers.GetManifestResponse\x12P\n" +
-	"\rDownloadTools\x12\x1d.workers.DownloadToolsRequest\x1a\x1e.workers.DownloadToolsResponse0\x01B\vZ\t./workersb\x06proto3"
+	"\rDownloadTools\x12\x1d.workers.DownloadToolsRequest\x1a\x1e.workers.DownloadToolsResponse0\x01\x12i\n" +
+	"\x16ConnectInternalNetwork\x12&.workers.ConnectInternalNetworkRequest\x1a'.workers.ConnectInternalNetworkResponseB\vZ\t./workersb\x06proto3"
 
 var (
 	file_workers_proto_rawDescOnce sync.Once
@@ -544,33 +741,39 @@ func file_workers_proto_rawDescGZIP() []byte {
 	return file_workers_proto_rawDescData
 }
 
-var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_workers_proto_goTypes = []any{
-	(*JoinRequest)(nil),           // 0: workers.JoinRequest
-	(*WorkerMetadata)(nil),        // 1: workers.WorkerMetadata
-	(*JoinResponse)(nil),          // 2: workers.JoinResponse
-	(*AliveRequest)(nil),          // 3: workers.AliveRequest
-	(*AliveResponse)(nil),         // 4: workers.AliveResponse
-	(*GetManifestRequest)(nil),    // 5: workers.GetManifestRequest
-	(*GetManifestResponse)(nil),   // 6: workers.GetManifestResponse
-	(*DownloadToolsRequest)(nil),  // 7: workers.DownloadToolsRequest
-	(*DownloadToolsResponse)(nil), // 8: workers.DownloadToolsResponse
+	(*JoinRequest)(nil),                    // 0: workers.JoinRequest
+	(*WorkerMetadata)(nil),                 // 1: workers.WorkerMetadata
+	(*JoinResponse)(nil),                   // 2: workers.JoinResponse
+	(*AliveRequest)(nil),                   // 3: workers.AliveRequest
+	(*AliveResponse)(nil),                  // 4: workers.AliveResponse
+	(*GetManifestRequest)(nil),             // 5: workers.GetManifestRequest
+	(*GetManifestResponse)(nil),            // 6: workers.GetManifestResponse
+	(*DownloadToolsRequest)(nil),           // 7: workers.DownloadToolsRequest
+	(*DownloadToolsResponse)(nil),          // 8: workers.DownloadToolsResponse
+	(*NetworkInterfaceMessage)(nil),        // 9: workers.NetworkInterfaceMessage
+	(*ConnectInternalNetworkRequest)(nil),  // 10: workers.ConnectInternalNetworkRequest
+	(*ConnectInternalNetworkResponse)(nil), // 11: workers.ConnectInternalNetworkResponse
 }
 var file_workers_proto_depIdxs = []int32{
-	1, // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
-	0, // 1: workers.WorkersService.Join:input_type -> workers.JoinRequest
-	3, // 2: workers.WorkersService.Alive:input_type -> workers.AliveRequest
-	5, // 3: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
-	7, // 4: workers.WorkersService.DownloadTools:input_type -> workers.DownloadToolsRequest
-	2, // 5: workers.WorkersService.Join:output_type -> workers.JoinResponse
-	4, // 6: workers.WorkersService.Alive:output_type -> workers.AliveResponse
-	6, // 7: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
-	8, // 8: workers.WorkersService.DownloadTools:output_type -> workers.DownloadToolsResponse
-	5, // [5:9] is the sub-list for method output_type
-	1, // [1:5] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
+	9,  // 1: workers.ConnectInternalNetworkRequest.network_interfaces:type_name -> workers.NetworkInterfaceMessage
+	0,  // 2: workers.WorkersService.Join:input_type -> workers.JoinRequest
+	3,  // 3: workers.WorkersService.Alive:input_type -> workers.AliveRequest
+	5,  // 4: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
+	7,  // 5: workers.WorkersService.DownloadTools:input_type -> workers.DownloadToolsRequest
+	10, // 6: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
+	2,  // 7: workers.WorkersService.Join:output_type -> workers.JoinResponse
+	4,  // 8: workers.WorkersService.Alive:output_type -> workers.AliveResponse
+	6,  // 9: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
+	8,  // 10: workers.WorkersService.DownloadTools:output_type -> workers.DownloadToolsResponse
+	11, // 11: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
+	7,  // [7:12] is the sub-list for method output_type
+	2,  // [2:7] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_workers_proto_init() }
@@ -586,7 +789,7 @@ func file_workers_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workers_proto_rawDesc), len(file_workers_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

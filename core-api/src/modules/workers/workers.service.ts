@@ -23,6 +23,8 @@ import { randomUUID } from 'crypto';
 import { LessThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
+import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
+import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
@@ -47,6 +49,12 @@ export class WorkersService {
 
     @InjectRepository(WorkspaceTool)
     public readonly workspaceToolRepo: Repository<WorkspaceTool>,
+
+    @InjectRepository(InternalNetwork)
+    private internalNetworkRepo: Repository<InternalNetwork>,
+
+    @InjectRepository(NetworkInterface)
+    private networkInterfaceRepo: Repository<NetworkInterface>,
 
     @Inject(forwardRef(() => JobsRegistryService))
     private jobsRegistryService: JobsRegistryService,
@@ -411,9 +419,11 @@ export class WorkersService {
    * @param token - The worker token to validate
    * @returns True if the token is valid, false otherwise
    */
-  public async validateWorkerToken(token: string): Promise<boolean> {
+  public async validateWorkerToken(
+    token: string,
+  ): Promise<WorkerInstance | null> {
     if (!token) {
-      return false;
+      return null;
     }
 
     try {
@@ -423,10 +433,10 @@ export class WorkersService {
         },
       });
 
-      return !!worker;
+      return worker;
     } catch (error) {
       this.logger.error('Error validating worker token', error);
-      return false;
+      return null;
     }
   }
 
@@ -466,5 +476,70 @@ export class WorkersService {
       .where('workerId = :workerId', { workerId })
       .andWhere('status = :status', { status: JobStatus.IN_PROGRESS })
       .execute();
+  }
+
+  /**
+   * Connects a worker to an internal network and inserts network interfaces.
+   * Validates that the worker and network belong to the same workspace.
+   * @param request - The request containing workerId, networkId, and network interfaces.
+   * @returns A success message.
+   */
+  public async connectInternalNetwork(request: {
+    workerId: string;
+    networkId: string;
+    networkInterfaces: Array<{
+      interfaceName: string;
+      ipAddress: string;
+      cidr: string;
+      gatewayIp: string;
+      gatewayMac: string;
+    }>;
+  }): Promise<{ message: string }> {
+    const { workerId, networkId, networkInterfaces } = request;
+
+    // Find worker and get its workspace
+    const worker = await this.repo.findOne({
+      where: { id: workerId },
+      relations: ['workspace'],
+    });
+    if (!worker) {
+      throw new RpcException(`Worker not found: ${workerId}`);
+    }
+    await this.repo.update(workerId, { internalNetwork: { id: networkId } });
+    const workerWorkspaceId = worker.workspace.id;
+
+    // Find network and check workspace
+    const network = await this.internalNetworkRepo.findOne({
+      where: { id: networkId },
+    });
+    if (!network) {
+      throw new RpcException(`Internal network not found: ${networkId}`);
+    }
+    if (network.workspaceId !== workerWorkspaceId) {
+      throw new RpcException(
+        `Network and worker belong to different workspaces`,
+      );
+    }
+
+    // Insert network interfaces, ignoring duplicates
+    const interfacesToSave = networkInterfaces.map((ni) => ({
+      workerId,
+      internalNetworkId: networkId,
+      interfaceName: ni.interfaceName,
+      ipAddress: ni.ipAddress,
+      cidr: ni.cidr,
+      gatewayIp: ni.gatewayIp,
+      gatewayMac: ni.gatewayMac,
+    }));
+
+    await this.networkInterfaceRepo
+      .createQueryBuilder()
+      .insert()
+      .into(NetworkInterface)
+      .values(interfacesToSave)
+      .orIgnore()
+      .execute();
+
+    return { message: 'Connect success' };
   }
 }

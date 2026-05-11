@@ -1,3 +1,4 @@
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import type { LanguageModel } from 'ai';
@@ -10,7 +11,10 @@ export type LLMHandler = (
   baseURL?: string,
 ) => LanguageModel;
 
-export type LLMModelsFetcher = (apiKey: string) => Promise<ProviderModelDto[]>;
+export type LLMModelsFetcher = (
+  apiKey: string,
+  baseURL?: string,
+) => Promise<ProviderModelDto[]>;
 
 export interface LLMProviderSupported {
   id: LLMProvider;
@@ -18,6 +22,7 @@ export interface LLMProviderSupported {
   logo: string;
   handler: LLMHandler;
   fetchModels: LLMModelsFetcher;
+  isAcceptCustomApiUrl?: boolean;
 }
 
 const fetchOpenAIModels = async (
@@ -60,7 +65,11 @@ const fetchOpenRouterModels = async (): Promise<ProviderModelDto[]> => {
     }
 
     const data = (await response.json()) as {
-      data: Array<{ id: string; name?: string; supported_parameters?: string[] }>;
+      data: Array<{
+        id: string;
+        name?: string;
+        supported_parameters?: string[];
+      }>;
     };
 
     return data.data
@@ -124,6 +133,41 @@ const fetchKiloGatewayModels = async (
   }
 };
 
+const fetchAnthropicModels = async (): Promise<ProviderModelDto[]> => {
+  return [
+    { id: 'claude-opus-4-6', name: 'Claude Opus 4.6' },
+    { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+    { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
+  ];
+};
+
+const fetchCustomProviderModels = async (
+  apiKey: string,
+  baseURL?: string,
+): Promise<ProviderModelDto[]> => {
+  if (!baseURL) return [];
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (apiKey && apiKey !== 'not_set') {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+    const response = await fetch(`${baseURL.replace(/\/$/, '')}/models`, {
+      headers,
+    });
+    if (!response.ok) return [];
+    const data = (await response.json()) as {
+      data: Array<{ id: string; name?: string }>;
+    };
+    return data.data
+      .map((m) => ({ id: m.id, name: m.name ?? m.id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+};
+
 export const llmProviderSupported: LLMProviderSupported[] = [
   {
     id: LLMProvider.OPENROUTER,
@@ -159,6 +203,26 @@ export const llmProviderSupported: LLMProviderSupported[] = [
         model,
       ),
     fetchModels: fetchKiloGatewayModels,
+  },
+  {
+    id: LLMProvider.ANTHROPIC,
+    name: 'Anthropic',
+    logo: '/static/images/anthropic.svg',
+    handler: (apiKey, model) => createAnthropic({ apiKey }).chat(model),
+    fetchModels: fetchAnthropicModels,
+  },
+  {
+    id: LLMProvider.CUSTOM,
+    name: 'Custom provider (OpenAI-compatible)',
+    logo: '/static/images/llm.svg',
+    handler: (apiKey, model, baseURL) => {
+      return createOpenAI({
+        apiKey: apiKey === 'not_set' ? undefined : apiKey,
+        baseURL: baseURL,
+      }).chat(model);
+    },
+    fetchModels: fetchCustomProviderModels,
+    isAcceptCustomApiUrl: true,
   },
 ];
 

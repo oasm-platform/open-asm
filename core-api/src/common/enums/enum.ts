@@ -211,3 +211,13 @@ export enum VulnerabilityAnalyzeStatus {
   DONE = 'done',
   FAILED = 'failed',
 }
+
+/**
+ * Enum representing target scope - internal or external networks
+ */
+export enum TargetScopeType {
+  /** Targets belonging to internal networks */
+  INTERNAL = 'INTERNAL',
+  /** Targets belonging to external networks (public) */
+  EXTERNAL = 'EXTERNAL',
+}

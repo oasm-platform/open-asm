@@ -1,16 +1,16 @@
 import Page from '@/components/common/page';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { ConnectWorker } from '@/components/ui/connect-worker';
+import Image from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Loader2Icon } from 'lucide-react';
+import { Loader2Icon, Server } from 'lucide-react';
 dayjs.extend(relativeTime);
 
 const ListWorkers = () => {
@@ -82,13 +82,118 @@ const ListWorkers = () => {
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
         {data.data.map((worker) => (
-          <Card key={worker.id} className="py-2">
-            <CardContent className="p-3 space-y-3">
+          <Card key={worker.id} className="p-1">
+<CardContent className="p-3 space-y-4">
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-muted rounded-lg">
+                    {worker.os ? (
+                      <img
+                        style={{ filter: 'brightness(0) invert(1)' }}
+                        width={30}
+                        height={30}
+                        src={`/${worker.os}.svg`}
+                        alt={worker.os}
+                      />
+                    ) : (
+                      <Server />
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-sm">{worker.name}</span>
+                    <div className="flex items-center space-x-2">
+                      {new Date().getTime() -
+                        new Date(worker.lastSeenAt).getTime() <
+                      30000 ? (
+                        <>
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                          </span>
+                          <span className="text-sm text-green-600">Online</span>
+                        </>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          {dayjs(worker.lastSeenAt).fromNow()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <Badge
+                  variant="secondary"
+                  className={`${worker.internalNetworkId ? 'cursor-pointer hover:bg-secondary/80' : ''}`}
+                  onClick={() => {
+                    if (worker.internalNetworkId) {
+                      navigateWithParams(
+                        `/internal-networks/${worker.internalNetworkId}`,
+                      );
+                    }
+                  }}
+                >
+                  {worker.internalNetworkId ? 'Internal network' : 'External'}
+                </Badge>
+              </CardTitle>
+              <div className="flex justify-between items-center">
+                <div className="flex -space-x-2">
+                  {worker.tools.map((tool) => (
+                    <Button
+                      key={tool.id}
+                      variant="ghost"
+                      className="h-8 w-8 p-0 rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigateWithParams(`/tools/${tool.id}`);
+                      }}
+                    >
+                      <Image
+                        className="rounded-full"
+                        height={30}
+                        width={30}
+                        url={`${tool.logoUrl}`}
+                      />
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex justify-between">
+                  {worker.currentJobsCount > 0 ? (
+                    <span className="text-green-600">
+                      {worker.currentJobsCount} active job
+                      {worker.currentJobsCount > 1 ? 's' : ''}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      No active jobs
+                    </span>
+                  )}
+                </div>
+              </div>
               <div className="flex justify-between items-start">
                 <Badge variant="outline">Scope</Badge>
                 <div className="flex">
                   <Badge variant="outline" className={`ml-2`}>
                     {worker.scope === 'cloud' ? 'Global' : 'This workspace'}
+                  </Badge>
+                </div>
+              </div>
+              <div className="text-sm text-muted-foreground text-right">
+                Created {dayjs(worker.createdAt).fromNow()}
+              </div>
+            </CardContent>
+            {/* <CardContent className="p-3 space-y-3">
+              <div className="flex justify-between items-start">
+                <Badge variant="outline">Scope</Badge>
+                <div className="flex">
+                  <Badge variant="outline" className={`ml-2`}>
+                    {worker.scope === 'cloud' ? 'Global' : 'This workspace'}
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex justify-between items-start">
+                <Badge variant="outline">Surface</Badge>
+                <div className="flex">
+                  <Badge variant="outline" className={`ml-2`}>
+                    {worker.internalNetworkId ? 'Internal network' : 'External'}
                   </Badge>
                 </div>
               </div>
@@ -165,7 +270,7 @@ const ListWorkers = () => {
                   {dayjs(worker.createdAt).fromNow()}
                 </span>
               </div>
-            </CardContent>
+            </CardContent> */}
           </Card>
         ))}
       </div>
