@@ -29,7 +29,7 @@ import { ServicesModule } from './services/services.module';
       fallbackLanguage: 'en',
       loaderOptions: {
         path: path.join(__dirname, '/i18n/'),
-        watch: true,
+        watch: false,
       },
       resolvers: [
         { use: QueryResolver, options: ['lang'] },

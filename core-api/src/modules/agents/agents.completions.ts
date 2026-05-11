@@ -13,6 +13,7 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 
 import { decrypt } from '@/common/utils/encryption.util';
+import { AgentsMemoriesService } from './agents.memories';
 import { AgentTool } from './agents.tools';
 import { SendMessageDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
@@ -36,6 +37,11 @@ export class AgentsCompletionsService {
     'VUL_ANALYZE.md': 'You are a security expert analyzing vulnerabilities.',
   };
   private static readonly PROMPTS_DIR = 'prompts';
+  private readonly toolCapableModelsCache = new Map<string, Set<string>>();
+  private toolCapableCacheExpiry = 0;
+  private static readonly TOOL_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+  // Cache for custom/Ollama model tool support: key = `${baseURL}:${model}`, value = boolean
+  private readonly customToolSupportCache = new Map<string, boolean>();
 
   constructor(
     @InjectRepository(AgentLLMConfig)
@@ -45,6 +51,7 @@ export class AgentsCompletionsService {
     @InjectRepository(AgentMessage)
     private readonly messageRepository: Repository<AgentMessage>,
     private readonly agentTool: AgentTool,
+    private readonly agentsMemories: AgentsMemoriesService,
   ) {
     this.loadAllPrompts();
   }
@@ -131,8 +138,96 @@ export class AgentsCompletionsService {
     return llmConfig;
   }
 
+  /**
+   * Validates that the model supports tool calling for providers that require it.
+   * Uses an in-memory cache (10 min TTL) to avoid repeated API calls per message.
+   * Throws BadRequestException BEFORE the stream starts so the caller can still
+   * return a proper HTTP 400 response.
+   */
+  private async validateToolSupport(config: AgentLLMConfig): Promise<void> {
+    if (config.provider !== LLMProvider.OPENROUTER) {
+      return;
+    }
+
+    const now = Date.now();
+    let toolModels = this.toolCapableModelsCache.get('openrouter');
+
+    if (!toolModels || now > this.toolCapableCacheExpiry) {
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/models');
+        if (response.ok) {
+          const data = (await response.json()) as {
+            data: Array<{ id: string; supported_parameters?: string[] }>;
+          };
+          toolModels = new Set(
+            data.data
+              .filter((m) => m.supported_parameters?.includes('tools'))
+              .map((m) => m.id),
+          );
+          this.toolCapableModelsCache.set('openrouter', toolModels);
+          this.toolCapableCacheExpiry =
+            now + AgentsCompletionsService.TOOL_CACHE_TTL_MS;
+        }
+      } catch (err) {
+        this.logger.warn('Failed to fetch OpenRouter model capabilities', err);
+        return; // Assume capable if check fails
+      }
+    }
+
+    if (toolModels && !toolModels.has(config.model)) {
+      throw new BadRequestException(
+        `The selected model "${config.model}" does not support tool calling. ` +
+          'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
+      );
+    }
+  }
+
+  /**
+   * Checks if a CUSTOM (Ollama-compatible) model supports tool calling.
+   * Uses /api/show endpoint; falls back to true (assume capable) on error.
+   */
+  private async customModelSupportsTools(
+    baseURL: string,
+    model: string,
+  ): Promise<boolean> {
+    const cacheKey = `${baseURL}:${model}`;
+    if (this.customToolSupportCache.has(cacheKey)) {
+      return this.customToolSupportCache.get(cacheKey)!;
+    }
+
+    try {
+      // Strip OpenAI-compat suffix (/v1) to get Ollama root URL
+      const base = baseURL.replace(/\/$/, '').replace(/\/v1$/, '');
+      const response = await fetch(`${base}/api/show`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: model }),
+      });
+
+      if (!response.ok) {
+        this.customToolSupportCache.set(cacheKey, true);
+        return true;
+      }
+
+      const data = (await response.json()) as {
+        capabilities?: string[];
+      };
+
+      const supportsTools =
+        data.capabilities?.includes('tools') ??
+        data.capabilities?.includes('tool_use') ??
+        true;
+
+      this.customToolSupportCache.set(cacheKey, supportsTools);
+      return supportsTools;
+    } catch {
+      this.customToolSupportCache.set(cacheKey, true);
+      return true;
+    }
+  }
+
   private createLanguageModel(config: AgentLLMConfig): LanguageModel {
-    const apiKey = decrypt(config.apiKey);
+    const apiKey = config.apiKey ? decrypt(config.apiKey) : '';
     const providerConfig = getLLMProviderConfig(config.provider);
 
     if (!providerConfig) {
@@ -334,6 +429,7 @@ export class AgentsCompletionsService {
       };
     });
 
+    await this.validateToolSupport(llmConfig);
     const model = this.createLanguageModel(llmConfig);
 
     const assistantMessage = this.messageRepository.create({
@@ -353,7 +449,16 @@ export class AgentsCompletionsService {
     const messageRepo = this.messageRepository;
     const assistantMsgId = assistantMessage.id;
     const assistantMsgMetadata = assistantMessage.metadata;
-    const tools = this.agentTool.getTools(workspaceId);
+    let toolsEnabled = true;
+    if (llmConfig.provider === LLMProvider.CUSTOM && llmConfig.apiUrl) {
+      toolsEnabled = await this.customModelSupportsTools(
+        llmConfig.apiUrl,
+        llmConfig.model,
+      );
+    }
+    const tools = toolsEnabled
+      ? this.agentTool.getTools(workspaceId)
+      : undefined;
     const systemPrompt = this.getPrompt('SYSTEM.md');
     const currentLlvmConfig = llmConfig;
 
@@ -361,23 +466,55 @@ export class AgentsCompletionsService {
 
     const now = new Date();
     const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
+    const [stmContext, ltmContext] = await Promise.all([
+      this.agentsMemories.stmFormatForPrompt(conversation.id),
+      this.agentsMemories.ltmFormatForPrompt(workspaceId),
+    ]);
+
+    const contextParts = [currentTimeContext, ltmContext, stmContext].filter(Boolean);
 
     const result = streamText({
       model,
       messages: [
         {
           role: 'system' as const,
-          content: currentTimeContext,
+          content: contextParts.join('\n\n'),
         },
         ...modelMessages,
       ],
       system: systemPrompt,
-      tools,
-      stopWhen: stepCountIs(10),
+      ...(tools ? { tools, stopWhen: stepCountIs(10) } : {}),
       onChunk: ({ chunk }) => {
         if (chunk.type === 'text-delta') {
           accumulatedText += chunk.text;
         }
+      },
+      onError: ({ error }) => {
+        const message = error instanceof Error ? error.message : String(error);
+        if (
+          message.includes('tool use') ||
+          message.includes('tool_choice') ||
+          message.includes('No endpoints found that support tool') ||
+          message.includes('does not support tools') ||
+          message.includes('tool_calls') ||
+          message.includes('tools is not supported')
+        ) {
+          // Invalidate cache so next request re-checks
+          if (
+            currentLlvmConfig.provider === LLMProvider.CUSTOM &&
+            currentLlvmConfig.apiUrl
+          ) {
+            this.customToolSupportCache.set(
+              `${currentLlvmConfig.apiUrl}:${currentLlvmConfig.model}`,
+              false,
+            );
+          }
+          throw new Error(
+            `The selected model "${currentLlvmConfig.model}" does not support tool calling. ` +
+              'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
+          );
+        }
+        throw error;
       },
       onFinish: async () => {
         if (accumulatedText) {

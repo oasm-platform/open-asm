@@ -57,6 +57,9 @@ export default defineConfig(({ mode }) => {
     },
     logLevel: 'silent',
     server: {
+      watch: {
+        usePolling: true,
+      },
       host: true,
       port: 5173,
       allowedHosts: true,

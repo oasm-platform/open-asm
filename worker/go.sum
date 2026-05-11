@@ -50,16 +50,6 @@ github.com/mattn/go-colorable v0.1.14 h1:9A9LHSqF/7dyVVX6g0U9cwm9pG3kP9gSzcuIPHP
 github.com/mattn/go-colorable v0.1.14/go.mod h1:6LmQG8QLFO4G5z1gPvYEzlUgJ2wF+stgPZH1UqBm1s8=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
-github.com/oasm-platform/oasm-sdk-go v0.1.1-0.20260428114300-b30669a4e6d6 h1:6r6VpsSmqYgH30CsRBMhagKzxJhpgova30jMplRlkdg=
-github.com/oasm-platform/oasm-sdk-go v0.1.1-0.20260428114300-b30669a4e6d6/go.mod h1:wjzvYSPzeBUO1nM0zTqe4o7HIjh5B29kRZtW4tj6P5E=
-github.com/oasm-platform/oasm-sdk-go v0.1.5 h1:8QB72U+IPq324N0rDXQwDJ25ArwiStNzt/VPJgjIhAA=
-github.com/oasm-platform/oasm-sdk-go v0.1.5/go.mod h1:wjzvYSPzeBUO1nM0zTqe4o7HIjh5B29kRZtW4tj6P5E=
-github.com/oasm-platform/oasm-sdk-go v0.1.6 h1:xF4sdrhZsyQEpMs0WY8FM0RX4WTicil6GQWuhk/8x0o=
-github.com/oasm-platform/oasm-sdk-go v0.1.6/go.mod h1:wjzvYSPzeBUO1nM0zTqe4o7HIjh5B29kRZtW4tj6P5E=
-github.com/oasm-platform/oasm-sdk-go v0.1.7-0.20260509103328-df5ddaf5aeb2 h1:V2cXYmY08bGlDzTotMp5SriTg2VPaG5xQlTxEcM5+k8=
-github.com/oasm-platform/oasm-sdk-go v0.1.7-0.20260509103328-df5ddaf5aeb2/go.mod h1:wjzvYSPzeBUO1nM0zTqe4o7HIjh5B29kRZtW4tj6P5E=
-github.com/oasm-platform/oasm-sdk-go v0.1.7 h1:zI2wP2pUysMBRIO2x1roe0+nOF4U5h4u8FG6MhrShmc=
-github.com/oasm-platform/oasm-sdk-go v0.1.7/go.mod h1:wjzvYSPzeBUO1nM0zTqe4o7HIjh5B29kRZtW4tj6P5E=
 github.com/oasm-platform/oasm-sdk-go v0.1.8 h1:0M4XqVTeVHCXpTiR3C3A+2tItuweu08dNNY9bYMVmV4=
 github.com/oasm-platform/oasm-sdk-go v0.1.8/go.mod h1:wjzvYSPzeBUO1nM0zTqe4o7HIjh5B29kRZtW4tj6P5E=
 github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260428111953-044d56938cef h1:Erss3VnnVcVxZ5E8ruU6+QCtJtLCoXtjPRe7cHsbKMY=

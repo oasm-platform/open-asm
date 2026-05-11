@@ -7,6 +7,10 @@ import { AssetsService } from '@/modules/assets/assets.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
+import { IssuesService } from '@/modules/issues/issues.service';
+import { ToolsService } from '@/modules/tools/tools.service';
+import { WorkersService } from '@/modules/workers/workers.service';
+import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
@@ -20,6 +24,11 @@ import {
   getTargetsSchema,
   getVulnerabilitiesSchema,
   listAssetsInTargetSchema,
+  listIssuesSchema,
+  detailIssueSchema,
+  listToolsSchema,
+  listWorkersSchema,
+  listJobsSchema,
 } from '@/mcp/mcp.schema';
 
 // Web fetch tool schema
@@ -45,6 +54,14 @@ export class AgentTool {
     @Inject(forwardRef(() => VulnerabilitiesService))
     private readonly vulnerabilitiesService: VulnerabilitiesService,
     private readonly statisticService: StatisticService,
+    @Inject(forwardRef(() => IssuesService))
+    private readonly issuesService: IssuesService,
+    @Inject(forwardRef(() => ToolsService))
+    private readonly toolsService: ToolsService,
+    @Inject(forwardRef(() => WorkersService))
+    private readonly workersService: WorkersService,
+    @Inject(forwardRef(() => JobsRegistryService))
+    private readonly jobsRegistryService: JobsRegistryService,
   ) {}
 
   /**
@@ -354,6 +371,155 @@ export class AgentTool {
   }
 
   /**
+   * List issues tool - returns a factory that accepts workspaceId
+   */
+  get listIssuesTool(): (workspaceId: string) => any {
+    return (workspaceId: string) => {
+      const toolConfig: any = {
+        description:
+          '✅ List all security issues in the workspace.\n\nReturns all issues (tickets/findings) with their status.\n\n✅ WHEN TO USE:\n- User asks "what issues are there?"\n- Search for specific issues\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- search: Filter by title or content\n- status: Filter by status (e.g. OPEN, IN_PROGRESS, RESOLVED)',
+        parameters: listIssuesSchema,
+        execute: async (params: z.infer<typeof listIssuesSchema>) => {
+          const { page, limit, search, status } = params;
+          const response = await this.issuesService.getMany(
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              search,
+              status: status as any,
+            },
+            workspaceId,
+          );
+          return {
+            ...response,
+            data: response.data.map((i) => ({
+              id: i.id,
+              title: i.title,
+              status: i.status,
+              tags: i.tags,
+            })),
+          };
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
+   * Detail issue tool - returns a factory that accepts workspaceId
+   */
+  get detailIssueTool(): (workspaceId: string) => any {
+    return (workspaceId: string) => {
+      const toolConfig: any = {
+        description:
+          '✅ Get FULL DETAILS about a single issue.\n\nUse this after you have an issue ID from list_issues. Returns everything known about this specific issue.\n\nPARAMETERS:\n- issueId: REQUIRED. The ID of the issue',
+        parameters: detailIssueSchema,
+        execute: async (params: z.infer<typeof detailIssueSchema>) => {
+          const { issueId } = params;
+          return this.issuesService.getById(issueId, workspaceId);
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
+   * List tools tool - returns a factory that accepts workspaceId
+   */
+  get listToolsTool(): (workspaceId: string) => any {
+    return (workspaceId: string) => {
+      const toolConfig: any = {
+        description:
+          '✅ List all installed security tools/scanners.\n\nReturns tools configured in the workspace.\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- q: Search query to filter tools',
+        parameters: listToolsSchema,
+        execute: async (params: z.infer<typeof listToolsSchema>) => {
+          const { page, limit, q } = params;
+          const response = await this.toolsService.getManyTools({
+            limit: limit ?? 100,
+            page: page ?? 1,
+            sortBy: 'createdAt',
+            sortOrder: SortOrder.DESC,
+            search: q,
+          });
+          return {
+            ...response,
+            data: response.data.map((i) => ({
+              id: i.id,
+              name: i.name,
+            })),
+          };
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
+   * List workers tool - returns a factory that accepts workspaceId
+   */
+  get listWorkersTool(): (workspaceId: string) => any {
+    return (workspaceId: string) => {
+      const toolConfig: any = {
+        description:
+          '✅ List all worker nodes.\n\nReturns worker nodes that are connected or configured.\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- q: Search query to filter workers',
+        parameters: listWorkersSchema,
+        execute: async (params: z.infer<typeof listWorkersSchema>) => {
+          const { page, limit, q } = params;
+          const response = await this.workersService.getWorkers({
+            limit: limit ?? 100,
+            page: page ?? 1,
+            sortBy: 'createdAt',
+            sortOrder: SortOrder.DESC,
+            search: q,
+          });
+          return {
+            ...response,
+            data: response.data.map((i) => ({
+              id: i.id,
+              name: i.name,
+            })),
+          };
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
+   * List jobs tool - returns a factory that accepts workspaceId
+   */
+  get listJobsTool(): (workspaceId: string) => any {
+    return (workspaceId: string) => {
+      const toolConfig: any = {
+        description:
+          '✅ List background jobs.\n\nReturns background scan jobs and their status.\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- jobHistoryId: Filter by specific job run ID\n- jobStatus: Filter by status (completed, failed, active)',
+        parameters: listJobsSchema,
+        execute: async (params: z.infer<typeof listJobsSchema>) => {
+          const { page, limit, jobHistoryId, jobStatus } = params;
+          const response = await this.jobsRegistryService.getManyJobs({
+            limit: limit ?? 100,
+            page: page ?? 1,
+            sortBy: 'createdAt',
+            sortOrder: SortOrder.DESC,
+            jobHistoryId: jobHistoryId,
+            jobStatus: jobStatus,
+          });
+          return {
+            ...response,
+            data: response.data.map((i) => ({
+              id: i.id,
+              status: i.status,
+            })),
+          };
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
    * Returns all available tools as a record, bound to the given workspaceId
    */
   getTools(workspaceId: string): Record<string, ToolType> {
@@ -369,6 +535,11 @@ export class AgentTool {
       get_technologies: this.getTechnologiesTool(workspaceId),
       get_tls: this.getTlsTool(workspaceId),
       web_fetch: this.webFetchTool(workspaceId),
+      list_issues: this.listIssuesTool(workspaceId),
+      detail_issue: this.detailIssueTool(workspaceId),
+      list_tools: this.listToolsTool(workspaceId),
+      list_workers: this.listWorkersTool(workspaceId),
+      list_jobs: this.listJobsTool(workspaceId),
     };
   }
 }

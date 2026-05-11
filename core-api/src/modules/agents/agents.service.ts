@@ -17,6 +17,7 @@ import {
   ConversationResponseDto,
   UpdateConversationDto,
 } from './dto/conversation.dto';
+import { AgentsMemoriesService } from './agents.memories';
 import {
   CreateLLMConfigDto,
   LLMConfigResponseDto,
@@ -38,7 +39,6 @@ import {
 @Injectable()
 export class AgentsService {
   private readonly logger = new Logger(AgentsService.name);
-  private systemPrompt: string | null = null;
 
   constructor(
     @InjectRepository(AgentLLMConfig)
@@ -48,6 +48,7 @@ export class AgentsService {
     @InjectRepository(AgentMessage)
     private readonly messageRepository: Repository<AgentMessage>,
     private readonly redisService: RedisService,
+    private readonly agentsMemories: AgentsMemoriesService,
   ) {}
 
   private maskApiKey(apiKey: string): string {
@@ -56,14 +57,16 @@ export class AgentsService {
   }
 
   private toLLMConfigResponse(config: AgentLLMConfig): LLMConfigResponseDto {
-    const decryptedKey = decrypt(config.apiKey);
+    const apiKeyMasked = config.apiKey
+      ? this.maskApiKey(decrypt(config.apiKey))
+      : '****';
     return {
       id: config.id,
       provider: config.provider,
       model: config.model,
       apiUrl: config.apiUrl,
       isPreferred: config.isPreferred,
-      apiKeyMasked: this.maskApiKey(decryptedKey),
+      apiKeyMasked,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
     };
@@ -163,7 +166,9 @@ export class AgentsService {
       const config = configs.find((c) => c.provider === provider.id);
 
       if (config) {
-        const decryptedKey = decrypt(config.apiKey);
+        const apiKeyMasked = config.apiKey
+          ? this.maskApiKey(decrypt(config.apiKey))
+          : '****';
         return {
           providerId: provider.id,
           providerName: provider.name,
@@ -173,7 +178,7 @@ export class AgentsService {
           model: config.model,
           apiUrl: config.apiUrl,
           isPreferred: config.isPreferred,
-          apiKeyMasked: this.maskApiKey(decryptedKey),
+          apiKeyMasked,
           createdAt: config.createdAt,
           updatedAt: config.updatedAt,
           isAcceptCustomApiUrl: provider.isAcceptCustomApiUrl ?? false,
@@ -407,10 +412,18 @@ export class AgentsService {
     }
 
     await this.conversationRepository.remove(conversation);
+    await this.agentsMemories.stmClear(id);
   }
 
   async deleteAllConversations(workspaceId: string): Promise<void> {
+    const conversations = await this.conversationRepository.find({
+      where: { workspaceId },
+      select: ['id'],
+    });
     await this.conversationRepository.delete({ workspaceId });
+    await Promise.all(
+      conversations.map((c) => this.agentsMemories.stmClear(c.id)),
+    );
   }
 
   async getMessages(

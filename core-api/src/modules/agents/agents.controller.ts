@@ -274,13 +274,23 @@ export class AgentsController {
       );
       res.flushHeaders();
 
-      const reader = stream.getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(`data: ${JSON.stringify(value)}\n\n`);
+      // Headers are now committed — from this point on we can only write SSE events
+      try {
+        const reader = stream.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(`data: ${JSON.stringify(value)}\n\n`);
+        }
+        res.end();
+      } catch (streamError) {
+        const message =
+          streamError instanceof Error ? streamError.message : 'Stream error';
+        res.write(
+          `data: ${JSON.stringify({ type: 'error', error: { message } })}\n\n`,
+        );
+        res.end();
       }
-      res.end();
     } catch (error) {
       if (error instanceof BadRequestException) {
         res.status(400).json({
