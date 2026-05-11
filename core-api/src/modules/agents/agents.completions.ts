@@ -36,6 +36,9 @@ export class AgentsCompletionsService {
     'VUL_ANALYZE.md': 'You are a security expert analyzing vulnerabilities.',
   };
   private static readonly PROMPTS_DIR = 'prompts';
+  private readonly toolCapableModelsCache = new Map<string, Set<string>>();
+  private toolCapableCacheExpiry = 0;
+  private static readonly TOOL_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
   constructor(
     @InjectRepository(AgentLLMConfig)
@@ -129,6 +132,50 @@ export class AgentsCompletionsService {
     }
 
     return llmConfig;
+  }
+
+  /**
+   * Validates that the model supports tool calling for providers that require it.
+   * Uses an in-memory cache (10 min TTL) to avoid repeated API calls per message.
+   * Throws BadRequestException BEFORE the stream starts so the caller can still
+   * return a proper HTTP 400 response.
+   */
+  private async validateToolSupport(config: AgentLLMConfig): Promise<void> {
+    if (config.provider !== LLMProvider.OPENROUTER) {
+      return;
+    }
+
+    const now = Date.now();
+    let toolModels = this.toolCapableModelsCache.get('openrouter');
+
+    if (!toolModels || now > this.toolCapableCacheExpiry) {
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/models');
+        if (response.ok) {
+          const data = (await response.json()) as {
+            data: Array<{ id: string; supported_parameters?: string[] }>;
+          };
+          toolModels = new Set(
+            data.data
+              .filter((m) => m.supported_parameters?.includes('tools'))
+              .map((m) => m.id),
+          );
+          this.toolCapableModelsCache.set('openrouter', toolModels);
+          this.toolCapableCacheExpiry =
+            now + AgentsCompletionsService.TOOL_CACHE_TTL_MS;
+        }
+      } catch (err) {
+        this.logger.warn('Failed to fetch OpenRouter model capabilities', err);
+        return; // Assume capable if check fails
+      }
+    }
+
+    if (toolModels && !toolModels.has(config.model)) {
+      throw new BadRequestException(
+        `The selected model "${config.model}" does not support tool calling. ` +
+          'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
+      );
+    }
   }
 
   private createLanguageModel(config: AgentLLMConfig): LanguageModel {
@@ -334,6 +381,7 @@ export class AgentsCompletionsService {
       };
     });
 
+    await this.validateToolSupport(llmConfig);
     const model = this.createLanguageModel(llmConfig);
 
     const assistantMessage = this.messageRepository.create({
@@ -378,6 +426,21 @@ export class AgentsCompletionsService {
         if (chunk.type === 'text-delta') {
           accumulatedText += chunk.text;
         }
+      },
+      onError: ({ error }) => {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        if (
+          message.includes('tool use') ||
+          message.includes('tool_choice') ||
+          message.includes('No endpoints found that support tool')
+        ) {
+          throw new Error(
+            `The selected model "${currentLlvmConfig.model}" does not support tool calling. ` +
+              'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
+          );
+        }
+        throw error;
       },
       onFinish: async () => {
         if (accumulatedText) {

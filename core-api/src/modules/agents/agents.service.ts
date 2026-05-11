@@ -38,7 +38,6 @@ import {
 @Injectable()
 export class AgentsService {
   private readonly logger = new Logger(AgentsService.name);
-  private systemPrompt: string | null = null;
 
   constructor(
     @InjectRepository(AgentLLMConfig)

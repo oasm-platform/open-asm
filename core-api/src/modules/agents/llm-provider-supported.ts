@@ -60,10 +60,11 @@ const fetchOpenRouterModels = async (): Promise<ProviderModelDto[]> => {
     }
 
     const data = (await response.json()) as {
-      data: Array<{ id: string; name?: string }>;
+      data: Array<{ id: string; name?: string; supported_parameters?: string[] }>;
     };
 
     return data.data
+      .filter((m) => m.supported_parameters?.includes('tools'))
       .map((m) => ({ id: m.id, name: m.name ?? m.id }))
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch {
