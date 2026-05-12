@@ -1,4 +1,5 @@
 {
   "WORKSPACE_CREATED": "Workspace {name} created",
-  "VULNERABILITY_ANALYSIS_COMPLETED": "Vulnerability analysis completed for {name}"
+  "VULNERABILITY_ANALYSIS_COMPLETED": "Vulnerability analysis completed for {name}",
+  "JOB_HISTORY_FINDINGS": "New finding {port, plural, =0{} other{# port{port, plural, =1{} other{s}}}}{subdomain, plural, =0{} other{, # subdomain{subdomain, plural, =1{} other{s}}}}{vuln, plural, =0{} other{, # vulnerabilit{vuln, plural, =1{y} other{ies}}}}{tech, plural, =0{} other{, # tech{tech, plural, =1{} other{s}}}}{service, plural, =0{} other{, # service{service, plural, =1{} other{s}}}}{domain, select, undefined{} other{ at {domain}}}"
 }

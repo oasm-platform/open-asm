@@ -11,6 +11,7 @@ import {
   QueryResolver,
 } from 'nestjs-i18n';
 import * as path from 'path';
+import { IntlMessageFormat } from 'intl-messageformat';
 import { DatabaseModule } from './database/database.module';
 import { CombineModule } from './modules/combine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -36,6 +37,10 @@ import { ServicesModule } from './services/services.module';
         AcceptLanguageResolver,
         new HeaderResolver(['x-custom-lang']),
       ],
+      formatter: (template: string, args: string | Record<string, string>, lang: string) => {
+        const formatArgs = typeof args === 'string' ? { value: args } : args;
+        return new IntlMessageFormat(template, lang).format(formatArgs) as string;
+      },
     }),
     BullModule.forRootAsync({
       useFactory: (config: ConfigService) => ({

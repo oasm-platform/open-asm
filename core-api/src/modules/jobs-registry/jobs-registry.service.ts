@@ -9,6 +9,8 @@ import {
   JobPriority,
   JobRunType,
   JobStatus,
+  NotificationScope,
+  NotificationType,
   ToolCategory,
   DataSource as ToolDataSource,
   WorkerScope,
@@ -30,6 +32,9 @@ import { randomUUID } from 'crypto';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { Target } from '../targets/entities/target.entity';
+import { StatisticService } from '../statistic/statistic.service';
 import { StorageService } from '../storage/storage.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
@@ -59,11 +64,15 @@ export class JobsRegistryService {
     public readonly jobHistoryRepo: Repository<JobHistory>,
     @InjectRepository(JobErrorLog)
     public readonly jobErrorLogRepo: Repository<JobErrorLog>,
+    @InjectRepository(Target)
+    private readonly targetRepo: Repository<Target>,
     private dataSource: DataSource,
     @Optional() private toolsService: ToolsService,
     private storageService: StorageService,
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
+    private readonly statisticService: StatisticService,
+    private readonly notificationsService: NotificationsService,
   ) {}
   public async getManyJobs(
     query: GetManyJobsRequestDto,
@@ -162,6 +171,15 @@ export class JobsRegistryService {
         jobHistoryName: jobName,
       });
       await this.jobHistoryRepo.save(jobHistory);
+
+      // Take snapshot for diff notification (only when creating new jobHistory)
+      if (workspaceId && targetIds && targetIds.length > 0) {
+        try {
+          await this.takeSnapshot(jobHistory.id, workspaceId, targetIds);
+        } catch {
+          // Silent fail - snapshot is best-effort
+        }
+      }
     }
 
     const jobRepo = this.dataSource.getRepository(Job);
@@ -770,7 +788,7 @@ export class JobsRegistryService {
     if (updateResult.affected && updateResult.affected > 0) {
       const jobHistory = await this.jobHistoryRepo.findOne({
         where: { id: jobHistoryId },
-        relations: { workflow: true },
+        relations: { workflow: { workspace: true } },
       });
 
       if (jobHistory) {
@@ -778,8 +796,93 @@ export class JobsRegistryService {
           `🎉 JobHistory ${jobHistoryId} completed! ` +
             `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
         );
+
+        // Compare snapshot and push diff notification
+        await this.handleCompletionNotification(jobHistoryId);
       }
     }
+  }
+
+  /**
+   * Handles completion notification by comparing snapshot counts with current counts.
+   * Sends a notification if there are any new findings.
+   * @param jobHistoryId the job history ID
+   */
+  private async handleCompletionNotification(
+    jobHistoryId: string,
+  ): Promise<void> {
+    // Load snapshot
+    const snapshot = await this.loadSnapshot(jobHistoryId);
+    if (!snapshot) {
+      return; // No snapshot (expired or never taken)
+    }
+
+    const { workspaceId, targetIds, counts: beforeCounts } = snapshot;
+
+    // Get current counts
+    const afterCounts =
+      await this.statisticService.getCountsForTargets(workspaceId, targetIds);
+
+    // Calculate diffs
+    const portDiff = afterCounts.ports - beforeCounts.ports;
+    const subdomainDiff = afterCounts.assets - beforeCounts.assets; // assets = subdomains
+    const vulnDiff = afterCounts.vulns - beforeCounts.vulns;
+    const techDiff = afterCounts.techs - beforeCounts.techs;
+    const serviceDiff = afterCounts.services - beforeCounts.services;
+
+    // Skip if no new findings
+    if (
+      portDiff <= 0 &&
+      subdomainDiff <= 0 &&
+      vulnDiff <= 0 &&
+      techDiff <= 0 &&
+      serviceDiff <= 0
+    ) {
+      await this.deleteSnapshot(jobHistoryId);
+      return;
+    }
+
+    // Get domain from first target for notification context
+    let domain: string | undefined;
+    if (targetIds && targetIds.length > 0) {
+      const firstTarget = await this.targetRepo.findOne({
+        where: { id: targetIds[0] },
+        select: ['value'],
+      });
+      domain = firstTarget?.value;
+    }
+
+    // Get workspace members as recipients
+    const workspaceMembers = await this.dataSource
+      .getRepository('workspace_members')
+      .find({
+        where: { workspace: { id: workspaceId } },
+        relations: ['user'],
+      });
+    const recipients = workspaceMembers
+      .map((m: { user?: { id: string } }) => m.user?.id)
+      .filter((id?: string): id is string => !!id);
+
+    if (recipients.length > 0) {
+      await this.notificationsService.createNotification({
+        recipients,
+        scope: NotificationScope.USER,
+        type: NotificationType.JOB_HISTORY_FINDINGS,
+        workspaceId,
+        metadata: {
+          port: Math.max(0, portDiff).toString(),
+          subdomain: Math.max(0, subdomainDiff).toString(),
+          vuln: Math.max(0, vulnDiff).toString(),
+          tech: Math.max(0, techDiff).toString(),
+          service: Math.max(0, serviceDiff).toString(),
+          domain: domain ?? 'undefined',
+          targetId: targetIds?.[0] ?? '',
+        },
+      });
+    }
+
+    // Clean up snapshot
+    await this.deleteSnapshot(jobHistoryId);
   }
 
   /**
@@ -808,6 +911,45 @@ export class JobsRegistryService {
         assetService: true,
       },
     });
+  }
+
+  // Snapshot helpers for job-history diff notifications
+  private snapshotKey(jobHistoryId: string): string {
+    return `snapshot:${jobHistoryId}`;
+  }
+
+  private async takeSnapshot(
+    jobHistoryId: string,
+    workspaceId: string,
+    targetIds: string[],
+  ): Promise<void> {
+    const counts = await this.statisticService.getCountsForTargets(
+      workspaceId,
+      targetIds,
+    );
+    const payload = JSON.stringify({ workspaceId, targetIds, counts });
+    // TTL: 7 days (60 * 60 * 24 * 7 seconds)
+    await this.redis.setex(this.snapshotKey(jobHistoryId), 604800, payload);
+  }
+
+  private async loadSnapshot(
+    jobHistoryId: string,
+  ): Promise<{ workspaceId: string; targetIds: string[]; counts: Record<string, number> } | null> {
+    const data = await this.redis.get(this.snapshotKey(jobHistoryId));
+    if (!data) return null;
+    try {
+      return JSON.parse(data) as {
+        workspaceId: string;
+        targetIds: string[];
+        counts: Record<string, number>;
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async deleteSnapshot(jobHistoryId: string): Promise<void> {
+    await this.redis.del(this.snapshotKey(jobHistoryId));
   }
 
   public async getManyJobHistories(
