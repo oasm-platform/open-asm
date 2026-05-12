@@ -1,0 +1,39 @@
+
+syntax = "proto3";
+package remote_exec;
+
+option go_package = "./remote_execution";
+
+service RemoteExecutionService {
+  rpc RemoteExecutionSession(stream RemoteExecutionOutput) returns (stream RemoteExecutionCommand);
+}
+
+message RemoteExecutionCommand {
+  string session_id = 1;
+  string command    = 2;
+  RemoteExecutionCommandType type = 3;
+}
+
+enum RemoteExecutionCommandType {
+  COMMAND_TYPE_UNKNOWN = 0;
+  EXEC   = 1;
+  CANCEL = 2;
+}
+
+message RemoteExecutionOutput {
+  string session_id = 1;
+  RemoteExecutionOutputType type = 2;
+  bytes  data       = 3;
+  int32  exit_code  = 4;
+}
+
+enum RemoteExecutionOutputType {
+  OUTPUT_TYPE_UNKNOWN = 0;
+  STDOUT       = 1;
+  STDERR       = 2;
+  EXIT         = 3;
+  CONNECTED    = 4;
+  DISCONNECTED = 5;
+  ERROR        = 6;
+}
+
