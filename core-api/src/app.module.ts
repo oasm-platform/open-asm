@@ -37,9 +37,14 @@ import { ServicesModule } from './services/services.module';
         AcceptLanguageResolver,
         new HeaderResolver(['x-custom-lang']),
       ],
-      formatter: (template: string, args: string | Record<string, string>, lang: string) => {
-        const formatArgs = typeof args === 'string' ? { value: args } : args;
-        return new IntlMessageFormat(template, lang).format(formatArgs) as string;
+      formatter: (template: string, args: Record<string, string> | string | undefined, lang: string) => {
+        const formatArgs = typeof args === 'string' ? { value: args } : (args ?? {});
+        try {
+          const result = new IntlMessageFormat(template, lang).format(formatArgs);
+          return typeof result === 'string' ? result : template;
+        } catch {
+          return template;
+        }
       },
     }),
     BullModule.forRootAsync({

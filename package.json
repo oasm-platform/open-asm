@@ -23,7 +23,5 @@
   "scripts": {
     "prepare": "husky"
   },
-  "dependencies": {
-    "intl-messageformat": "11.2.4"
-  }
+  "dependencies": {}
 }

@@ -40,6 +40,7 @@ import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
+import { WorkspaceMembers } from '../workspaces/entities/workspace-members.entity';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
@@ -854,7 +855,7 @@ export class JobsRegistryService {
 
     // Get workspace members as recipients
     const workspaceMembers = await this.dataSource
-      .getRepository('workspace_members')
+      .getRepository(WorkspaceMembers)
       .find({
         where: { workspace: { id: workspaceId } },
         relations: ['user'],
