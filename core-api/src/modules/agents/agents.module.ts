@@ -14,18 +14,31 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
+import { HttpModule } from '@nestjs/axios';
 
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AgentLLMConfig, AgentConversation, AgentMessage, AgentWorkspaceMemory, AgentMCPConfig]),
+    TypeOrmModule.forFeature([
+      AgentLLMConfig,
+      AgentConversation,
+      AgentMessage,
+      AgentWorkspaceMemory,
+      AgentMCPConfig,
+    ]),
     AssetsModule,
     TargetsModule,
     forwardRef(() => VulnerabilitiesModule),
     StatisticModule,
+    HttpModule,
   ],
   controllers: [AgentsController],
-  providers: [AgentsService, AgentsCompletionsService, AgentTool, AgentsMemoriesService],
+  providers: [
+    AgentsService,
+    AgentsCompletionsService,
+    AgentTool,
+    AgentsMemoriesService,
+  ],
   exports: [AgentsService, AgentsCompletionsService, AgentsMemoriesService],
 })
 export class AgentsModule {}

@@ -11,7 +11,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
+import { firstValueFrom } from 'rxjs';
 import { Repository } from 'typeorm';
 import {
   ConversationResponseDto,
@@ -57,6 +59,7 @@ export class AgentsService {
     private readonly mcpConfigRepository: Repository<AgentMCPConfig>,
     private readonly redisService: RedisService,
     private readonly agentsMemories: AgentsMemoriesService,
+    private readonly httpService: HttpService,
   ) {}
 
   private maskApiKey(apiKey: string): string {
@@ -162,7 +165,9 @@ export class AgentsService {
 
     // One row per connected config
     for (const config of configs) {
-      const providerMeta = llmProviderSupported.find((p) => p.id === config.provider);
+      const providerMeta = llmProviderSupported.find(
+        (p) => p.id === config.provider,
+      );
       const apiKeyMasked = config.apiKey
         ? this.maskApiKey(decrypt(config.apiKey))
         : '****';
@@ -469,8 +474,12 @@ export class AgentsService {
   // MCP Config Methods
   // ==========================================
 
-  private async getOrCreateMCPConfig(workspaceId: string): Promise<AgentMCPConfig> {
-    let config = await this.mcpConfigRepository.findOne({ where: { workspaceId } });
+  private async getOrCreateMCPConfig(
+    workspaceId: string,
+  ): Promise<AgentMCPConfig> {
+    let config = await this.mcpConfigRepository.findOne({
+      where: { workspaceId },
+    });
     if (!config) {
       config = this.mcpConfigRepository.create({
         workspaceId,
@@ -553,19 +562,19 @@ export class AgentsService {
 
     try {
       const start = Date.now();
-      const headers: Record<string, string> = { Accept: 'text/event-stream,*/*' };
+      const headers: Record<string, string> = {
+        Accept: 'text/event-stream,*/*',
+      };
       if (server.headers) {
         Object.assign(headers, server.headers);
       }
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-
-      const res = await fetch(server.url, {
-        method: 'GET',
-        headers,
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeout));
+      const res = await firstValueFrom(
+        this.httpService.get(server.url, {
+          headers,
+          timeout: 5000,
+        }),
+      );
 
       const latency = Date.now() - start;
       // Any HTTP response (even 4xx) means the server is reachable
