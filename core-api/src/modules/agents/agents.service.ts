@@ -474,6 +474,47 @@ export class AgentsService {
   // MCP Config Methods
   // ==========================================
 
+  private assertSafeMCPServerName(name: string): void {
+    if (
+      name === '__proto__' ||
+      name === 'constructor' ||
+      name === 'prototype'
+    ) {
+      throw new BadRequestException('Invalid MCP server name');
+    }
+  }
+
+  private isSafeUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+
+      // Block common private/internal addresses (allowing localhost for local MCP servers)
+      if (
+        hostname === '169.254.169.254' || // AWS/Cloud metadata
+        hostname.startsWith('10.') ||
+        hostname.startsWith('192.168.')
+      ) {
+        return false;
+      }
+
+      // More thorough private IP check for 172.16.0.0/12
+      if (hostname.startsWith('172.')) {
+        const parts = hostname.split('.');
+        if (parts.length === 4) {
+          const secondPart = parseInt(parts[1], 10);
+          if (secondPart >= 16 && secondPart <= 31) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async getOrCreateMCPConfig(
     workspaceId: string,
   ): Promise<AgentMCPConfig> {
@@ -481,11 +522,19 @@ export class AgentsService {
       where: { workspaceId },
     });
     if (!config) {
-      config = this.mcpConfigRepository.create({
-        workspaceId,
-        configJson: { mcpServers: {} },
-      });
-      await this.mcpConfigRepository.save(config);
+      try {
+        config = this.mcpConfigRepository.create({
+          workspaceId,
+          configJson: { mcpServers: {} },
+        });
+        config = await this.mcpConfigRepository.save(config);
+      } catch (e) {
+        // Handle race condition: if another request created it, find it
+        config = await this.mcpConfigRepository.findOne({
+          where: { workspaceId },
+        });
+        if (!config) throw e;
+      }
     }
     return config;
   }
@@ -503,6 +552,7 @@ export class AgentsService {
     name: string,
     dto: MCPServerConfigDto,
   ): Promise<MCPServerResponseDto> {
+    this.assertSafeMCPServerName(name);
     const config = await this.getOrCreateMCPConfig(workspaceId);
 
     const existing = config.configJson.mcpServers[name] ?? {};
@@ -519,6 +569,7 @@ export class AgentsService {
   }
 
   async deleteMCPServer(workspaceId: string, name: string): Promise<void> {
+    this.assertSafeMCPServerName(name);
     const config = await this.getOrCreateMCPConfig(workspaceId);
     if (!config.configJson.mcpServers[name]) {
       throw new NotFoundException(`MCP server "${name}" not found`);
@@ -532,6 +583,7 @@ export class AgentsService {
     name: string,
     disabled: boolean,
   ): Promise<MCPServerResponseDto> {
+    this.assertSafeMCPServerName(name);
     const config = await this.getOrCreateMCPConfig(workspaceId);
     if (!config.configJson.mcpServers[name]) {
       throw new NotFoundException(`MCP server "${name}" not found`);
@@ -545,6 +597,7 @@ export class AgentsService {
     workspaceId: string,
     name: string,
   ): Promise<MCPServerPingResponseDto> {
+    this.assertSafeMCPServerName(name);
     const config = await this.getOrCreateMCPConfig(workspaceId);
     const server = config.configJson.mcpServers[name];
     if (!server) {
@@ -560,6 +613,13 @@ export class AgentsService {
       return { status: 'unknown' };
     }
 
+    if (!this.isSafeUrl(server.url)) {
+      this.logger.warn(
+        `Blocked potentially unsafe MCP ping URL: ${server.url}`,
+      );
+      return { status: 'offline' };
+    }
+
     try {
       const start = Date.now();
       const headers: Record<string, string> = {
@@ -573,6 +633,7 @@ export class AgentsService {
         this.httpService.get(server.url, {
           headers,
           timeout: 5000,
+          validateStatus: () => true, // Don't throw for non-2xx status
         }),
       );
 

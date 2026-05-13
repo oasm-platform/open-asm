@@ -31,6 +31,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { cn } from '@/lib/utils';
 
 const MCP_QUERY_KEY = '/api/agents/mcp-configs';
 
@@ -72,6 +73,39 @@ const serverSchema = z
 
 type ServerFormData = z.input<typeof serverSchema>;
 
+function parseArgs(input: string): string[] {
+  const args: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let quoteChar = '';
+
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+    if ((char === '"' || char === "'") && (i === 0 || input[i - 1] !== '\\')) {
+      if (inQuotes) {
+        if (char === quoteChar) {
+          inQuotes = false;
+          quoteChar = '';
+        } else {
+          current += char;
+        }
+      } else {
+        inQuotes = true;
+        quoteChar = char;
+      }
+    } else if (char === ' ' && !inQuotes) {
+      if (current) {
+        args.push(current);
+        current = '';
+      }
+    } else {
+      current += char;
+    }
+  }
+  if (current) args.push(current);
+  return args;
+}
+
 function detectTransport(server: MCPServerResponseDto): TransportType {
   return server.url ? 'sse' : 'stdio';
 }
@@ -82,21 +116,46 @@ function StatusDot({ status }: { status: MCPServerStatus }) {
       <Loader2 className="size-3 animate-spin text-muted-foreground shrink-0" />
     );
   }
-  const cls: Record<Exclude<MCPServerStatus, 'checking'>, string> = {
-    online: 'bg-green-500 shadow-[0_0_6px_1px] shadow-green-500/60',
-    offline: 'bg-red-500 shadow-[0_0_6px_1px] shadow-red-500/50',
-    unknown: 'bg-muted-foreground/40',
+
+  const configs: Record<
+    Exclude<MCPServerStatus, 'checking'>,
+    { bg: string; shadow: string; label: string; animate?: string }
+  > = {
+    online: {
+      bg: 'bg-emerald-500',
+      shadow: 'shadow-[0_0_8px_rgba(16,185,129,0.6)]',
+      label: 'Online',
+      animate: 'animate-pulse',
+    },
+    offline: {
+      bg: 'bg-rose-500',
+      shadow: 'shadow-[0_0_8px_rgba(244,63,94,0.4)]',
+      label: 'Offline',
+    },
+    unknown: {
+      bg: 'bg-slate-500/50',
+      shadow: '',
+      label: 'Status unknown (stdio)',
+    },
   };
-  const titles: Record<Exclude<MCPServerStatus, 'checking'>, string> = {
-    online: 'Online',
-    offline: 'Offline',
-    unknown: 'Status unknown (stdio)',
-  };
+
+  const config = configs[status];
+
   return (
-    <span
-      title={titles[status]}
-      className={`block size-2 rounded-full shrink-0 ${cls[status]}`}
-    />
+    <div className="relative flex items-center justify-center">
+      {status === 'online' && (
+        <span className="absolute inset-0 rounded-full bg-emerald-500/40 animate-ping" />
+      )}
+      <span
+        title={config.label}
+        className={cn(
+          'relative block size-2 rounded-full shrink-0 transition-all duration-300',
+          config.bg,
+          config.shadow,
+          config.animate,
+        )}
+      />
+    </div>
   );
 }
 
@@ -147,7 +206,7 @@ function AddServerForm({
         config.headers = { 'api-key': data.apiKey.trim() };
     } else {
       config.command = data.command;
-      config.args = data.args ? data.args.split(' ').filter(Boolean) : [];
+      config.args = data.args ? parseArgs(data.args) : [];
     }
     upsert.mutate({ name: data.name, data: config });
   };
@@ -160,26 +219,32 @@ function AddServerForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="border rounded-lg p-4 bg-muted/20 flex flex-col gap-3"
+      className="border rounded-xl p-5 bg-card/50 backdrop-blur-sm flex flex-col gap-4 shadow-sm"
     >
-      <p className="text-sm font-medium">New MCP Server</p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold tracking-tight">New MCP Server</p>
+        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest bg-muted px-2 py-0.5 rounded-full">
+          Configuration
+        </span>
+      </div>
 
-      <div className="flex gap-2">
+      <div className="flex p-1 bg-muted/50 rounded-lg w-fit border border-border/50">
         {(['sse', 'stdio'] as TransportType[]).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => handleTransportChange(t)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border transition-colors ${
+            className={cn(
+              'flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-semibold transition-all duration-200',
               currentTransport === t
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'border-border hover:bg-accent'
-            }`}
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
+            )}
           >
             {t === 'sse' ? (
-              <Wifi className="size-3.5" />
+              <Wifi className={cn('size-3.5', currentTransport === t && 'text-blue-500')} />
             ) : (
-              <Terminal className="size-3.5" />
+              <Terminal className={cn('size-3.5', currentTransport === t && 'text-amber-500')} />
             )}
             {t === 'sse' ? 'SSE / HTTP' : 'stdio'}
           </button>
@@ -188,62 +253,94 @@ function AddServerForm({
 
       <input type="hidden" {...register('transport')} value={transport} />
 
-      <Input
-        {...register('name')}
-        placeholder="server-name"
-        error={errors.name?.message}
-      />
+      <div className="grid gap-3">
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Server Name</label>
+          <Input
+            {...register('name')}
+            placeholder="e.g. filesystem-server"
+            error={errors.name?.message}
+            className="bg-background/50 h-10"
+          />
+        </div>
 
-      {currentTransport === 'sse' && (
-        <>
-          <Input
-            {...register('url')}
-            type="url"
-            placeholder="https://mcp.example.com/sse"
-            error={errors.url?.message}
-          />
-          <Input
-            {...register('apiKey')}
-            type="password"
-            placeholder="API key (optional)"
-            autoComplete="new-password"
-          />
-        </>
-      )}
+        {currentTransport === 'sse' && (
+          <>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Endpoint URL</label>
+              <Input
+                {...register('url')}
+                type="url"
+                placeholder="https://mcp.example.com/sse"
+                error={errors.url?.message}
+                className="bg-background/50 h-10 font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">API Key (Optional)</label>
+              <Input
+                {...register('apiKey')}
+                type="password"
+                placeholder="••••••••••••••••"
+                autoComplete="new-password"
+                className="bg-background/50 h-10"
+              />
+            </div>
+          </>
+        )}
 
-      {currentTransport === 'stdio' && (
-        <>
-          <Input
-            {...register('command')}
-            placeholder="npx"
-            error={errors.command?.message}
-          />
-          <Input
-            {...register('args')}
-            placeholder="Arguments (e.g. -y @modelcontextprotocol/server-filesystem /path)"
-          />
-        </>
-      )}
-
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-muted-foreground shrink-0">
-          Timeout (s)
-        </label>
-        <Input
-          {...register('timeout')}
-          type="number"
-          min={1}
-          className="w-20"
-        />
+        {currentTransport === 'stdio' && (
+          <>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Command</label>
+              <Input
+                {...register('command')}
+                placeholder="npx"
+                error={errors.command?.message}
+                className="bg-background/50 h-10 font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Arguments</label>
+              <Input
+                {...register('args')}
+                placeholder="-y @modelcontextprotocol/server-filesystem /path"
+                className="bg-background/50 h-10 font-mono text-xs"
+              />
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" size="sm" disabled={upsert.isPending}>
-          {upsert.isPending ? 'Adding…' : 'Add Server'}
-        </Button>
+      <div className="flex items-center justify-between pt-2 border-t border-border/50">
+        <div className="flex items-center gap-3">
+          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+            Timeout
+          </label>
+          <div className="flex items-center gap-2">
+            <Input
+              {...register('timeout')}
+              type="number"
+              min={1}
+              className="w-20 h-8 text-xs bg-background/50"
+            />
+            <span className="text-[10px] text-muted-foreground">seconds</span>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel} className="font-semibold h-8">
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" disabled={upsert.isPending} className="font-bold h-8">
+            {upsert.isPending ? (
+              <Loader2 className="size-3 animate-spin mr-2" />
+            ) : (
+              <Plus className="size-3 mr-2" />
+            )}
+            Add Server
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -295,60 +392,74 @@ function ServerRow({
   }, [remove, server.name]);
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <div className="flex items-center gap-3 p-3">
-        {/* Status dot */}
-        <div className="flex items-center justify-center size-8 rounded-md bg-muted shrink-0 relative">
+    <div className="group relative rounded-xl border bg-card transition-all duration-200 hover:shadow-md hover:border-border/80 overflow-hidden">
+      <div className="flex items-center gap-3 p-4">
+        {/* Status & Icon container */}
+        <div className={cn(
+          "relative flex items-center justify-center size-10 rounded-xl shrink-0 transition-all duration-300",
+          transport === 'sse' 
+            ? "bg-blue-500/10 text-blue-600 dark:bg-blue-500/5 dark:text-blue-500 group-hover:bg-blue-500/20 dark:group-hover:bg-blue-500/10" 
+            : "bg-amber-500/10 text-amber-600 dark:bg-amber-500/5 dark:text-amber-500 group-hover:bg-amber-500/20 dark:group-hover:bg-amber-500/10"
+        )}>
           {transport === 'sse' ? (
-            <Wifi className="size-4 text-muted-foreground" />
+            <Wifi className="size-5" />
           ) : (
-            <Terminal className="size-4 text-muted-foreground" />
+            <Terminal className="size-5" />
           )}
-          <span className="absolute -top-0.5 -right-0.5">
+          <div className="absolute -top-1 -right-1 bg-card rounded-full p-0.5">
             <StatusDot status={server.disabled ? 'offline' : status} />
-          </span>
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{server.name}</p>
-          <p className="text-xs text-muted-foreground truncate">
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold tracking-tight truncate">{server.name}</p>
+            {server.disabled && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">
+                Disabled
+              </span>
+            )}
+          </div>
+          <p className="text-xs font-mono text-muted-foreground/60 truncate selection:bg-primary/10">
             {transport === 'sse'
               ? server.url
               : `${server.command ?? ''} ${(server.args ?? []).join(' ')}`}
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Re-ping button */}
-          <button
-            type="button"
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => onPing(server.name)}
             disabled={status === 'checking' || server.disabled}
-            className="rounded-md p-1 hover:bg-accent transition-colors disabled:opacity-40"
-            aria-label="Re-check status"
+            className="text-muted-foreground hover:text-foreground"
             title="Re-check status"
           >
-            <RefreshCw className="size-3.5 text-muted-foreground" />
-          </button>
+            <RefreshCw className={cn("size-3.5", status === 'checking' && "animate-spin")} />
+          </Button>
 
-          <Switch
-            checked={!server.disabled}
-            onCheckedChange={handleToggle}
-            disabled={toggle.isPending}
-          />
+          <div className="px-2 h-8 flex items-center">
+            <Switch
+              checked={!server.disabled}
+              onCheckedChange={handleToggle}
+              disabled={toggle.isPending}
+              className="scale-90"
+            />
+          </div>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => setExpanded((v) => !v)}
-            className="rounded-md p-1 hover:bg-accent transition-colors"
-            aria-label="Expand"
+            className={cn("text-muted-foreground", expanded && "bg-accent text-accent-foreground")}
           >
             {expanded ? (
               <ChevronUp className="size-4" />
             ) : (
               <ChevronDown className="size-4" />
             )}
-          </button>
+          </Button>
 
           <ConfirmDialog
             title="Remove MCP Server"
@@ -356,84 +467,90 @@ function ServerRow({
             onConfirm={handleDelete}
             confirmText="Remove"
             trigger={
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 disabled={remove.isPending}
-                className="rounded-md p-1 hover:bg-destructive/10 text-destructive transition-colors disabled:opacity-50"
-                aria-label="Delete"
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/5"
               >
                 <Trash2 className="size-4" />
-              </button>
+              </Button>
             }
           />
         </div>
       </div>
 
       {expanded && (
-        <div className="border-t bg-muted/30 px-3 py-2 space-y-1 text-xs">
+        <div className={cn(
+          "border-t px-4 py-3 space-y-2 text-[11px] animate-in fade-in slide-in-from-top-1 duration-200",
+          transport === 'sse' ? "bg-blue-500/[0.04] dark:bg-blue-500/[0.02]" : "bg-amber-500/[0.04] dark:bg-amber-500/[0.02]"
+        )}>
           {server.url && (
-            <div className="flex gap-2">
-              <span className="text-muted-foreground w-20 shrink-0">URL</span>
-              <span className="truncate font-mono">{server.url}</span>
+            <div className="flex gap-4">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">URL</span>
+              <span className="truncate font-mono text-muted-foreground/90 selection:bg-primary/20">{server.url}</span>
             </div>
           )}
           {server.command && (
-            <div className="flex gap-2">
-              <span className="text-muted-foreground w-20 shrink-0">
+            <div className="flex gap-4">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
                 Command
               </span>
-              <span className="font-mono">
+              <span className="font-mono text-muted-foreground/90 selection:bg-primary/20">
                 {server.command} {(server.args ?? []).join(' ')}
               </span>
             </div>
           )}
           {server.headers && Object.keys(server.headers).length > 0 && (
-            <div className="flex gap-2">
-              <span className="text-muted-foreground w-20 shrink-0">
+            <div className="flex gap-4">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
                 Headers
               </span>
-              <span className="font-mono">
+              <span className="font-mono text-muted-foreground/90">
                 {Object.keys(server.headers).join(', ')}
               </span>
             </div>
           )}
           {Array.isArray(server.allowed_tools) &&
             server.allowed_tools.length > 0 && (
-              <div className="flex gap-2">
-                <span className="text-muted-foreground w-20 shrink-0">
+              <div className="flex gap-4">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
                   Tools
                 </span>
-                <span>
-                  {(server.allowed_tools as unknown as string[]).join(', ')}
+                <span className="flex flex-wrap gap-1">
+                  {(server.allowed_tools as unknown as string[]).map(t => (
+                    <span key={t} className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/50">{t}</span>
+                  ))}
                 </span>
               </div>
             )}
-          <div className="flex gap-2">
-            <span className="text-muted-foreground w-20 shrink-0">Timeout</span>
-            <span>{server.timeout ?? 60}s</span>
+          <div className="flex gap-4">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Timeout</span>
+            <span className="text-muted-foreground/90 font-semibold">{server.timeout ?? 60}s</span>
           </div>
-          <div className="flex gap-2">
-            <span className="text-muted-foreground w-20 shrink-0">Status</span>
+          <div className="flex gap-4">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Status</span>
             <span
-              className={
+              className={cn(
+                "font-bold uppercase tracking-wider text-[10px]",
                 server.disabled
                   ? 'text-muted-foreground'
                   : status === 'online'
-                    ? 'text-green-500'
+                    ? 'text-emerald-500'
                     : status === 'offline'
-                      ? 'text-red-500'
-                      : 'text-muted-foreground'
-              }
+                      ? 'text-rose-500'
+                      : 'text-slate-500'
+              )}
             >
               {server.disabled
                 ? 'Disabled'
                 : status === 'online'
-                  ? 'Online'
+                  ? 'Online • Reachable'
                   : status === 'offline'
-                    ? 'Offline'
+                    ? 'Offline • Unreachable'
                     : status === 'checking'
                       ? 'Checking…'
-                      : 'Unknown (stdio)'}
+                      : 'Active • Protocol Status Unknown'}
             </span>
           </div>
         </div>
