@@ -21,7 +21,7 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { UserContext } from '@/common/decorators/app.decorator';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
-import { CliService } from './remote-execution.service';
+import { RemoteExecutionService } from './remote-execution.service';
 import {
   CliOutputDto,
   CliOutputType,
@@ -57,7 +57,7 @@ const GRPC_TO_CLI_OUTPUT: Record<string, CliOutputType> = {
 export class RemoteExecutionController {
   private readonly logger = new Logger(RemoteExecutionController.name);
 
-  constructor(private readonly cliService: CliService) {}
+  constructor(private readonly cliService: RemoteExecutionService) {}
 
   @Doc({ summary: 'Create a new remote execution session' })
   @Post('sessions')

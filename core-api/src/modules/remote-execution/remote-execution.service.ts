@@ -8,8 +8,8 @@ import {
 } from './dto/remote-execution.dto';
 
 @Injectable()
-export class CliService {
-  private readonly logger = new Logger(CliService.name);
+export class RemoteExecutionService {
+  private readonly logger = new Logger(RemoteExecutionService.name);
   private readonly SESSION_TTL = 24 * 60 * 60;
 
   constructor(private readonly redisService: RedisService) {}
