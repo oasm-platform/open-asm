@@ -1,0 +1,82 @@
+<section class="mb-6 avoid-break">
+  <h2 class="text-base font-bold mb-3 flex items-center gap-2 text-slate-900">
+    <span class="text-slate-800">01</span>
+    Weekly Performance Metrics
+  </h2>
+  <div class="grid grid-cols-4 gap-2 mb-3">
+    <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-[10px] font-medium text-slate-500 uppercase">Targets</span>
+      </div>
+      <div class="flex justify-between items-end">
+        <p class="text-2xl font-bold text-slate-900 m-0">{{weekly.totalTargets}}</p>
+        <div class="flex items-center gap-0.5 text-[9px] text-green-600">
+          <span>+{{weekly.targetsChange}} ({{weekly.targetsChangePercent}}%)</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-[10px] font-medium text-slate-500 uppercase">Assets</span>
+      </div>
+      <div class="flex justify-between items-end">
+        <p class="text-2xl font-bold text-slate-900 m-0">{{weekly.totalAssets}}</p>
+        <div class="flex items-center gap-0.5 text-[9px] text-green-600">
+          <span>+{{weekly.assetsChange}} ({{weekly.assetsChangePercent}}%)</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-[10px] font-medium text-slate-500 uppercase">Services</span>
+      </div>
+      <div class="flex justify-between items-end">
+        <p class="text-2xl font-bold text-slate-900 m-0">{{weekly.totalServices}}</p>
+        <div class="flex items-center gap-0.5 text-[9px] text-red-600">
+          <span>{{weekly.servicesChange}} ({{weekly.servicesChangePercent}}%)</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-[10px] font-medium text-slate-500 uppercase">Security Score</span>
+      </div>
+      <div class="flex justify-between items-end">
+        <p class="text-2xl font-bold text-slate-900 m-0">{{weekly.securityScore}}</p>
+        <div class="flex items-center gap-0.5 text-[9px] text-green-600">
+          <span>+{{weekly.scoreChange}} ({{weekly.scoreChangePercent}}%)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="grid grid-cols-6 gap-2 mb-3">
+    <div class="bg-slate-100 p-2 rounded border border-slate-200 text-center">
+      <p class="text-[10px] text-slate-500 m-0 mb-1">Total Vulns</p>
+      <p class="text-lg font-bold text-slate-900 m-0">{{weekly.activeVulns}}</p>
+    </div>
+    <div class="bg-red-50 p-2 rounded border border-red-200 text-center">
+      <p class="text-[10px] text-red-600 m-0 mb-1">Critical</p>
+      <p class="text-lg font-bold text-red-600 m-0">{{weekly.criticalVulns}}</p>
+    </div>
+    <div class="bg-orange-50 p-2 rounded border border-orange-200 text-center">
+      <p class="text-[10px] text-orange-600 m-0 mb-1">High</p>
+      <p class="text-lg font-bold text-orange-600 m-0">{{weekly.highVulns}}</p>
+    </div>
+    <div class="bg-yellow-50 p-2 rounded border border-yellow-200 text-center">
+      <p class="text-[10px] text-yellow-600 m-0 mb-1">Medium</p>
+      <p class="text-lg font-bold text-yellow-600 m-0">{{weekly.mediumVulns}}</p>
+    </div>
+    <div class="bg-blue-50 p-2 rounded border border-blue-200 text-center">
+      <p class="text-[10px] text-blue-600 m-0 mb-1">Low</p>
+      <p class="text-lg font-bold text-blue-600 m-0">{{weekly.lowVulns}}</p>
+    </div>
+    <div class="bg-slate-100 p-2 rounded border border-slate-200 text-center">
+      <p class="text-[10px] text-slate-500 m-0 mb-1">Info</p>
+      <p class="text-lg font-bold text-slate-600 m-0">{{weekly.infoVulns}}</p>
+    </div>
+  </div>
+  <div class="flex gap-4 text-xs text-slate-600 bg-slate-50 p-2 rounded">
+    <span><strong>{{weekly.newVulns}}</strong> new vulnerabilities</span>
+    <span><strong>{{weekly.resolvedVulns}}</strong> resolved</span>
+  </div>
+</section>

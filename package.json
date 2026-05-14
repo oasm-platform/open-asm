@@ -22,5 +22,8 @@
   },
   "scripts": {
     "prepare": "husky"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.9"
   }
 }

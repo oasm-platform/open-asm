@@ -23,6 +23,7 @@ import Issues from '@/pages/issues/issues';
 import JobsRegistryPage from '@/pages/jobs-registry/jobs-registry';
 import Runs from '@/pages/jobs-registry/runs';
 import Login from '@/pages/login/login';
+import Reports from '@/pages/reports/reports';
 import NotificationsPage from '@/pages/notifications/notifications';
 import CreateProviderPage from '@/pages/providers/create-provider';
 import DetailProvider from '@/pages/providers/detail-provider';
@@ -212,6 +213,14 @@ export const router = createBrowserRouter([
                 ),
               },
             ],
+          },
+          {
+            path: 'reports',
+            element: (
+              <RequireWorkspace>
+                <Reports />
+              </RequireWorkspace>
+            ),
           },
           {
             element: (
