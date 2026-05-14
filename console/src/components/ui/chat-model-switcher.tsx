@@ -252,7 +252,7 @@ export function ChatModelSwitcher({
                 <Image
                   url={currentDisplay.logo}
                   height={16}
-                  className="dark:bg-white bg-gray-500 rounded p-0.5"
+                  className="bg-white rounded p-0.5"
                 />
               )}
               <span className="text-muted-foreground max-w-[140px] truncate">
@@ -261,7 +261,11 @@ export function ChatModelSwitcher({
               <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-[280px] p-0" align="start" sideOffset={4}>
+          <PopoverContent
+            className="w-[280px] p-0"
+            align="start"
+            sideOffset={4}
+          >
             <Command shouldFilter={false} className="p-1">
               <CommandInput
                 placeholder="Search models..."
