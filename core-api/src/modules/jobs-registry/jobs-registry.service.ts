@@ -9,6 +9,8 @@ import {
   JobPriority,
   JobRunType,
   JobStatus,
+  NotificationScope,
+  NotificationType,
   ToolCategory,
   DataSource as ToolDataSource,
   WorkerScope,
@@ -30,11 +32,14 @@ import { randomUUID } from 'crypto';
 import { DataSource, DeepPartial, In, Repository } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { StatisticService } from '../statistic/statistic.service';
 import { StorageService } from '../storage/storage.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
@@ -51,8 +56,19 @@ import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 
+interface FindingSnapshot {
+  workspaceId: string;
+  targetId: string;
+  domain: string;
+  totalPort: number;
+  totalSubdomain: number;
+  totalTech: number;
+}
+
 @Injectable()
 export class JobsRegistryService {
+  private readonly snapshotTtlSeconds = 7 * 24 * 60 * 60;
+
   constructor(
     @InjectRepository(Job) public readonly repo: Repository<Job>,
     @InjectRepository(JobHistory)
@@ -64,6 +80,9 @@ export class JobsRegistryService {
     private storageService: StorageService,
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
+    private readonly statisticService: StatisticService,
+    private readonly notificationsService: NotificationsService,
+    private readonly workspacesService: WorkspacesService,
   ) {}
   public async getManyJobs(
     query: GetManyJobsRequestDto,
@@ -251,7 +270,54 @@ export class JobsRegistryService {
       await jobRepo.save(jobsToInsert);
     }
 
+    if (!existingJobHistory) {
+      await this.storeFindingSnapshot({
+        jobHistory,
+        workspaceId,
+        assets: jobsToInsert.map((job) => job.asset).filter(Boolean),
+      });
+    }
+
     return jobsToInsert;
+  }
+
+  private getSnapshotKey(jobHistoryId: string): string {
+    return `snapshot:${jobHistoryId}`;
+  }
+
+  private async storeFindingSnapshot({
+    jobHistory,
+    workspaceId,
+    assets,
+  }: {
+    jobHistory: JobHistory;
+    workspaceId: string;
+    assets: Asset[];
+  }): Promise<void> {
+    const firstAsset = assets[0];
+    const targetId = firstAsset?.target?.id ?? firstAsset?.targetId;
+
+    if (!targetId) {
+      return;
+    }
+
+    const snapshot = await this.statisticService.getFindingSnapshot({
+      workspaceId,
+      targetId,
+    });
+
+    const payload: FindingSnapshot = {
+      workspaceId,
+      targetId,
+      domain: firstAsset.target?.value ?? firstAsset.value,
+      ...snapshot,
+    };
+
+    await this.redis.setex(
+      this.getSnapshotKey(jobHistory.id),
+      this.snapshotTtlSeconds,
+      JSON.stringify(payload),
+    );
   }
 
   /**
@@ -285,7 +351,7 @@ export class JobsRegistryService {
 
     if (workspaceId) {
       assetsQueryBuilder
-        .innerJoin('assets.target', 'target')
+        .innerJoinAndSelect('assets.target', 'target')
         .innerJoin('target.workspaceTargets', 'workspaceTarget')
         .innerJoin('workspaceTarget.workspace', 'workspace')
         .andWhere('workspace.id = :workspaceId', { workspaceId });
@@ -329,7 +395,7 @@ export class JobsRegistryService {
 
     if (workspaceId) {
       assetServicesQueryBuilder
-        .innerJoin('asset.target', 'target')
+        .innerJoinAndSelect('asset.target', 'target')
         .innerJoin('target.workspaceTargets', 'workspaceTarget')
         .innerJoin('workspaceTarget.workspace', 'workspace')
         .andWhere('workspace.id = :workspaceId', { workspaceId });
@@ -779,7 +845,101 @@ export class JobsRegistryService {
             `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
         );
       }
+
+      await this.notifyNewFindings(jobHistoryId, logger);
     }
+  }
+
+  private async notifyNewFindings(
+    jobHistoryId: string,
+    logger: Logger,
+  ): Promise<void> {
+    const snapshotKey = this.getSnapshotKey(jobHistoryId);
+    const cachedSnapshot = await this.redis.get(snapshotKey);
+
+    if (!cachedSnapshot) {
+      return;
+    }
+
+    try {
+      const snapshot = JSON.parse(cachedSnapshot) as FindingSnapshot;
+      const current = await this.statisticService.getFindingSnapshot({
+        workspaceId: snapshot.workspaceId,
+        targetId: snapshot.targetId,
+      });
+
+      const delta = {
+        port: Math.max(0, current.totalPort - snapshot.totalPort),
+        subdomain: Math.max(
+          0,
+          current.totalSubdomain - snapshot.totalSubdomain,
+        ),
+        tech: Math.max(0, current.totalTech - snapshot.totalTech),
+      };
+
+      if (delta.port === 0 && delta.subdomain === 0 && delta.tech === 0) {
+        return;
+      }
+
+      const members = await this.workspacesService.getMembersByWorkspaceId(
+        snapshot.workspaceId,
+      );
+      const recipients = members
+        .map((member) => member.user?.id)
+        .filter((id): id is string => Boolean(id));
+
+      if (recipients.length === 0) {
+        return;
+      }
+
+      await this.notificationsService.createNotification({
+        recipients,
+        scope: NotificationScope.USER,
+        type: NotificationType.NEW_FINDING_DISCOVERED,
+        metadata: {
+          targetId: snapshot.targetId,
+          domain: snapshot.domain,
+          port: delta.port.toString(),
+          subdomain: delta.subdomain.toString(),
+          tech: delta.tech.toString(),
+          summary: this.buildFindingSummary(delta),
+        },
+        workspaceId: snapshot.workspaceId,
+      });
+    } catch (error) {
+      logger.error(
+        `Failed to notify new findings for job history ${jobHistoryId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    } finally {
+      await this.redis.del(snapshotKey);
+    }
+  }
+
+  private buildFindingSummary(delta: {
+    port: number;
+    subdomain: number;
+    tech: number;
+  }): string {
+    const parts: string[] = [];
+
+    if (delta.port > 0) {
+      parts.push(`${delta.port} ${delta.port === 1 ? 'port' : 'ports'}`);
+    }
+
+    if (delta.subdomain > 0) {
+      parts.push(
+        `${delta.subdomain} ${
+          delta.subdomain === 1 ? 'subdomain' : 'subdomains'
+        }`,
+      );
+    }
+
+    if (delta.tech > 0) {
+      parts.push(`${delta.tech} ${delta.tech === 1 ? 'tech' : 'techs'}`);
+    }
+
+    return parts.join(', ');
   }
 
   /**

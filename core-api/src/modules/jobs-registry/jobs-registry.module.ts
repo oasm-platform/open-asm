@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflows.entity';
 import { IssueComment } from '../issues/entities/issue-comment.entity';
 import { Issue } from '../issues/entities/issue.entity';
+import { StatisticModule } from '../statistic/statistic.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
@@ -30,6 +31,7 @@ import {
       IssueComment,
     ]),
     WorkspacesModule,
+    StatisticModule,
     BullModule.registerQueue({
       name: BullMQName.JOB_RESULT,
     }),

@@ -1,4 +1,9 @@
-import { BullMQName, JobStatus } from '@/common/enums/enum';
+import {
+  BullMQName,
+  JobStatus,
+  NotificationScope,
+  NotificationType,
+} from '@/common/enums/enum';
 import { RedisService } from '@/services/redis/redis.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
@@ -8,7 +13,10 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
+import { StatisticService } from '../statistic/statistic.service';
 import { ToolsService } from '../tools/tools.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
@@ -31,6 +39,8 @@ describe('JobsRegistryService', () => {
 
   const mockJobHistoryRepository = {
     createQueryBuilder: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
   };
@@ -54,6 +64,9 @@ describe('JobsRegistryService', () => {
 
   const mockRedisService = {
     publish: jest.fn(),
+    setex: jest.fn(),
+    get: jest.fn(),
+    del: jest.fn(),
     client: {
       incr: jest.fn(),
       decr: jest.fn(),
@@ -66,6 +79,18 @@ describe('JobsRegistryService', () => {
   const mockToolsService = {
     getInstalledTools: jest.fn(),
     getToolByNames: jest.fn(),
+  };
+
+  const mockStatisticService = {
+    getFindingSnapshot: jest.fn(),
+  };
+
+  const mockNotificationsService = {
+    createNotification: jest.fn(),
+  };
+
+  const mockWorkspacesService = {
+    getMembersByWorkspaceId: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -102,6 +127,18 @@ describe('JobsRegistryService', () => {
         {
           provide: ToolsService,
           useValue: mockToolsService,
+        },
+        {
+          provide: StatisticService,
+          useValue: mockStatisticService,
+        },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
+        },
+        {
+          provide: WorkspacesService,
+          useValue: mockWorkspacesService,
         },
         {
           provide: getQueueToken(BullMQName.JOB_RESULT),
@@ -577,7 +614,9 @@ describe('JobsRegistryService', () => {
       const mockQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([{ id: 'asset-1', isPrimary: true }]),
+        getMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'asset-1', isPrimary: true }]),
       };
       const mockJobRepo = {
         create: jest.fn().mockReturnValue({}),
@@ -589,6 +628,62 @@ describe('JobsRegistryService', () => {
       const result = await service.getNextStepForJob(jobWithNextStep as any);
 
       expect(result).toBe(1);
+    });
+  });
+
+  describe('createNewJob notification snapshot', () => {
+    it('should store a finding snapshot in Redis when creating a new job history', async () => {
+      const jobHistory = { id: 'history-uuid' };
+      const asset = {
+        id: 'asset-uuid',
+        isPrimary: true,
+        value: 'example.com',
+        target: { id: 'target-uuid', value: 'example.com' },
+      };
+      const jobRepository = {
+        create: jest.fn((job: Partial<Job>) => ({ id: 'job-uuid', ...job })),
+        save: jest.fn().mockResolvedValue([{ id: 'job-uuid' }]),
+        createQueryBuilder: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          innerJoinAndSelect: jest.fn().mockReturnThis(),
+          innerJoin: jest.fn().mockReturnThis(),
+          getMany: jest.fn().mockResolvedValue([asset]),
+        }),
+      };
+
+      mockJobHistoryRepository.create.mockReturnValue(jobHistory);
+      mockJobHistoryRepository.save.mockResolvedValue(jobHistory);
+      mockDataSource.getRepository.mockReturnValue(jobRepository);
+      mockStatisticService.getFindingSnapshot.mockResolvedValue({
+        totalPort: 2,
+        totalSubdomain: 3,
+        totalTech: 4,
+      });
+
+      await service.createNewJob({
+        tool: { name: 'subfinder', category: 'subdomains', priority: 4 } as any,
+        targetIds: ['target-uuid'],
+        workspaceId: 'workspace-uuid',
+        workflow: { id: 'workflow-uuid' } as any,
+      });
+
+      expect(mockStatisticService.getFindingSnapshot).toHaveBeenCalledWith({
+        workspaceId: 'workspace-uuid',
+        targetId: 'target-uuid',
+      });
+      expect(mockRedisService.setex).toHaveBeenCalledWith(
+        'snapshot:history-uuid',
+        604800,
+        JSON.stringify({
+          workspaceId: 'workspace-uuid',
+          targetId: 'target-uuid',
+          domain: 'example.com',
+          totalPort: 2,
+          totalSubdomain: 3,
+          totalTech: 4,
+        }),
+      );
     });
   });
 
@@ -631,6 +726,87 @@ describe('JobsRegistryService', () => {
       await service.markWorkflowDone(mockJobHistoryId);
 
       expect(mockJobHistoryRepository.update).toHaveBeenCalled();
+    });
+
+    it('should notify workspace members when new findings are discovered', async () => {
+      mockJobRepository.exists.mockResolvedValue(false);
+      mockJobHistoryRepository.update.mockResolvedValue({ affected: 1 });
+      mockJobHistoryRepository.findOne.mockResolvedValue({
+        id: mockJobHistoryId,
+        workflow: { name: 'test-workflow' },
+      });
+      mockRedisService.get.mockResolvedValue(
+        JSON.stringify({
+          workspaceId: 'workspace-uuid',
+          targetId: 'target-uuid',
+          domain: 'example.com',
+          totalPort: 2,
+          totalSubdomain: 3,
+          totalTech: 4,
+        }),
+      );
+      mockStatisticService.getFindingSnapshot.mockResolvedValue({
+        totalPort: 10,
+        totalSubdomain: 8,
+        totalTech: 5,
+      });
+      mockWorkspacesService.getMembersByWorkspaceId.mockResolvedValue([
+        { user: { id: 'user-1' } },
+        { user: { id: 'user-2' } },
+      ]);
+
+      await service.markWorkflowDone(mockJobHistoryId);
+
+      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith({
+        recipients: ['user-1', 'user-2'],
+        scope: NotificationScope.USER,
+        type: NotificationType.NEW_FINDING_DISCOVERED,
+        metadata: {
+          targetId: 'target-uuid',
+          domain: 'example.com',
+          port: '8',
+          subdomain: '5',
+          tech: '1',
+          summary: '8 ports, 5 subdomains, 1 tech',
+        },
+        workspaceId: 'workspace-uuid',
+      });
+      expect(mockRedisService.del).toHaveBeenCalledWith(
+        'snapshot:history-uuid',
+      );
+    });
+
+    it('should not notify when finding counts did not increase', async () => {
+      mockJobRepository.exists.mockResolvedValue(false);
+      mockJobHistoryRepository.update.mockResolvedValue({ affected: 1 });
+      mockJobHistoryRepository.findOne.mockResolvedValue({
+        id: mockJobHistoryId,
+        workflow: { name: 'test-workflow' },
+      });
+      mockRedisService.get.mockResolvedValue(
+        JSON.stringify({
+          workspaceId: 'workspace-uuid',
+          targetId: 'target-uuid',
+          domain: 'example.com',
+          totalPort: 2,
+          totalSubdomain: 3,
+          totalTech: 4,
+        }),
+      );
+      mockStatisticService.getFindingSnapshot.mockResolvedValue({
+        totalPort: 2,
+        totalSubdomain: 3,
+        totalTech: 4,
+      });
+
+      await service.markWorkflowDone(mockJobHistoryId);
+
+      expect(
+        mockNotificationsService.createNotification,
+      ).not.toHaveBeenCalled();
+      expect(mockRedisService.del).toHaveBeenCalledWith(
+        'snapshot:history-uuid',
+      );
     });
   });
 });

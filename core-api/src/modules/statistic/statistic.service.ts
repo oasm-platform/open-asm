@@ -33,6 +33,12 @@ interface RawAssetVulCount {
   total: string;
 }
 
+export interface FindingSnapshotCounts {
+  totalPort: number;
+  totalSubdomain: number;
+  totalTech: number;
+}
+
 @Injectable()
 export class StatisticService {
   constructor(
@@ -161,6 +167,90 @@ export class StatisticService {
    */
   async getTotalAssets(query: GetStatisticQueryDto): Promise<number> {
     return this.countAssets(query.workspaceId);
+  }
+
+  async getFindingSnapshot({
+    workspaceId,
+    targetId,
+  }: {
+    workspaceId: string;
+    targetId: string;
+  }): Promise<FindingSnapshotCounts> {
+    const [totalSubdomain, totalPort, totalTech] = await Promise.all([
+      this.countTargetAssets(workspaceId, targetId),
+      this.countTargetPorts(workspaceId, targetId),
+      this.countTargetTechnologies(workspaceId, targetId),
+    ]);
+
+    return {
+      totalPort,
+      totalSubdomain,
+      totalTech,
+    };
+  }
+
+  private async countTargetAssets(
+    workspaceId: string,
+    targetId: string,
+  ): Promise<number> {
+    return this.dataSource
+      .getRepository(Asset)
+      .createQueryBuilder('asset')
+      .innerJoin('asset.target', 'target')
+      .innerJoin('target.workspaceTargets', 'workspaceTarget')
+      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
+      .andWhere('target.id = :targetId', { targetId })
+      .getCount();
+  }
+
+  private async countTargetPorts(
+    workspaceId: string,
+    targetId: string,
+  ): Promise<number> {
+    const result = await this.dataSource
+      .getRepository(AssetService)
+      .createQueryBuilder('assetService')
+      .select('COUNT(DISTINCT assetService.port)', 'count')
+      .innerJoin('assetService.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .innerJoin('target.workspaceTargets', 'workspaceTarget')
+      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
+      .andWhere('target.id = :targetId', { targetId })
+      .andWhere('assetService.isErrorPage = false')
+      .getRawOne<{ count: string }>();
+
+    return Number(result?.count || 0);
+  }
+
+  private async countTargetTechnologies(
+    workspaceId: string,
+    targetId: string,
+  ): Promise<number> {
+    const subQuery = this.dataSource
+      .createQueryBuilder()
+      .select('unnest(latest_http.tech)', 'tech')
+      .from(AssetService, 'assetService')
+      .innerJoin('assetService.asset', 'asset')
+      .innerJoin('asset.target', 'target')
+      .innerJoin('target.workspaceTargets', 'workspaceTarget')
+      .innerJoin(
+        'assetService.httpResponses',
+        'latest_http',
+        'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
+      )
+      .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
+      .andWhere('target.id = :targetId', { targetId })
+      .andWhere('assetService.isErrorPage = false')
+      .andWhere('latest_http.tech IS NOT NULL');
+
+    const result = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(DISTINCT sq.tech)', 'count')
+      .from(`(${subQuery.getQuery()})`, 'sq')
+      .setParameters(subQuery.getParameters())
+      .getRawOne<{ count: string }>();
+
+    return Number(result?.count || 0);
   }
 
   /**
