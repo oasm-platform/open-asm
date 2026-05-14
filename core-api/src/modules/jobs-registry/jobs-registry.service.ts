@@ -281,8 +281,12 @@ export class JobsRegistryService {
     return jobsToInsert;
   }
 
-  private getSnapshotKey(jobHistoryId: string): string {
-    return `snapshot:${jobHistoryId}`;
+  private getSnapshotTargetsKey(jobHistoryId: string): string {
+    return `snapshot:${jobHistoryId}:targets`;
+  }
+
+  private getSnapshotKey(jobHistoryId: string, targetId: string): string {
+    return `snapshot:${jobHistoryId}:${targetId}`;
   }
 
   private async storeFindingSnapshot({
@@ -294,29 +298,52 @@ export class JobsRegistryService {
     workspaceId: string;
     assets: Asset[];
   }): Promise<void> {
-    const firstAsset = assets[0];
-    const targetId = firstAsset?.target?.id ?? firstAsset?.targetId;
+    const assetsByTarget = new Map<string, Asset>();
 
-    if (!targetId) {
+    for (const asset of assets) {
+      const targetId = asset.target?.id ?? asset.targetId;
+      if (targetId && !assetsByTarget.has(targetId)) {
+        assetsByTarget.set(targetId, asset);
+      }
+    }
+
+    if (assetsByTarget.size === 0) {
       return;
     }
 
-    const snapshot = await this.statisticService.getFindingSnapshot({
-      workspaceId,
-      targetId,
-    });
-
-    const payload: FindingSnapshot = {
-      workspaceId,
-      targetId,
-      domain: firstAsset.target?.value ?? firstAsset.value,
-      ...snapshot,
-    };
+    const targetIds = Array.from(assetsByTarget.keys());
 
     await this.redis.setex(
-      this.getSnapshotKey(jobHistory.id),
+      this.getSnapshotTargetsKey(jobHistory.id),
       this.snapshotTtlSeconds,
-      JSON.stringify(payload),
+      JSON.stringify(targetIds),
+    );
+
+    await Promise.all(
+      targetIds.map(async (targetId) => {
+        const asset = assetsByTarget.get(targetId);
+        if (!asset) {
+          return;
+        }
+
+        const snapshot = await this.statisticService.getFindingSnapshot({
+          workspaceId,
+          targetId,
+        });
+
+        const payload: FindingSnapshot = {
+          workspaceId,
+          targetId,
+          domain: asset.target?.value ?? asset.value,
+          ...snapshot,
+        };
+
+        await this.redis.setex(
+          this.getSnapshotKey(jobHistory.id, targetId),
+          this.snapshotTtlSeconds,
+          JSON.stringify(payload),
+        );
+      }),
     );
   }
 
@@ -854,36 +881,33 @@ export class JobsRegistryService {
     jobHistoryId: string,
     logger: Logger,
   ): Promise<void> {
-    const snapshotKey = this.getSnapshotKey(jobHistoryId);
-    const cachedSnapshot = await this.redis.get(snapshotKey);
+    const targetIdsKey = this.getSnapshotTargetsKey(jobHistoryId);
+    const cachedTargetIds = await this.redis.get(targetIdsKey);
 
-    if (!cachedSnapshot) {
+    if (!cachedTargetIds) {
       return;
     }
 
+    let targetIds: string[] = [];
+
     try {
-      const snapshot = JSON.parse(cachedSnapshot) as FindingSnapshot;
-      const current = await this.statisticService.getFindingSnapshot({
-        workspaceId: snapshot.workspaceId,
-        targetId: snapshot.targetId,
-      });
+      targetIds = JSON.parse(cachedTargetIds) as string[];
+      const snapshots: FindingSnapshot[] = [];
 
-      const delta = {
-        port: Math.max(0, current.totalPort - snapshot.totalPort),
-        subdomain: Math.max(
-          0,
-          current.totalSubdomain - snapshot.totalSubdomain,
-        ),
-        tech: Math.max(0, current.totalTech - snapshot.totalTech),
-      };
-
-      if (delta.port === 0 && delta.subdomain === 0 && delta.tech === 0) {
-        return;
+      for (const targetId of targetIds) {
+        const cachedSnapshot = await this.redis.get(
+          this.getSnapshotKey(jobHistoryId, targetId),
+        );
+        if (cachedSnapshot) {
+          snapshots.push(JSON.parse(cachedSnapshot) as FindingSnapshot);
+        }
       }
 
-      const members = await this.workspacesService.getMembersByWorkspaceId(
-        snapshot.workspaceId,
-      );
+      const workspaceId = snapshots[0]?.workspaceId;
+      if (!workspaceId) return;
+
+      const members =
+        await this.workspacesService.getMembersByWorkspaceId(workspaceId);
       const recipients = members
         .map((member) => member.user?.id)
         .filter((id): id is string => Boolean(id));
@@ -892,54 +916,59 @@ export class JobsRegistryService {
         return;
       }
 
-      await this.notificationsService.createNotification({
-        recipients,
-        scope: NotificationScope.USER,
-        type: NotificationType.NEW_FINDING_DISCOVERED,
-        metadata: {
-          targetId: snapshot.targetId,
-          domain: snapshot.domain,
-          port: delta.port.toString(),
-          subdomain: delta.subdomain.toString(),
-          tech: delta.tech.toString(),
-          summary: this.buildFindingSummary(delta),
-        },
-        workspaceId: snapshot.workspaceId,
-      });
+      for (const snapshot of snapshots) {
+        await this.notifyNewFindingsForTarget({ snapshot, recipients });
+      }
     } catch (error) {
       logger.error(
         `Failed to notify new findings for job history ${jobHistoryId}`,
         error instanceof Error ? error.stack : String(error),
       );
     } finally {
-      await this.redis.del(snapshotKey);
+      await Promise.all([
+        ...targetIds.map((targetId) =>
+          this.redis.del(this.getSnapshotKey(jobHistoryId, targetId)),
+        ),
+        this.redis.del(targetIdsKey),
+      ]);
     }
   }
 
-  private buildFindingSummary(delta: {
-    port: number;
-    subdomain: number;
-    tech: number;
-  }): string {
-    const parts: string[] = [];
+  private async notifyNewFindingsForTarget({
+    snapshot,
+    recipients,
+  }: {
+    snapshot: FindingSnapshot;
+    recipients: string[];
+  }): Promise<void> {
+    const current = await this.statisticService.getFindingSnapshot({
+      workspaceId: snapshot.workspaceId,
+      targetId: snapshot.targetId,
+    });
 
-    if (delta.port > 0) {
-      parts.push(`${delta.port} ${delta.port === 1 ? 'port' : 'ports'}`);
+    const delta = {
+      port: Math.max(0, current.totalPort - snapshot.totalPort),
+      subdomain: Math.max(0, current.totalSubdomain - snapshot.totalSubdomain),
+      tech: Math.max(0, current.totalTech - snapshot.totalTech),
+    };
+
+    if (delta.port === 0 && delta.subdomain === 0 && delta.tech === 0) {
+      return;
     }
 
-    if (delta.subdomain > 0) {
-      parts.push(
-        `${delta.subdomain} ${
-          delta.subdomain === 1 ? 'subdomain' : 'subdomains'
-        }`,
-      );
-    }
-
-    if (delta.tech > 0) {
-      parts.push(`${delta.tech} ${delta.tech === 1 ? 'tech' : 'techs'}`);
-    }
-
-    return parts.join(', ');
+    await this.notificationsService.createNotification({
+      recipients,
+      scope: NotificationScope.USER,
+      type: NotificationType.NEW_FINDING_DISCOVERED,
+      metadata: {
+        targetId: snapshot.targetId,
+        domain: snapshot.domain,
+        port: delta.port.toString(),
+        subdomain: delta.subdomain.toString(),
+        tech: delta.tech.toString(),
+      },
+      workspaceId: snapshot.workspaceId,
+    });
   }
 
   /**

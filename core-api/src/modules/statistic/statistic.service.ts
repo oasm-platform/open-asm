@@ -226,6 +226,7 @@ export class StatisticService {
     workspaceId: string,
     targetId: string,
   ): Promise<number> {
+    const latestHttpResponseQuery = this.buildLatestHttpResponseTechSubQuery();
     const subQuery = this.dataSource
       .createQueryBuilder()
       .select('unnest(latest_http.tech)', 'tech')
@@ -234,14 +235,14 @@ export class StatisticService {
       .innerJoin('asset.target', 'target')
       .innerJoin('target.workspaceTargets', 'workspaceTarget')
       .innerJoin(
-        'assetService.httpResponses',
+        `(${latestHttpResponseQuery.getQuery()})`,
         'latest_http',
-        'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
+        'latest_http."assetServiceId" = assetService.id',
       )
       .where('workspaceTarget.workspace.id = :workspaceId', { workspaceId })
       .andWhere('target.id = :targetId', { targetId })
       .andWhere('assetService.isErrorPage = false')
-      .andWhere('latest_http.tech IS NOT NULL');
+      .setParameters(latestHttpResponseQuery.getParameters());
 
     const result = await this.dataSource
       .createQueryBuilder()
@@ -251,6 +252,20 @@ export class StatisticService {
       .getRawOne<{ count: string }>();
 
     return Number(result?.count || 0);
+  }
+
+  private buildLatestHttpResponseTechSubQuery() {
+    return this.dataSource
+      .createQueryBuilder()
+      .select(
+        'DISTINCT ON (httpResponse."assetServiceId") httpResponse."assetServiceId"',
+        'assetServiceId',
+      )
+      .addSelect('httpResponse.tech', 'tech')
+      .from(HttpResponse, 'httpResponse')
+      .where('httpResponse.tech IS NOT NULL')
+      .orderBy('httpResponse."assetServiceId"', 'ASC')
+      .addOrderBy('httpResponse."createdAt"', 'DESC');
   }
 
   /**
@@ -516,6 +531,7 @@ export class StatisticService {
    */
   async getTechCounts(workspaceIds: string[]) {
     // Subquery to unnest the 'tech' array from latest HttpResponse and link to workspaceId
+    const latestHttpResponseQuery = this.buildLatestHttpResponseTechSubQuery();
     const subQuery = this.dataSource
       .createQueryBuilder()
       .select('wt.workspaceId', 'workspaceId')
@@ -525,13 +541,13 @@ export class StatisticService {
       .innerJoin('asset.target', 'target')
       .innerJoin('target.workspaceTargets', 'wt')
       .innerJoin(
-        'assetService.httpResponses',
+        `(${latestHttpResponseQuery.getQuery()})`,
         'latest_http',
-        'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
+        'latest_http."assetServiceId" = assetService.id',
       )
       .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
       .andWhere('assetService.isErrorPage = false')
-      .andWhere('latest_http.tech IS NOT NULL');
+      .setParameters(latestHttpResponseQuery.getParameters());
 
     // Main query to count distinct technologies for each workspaceId
     return this.dataSource

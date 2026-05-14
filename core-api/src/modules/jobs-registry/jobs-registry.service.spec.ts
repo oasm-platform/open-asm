@@ -632,14 +632,22 @@ describe('JobsRegistryService', () => {
   });
 
   describe('createNewJob notification snapshot', () => {
-    it('should store a finding snapshot in Redis when creating a new job history', async () => {
+    it('should store finding snapshots in Redis for each target in a new job history', async () => {
       const jobHistory = { id: 'history-uuid' };
-      const asset = {
-        id: 'asset-uuid',
-        isPrimary: true,
-        value: 'example.com',
-        target: { id: 'target-uuid', value: 'example.com' },
-      };
+      const assets = [
+        {
+          id: 'asset-uuid-1',
+          isPrimary: true,
+          value: 'example.com',
+          target: { id: 'target-uuid-1', value: 'example.com' },
+        },
+        {
+          id: 'asset-uuid-2',
+          isPrimary: true,
+          value: 'example.org',
+          target: { id: 'target-uuid-2', value: 'example.org' },
+        },
+      ];
       const jobRepository = {
         create: jest.fn((job: Partial<Job>) => ({ id: 'job-uuid', ...job })),
         save: jest.fn().mockResolvedValue([{ id: 'job-uuid' }]),
@@ -648,40 +656,67 @@ describe('JobsRegistryService', () => {
           andWhere: jest.fn().mockReturnThis(),
           innerJoinAndSelect: jest.fn().mockReturnThis(),
           innerJoin: jest.fn().mockReturnThis(),
-          getMany: jest.fn().mockResolvedValue([asset]),
+          getMany: jest.fn().mockResolvedValue(assets),
         }),
       };
 
       mockJobHistoryRepository.create.mockReturnValue(jobHistory);
       mockJobHistoryRepository.save.mockResolvedValue(jobHistory);
       mockDataSource.getRepository.mockReturnValue(jobRepository);
-      mockStatisticService.getFindingSnapshot.mockResolvedValue({
-        totalPort: 2,
-        totalSubdomain: 3,
-        totalTech: 4,
-      });
+      mockStatisticService.getFindingSnapshot
+        .mockResolvedValueOnce({
+          totalPort: 2,
+          totalSubdomain: 3,
+          totalTech: 4,
+        })
+        .mockResolvedValueOnce({
+          totalPort: 5,
+          totalSubdomain: 6,
+          totalTech: 7,
+        });
 
       await service.createNewJob({
         tool: { name: 'subfinder', category: 'subdomains', priority: 4 } as any,
-        targetIds: ['target-uuid'],
+        targetIds: ['target-uuid-1', 'target-uuid-2'],
         workspaceId: 'workspace-uuid',
         workflow: { id: 'workflow-uuid' } as any,
       });
 
       expect(mockStatisticService.getFindingSnapshot).toHaveBeenCalledWith({
         workspaceId: 'workspace-uuid',
-        targetId: 'target-uuid',
+        targetId: 'target-uuid-1',
+      });
+      expect(mockStatisticService.getFindingSnapshot).toHaveBeenCalledWith({
+        workspaceId: 'workspace-uuid',
+        targetId: 'target-uuid-2',
       });
       expect(mockRedisService.setex).toHaveBeenCalledWith(
-        'snapshot:history-uuid',
+        'snapshot:history-uuid:targets',
+        604800,
+        JSON.stringify(['target-uuid-1', 'target-uuid-2']),
+      );
+      expect(mockRedisService.setex).toHaveBeenCalledWith(
+        'snapshot:history-uuid:target-uuid-1',
         604800,
         JSON.stringify({
           workspaceId: 'workspace-uuid',
-          targetId: 'target-uuid',
+          targetId: 'target-uuid-1',
           domain: 'example.com',
           totalPort: 2,
           totalSubdomain: 3,
           totalTech: 4,
+        }),
+      );
+      expect(mockRedisService.setex).toHaveBeenCalledWith(
+        'snapshot:history-uuid:target-uuid-2',
+        604800,
+        JSON.stringify({
+          workspaceId: 'workspace-uuid',
+          targetId: 'target-uuid-2',
+          domain: 'example.org',
+          totalPort: 5,
+          totalSubdomain: 6,
+          totalTech: 7,
         }),
       );
     });
@@ -735,16 +770,18 @@ describe('JobsRegistryService', () => {
         id: mockJobHistoryId,
         workflow: { name: 'test-workflow' },
       });
-      mockRedisService.get.mockResolvedValue(
-        JSON.stringify({
-          workspaceId: 'workspace-uuid',
-          targetId: 'target-uuid',
-          domain: 'example.com',
-          totalPort: 2,
-          totalSubdomain: 3,
-          totalTech: 4,
-        }),
-      );
+      mockRedisService.get
+        .mockResolvedValueOnce(JSON.stringify(['target-uuid']))
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            workspaceId: 'workspace-uuid',
+            targetId: 'target-uuid',
+            domain: 'example.com',
+            totalPort: 2,
+            totalSubdomain: 3,
+            totalTech: 4,
+          }),
+        );
       mockStatisticService.getFindingSnapshot.mockResolvedValue({
         totalPort: 10,
         totalSubdomain: 8,
@@ -767,12 +804,14 @@ describe('JobsRegistryService', () => {
           port: '8',
           subdomain: '5',
           tech: '1',
-          summary: '8 ports, 5 subdomains, 1 tech',
         },
         workspaceId: 'workspace-uuid',
       });
       expect(mockRedisService.del).toHaveBeenCalledWith(
-        'snapshot:history-uuid',
+        'snapshot:history-uuid:target-uuid',
+      );
+      expect(mockRedisService.del).toHaveBeenCalledWith(
+        'snapshot:history-uuid:targets',
       );
     });
 
@@ -783,16 +822,18 @@ describe('JobsRegistryService', () => {
         id: mockJobHistoryId,
         workflow: { name: 'test-workflow' },
       });
-      mockRedisService.get.mockResolvedValue(
-        JSON.stringify({
-          workspaceId: 'workspace-uuid',
-          targetId: 'target-uuid',
-          domain: 'example.com',
-          totalPort: 2,
-          totalSubdomain: 3,
-          totalTech: 4,
-        }),
-      );
+      mockRedisService.get
+        .mockResolvedValueOnce(JSON.stringify(['target-uuid']))
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            workspaceId: 'workspace-uuid',
+            targetId: 'target-uuid',
+            domain: 'example.com',
+            totalPort: 2,
+            totalSubdomain: 3,
+            totalTech: 4,
+          }),
+        );
       mockStatisticService.getFindingSnapshot.mockResolvedValue({
         totalPort: 2,
         totalSubdomain: 3,
@@ -805,7 +846,10 @@ describe('JobsRegistryService', () => {
         mockNotificationsService.createNotification,
       ).not.toHaveBeenCalled();
       expect(mockRedisService.del).toHaveBeenCalledWith(
-        'snapshot:history-uuid',
+        'snapshot:history-uuid:target-uuid',
+      );
+      expect(mockRedisService.del).toHaveBeenCalledWith(
+        'snapshot:history-uuid:targets',
       );
     });
   });
