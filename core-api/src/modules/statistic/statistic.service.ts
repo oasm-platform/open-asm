@@ -257,8 +257,9 @@ export class StatisticService {
   private buildLatestHttpResponseTechSubQuery() {
     return this.dataSource
       .createQueryBuilder()
+      .distinctOn(['httpResponse."assetServiceId"'])
       .select(
-        'DISTINCT ON (httpResponse."assetServiceId") httpResponse."assetServiceId"',
+        'httpResponse."assetServiceId"',
         'assetServiceId',
       )
       .addSelect('httpResponse.tech', 'tech')
