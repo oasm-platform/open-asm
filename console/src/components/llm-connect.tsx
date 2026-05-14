@@ -23,7 +23,6 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
-  Plus,
   PlugZap,
   Star,
   Unplug,
@@ -188,10 +187,12 @@ function ModelSelectForm({
 function ConnectForm({
   provider,
   onSubmit,
+  onCancel,
   isSubmitting,
 }: {
   provider: LLMConfigWithProviderDto;
   onSubmit: (data: ConnectFormData, providerId: string) => void;
+  onCancel: () => void;
   isSubmitting: boolean;
 }) {
   const isCustomProvider =
@@ -247,7 +248,10 @@ function ConnectForm({
         error={errors.apiKey?.message}
       />
 
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-between items-center gap-2">
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
         <Button type="submit" size="sm" disabled={isSubmitting}>
           {isSubmitting ? 'Connecting...' : 'Connect'}
         </Button>
@@ -294,7 +298,7 @@ function AddConfigPanel({
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="p-3 border-b bg-muted/30">
-        <p className="text-sm font-medium mb-2">Add new LLM connection</p>
+        <p className="text-sm font-medium mb-2">Connect provider</p>
         <div className="flex flex-wrap gap-1.5">
           {ALL_PROVIDERS.map((pid) => {
             const meta = providersList.find((p) => p.providerId === pid);
@@ -321,17 +325,13 @@ function AddConfigPanel({
           })}
         </div>
       </div>
-      <div className="p-3 flex flex-col gap-3">
+      <div className="p-3">
         <ConnectForm
           provider={providerEntry}
           onSubmit={onSubmit}
+          onCancel={onCancel}
           isSubmitting={isSubmitting}
         />
-        <div className="flex justify-end">
-          <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
       </div>
     </div>
   );
@@ -508,26 +508,27 @@ export default function LlmConnect() {
         );
       })}
 
-      {/* Add new config panel */}
-      {showAddPanel ? (
-        <AddConfigPanel
-          providersList={providersList}
-          onSubmit={handleConnect}
-          onCancel={() => setShowAddPanel(false)}
-          isSubmitting={isSubmitting}
-        />
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowAddPanel(true)}
-          className="gap-2 self-start"
-        >
-          <Plus size={16} />
-          <PlugZap size={16} />
-          Add LLM Connection
-        </Button>
-      )}
+      <div className="flex justify-center items-center w-full">
+        {/* Add new config panel */}
+        {showAddPanel ? (
+          <AddConfigPanel
+            providersList={providersList}
+            onSubmit={handleConnect}
+            onCancel={() => setShowAddPanel(false)}
+            isSubmitting={isSubmitting}
+          />
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAddPanel(true)}
+            className="gap-2 self-start"
+          >
+            <PlugZap size={16} />
+            Connect provider
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

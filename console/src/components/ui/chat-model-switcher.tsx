@@ -37,7 +37,6 @@ interface ModelListProps {
   isActiveConfig: boolean;
   activeProviderLogo?: string;
   onSelect: (modelId: string) => void;
-  onConnect: () => void;
 }
 
 const ModelListItem = memo(
@@ -79,7 +78,6 @@ const ModelListContent = memo(
     isActiveConfig,
     activeProviderLogo,
     onSelect,
-    onConnect,
   }: ModelListProps) => {
     if (isLoading && models.length === 0) {
       return (
@@ -91,11 +89,7 @@ const ModelListContent = memo(
     }
 
     return (
-      <CommandList className="max-h-[320px]">
-        <CommandItem onSelect={onConnect} className="gap-2">
-          <Settings className="h-4 w-4" />
-          Agent Settings
-        </CommandItem>
+      <CommandList className="max-h-80">
         {models.length > 0 ? (
           models.map((model) => (
             <ModelListItem
@@ -179,9 +173,10 @@ export function ChatModelSwitcher({
 
   const currentDisplay = useMemo(() => {
     if (activeConfig) {
-      const label = selectedModel && activeConfig.configId === selectedConfigId
-        ? selectedModel
-        : (activeConfig.model ?? activeConfig.providerName);
+      const label =
+        selectedModel && activeConfig.configId === selectedConfigId
+          ? selectedModel
+          : (activeConfig.model ?? activeConfig.providerName);
       return {
         logo: activeConfig.logo,
         label,
@@ -204,7 +199,9 @@ export function ChatModelSwitcher({
         { id: activeConfig.configId, data: { model: modelId } },
         {
           onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: ['/api/agents/llm-configs'] });
+            void queryClient.invalidateQueries({
+              queryKey: ['/api/agents/llm-configs'],
+            });
             toast.success('Model updated');
           },
           onError: () => toast.error('Failed to sync model preference'),
@@ -214,11 +211,6 @@ export function ChatModelSwitcher({
     },
     [activeConfig, onSelectModel, updateLLMConfig, queryClient],
   );
-
-  const handleConnect = useCallback(() => {
-    setOpen(false);
-    setSettingsOpen(true);
-  }, []);
 
   const handleOpenChange = useCallback((isOpen: boolean) => {
     setOpen(isOpen);
@@ -238,53 +230,64 @@ export function ChatModelSwitcher({
           <Settings className="h-3.5 w-3.5" />
           Connect LLM
         </button>
-        <AgentSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+        <AgentSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+        />
       </>
     );
   }
 
   return (
     <>
-      <Popover open={open} onOpenChange={handleOpenChange}>
-        <PopoverTrigger asChild>
-          <button
-            disabled={isUpdating}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
-            aria-label="Select model"
-          >
-            {currentDisplay && (
-              <Image
-                url={currentDisplay.logo}
-                height={16}
-                className="dark:bg-white bg-gray-500 rounded p-0.5"
+      <div className="flex items-center gap-1">
+        <Popover open={open} onOpenChange={handleOpenChange}>
+          <PopoverTrigger asChild>
+            <button
+              disabled={isUpdating}
+              className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+              aria-label="Select model"
+            >
+              {currentDisplay && (
+                <Image
+                  url={currentDisplay.logo}
+                  height={16}
+                  className="dark:bg-white bg-gray-500 rounded p-0.5"
+                />
+              )}
+              <span className="text-muted-foreground max-w-[140px] truncate">
+                {currentDisplay?.label ?? 'Select model'}
+              </span>
+              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[280px] p-0" align="start" sideOffset={4}>
+            <Command shouldFilter={false} className="p-1">
+              <CommandInput
+                placeholder="Search models..."
+                value={searchQuery}
+                onValueChange={setSearchQuery}
               />
-            )}
-            <span className="text-muted-foreground max-w-[140px] truncate">
-              {currentDisplay?.label ?? 'Select model'}
-            </span>
-            <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[280px] p-0" align="start" sideOffset={4}>
-          <Command shouldFilter={false} className="p-1">
-            <CommandInput
-              placeholder="Search models..."
-              value={searchQuery}
-              onValueChange={setSearchQuery}
-            />
-            <ModelListContent
-              models={filteredModels}
-              isLoading={isLoading}
-              searchQuery={deferredSearch}
-              selectedModel={selectedModel}
-              isActiveConfig={isActiveConfig}
-              activeProviderLogo={activeConfig?.logo}
-              onSelect={handleSelect}
-              onConnect={handleConnect}
-            />
-          </Command>
-        </PopoverContent>
-      </Popover>
+              <ModelListContent
+                models={filteredModels}
+                isLoading={isLoading}
+                searchQuery={deferredSearch}
+                selectedModel={selectedModel}
+                isActiveConfig={isActiveConfig}
+                activeProviderLogo={activeConfig?.logo}
+                onSelect={handleSelect}
+              />
+            </Command>
+          </PopoverContent>
+        </Popover>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
+        >
+          <Settings className="h-3.5 w-3.5" />
+        </button>
+      </div>
       <AgentSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   );
