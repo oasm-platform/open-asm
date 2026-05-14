@@ -19,6 +19,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Res,
   UseGuards,
@@ -39,6 +40,13 @@ import {
   ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
+import {
+  MCPConfigResponseDto,
+  MCPServerConfigDto,
+  MCPServerPingResponseDto,
+  MCPServerResponseDto,
+  ToggleMCPServerDto,
+} from './dto/mcp-config.dto';
 import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
 
 @ApiTags('Agents')
@@ -333,5 +341,89 @@ export class AgentsController {
       workspaceId,
     );
     return { message: 'Message deleted successfully' };
+  }
+
+  @Get('mcp-configs')
+  @Doc({
+    summary: 'Get MCP configs',
+    description: 'Get all MCP server configurations for the workspace',
+    request: { getWorkspaceId: true },
+    response: { serialization: MCPConfigResponseDto },
+  })
+  getMCPConfig(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<MCPConfigResponseDto> {
+    return this.agentsService.getMCPConfig(workspaceId);
+  }
+
+  @Put('mcp-configs/:name')
+  @Doc({
+    summary: 'Upsert MCP server',
+    description: 'Add or update an MCP server configuration',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'name', description: 'MCP server name' }],
+    },
+    response: { serialization: MCPServerResponseDto },
+  })
+  upsertMCPServer(
+    @Param('name') name: string,
+    @Body() dto: MCPServerConfigDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<MCPServerResponseDto> {
+    return this.agentsService.upsertMCPServer(workspaceId, name, dto);
+  }
+
+  @Delete('mcp-configs/:name')
+  @Doc({
+    summary: 'Delete MCP server',
+    description: 'Remove an MCP server configuration',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'name', description: 'MCP server name' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteMCPServer(
+    @Param('name') name: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsService.deleteMCPServer(workspaceId, name);
+    return { message: 'MCP server deleted successfully' };
+  }
+
+  @Patch('mcp-configs/:name/toggle')
+  @Doc({
+    summary: 'Toggle MCP server',
+    description: 'Enable or disable an MCP server',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'name', description: 'MCP server name' }],
+    },
+    response: { serialization: MCPServerResponseDto },
+  })
+  toggleMCPServer(
+    @Param('name') name: string,
+    @Body() dto: ToggleMCPServerDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<MCPServerResponseDto> {
+    return this.agentsService.toggleMCPServer(workspaceId, name, dto.disabled);
+  }
+
+  @Get('mcp-configs/:name/ping')
+  @Doc({
+    summary: 'Ping MCP server',
+    description: 'Check connectivity status of an MCP server',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'name', description: 'MCP server name' }],
+    },
+    response: { serialization: MCPServerPingResponseDto },
+  })
+  pingMCPServer(
+    @Param('name') name: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<MCPServerPingResponseDto> {
+    return this.agentsService.pingMCPServer(workspaceId, name);
   }
 }

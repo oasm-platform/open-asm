@@ -39,6 +39,11 @@ export class CreateLLMConfigDto {
   @IsEnum(LLMProvider)
   provider: LLMProvider;
 
+  @ApiProperty({ required: false, example: 'My OpenAI key' })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
   @ApiProperty({})
   @IsString()
   @IsOptional()
@@ -68,6 +73,9 @@ export class LLMConfigResponseDto {
 
   @ApiProperty({ enum: LLMProvider })
   provider: LLMProvider;
+
+  @ApiProperty({ required: false })
+  name?: string;
 
   @ApiProperty()
   @IsString()
@@ -116,6 +124,9 @@ export class LLMConfigWithProviderDto {
 
   @ApiProperty({ description: 'LLM config ID if connected', required: false })
   configId?: string;
+
+  @ApiProperty({ description: 'User-defined label for this config', required: false })
+  name?: string;
 
   @ApiProperty({ description: 'Model name if connected', required: false })
   model?: string;

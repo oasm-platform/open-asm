@@ -58,7 +58,7 @@ interface ChatConversationProps {
   isLoadingMessages?: boolean;
   streamError?: string | null;
   onDismissError?: () => void;
-  selectedProvider?: string | null;
+  selectedConfigId?: string | null;
   selectedModel?: string | null;
   onSelectModel?: (provider: string, model: string, configId: string) => void;
   hasSentFirstMessage?: boolean;
@@ -368,7 +368,7 @@ export const ChatConversation = memo(function ChatConversation({
   isLoadingMessages = false,
   streamError,
   onDismissError,
-  selectedProvider,
+  selectedConfigId,
   selectedModel,
   onSelectModel,
   onLoadMore,
@@ -647,7 +647,7 @@ export const ChatConversation = memo(function ChatConversation({
               <PromptInputTools>
                 {onSelectModel && (
                   <ChatModelSwitcher
-                    selectedProvider={selectedProvider ?? null}
+                    selectedConfigId={selectedConfigId ?? null}
                     selectedModel={selectedModel ?? null}
                     onSelectModel={onSelectModel}
                   />
