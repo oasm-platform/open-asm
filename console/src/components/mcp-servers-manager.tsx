@@ -397,15 +397,9 @@ function ServerRow({
         {/* Status & Icon container */}
         <div className={cn(
           "relative flex items-center justify-center size-10 rounded-xl shrink-0 transition-all duration-300",
-          transport === 'sse' 
-            ? "bg-blue-500/10 text-blue-600 dark:bg-blue-500/5 dark:text-blue-500 group-hover:bg-blue-500/20 dark:group-hover:bg-blue-500/10" 
-            : "bg-amber-500/10 text-amber-600 dark:bg-amber-500/5 dark:text-amber-500 group-hover:bg-amber-500/20 dark:group-hover:bg-amber-500/10"
+          "bg-primary/10 text-primary dark:bg-primary/5 dark:text-primary group-hover:bg-primary/20 dark:group-hover:bg-primary/10"
         )}>
-          {transport === 'sse' ? (
-            <Wifi className="size-5" />
-          ) : (
-            <Terminal className="size-5" />
-          )}
+          <Server className="size-5" />
           <div className="absolute -top-1 -right-1 bg-card rounded-full p-0.5">
             <StatusDot status={server.disabled ? 'offline' : status} />
           </div>

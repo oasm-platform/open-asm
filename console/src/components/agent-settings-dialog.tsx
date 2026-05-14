@@ -57,16 +57,13 @@ export function AgentSettingsDialog({
                     type="button"
                     onClick={() => setActiveTab(id)}
                     className={cn(
-                      'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200 text-left w-full border border-transparent',
+                      'group relative flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200 text-left w-full border border-transparent',
                       isActive
                         ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
                         : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
                     )}
                   >
-                    {/* Active indicator */}
-                    {isActive && (
-                      <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-sidebar-primary" />
-                    )}
+
                     <Icon
                       className={cn(
                         'size-4.5 shrink-0 transition-colors',
