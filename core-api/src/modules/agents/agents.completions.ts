@@ -21,6 +21,7 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
 import { getLLMProviderConfig } from './llm-provider-supported';
+import { AgentsMcpService } from './agents.mcp';
 
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
@@ -52,6 +53,7 @@ export class AgentsCompletionsService {
     private readonly messageRepository: Repository<AgentMessage>,
     private readonly agentTool: AgentTool,
     private readonly agentsMemories: AgentsMemoriesService,
+    private readonly agentsMcpService: AgentsMcpService,
   ) {
     this.loadAllPrompts();
   }
@@ -457,7 +459,10 @@ export class AgentsCompletionsService {
       );
     }
     const tools = toolsEnabled
-      ? this.agentTool.getTools(workspaceId)
+      ? {
+          ...this.agentTool.getTools(workspaceId),
+          ...(await this.agentsMcpService.getTools(workspaceId)),
+        }
       : undefined;
     const systemPrompt = this.getPrompt('SYSTEM.md');
     const currentLlvmConfig = llmConfig;
