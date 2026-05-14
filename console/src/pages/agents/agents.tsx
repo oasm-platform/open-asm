@@ -33,11 +33,11 @@ export default function AgentsChatPage() {
   const { data: providers } =
     useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
   const prefer = providers?.find((item) => item.isPreferred);
-  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>({
-    provider: prefer?.providerId || '',
-    model: prefer?.model || '',
-    configId: prefer?.configId || '',
-  });
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
+    prefer?.configId
+      ? { provider: prefer.providerId, model: prefer.model ?? '', configId: prefer.configId }
+      : null,
+  );
   const selectedModelRef = useRef<SelectedModel | null>(selectedModel);
 
   // Keep ref in sync with state
@@ -254,7 +254,7 @@ export default function AgentsChatPage() {
         isLoadingMessages={isLoadingHistory}
         streamError={streamError}
         onDismissError={handleDismissError}
-        selectedProvider={selectedModel?.provider ?? null}
+        selectedConfigId={selectedModel?.configId ?? null}
         selectedModel={selectedModel?.model ?? null}
         onSelectModel={handleSelectModel}
         hasSentFirstMessage={hasSentFirstMessage}
