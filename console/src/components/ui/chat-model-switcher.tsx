@@ -59,7 +59,7 @@ const ModelListItem = memo(
       <Image
         url={activeProviderLogo}
         height={16}
-        className="dark:bg-white bg-gray-500 rounded p-0.5 shrink-0"
+        className="bg-white rounded p-0.5 shrink-0"
       />
       <span className="truncate flex-1">{model.name}</span>
       {isSelected && <Check className="h-4 w-4 shrink-0" />}
