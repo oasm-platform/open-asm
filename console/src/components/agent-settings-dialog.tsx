@@ -1,10 +1,6 @@
 import LlmConnect from '@/components/llm-connect';
 import { MCPServersManager } from '@/components/mcp-servers-manager';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { KeyRound, Server } from 'lucide-react';
 import { useState } from 'react';
@@ -15,9 +11,18 @@ interface AgentSettingsDialogProps {
   defaultTab?: 'llm' | 'mcp';
 }
 
-const NAV_ITEMS = [
-  { id: 'llm' as const, label: 'LLM Providers', icon: KeyRound },
-  { id: 'mcp' as const, label: 'MCP Servers', icon: Server },
+interface TabItem {
+  id: 'llm' | 'mcp';
+  label: string;
+  icon: typeof KeyRound;
+  element: React.ReactNode;
+  title: string;
+  description: string;
+}
+
+const TABS: TabItem[] = [
+  { id: 'llm', label: 'LLM Providers', icon: KeyRound, element: <LlmConnect />, title: 'LLM Providers', description: 'Manage your AI models and API connections' },
+  { id: 'mcp', label: 'MCP Servers', icon: Server, element: <MCPServersManager />, title: 'MCP Servers', description: 'Extend agent capabilities with external MCP servers' },
 ];
 
 export function AgentSettingsDialog({
@@ -25,7 +30,8 @@ export function AgentSettingsDialog({
   onOpenChange,
   defaultTab = 'llm',
 }: AgentSettingsDialogProps) {
-  const [activeTab, setActiveTab] = useState<'llm' | 'mcp'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<TabItem['id']>(defaultTab);
+  const active = TABS.find((t) => t.id === activeTab);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -42,7 +48,7 @@ export function AgentSettingsDialog({
               </p>
             </div>
             <nav className="flex flex-col gap-1 px-3 flex-1">
-              {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+              {TABS.map(({ id, label, icon: Icon }) => {
                 const isActive = activeTab === id;
 
                 return (
@@ -64,7 +70,9 @@ export function AgentSettingsDialog({
                     <Icon
                       className={cn(
                         'size-4.5 shrink-0 transition-colors',
-                        isActive ? 'text-sidebar-primary' : 'group-hover:text-sidebar-foreground',
+                        isActive
+                          ? 'text-sidebar-primary'
+                          : 'group-hover:text-sidebar-foreground',
                       )}
                     />
                     {label}
@@ -76,21 +84,18 @@ export function AgentSettingsDialog({
 
           {/* Right content */}
           <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-background/50">
-            <div className="px-8 pt-6 pb-4 border-b shrink-0 flex items-center justify-between">
+            <div className="px-6 pt-3 pb-4 border-b shrink-0 flex items-center justify-between">
               <div className="space-y-0.5">
                 <p className="text-lg font-bold tracking-tight">
-                  {NAV_ITEMS.find((n) => n.id === activeTab)?.label}
+                  {active?.title}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {activeTab === 'llm' 
-                    ? 'Manage your AI models and API connections' 
-                    : 'Extend agent capabilities with external MCP servers'}
+                  {active?.description}
                 </p>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              {activeTab === 'llm' && <LlmConnect />}
-              {activeTab === 'mcp' && <MCPServersManager />}
+              {active?.element}
             </div>
           </div>
         </div>
