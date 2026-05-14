@@ -83,13 +83,13 @@ const ListWorkers = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
         {data.data.map((worker) => (
           <Card key={worker.id} className="p-1">
-<CardContent className="p-3 space-y-4">
+            <CardContent className="p-3 space-y-4">
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="p-1 bg-muted rounded-lg">
                     {worker.os ? (
                       <img
-                        style={{ filter: 'brightness(0) invert(1)' }}
+                        className="dark:brightness-0 dark:invert"
                         width={30}
                         height={30}
                         src={`/${worker.os}.svg`}
