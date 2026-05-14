@@ -148,37 +148,7 @@
     </div>
 
     <!-- Content wrapper -->
-    <div class='px-8 py-4'>
-      <!-- Content Page Header -->
-      <div class='border-b-4 border-slate-800 pb-6 mb-6'>
-        <div class='flex items-start justify-between'>
-          <div>
-            <div class='flex items-center gap-2 mb-2'>
-              <div
-                class='w-8 h-8 bg-slate-800 rounded flex items-center justify-center'
-              >
-                <span class='text-white font-bold'>{{systemNameChar}}</span>
-              </div>
-              <div>
-                <h1
-                  class='text-xl font-bold tracking-tight text-slate-900'
-                >{{reportTitle}}</h1>
-              </div>
-            </div>
-            <p class='text-sm text-slate-500'>Week
-              {{week}},
-              {{year}}
-              · Exported:
-              {{formattedDate}}</p>
-          </div>
-          <div class='text-right'>
-            <span
-              class='bg-red-100 text-red-700 border border-red-300 text-sm px-3 py-1 rounded font-medium'
-            >{{classification}}</span>
-          </div>
-        </div>
-      </div>
-
+    <div class='px-4 py-2'>
       <!-- Section 01: Weekly Performance Metrics -->
       <section class='mb-3 avoid-break'>
         <h2
@@ -917,9 +887,20 @@
 
         <!-- Footer -->
         <div class='border-t-2 border-slate-300 pt-4 mt-6 avoid-break'>
-          <div class='flex items-center justify-between text-xs text-slate-500'>
-            <p>© 2026 {{systemName}}. All Rights Reserved.</p>
-            <p>Internal Confidential Document</p>
+          <div class='flex flex-col gap-2'>
+            <div class='text-xs font-bold text-slate-800'>Open Attack Surface Management</div>
+            <p class='text-[10px] text-slate-500'>Open-source platform for cybersecurity Attack Surface Management (OASM).</p>
+            <div class='flex flex-col gap-1 text-[10px]'>
+              <div class='flex gap-2'>
+                <span class='text-slate-800 font-bold w-12'>Linkedin</span>
+                <span class='text-slate-700 font-medium'>https://www.linkedin.com/company/oasm-platform</span>
+              </div>
+              <div class='flex gap-2'>
+                <span class='text-slate-800 font-bold w-12'>Github</span>
+                <span class='text-slate-700 font-medium'>https://github.com/oasm-platform</span>
+              </div>
+            </div>
+            <p class='text-[10px] text-slate-400'>© 2026 Open Attack Surface Management. All Rights Reserved.</p>
           </div>
         </div>
       </section>
