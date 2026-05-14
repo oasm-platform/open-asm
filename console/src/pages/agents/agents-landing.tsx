@@ -220,7 +220,7 @@ export default function AgentsLandingPage() {
             <PromptInputFooter>
               <PromptInputTools>
                 <ChatModelSwitcher
-                  selectedProvider={selectedModel?.provider ?? null}
+                  selectedConfigId={selectedModel?.configId ?? null}
                   selectedModel={selectedModel?.model ?? null}
                   onSelectModel={(provider, model, configId) => {
                     setSelectedModel({ provider, model, configId });

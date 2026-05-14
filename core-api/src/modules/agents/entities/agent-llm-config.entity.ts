@@ -1,4 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -7,7 +8,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { LLMProvider } from '../enums/agent.enums';
 
 @Entity('agent_llm_configs')
@@ -16,6 +17,16 @@ export class AgentLLMConfig extends BaseEntity {
   @IsUUID()
   @Column({ type: 'uuid' })
   workspaceId: string;
+
+  @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'workspaceId' })
+  workspace: Workspace;
+
+  @ApiProperty({ example: 'My OpenAI key', required: false })
+  @IsOptional()
+  @IsString()
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  name?: string;
 
   @ApiProperty({ enum: LLMProvider, example: LLMProvider.OPENAI })
   @IsEnum(LLMProvider)

@@ -11,7 +11,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
+import { firstValueFrom } from 'rxjs';
 import { Repository } from 'typeorm';
 import {
   ConversationResponseDto,
@@ -26,11 +28,17 @@ import {
   ProviderModelDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
+import {
+  MCPConfigResponseDto,
+  MCPServerConfigDto,
+  MCPServerPingResponseDto,
+  MCPServerResponseDto,
+} from './dto/mcp-config.dto';
 import { MessageResponseDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
+import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
-import { LLMProvider } from './enums/agent.enums';
 import {
   getLLMProviderConfig,
   llmProviderSupported,
@@ -47,8 +55,11 @@ export class AgentsService {
     private readonly conversationRepository: Repository<AgentConversation>,
     @InjectRepository(AgentMessage)
     private readonly messageRepository: Repository<AgentMessage>,
+    @InjectRepository(AgentMCPConfig)
+    private readonly mcpConfigRepository: Repository<AgentMCPConfig>,
     private readonly redisService: RedisService,
     private readonly agentsMemories: AgentsMemoriesService,
+    private readonly httpService: HttpService,
   ) {}
 
   private maskApiKey(apiKey: string): string {
@@ -63,6 +74,7 @@ export class AgentsService {
     return {
       id: config.id,
       provider: config.provider,
+      name: config.name,
       model: config.model,
       apiUrl: config.apiUrl,
       isPreferred: config.isPreferred,
@@ -77,17 +89,6 @@ export class AgentsService {
     workspaceId: string,
     userId: string,
   ): Promise<LLMConfigResponseDto> {
-    // Check if provider already exists in workspace
-    const existingConfig = await this.llmConfigRepository.findOne({
-      where: { workspaceId, provider: dto.provider },
-    });
-
-    if (existingConfig) {
-      throw new BadRequestException(
-        `Provider ${dto.provider} is already configured. Please update or delete the existing configuration first.`,
-      );
-    }
-
     // Validate API key by fetching models
     const provider = getLLMProviderConfig(dto.provider);
     if (!provider) {
@@ -100,18 +101,17 @@ export class AgentsService {
 
     if (models.length === 0) {
       throw new BadRequestException(
-        'Invalid API key. Unable to fetch models from the provider.',
+        `Cannot connect to ${provider.name}: invalid API key or unable to reach the provider. Please double-check your API key and try again.`,
       );
     }
 
     // Use first model from the list as default
     const defaultModel = models[0].id;
 
-    // Check if this is the first LLM config in workspace
+    // First config in workspace becomes preferred automatically
     const totalConfigs = await this.llmConfigRepository.count({
       where: { workspaceId },
     });
-
     const isPreferred = totalConfigs === 0;
 
     if (!dto.apiKey) {
@@ -121,6 +121,7 @@ export class AgentsService {
     const config = this.llmConfigRepository.create({
       workspaceId,
       provider: dto.provider,
+      name: dto.name,
       apiKey: encrypt(dto.apiKey),
       model: dto.model || defaultModel,
       apiUrl: dto.apiUrl,
@@ -155,46 +156,53 @@ export class AgentsService {
   async getLLMConfigsWithProviders(
     workspaceId: string,
   ): Promise<LLMConfigWithProviderDto[]> {
-    // Get all configs for workspace
     const configs = await this.llmConfigRepository.find({
       where: { workspaceId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: 'ASC' },
     });
 
-    // Map providers with their config status
-    const result = llmProviderSupported.map((provider) => {
-      const config = configs.find((c) => c.provider === provider.id);
+    const result: LLMConfigWithProviderDto[] = [];
 
-      if (config) {
-        const apiKeyMasked = config.apiKey
-          ? this.maskApiKey(decrypt(config.apiKey))
-          : '****';
-        return {
+    // One row per connected config
+    for (const config of configs) {
+      const providerMeta = llmProviderSupported.find(
+        (p) => p.id === config.provider,
+      );
+      const apiKeyMasked = config.apiKey
+        ? this.maskApiKey(decrypt(config.apiKey))
+        : '****';
+      result.push({
+        providerId: config.provider,
+        providerName: providerMeta?.name ?? config.provider,
+        logo: providerMeta?.logo,
+        isConnected: true,
+        configId: config.id,
+        name: config.name,
+        model: config.model,
+        apiUrl: config.apiUrl,
+        isPreferred: config.isPreferred,
+        apiKeyMasked,
+        createdAt: config.createdAt,
+        updatedAt: config.updatedAt,
+        isAcceptCustomApiUrl: providerMeta?.isAcceptCustomApiUrl ?? false,
+      });
+    }
+
+    // One row per provider that has NO configs yet (for the "Connect" UI)
+    const connectedProviderIds = new Set(configs.map((c) => c.provider));
+    for (const provider of llmProviderSupported) {
+      if (!connectedProviderIds.has(provider.id)) {
+        result.push({
           providerId: provider.id,
           providerName: provider.name,
           logo: provider.logo,
-          isConnected: true,
-          configId: config.id,
-          model: config.model,
-          apiUrl: config.apiUrl,
-          isPreferred: config.isPreferred,
-          apiKeyMasked,
-          createdAt: config.createdAt,
-          updatedAt: config.updatedAt,
+          isConnected: false,
           isAcceptCustomApiUrl: provider.isAcceptCustomApiUrl ?? false,
-        };
+        });
       }
+    }
 
-      return {
-        providerId: provider.id,
-        providerName: provider.name,
-        logo: provider.logo,
-        isConnected: false,
-        isAcceptCustomApiUrl: provider.isAcceptCustomApiUrl ?? false,
-      };
-    });
-
-    return result as LLMConfigWithProviderDto[];
+    return result;
   }
 
   async updateLLMConfig(
@@ -263,36 +271,6 @@ export class AgentsService {
     return this.llmConfigRepository.findOne({
       where: { workspaceId, isPreferred: true },
     });
-  }
-
-  /**
-   * Resolve LLM config to use for a conversation.
-   * Priority: requested provider/model > preferred config
-   */
-  private async resolveLLMConfig(
-    workspaceId: string,
-    provider?: string,
-    model?: string,
-  ): Promise<AgentLLMConfig> {
-    let llmConfig: AgentLLMConfig | null = null;
-
-    if (model && provider) {
-      llmConfig = await this.llmConfigRepository.findOne({
-        where: { workspaceId, provider: provider as LLMProvider },
-      });
-    }
-
-    if (!llmConfig) {
-      llmConfig = await this.getPreferredLLMConfig(workspaceId);
-    }
-
-    if (!llmConfig) {
-      throw new BadRequestException(
-        'No preferred LLM config found. Please create and set a preferred LLM config first.',
-      );
-    }
-
-    return llmConfig;
   }
 
   async getModelsForProvider(
@@ -490,5 +468,180 @@ export class AgentsService {
     }
 
     await this.messageRepository.remove(message);
+  }
+
+  // ==========================================
+  // MCP Config Methods
+  // ==========================================
+
+  private assertSafeMCPServerName(name: string): void {
+    if (
+      name === '__proto__' ||
+      name === 'constructor' ||
+      name === 'prototype'
+    ) {
+      throw new BadRequestException('Invalid MCP server name');
+    }
+  }
+
+  private isSafeUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+
+      // Block common private/internal addresses (allowing localhost for local MCP servers)
+      if (
+        hostname === '169.254.169.254' || // AWS/Cloud metadata
+        hostname.startsWith('10.') ||
+        hostname.startsWith('192.168.')
+      ) {
+        return false;
+      }
+
+      // More thorough private IP check for 172.16.0.0/12
+      if (hostname.startsWith('172.')) {
+        const parts = hostname.split('.');
+        if (parts.length === 4) {
+          const secondPart = parseInt(parts[1], 10);
+          if (secondPart >= 16 && secondPart <= 31) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async getOrCreateMCPConfig(
+    workspaceId: string,
+  ): Promise<AgentMCPConfig> {
+    let config = await this.mcpConfigRepository.findOne({
+      where: { workspaceId },
+    });
+    if (!config) {
+      try {
+        config = this.mcpConfigRepository.create({
+          workspaceId,
+          configJson: { mcpServers: {} },
+        });
+        config = await this.mcpConfigRepository.save(config);
+      } catch (e) {
+        // Handle race condition: if another request created it, find it
+        config = await this.mcpConfigRepository.findOne({
+          where: { workspaceId },
+        });
+        if (!config) throw e;
+      }
+    }
+    return config;
+  }
+
+  async getMCPConfig(workspaceId: string): Promise<MCPConfigResponseDto> {
+    const config = await this.getOrCreateMCPConfig(workspaceId);
+    const servers: MCPServerResponseDto[] = Object.entries(
+      config.configJson.mcpServers ?? {},
+    ).map(([name, serverConfig]) => ({ name, ...serverConfig }));
+    return { servers };
+  }
+
+  async upsertMCPServer(
+    workspaceId: string,
+    name: string,
+    dto: MCPServerConfigDto,
+  ): Promise<MCPServerResponseDto> {
+    this.assertSafeMCPServerName(name);
+    const config = await this.getOrCreateMCPConfig(workspaceId);
+
+    const existing = config.configJson.mcpServers[name] ?? {};
+    config.configJson.mcpServers[name] = {
+      disabled: false,
+      timeout: 60,
+      allowed_tools: null,
+      ...existing,
+      ...dto,
+    };
+
+    await this.mcpConfigRepository.save(config);
+    return { name, ...config.configJson.mcpServers[name] };
+  }
+
+  async deleteMCPServer(workspaceId: string, name: string): Promise<void> {
+    this.assertSafeMCPServerName(name);
+    const config = await this.getOrCreateMCPConfig(workspaceId);
+    if (!config.configJson.mcpServers[name]) {
+      throw new NotFoundException(`MCP server "${name}" not found`);
+    }
+    delete config.configJson.mcpServers[name];
+    await this.mcpConfigRepository.save(config);
+  }
+
+  async toggleMCPServer(
+    workspaceId: string,
+    name: string,
+    disabled: boolean,
+  ): Promise<MCPServerResponseDto> {
+    this.assertSafeMCPServerName(name);
+    const config = await this.getOrCreateMCPConfig(workspaceId);
+    if (!config.configJson.mcpServers[name]) {
+      throw new NotFoundException(`MCP server "${name}" not found`);
+    }
+    config.configJson.mcpServers[name].disabled = disabled;
+    await this.mcpConfigRepository.save(config);
+    return { name, ...config.configJson.mcpServers[name] };
+  }
+
+  async pingMCPServer(
+    workspaceId: string,
+    name: string,
+  ): Promise<MCPServerPingResponseDto> {
+    this.assertSafeMCPServerName(name);
+    const config = await this.getOrCreateMCPConfig(workspaceId);
+    const server = config.configJson.mcpServers[name];
+    if (!server) {
+      throw new NotFoundException(`MCP server "${name}" not found`);
+    }
+
+    if (server.disabled) {
+      return { status: 'offline' };
+    }
+
+    // stdio servers cannot be tested from the API
+    if (!server.url) {
+      return { status: 'unknown' };
+    }
+
+    if (!this.isSafeUrl(server.url)) {
+      this.logger.warn(
+        `Blocked potentially unsafe MCP ping URL: ${server.url}`,
+      );
+      return { status: 'offline' };
+    }
+
+    try {
+      const start = Date.now();
+      const headers: Record<string, string> = {
+        Accept: 'text/event-stream,*/*',
+      };
+      if (server.headers) {
+        Object.assign(headers, server.headers);
+      }
+
+      const res = await firstValueFrom(
+        this.httpService.get(server.url, {
+          headers,
+          timeout: 5000,
+          validateStatus: () => true, // Don't throw for non-2xx status
+        }),
+      );
+
+      const latency = Date.now() - start;
+      // Any HTTP response (even 4xx) means the server is reachable
+      return { status: res.status < 500 ? 'online' : 'offline', latency };
+    } catch {
+      return { status: 'offline' };
+    }
   }
 }
