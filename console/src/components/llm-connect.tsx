@@ -457,7 +457,7 @@ export default function LlmConnect() {
           <div key={key} className="rounded-lg border bg-card overflow-hidden">
             <div className="flex items-center justify-between p-3">
               <div className="flex items-center gap-2">
-                <div className="flex items-center justify-center w-9 h-9 rounded-md dark:bg-white bg-gray-500 shrink-0">
+                <div className="flex items-center justify-center w-9 h-9 rounded-md bg-white shrink-0">
                   <Image width={24} height={24} url={item.logo} />
                 </div>
                 <div className="flex flex-col justify-start items-start">
