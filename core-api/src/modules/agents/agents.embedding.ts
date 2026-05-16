@@ -13,14 +13,47 @@ export type EmbeddingModelInfo = {
   dimensions: number;
 };
 
+export type EmbeddingModelsFetcher = (
+  apiKey: string,
+  baseURL?: string,
+) => Promise<EmbeddingModelInfo[]>;
+
 export interface EmbeddingProviderSupported {
   id: EmbeddingProvider;
   name: string;
   logo: string;
   models: EmbeddingModelInfo[];
   handler: (apiKey: string, model: string, baseURL?: string) => EmbeddingModel;
+  fetchModels?: EmbeddingModelsFetcher;
   isAcceptCustomApiUrl?: boolean;
 }
+
+const fetchCustomEmbeddingModels = async (
+  apiKey: string,
+  baseURL?: string,
+): Promise<EmbeddingModelInfo[]> => {
+  if (!baseURL) return [];
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (apiKey && apiKey !== 'not_set') {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+    const response = await fetch(`${baseURL.replace(/\/$/, '')}/models`, {
+      headers,
+    });
+    if (!response.ok) return [];
+    const data = (await response.json()) as {
+      data: Array<{ id: string; name?: string }>;
+    };
+    return data.data
+      .map((m) => ({ id: m.id, name: m.name ?? m.id, dimensions: 0 }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+};
 
 export const embeddingProviderSupported: EmbeddingProviderSupported[] = [
   {
@@ -110,6 +143,7 @@ export const embeddingProviderSupported: EmbeddingProviderSupported[] = [
         apiKey: !apiKey || apiKey === 'not_set' ? 'not_required' : apiKey,
         baseURL,
       }).embedding(model),
+    fetchModels: fetchCustomEmbeddingModels,
     isAcceptCustomApiUrl: true,
   },
 ];

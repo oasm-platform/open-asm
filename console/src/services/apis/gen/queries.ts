@@ -2480,6 +2480,11 @@ export type AgentsControllerGetEmbeddingProviders200 =
     data?: EmbeddingProviderStatusDto[];
   };
 
+export type AgentsControllerGetEmbeddingProviderModels200 =
+  AppResponseSerialization & {
+    data?: EmbeddingModelInfoDto[];
+  };
+
 export type NotificationsControllerGetNotificationsParams = {
   search?: string;
   page?: number;
@@ -20466,6 +20471,192 @@ export const useAgentsControllerSetPreferredEmbeddingConfig = <
     queryClient,
   );
 };
+
+/**
+ * Get available models for a specific embedding provider configuration
+ * @summary List models for an embedding config
+ */
+export const agentsControllerGetEmbeddingProviderModels = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentsControllerGetEmbeddingProviderModels200>(
+    { url: `/api/agents/embedding/${id}/models`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetEmbeddingProviderModelsQueryKey = (
+  id: string,
+) => {
+  return [`/api/agents/embedding/${id}/models`] as const;
+};
+
+export const getAgentsControllerGetEmbeddingProviderModelsQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof agentsControllerGetEmbeddingProviderModels>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetEmbeddingProviderModelsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>
+  > = ({ signal }) =>
+    agentsControllerGetEmbeddingProviderModels(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetEmbeddingProviderModelsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>
+>;
+export type AgentsControllerGetEmbeddingProviderModelsQueryError = unknown;
+
+export function useAgentsControllerGetEmbeddingProviderModels<
+  TData = Awaited<
+    ReturnType<typeof agentsControllerGetEmbeddingProviderModels>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof agentsControllerGetEmbeddingProviderModels>
+          >,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetEmbeddingProviderModels<
+  TData = Awaited<
+    ReturnType<typeof agentsControllerGetEmbeddingProviderModels>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof agentsControllerGetEmbeddingProviderModels>
+          >,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetEmbeddingProviderModels<
+  TData = Awaited<
+    ReturnType<typeof agentsControllerGetEmbeddingProviderModels>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List models for an embedding config
+ */
+
+export function useAgentsControllerGetEmbeddingProviderModels<
+  TData = Awaited<
+    ReturnType<typeof agentsControllerGetEmbeddingProviderModels>
+  >,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviderModels>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAgentsControllerGetEmbeddingProviderModelsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * Retrieve a paginated list of notifications for the current user

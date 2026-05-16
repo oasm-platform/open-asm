@@ -56,6 +56,7 @@ import { UpsertSkillDto, SkillResponseDto } from './dto/skill.dto';
 import {
   CreateEmbeddingConfigDto,
   EmbeddingConfigResponseDto,
+  EmbeddingModelInfoDto,
   EmbeddingProviderStatusDto,
   UpdateEmbeddingConfigDto,
 } from './dto/embedding-config.dto';
@@ -858,6 +859,51 @@ export class AgentsService {
     }));
   }
 
+  async getEmbeddingModelsForProvider(
+    configId: string,
+    workspaceId: string,
+  ): Promise<EmbeddingModelInfoDto[]> {
+    const cacheKey = `agents:embedding_models:${configId}`;
+
+    try {
+      const cached = await this.redisService.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached) as EmbeddingModelInfoDto[];
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to read from Redis cache: ${error}`);
+    }
+
+    const config = await this.embeddingConfigRepository.findOne({
+      where: { id: configId, workspaceId },
+    });
+
+    if (!config) {
+      throw new NotFoundException('Embedding config not found');
+    }
+
+    const provider = getEmbeddingProviderConfig(config.provider);
+    if (!provider) {
+      return [];
+    }
+
+    let models: EmbeddingModelInfoDto[] = [];
+    if (provider.fetchModels) {
+      const apiKey = config.apiKey ? decrypt(config.apiKey) : '';
+      models = await provider.fetchModels(apiKey, config.apiUrl);
+    } else {
+      models = provider.models;
+    }
+
+    try {
+      await this.redisService.setex(cacheKey, 3600, JSON.stringify(models));
+    } catch (error) {
+      this.logger.warn(`Failed to cache models in Redis: ${error}`);
+    }
+
+    return models;
+  }
+
   async createEmbeddingConfig(
     dto: CreateEmbeddingConfigDto,
     workspaceId: string,
@@ -868,6 +914,19 @@ export class AgentsService {
       throw new BadRequestException(
         `Provider ${dto.provider} is not supported`,
       );
+    }
+
+    let defaultModel = '';
+    if (provider.fetchModels) {
+      const models = await provider.fetchModels(dto.apiKey, dto.apiUrl);
+      if (models.length === 0) {
+        throw new BadRequestException(
+          `Cannot connect to ${provider.name}: invalid API key or unable to reach the provider.`,
+        );
+      }
+      defaultModel = models[0].id;
+    } else {
+      defaultModel = provider.models[0]?.id ?? '';
     }
 
     const totalConfigs = await this.embeddingConfigRepository.count({
@@ -884,7 +943,7 @@ export class AgentsService {
       provider: dto.provider,
       name: dto.name,
       apiKey: encrypt(dto.apiKey),
-      model: dto.model || (provider.models[0]?.id ?? ''),
+      model: dto.model || defaultModel,
       apiUrl: dto.apiUrl,
       createdBy: userId,
       isPreferred,

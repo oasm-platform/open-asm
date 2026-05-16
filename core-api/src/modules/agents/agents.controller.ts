@@ -55,6 +55,7 @@ import {
   EmbeddingConfigResponseDto,
   EmbeddingProviderStatusDto,
   UpdateEmbeddingConfigDto,
+  EmbeddingModelInfoDto,
 } from './dto/embedding-config.dto';
 
 @ApiTags('Agents')
@@ -581,5 +582,23 @@ export class AgentsController {
     @WorkspaceId() workspaceId: string,
   ): Promise<EmbeddingConfigResponseDto> {
     return this.agentsService.setPreferredEmbeddingConfig(id, workspaceId);
+  }
+
+  @Get('embedding/:id/models')
+  @Doc({
+    summary: 'List models for an embedding config',
+    description:
+      'Get available models for a specific embedding provider configuration',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Embedding config ID' }],
+    },
+    response: { serialization: EmbeddingModelInfoDto, isArray: true },
+  })
+  async getEmbeddingProviderModels(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<EmbeddingModelInfoDto[]> {
+    return this.agentsService.getEmbeddingModelsForProvider(id, workspaceId);
   }
 }

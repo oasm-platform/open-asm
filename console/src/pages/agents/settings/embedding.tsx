@@ -7,6 +7,7 @@ import {
   useAgentsControllerDeleteEmbeddingConfig,
   useAgentsControllerSetPreferredEmbeddingConfig,
   getAgentsControllerGetEmbeddingProvidersQueryKey,
+  useAgentsControllerGetEmbeddingProviderModels,
   type EmbeddingProviderStatusDto,
   type EmbeddingConfigResponseDto,
   type CreateEmbeddingConfigDto,
@@ -24,7 +25,11 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import Image from '@/components/ui/image';
 import { toast } from 'sonner';
 import {
@@ -38,8 +43,6 @@ import {
 } from 'lucide-react';
 import type { AxiosError } from 'axios';
 import { cn } from '@/lib/utils';
-
-// ─── ModelSelect ──────────────────────────────────────────────────────────────
 
 function ModelSelect({
   models,
@@ -103,8 +106,6 @@ function ModelSelect({
   );
 }
 
-// ─── ConfigPanel ──────────────────────────────────────────────────────────────
-
 function ConfigPanel({
   provider,
   config,
@@ -134,6 +135,16 @@ function ConfigPanel({
       },
     });
 
+  const { data: dynamicModelsRaw, isLoading } =
+    useAgentsControllerGetEmbeddingProviderModels(config.id, {
+      query: { enabled: !!config.id, staleTime: 5 * 60 * 1000 },
+    });
+
+  const dynamicModels: EmbeddingModelInfoDto[] | undefined =
+    (dynamicModelsRaw as unknown as { data?: EmbeddingModelInfoDto[] })?.data ??
+    (Array.isArray(dynamicModelsRaw) ? dynamicModelsRaw : undefined);
+
+  const modelList = dynamicModels ?? provider.models;
   const isCustom = provider.id === 'custom';
 
   const saveModel = async (modelId: string) => {
@@ -180,7 +191,7 @@ function ConfigPanel({
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-foreground">Model</label>
-        {isCustom ? (
+        {isCustom && modelList.length === 0 && !isLoading ? (
           <Input
             value={customModel}
             onChange={(e) => setCustomModel(e.target.value)}
@@ -190,10 +201,11 @@ function ConfigPanel({
           />
         ) : (
           <ModelSelect
-            models={provider.models}
+            models={modelList}
             value={config.model}
             onChange={(id) => void saveModel(id)}
-            disabled={isSaving || isUpdating}
+            disabled={isSaving || isUpdating || isLoading}
+            placeholder={isLoading ? 'Loading models...' : 'Select a model'}
           />
         )}
       </div>
@@ -271,8 +283,6 @@ function ConfigPanel({
   );
 }
 
-// ─── ConnectFormWrapper ───────────────────────────────────────────────────────
-
 function ConnectFormWrapper({
   provider,
   onSubmit,
@@ -290,11 +300,10 @@ function ConnectFormWrapper({
   const [name, setName] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState(provider.models[0]?.id ?? '');
-  const [customModel, setCustomModel] = useState('');
   const [apiUrl, setApiUrl] = useState('');
 
   const isCustom = provider.id === 'custom';
-  const effectiveModel = isCustom ? customModel : model;
+  const effectiveModel = isCustom ? '' : model;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,22 +337,16 @@ function ConnectFormWrapper({
         autoComplete="new-password"
       />
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-foreground">Model</label>
-        {isCustom ? (
-          <Input
-            placeholder="nomic-embed-text"
-            value={customModel}
-            onChange={(e) => setCustomModel(e.target.value)}
-          />
-        ) : (
+      {!isCustom && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-foreground">Model</label>
           <ModelSelect
             models={provider.models}
             value={model}
             onChange={setModel}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex justify-between items-center gap-2">
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
@@ -360,8 +363,6 @@ function ConnectFormWrapper({
     </form>
   );
 }
-
-// ─── EmbeddingConnect ─────────────────────────────────────────────────────────
 
 function EmbeddingConnect() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -493,117 +494,111 @@ function EmbeddingConnect() {
       </div>
 
       <div className="flex flex-col gap-2">
-      {connectedProviders.map((provider) => {
-        const config = provider.config!;
-        const isExpanded = expandedId === provider.id;
+        {connectedProviders.map((provider) => {
+          const config = provider.config!;
+          const isExpanded = expandedId === provider.id;
 
-        return (
-          <div
-            key={provider.id}
-            className="rounded-lg border bg-card overflow-hidden"
-          >
-            <div className="flex items-center justify-between p-3">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center justify-center w-9 h-9 rounded-md bg-white shrink-0">
-                  <Image width={24} height={24} url={provider.logo} />
-                </div>
-                <div className="flex flex-col justify-start items-start">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-medium text-foreground">
-                      {provider.name}
+          return (
+            <div
+              key={provider.id}
+              className="rounded-lg border bg-card overflow-hidden"
+            >
+              <div className="flex items-center justify-between p-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-md bg-white shrink-0">
+                    <Image width={24} height={24} url={provider.logo} />
+                  </div>
+                  <div className="flex flex-col justify-start items-start">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-foreground">
+                        {provider.name}
+                      </span>
+                      {config.isPreferred && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 font-medium leading-none">
+                          default
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {config.name ? `${config.name} · ` : ''}
+                      {config.model}
                     </span>
-                    {config.isPreferred && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 font-medium leading-none">
-                        default
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExpandedId(isExpanded ? null : provider.id)}
+                  className="gap-1 border border-green-600 text-green-600 hover:bg-green-50"
+                >
+                  <Check size={16} />
+                  Connected
+                  {isExpanded ? (
+                    <ChevronUp size={16} />
+                  ) : (
+                    <ChevronDown size={16} />
+                  )}
+                </Button>
+              </div>
+
+              {isExpanded && (
+                <div className="border-t p-4 flex flex-col gap-3 bg-muted/30">
+                  <ConfigPanel
+                    provider={provider}
+                    config={config}
+                    onDelete={handleDelete}
+                    onSetPreferred={handleSetPreferred}
+                    isUpdating={isSubmitting}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {showAddPanel && addingProvider && (
+          <div className="rounded-lg border bg-card overflow-hidden">
+            <div className="p-3 border-b bg-muted/30">
+              <p className="text-sm font-medium mb-2">Connect provider</p>
+              <div className="flex flex-wrap gap-1.5">
+                {unconnectedProviders.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setAddingProvider(p)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors',
+                      addingProvider.id === p.id
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'border-border hover:bg-accent',
+                    )}
+                  >
+                    {p.logo && (
+                      <span className="inline-flex size-3.5 items-center justify-center rounded bg-white/10">
+                        <Image width={12} height={12} url={p.logo} />
                       </span>
                     )}
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {config.name ? `${config.name} · ` : ''}
-                    {config.model}
-                  </span>
-                </div>
+                    {p.name}
+                  </button>
+                ))}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setExpandedId(isExpanded ? null : provider.id)
-                }
-                className="gap-1 border border-green-600 text-green-600 hover:bg-green-50"
-              >
-                <Check size={16} />
-                Connected
-                {isExpanded ? (
-                  <ChevronUp size={16} />
-                ) : (
-                  <ChevronDown size={16} />
-                )}
-              </Button>
             </div>
-
-            {isExpanded && (
-              <div className="border-t p-4 flex flex-col gap-3 bg-muted/30">
-                <ConfigPanel
-                  provider={provider}
-                  config={config}
-                  onDelete={handleDelete}
-                  onSetPreferred={handleSetPreferred}
-                  isUpdating={isSubmitting}
-                />
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {showAddPanel && addingProvider && (
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <div className="p-3 border-b bg-muted/30">
-            <p className="text-sm font-medium mb-2">Connect provider</p>
-            <div className="flex flex-wrap gap-1.5">
-              {unconnectedProviders.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setAddingProvider(p)}
-                  className={cn(
-                    'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors',
-                    addingProvider.id === p.id
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-border hover:bg-accent',
-                  )}
-                >
-                  {p.logo && (
-                    <span className="inline-flex size-3.5 items-center justify-center rounded bg-white/10">
-                      <Image width={12} height={12} url={p.logo} />
-                    </span>
-                  )}
-                  {p.name}
-                </button>
-              ))}
+            <div className="p-3">
+              <ConnectFormWrapper
+                key={addingProvider.id}
+                provider={addingProvider}
+                onSubmit={handleConnect}
+                onCancel={() => setShowAddPanel(false)}
+                isSubmitting={isSubmitting}
+              />
             </div>
           </div>
-          <div className="p-3">
-            <ConnectFormWrapper
-              key={addingProvider.id}
-              provider={addingProvider}
-              onSubmit={handleConnect}
-              onCancel={() => setShowAddPanel(false)}
-              isSubmitting={isSubmitting}
-            />
-          </div>
-        </div>
-      )}
+        )}
       </div>
     </div>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function AgentSettingsEmbedding() {
-  return (
-    <EmbeddingConnect />
-  );
+  return <EmbeddingConnect />;
 }
