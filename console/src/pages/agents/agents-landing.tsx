@@ -9,7 +9,6 @@ import {
 } from '@/components/ai-elements/prompt-input';
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 import Page from '@/components/common/page';
-import LlmConnect from '@/components/llm-connect';
 import TypewriterText from '@/components/typewriter-text';
 import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
 
@@ -21,7 +20,10 @@ import {
   useAgentsControllerGetConversations,
   useAgentsControllerGetLLMConfigs,
 } from '@/services/apis/gen/queries';
-import { MessageSquare, Sparkles } from 'lucide-react';
+import { MessageSquare, Sparkles, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AgentSettingsDialog } from './components/agent-settings-dialog';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -75,6 +77,7 @@ export default function AgentsLandingPage() {
     model: string;
     configId: string;
   } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const {
     state: { selectedWorkspaceId },
@@ -176,24 +179,46 @@ export default function AgentsLandingPage() {
             </div>
             <div className="space-y-1.5">
               <h2 className="text-xl font-semibold text-foreground">
-                Connect an AI Provider
+                Set up your AI Agent
               </h2>
               <p className="text-sm text-muted-foreground max-w-sm">
-                To start chatting with the AI security agent, connect an LLM
-                provider first.
+                To start chatting with the AI security agent, you need to
+                configure an LLM provider and optionally define some skills.
               </p>
             </div>
           </div>
-          <div className="w-full max-w-md">
-            <LlmConnect />
-          </div>
+          <Button onClick={() => setSettingsOpen(true)} className="gap-2">
+            <Settings className="h-4 w-4" />
+            Go to Agent Settings
+          </Button>
         </div>
+        <AgentSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+        />
       </Page>
     );
   }
 
   return (
-    <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto">
+    <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto relative">
+      {/* <div className="absolute top-0 right-0 p-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Agent Options
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div> */}
       <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-8">
         {/* Hero */}
         <div className="flex flex-col items-center gap-3 text-center">
@@ -273,6 +298,7 @@ export default function AgentsLandingPage() {
           </div>
         )}
       </div>
+      <AgentSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Page>
   );
 }

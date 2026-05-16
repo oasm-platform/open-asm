@@ -1,15 +1,19 @@
+import { History, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
 import {
   useAgentsControllerGetLLMConfigs,
   useAgentsControllerGetMessagesInfinite,
+  useAgentsControllerGetConversations,
   type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChatConversation } from './chat-conversation';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+
 
 interface SelectedModel {
   provider: string;
@@ -29,13 +33,18 @@ export default function AgentsChatPage() {
   const hasAutoSentRef = useRef(false);
   const chatMessagesRef = useRef<UIMessage[]>([]);
   const isStreamingRef = useRef(false);
+  const prevIsLoadingRef = useRef(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const { data: providers } =
     useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
   const prefer = providers?.find((item) => item.isPreferred);
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
     prefer?.configId
-      ? { provider: prefer.providerId, model: prefer.model ?? '', configId: prefer.configId }
+      ? {
+          provider: prefer.providerId,
+          model: prefer.model ?? '',
+          configId: prefer.configId,
+        }
       : null,
   );
   const selectedModelRef = useRef<SelectedModel | null>(selectedModel);
@@ -48,6 +57,30 @@ export default function AgentsChatPage() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
+
+  const { data: conversationsData, refetch: refetchConversations } =
+    useAgentsControllerGetConversations(
+      { limit: 20, sortBy: 'updatedAt', sortOrder: 'DESC' },
+      {
+        query: {
+          enabled: !!conversationId,
+        },
+      },
+    );
+
+  const currentConversationTitle = useMemo(() => {
+    if (!conversationsData) return null;
+    const items = Array.isArray(conversationsData)
+      ? conversationsData
+      : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (conversationsData as any).data ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (conversationsData as any).items ||
+        [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const conv = items.find((c: any) => c.id === conversationId);
+    return conv?.title;
+  }, [conversationsData, conversationId]);
 
   // Fetch messages with infinite scroll
   const {
@@ -164,6 +197,14 @@ export default function AgentsChatPage() {
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
+  // Refetch conversation list when streaming ends so the generated title shows immediately
+  useEffect(() => {
+    if (prevIsLoadingRef.current && !isLoading && conversationId) {
+      void refetchConversations();
+    }
+    prevIsLoadingRef.current = isLoading;
+  }, [isLoading, conversationId, refetchConversations]);
+
   // Sync history whenever savedMessages changes (new pages loaded) but not while streaming
   useEffect(() => {
     if (!conversationId || isLoadingHistory || isStreamingRef.current) return;
@@ -246,6 +287,39 @@ export default function AgentsChatPage() {
       className="-m-4 flex flex-col overflow-hidden"
       style={{ height: 'calc(100vh - 4rem)' }}
     >
+      <div className="flex items-center justify-between px-6 py-3 border-b bg-background/50 backdrop-blur-sm shrink-0 relative">
+        <div className="flex-1" />
+
+        <div className="flex items-center justify-center absolute left-1/2 -translate-x-1/2 gap-2">
+          {/* <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors">
+            <Sparkles className="h-3.5 w-3.5" />
+          </div> */}
+          <h2 className="font-semibold text-sm truncate max-w-[400px]">
+            {currentConversationTitle || 'Security Agent'}
+          </h2>
+        </div>
+
+        <div className="flex-1 flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-dashed"
+            onClick={() => navigate('/agents/conversations')}
+          >
+            <History className="mr-2 h-4 w-4" />
+            History
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-dashed"
+            onClick={() => navigate('/agents')}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Chat
+          </Button>
+        </div>
+      </div>
       <ChatConversation
         messages={displayMessages}
         onSendMessage={handleSendMessage}
