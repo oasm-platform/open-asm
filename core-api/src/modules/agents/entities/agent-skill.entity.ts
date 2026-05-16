@@ -1,5 +1,5 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { BaseEntity } from 'src/common/entities/base.entity';
+import { BaseEntity } from '@/common/entities/base.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { SkillStatus } from '../enums/agent.enums';
 
