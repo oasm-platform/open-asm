@@ -1,8 +1,4 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import SettingMenu from '@/pages/agents/settings/setting-menu';
 
 interface AgentSettingsDialogProps {
@@ -18,7 +14,7 @@ export function AgentSettingsDialog({
 }: AgentSettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl w-full h-[80vh] p-0 overflow-hidden sm:rounded-xl border shadow-lg bg-background">
+      <DialogContent className="max-w-7xl w-full h-[80vh] p-0 overflow-hidden sm:rounded-xl border shadow-lg bg-background">
         <DialogTitle className="sr-only">Agent Settings</DialogTitle>
         <SettingMenu defaultTab={defaultTab} />
       </DialogContent>

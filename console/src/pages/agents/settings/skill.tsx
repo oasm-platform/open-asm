@@ -30,7 +30,11 @@ const blackTheme = EditorView.theme(
     '&': { backgroundColor: '#000', color: '#e5e5e5' },
     '.cm-content': { caretColor: '#fff' },
     '.cm-cursor': { borderLeftColor: '#fff' },
-    '.cm-gutters': { backgroundColor: '#000', color: '#555', borderRight: '1px solid #1f1f1f' },
+    '.cm-gutters': {
+      backgroundColor: '#000',
+      color: '#555',
+      borderRight: '1px solid #1f1f1f',
+    },
     '.cm-activeLineGutter': { backgroundColor: '#000' },
     '.cm-activeLine': { backgroundColor: '#0a0a0a' },
     '.cm-selectionBackground, .cm-focused .cm-selectionBackground': {
@@ -72,13 +76,17 @@ function SkillRow({
     .slice(0, 120);
 
   return (
-    <div className={`flex items-center gap-4 py-3 px-4 border-b last:border-b-0 text-sm ${!isActive ? 'opacity-50' : ''}`}>
+    <div
+      className={`flex items-center gap-4 py-3 px-4 border-b last:border-b-0 text-sm ${!isActive ? 'opacity-50' : ''}`}
+    >
       <Workflow className="size-4 text-muted-foreground shrink-0" />
 
       <div className="flex-1 min-w-0">
         <p className="font-medium truncate">{skill.title}</p>
         {summary && (
-          <p className="text-xs text-muted-foreground truncate mt-0.5">{summary}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {summary}
+          </p>
         )}
       </div>
 
@@ -176,19 +184,15 @@ function SkillEditor({
 
   if (id && isLoadingSkill) {
     return (
-      <div className="border rounded-lg p-12 flex items-center justify-center">
+      <div className="rounded-lg p-12 flex items-center justify-center">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="flex items-center px-4 py-3 border-b bg-muted/20">
-        <p className="text-sm font-semibold">{id ? 'Edit Skill' : 'New Skill'}</p>
-      </div>
-
-      <div className="p-4 space-y-4">
+    <div className="rounded-lg overflow-hidden">
+      <div className="space-y-4">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Title
@@ -310,14 +314,22 @@ export default function AgentSettingsSkill() {
 
   const handleToggleStatus = (id: string) => {
     const queryKey = getAgentsControllerGetSkillsQueryKey();
-    type CacheData = { data?: SkillResponseDto[] } | SkillResponseDto[] | undefined;
+    type CacheData =
+      | { data?: SkillResponseDto[] }
+      | SkillResponseDto[]
+      | undefined;
 
     const previous = queryClient.getQueryData<CacheData>(queryKey);
 
     const updateList = (list: SkillResponseDto[]) =>
       list.map((s) =>
         s.id === id
-          ? { ...s, status: (s.status === 'active' ? 'inactive' : 'active') as SkillResponseDto['status'] }
+          ? {
+              ...s,
+              status: (s.status === 'active'
+                ? 'inactive'
+                : 'active') as SkillResponseDto['status'],
+            }
           : s,
       );
 
@@ -333,7 +345,9 @@ export default function AgentSettingsSkill() {
       {
         onSuccess: (updated) => {
           toast.success(
-            updated.status === 'active' ? 'Skill activated' : 'Skill deactivated',
+            updated.status === 'active'
+              ? 'Skill activated'
+              : 'Skill deactivated',
           );
         },
         onError: () => {
@@ -398,7 +412,7 @@ export default function AgentSettingsSkill() {
               ))}
             </div>
           ) : filteredSkills.length === 0 ? (
-            <div className="border rounded-lg border-dashed p-10 text-center">
+            <div className="rounded-lg border-dashed p-10 text-center">
               <Workflow className="size-7 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm font-medium mb-1">No skills found</p>
               <p className="text-xs text-muted-foreground mb-4">
@@ -406,18 +420,14 @@ export default function AgentSettingsSkill() {
                   ? 'Try a different search term.'
                   : 'Add your first skill to extend agent capabilities.'}
               </p>
-              {search ? (
-                <Button variant="outline" size="sm" className="border-dashed" onClick={() => setSearch('')}>
-                  Clear Search
-                </Button>
-              ) : (
+              {search && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="border-dashed"
-                  onClick={() => setIsEditing(true)}
+                  onClick={() => setSearch('')}
                 >
-                  <Plus className="mr-2 h-4 w-4" /> Add Skill
+                  Clear Search
                 </Button>
               )}
             </div>
