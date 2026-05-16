@@ -1,59 +1,77 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import * as fs from 'fs';
 import Handlebars from 'handlebars';
 import * as path from 'path';
 import * as puppeteer from 'puppeteer';
-
-interface ReportData {
-  reportTitle: string;
-  week: number;
-  year: number;
-  exportedAt: string;
-  classification: string;
-  systemName: string;
-  formattedDate: string;
-  weekPad: string;
-  systemNameChar: string;
-  weekly: Record<string, number>;
-  monthly: Record<string, number>;
-  vulnerabilityTrends: Record<string, unknown>;
-  newDiscoveries: Record<string, unknown[]>;
-  newFindings: Record<string, unknown>[];
-  resolvedFindings: Record<string, unknown>[];
-  riskDistribution: Record<string, unknown>[];
-  targets: Record<string, unknown>[];
-  vulnerabilityByTarget: Record<string, unknown>[];
-}
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { generateToken } from '@/utils/genToken';
+import { getManyResponse } from '@/utils/getManyResponse';
+import { StorageService } from '@/modules/storage/storage.service';
+import { GetManyReportsQueryDto } from './dto/reports.dto';
+import { Report } from './entities/report.entity';
+import { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
+import { TargetType } from '@/modules/targets/entities/target.entity';
+import type { ReportData } from './types/report-data.type';
 
 @Injectable()
 export class ReportsService {
-  private readonly storagePath: string;
   private readonly templatePath: string;
   private handlebarsTemplate: ReturnType<typeof Handlebars.compile> | null =
     null;
 
-  constructor() {
-    this.storagePath = path.join(process.cwd(), '.storage', 'reports');
+  constructor(
+    @InjectRepository(Report)
+    private readonly reportRepo: Repository<Report>,
+    private readonly storageService: StorageService,
+  ) {
     const srcDir = path.join(process.cwd(), 'src', 'modules', 'reports');
     this.templatePath = path.join(srcDir, 'templates', 'report.hbs');
-    this.ensureStorageDirectory();
     this.compileTemplate();
   }
 
-  private ensureStorageDirectory(): void {
-    if (!fs.existsSync(this.storagePath)) {
-      fs.mkdirSync(this.storagePath, { recursive: true });
+  async findById(id: string, workspaceId: string): Promise<Report> {
+    const report = await this.reportRepo.findOne({
+      where: { id, workspace: { id: workspaceId } },
+    });
+    if (!report) {
+      throw new NotFoundException('Report not found');
     }
+    return report;
+  }
+
+  async getMany(query: GetManyReportsQueryDto, workspaceId: string) {
+    const { limit, page, sortBy, sortOrder, search } = query;
+    const offset = (page - 1) * limit;
+
+    const qb = this.reportRepo
+      .createQueryBuilder('report')
+      .where('report.workspaceId = :workspaceId', { workspaceId });
+
+    if (search) {
+      qb.andWhere('report.fileName ILIKE :search', {
+        search: `%${search}%`,
+      });
+    }
+
+    const allowedSortColumns = ['id', 'createdAt', 'updatedAt', 'fileName', 'userId'];
+    const sortColumn = allowedSortColumns.includes(sortBy)
+      ? `report.${sortBy}`
+      : 'report.createdAt';
+    qb.orderBy(sortColumn, sortOrder);
+
+    const total = await qb.getCount();
+    const data = await qb.limit(limit).offset(offset).getMany();
+
+    return getManyResponse({ query, data, total });
   }
 
   private compileTemplate(): void {
     try {
       if (!fs.existsSync(this.templatePath)) {
-        console.error('Template file not found:', this.templatePath);
         return;
       }
       const templateContent = fs.readFileSync(this.templatePath, 'utf-8');
-      console.log('Template loaded, length:', templateContent.length);
 
       Handlebars.registerHelper('percentage', (value: number, max: number) => {
         return ((value / max) * 100).toFixed(1) + '%';
@@ -201,36 +219,39 @@ export class ReportsService {
       });
 
       this.handlebarsTemplate = Handlebars.compile<ReportData>(templateContent);
-    } catch (error) {
-      console.error('Failed to compile Handlebars template:', error);
+    } catch {
+      // ignore
     }
   }
 
-  async renderHtmlOnly(): Promise<string> {
+  renderHtmlOnly(): string {
     const data = this.getMockData();
     return this.renderTemplate(data);
   }
 
-  async generateReport(): Promise<string> {
+  async generateReport(
+    workspaceId: string,
+    userId: string,
+    type: 'SUMMARY' | 'VULNERABILITY' = 'SUMMARY',
+  ): Promise<{ filePath: string; fileName: string }> {
     const data = this.getMockData();
-
-    let html: string;
-    try {
-      html = this.renderTemplate(data);
-      console.log('HTML generated, length:', html.length);
-    } catch (e) {
-      console.error('Template render error:', e);
-      throw e;
-    }
+    const html = this.renderTemplate(data);
 
     const pdfBuffer = await this.htmlToPdf(html);
 
-    const fileName = `report-${data.year}-W${data.weekPad}-${Date.now()}.pdf`;
-    const filePath = path.join(this.storagePath, fileName);
+    const fileName = `report-${type.toLowerCase()}-${data.year}-W${data.weekPad}-${generateToken(5)}-${Date.now()}.pdf`;
+    const { path: uploadPath } =
+      this.storageService.uploadFile(fileName, pdfBuffer, 'reports');
 
-    fs.writeFileSync(filePath, pdfBuffer);
+    await this.reportRepo.save({
+      workspace: { id: workspaceId },
+      user: { id: userId },
+      type,
+      path: uploadPath,
+      fileName,
+    });
 
-    return filePath;
+    return { filePath: uploadPath, fileName };
   }
 
   private renderTemplate(data: ReportData): string {
@@ -238,6 +259,21 @@ export class ReportsService {
       throw new Error('Template not compiled');
     }
     return this.handlebarsTemplate(data);
+  }
+
+  async deleteReport(id: string, workspaceId: string): Promise<void> {
+    const report = await this.findById(id, workspaceId);
+
+    try {
+      const idx = report.path.indexOf('/');
+      const bucket = report.path.slice(0, idx);
+      const filePath = report.path.slice(idx + 1);
+      this.storageService.deleteFile(filePath, bucket);
+    } catch {
+      // File may not exist, ignore
+    }
+
+    await this.reportRepo.remove(report);
   }
 
   private async htmlToPdf(html: string): Promise<Buffer> {
@@ -248,7 +284,10 @@ export class ReportsService {
 
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'load' });
+      await page.goto(`data:text/html,${encodeURIComponent(html)}`, {
+        waitUntil: 'networkidle0',
+      });
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const pdf = await page.pdf({
         format: 'A4',
@@ -345,24 +384,24 @@ export class ReportsService {
         trend: 'decreasing',
       },
       newDiscoveries: {
-        domains: [
+          domains: [
           {
             identifier: 'api.example.com',
             discovered: '2026-05-08',
             provider: 'AWS CloudFront',
-            riskLevel: 'medium',
+            riskLevel: Severity.MEDIUM,
           },
           {
             identifier: 'staging.example.com',
             discovered: '2026-05-07',
             provider: 'AWS CloudFront',
-            riskLevel: 'low',
+            riskLevel: Severity.LOW,
           },
           {
             identifier: 'test-portal.example.com',
             discovered: '2026-05-06',
             provider: 'Azure CDN',
-            riskLevel: 'low',
+            riskLevel: Severity.LOW,
           },
         ],
         ipAddresses: [
@@ -370,19 +409,19 @@ export class ReportsService {
             identifier: '10.0.1.50',
             discovered: '2026-05-09',
             provider: 'AWS EC2',
-            riskLevel: 'low',
+            riskLevel: Severity.LOW,
           },
           {
             identifier: '10.0.1.51',
             discovered: '2026-05-08',
             provider: 'AWS EC2',
-            riskLevel: 'medium',
+            riskLevel: Severity.MEDIUM,
           },
           {
             identifier: '172.16.0.25',
             discovered: '2026-05-07',
             provider: 'On-Premise',
-            riskLevel: 'critical',
+            riskLevel: Severity.CRITICAL,
           },
         ],
         ports: [
@@ -391,21 +430,21 @@ export class ReportsService {
             service: 'MySQL',
             discovered: '2026-05-09',
             target: '10.0.1.50',
-            riskLevel: 'high',
+            riskLevel: Severity.HIGH,
           },
           {
             port: 6379,
             service: 'Redis',
             discovered: '2026-05-08',
             target: '10.0.1.51',
-            riskLevel: 'high',
+            riskLevel: Severity.HIGH,
           },
           {
             port: 5432,
             service: 'PostgreSQL',
             discovered: '2026-05-07',
             target: '10.0.1.52',
-            riskLevel: 'medium',
+            riskLevel: Severity.MEDIUM,
           },
         ],
         technologies: [
@@ -427,42 +466,42 @@ export class ReportsService {
         {
           id: 'VULN-001',
           title: 'Remote Code Execution in Apache Struts',
-          severity: 'critical',
+          severity: Severity.CRITICAL,
           cvss: 9.8,
           asset: 'api-v2.example.com',
           category: 'Web Application',
           discovered: '2026-05-09',
-          status: 'not_analyzed',
+          status: VulnerabilityAnalyzeStatus.NOT_ANALYZED,
         },
         {
           id: 'VULN-002',
           title: 'SQL Injection in Legacy API',
-          severity: 'high',
+          severity: Severity.HIGH,
           cvss: 8.2,
           asset: 'api.example.com/v1',
           category: 'API',
           discovered: '2026-05-08',
-          status: 'running',
+          status: VulnerabilityAnalyzeStatus.RUNNING,
         },
         {
           id: 'VULN-003',
           title: 'Cross-Site Scripting in Admin Panel',
-          severity: 'medium',
+          severity: Severity.MEDIUM,
           cvss: 6.1,
           asset: 'admin.example.com',
           category: 'Web Application',
           discovered: '2026-05-07',
-          status: 'not_analyzed',
+          status: VulnerabilityAnalyzeStatus.NOT_ANALYZED,
         },
         {
           id: 'VULN-004',
           title: 'Exposed Docker Socket',
-          severity: 'critical',
+          severity: Severity.CRITICAL,
           cvss: 9.1,
           asset: '10.50.12.44',
           category: 'Infrastructure',
           discovered: '2026-05-06',
-          status: 'running',
+          status: VulnerabilityAnalyzeStatus.RUNNING,
         },
       ],
       resolvedFindings: [
@@ -486,63 +525,63 @@ export class ReportsService {
         },
       ],
       riskDistribution: [
-        { level: 'critical', count: 3, percent: 2.4, color: 'bg-red-600' },
-        { level: 'high', count: 12, percent: 9.8, color: 'bg-orange-500' },
-        { level: 'medium', count: 45, percent: 36.6, color: 'bg-yellow-500' },
-        { level: 'low', count: 63, percent: 51.2, color: 'bg-blue-500' },
+        { level: Severity.CRITICAL, count: 3, percent: 2.4, color: 'bg-red-600' },
+        { level: Severity.HIGH, count: 12, percent: 9.8, color: 'bg-orange-500' },
+        { level: Severity.MEDIUM, count: 45, percent: 36.6, color: 'bg-yellow-500' },
+        { level: Severity.LOW, count: 63, percent: 51.2, color: 'bg-blue-500' },
       ],
       targets: [
         {
           id: 'TARGET-001',
           identifier: 'example.com',
-          type: 'DOMAIN',
-          status: 'completed',
-          riskLevel: 'low',
+          type: TargetType.DOMAIN,
+          status: JobStatus.COMPLETED,
+          riskLevel: Severity.LOW,
           provider: 'Cloudflare',
           lastScan: '1h ago',
         },
         {
           id: 'TARGET-002',
           identifier: 'auth.example.com',
-          type: 'DOMAIN',
-          status: 'completed',
-          riskLevel: 'medium',
+          type: TargetType.DOMAIN,
+          status: JobStatus.COMPLETED,
+          riskLevel: Severity.MEDIUM,
           provider: 'AWS CloudFront',
           lastScan: '45m ago',
         },
         {
           id: 'TARGET-003',
           identifier: '34.211.90.12',
-          type: 'IP',
-          status: 'completed',
-          riskLevel: 'low',
+          type: TargetType.IP,
+          status: JobStatus.COMPLETED,
+          riskLevel: Severity.LOW,
           provider: 'AWS EC2',
           lastScan: '3h ago',
         },
         {
           id: 'TARGET-004',
           identifier: '192.168.1.0/24',
-          type: 'CIDR',
-          status: 'in_progress',
-          riskLevel: 'medium',
+          type: TargetType.CIDR,
+          status: JobStatus.IN_PROGRESS,
+          riskLevel: Severity.MEDIUM,
           provider: 'Internal Network',
           lastScan: '12h ago',
         },
         {
           id: 'TARGET-005',
           identifier: 'api.example.com',
-          type: 'DOMAIN',
-          status: 'completed',
-          riskLevel: 'high',
+          type: TargetType.DOMAIN,
+          status: JobStatus.COMPLETED,
+          riskLevel: Severity.HIGH,
           provider: 'AWS Lambda',
           lastScan: '30m ago',
         },
         {
           id: 'TARGET-006',
           identifier: '10.50.12.44',
-          type: 'IP',
-          status: 'failed',
-          riskLevel: 'critical',
+          type: TargetType.IP,
+          status: VulnerabilityAnalyzeStatus.FAILED,
+          riskLevel: Severity.CRITICAL,
           provider: 'On-Premise',
           lastScan: '15m ago',
         },
@@ -550,7 +589,7 @@ export class ReportsService {
       vulnerabilityByTarget: [
         {
           target: 'api.example.com',
-          type: 'DOMAIN',
+          type: TargetType.DOMAIN,
           critical: 3,
           high: 5,
           medium: 8,
@@ -559,7 +598,7 @@ export class ReportsService {
         },
         {
           target: 'auth.example.com',
-          type: 'DOMAIN',
+          type: TargetType.DOMAIN,
           critical: 2,
           high: 4,
           medium: 6,
@@ -568,7 +607,7 @@ export class ReportsService {
         },
         {
           target: '10.50.12.44',
-          type: 'IP',
+          type: TargetType.IP,
           critical: 2,
           high: 3,
           medium: 4,
@@ -577,7 +616,7 @@ export class ReportsService {
         },
         {
           target: 'admin.example.com',
-          type: 'DOMAIN',
+          type: TargetType.DOMAIN,
           critical: 1,
           high: 3,
           medium: 5,

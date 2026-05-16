@@ -2010,6 +2010,44 @@ export type UpdateInternalNetworkDto = {
   name?: string;
 };
 
+export type ReportResponseDtoType =
+  (typeof ReportResponseDtoType)[keyof typeof ReportResponseDtoType];
+
+export const ReportResponseDtoType = {
+  SUMMARY: 'SUMMARY',
+  VULNERABILITY: 'VULNERABILITY',
+} as const;
+
+export type ReportResponseDto = {
+  id: string;
+  userId: string;
+  path: string;
+  fileName: string;
+  type: ReportResponseDtoType;
+  createdAt: string;
+};
+
+export type GetManyReportResponseDtoDto = {
+  data: ReportResponseDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type GenerateReportBodyDtoType =
+  (typeof GenerateReportBodyDtoType)[keyof typeof GenerateReportBodyDtoType];
+
+export const GenerateReportBodyDtoType = {
+  SUMMARY: 'SUMMARY',
+  VULNERABILITY: 'VULNERABILITY',
+} as const;
+
+export type GenerateReportBodyDto = {
+  type: GenerateReportBodyDtoType;
+};
+
 export type TargetsControllerGetTargetsInWorkspaceParams = {
   search?: string;
   page?: number;
@@ -2458,6 +2496,14 @@ export type InternalNetworksControllerGetManyInternalNetworksParams = {
 };
 
 export type InternalNetworksControllerGetManyNetworkInterfacesParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+};
+
+export type ReportsControllerGetManyParams = {
   search?: string;
   page?: number;
   limit?: number;
@@ -28269,6 +28315,697 @@ export const useInternalNetworksControllerDeleteInternalNetwork = <
 > => {
   return useMutation(
     getInternalNetworksControllerDeleteInternalNetworkMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Returns paginated list of reports for the current workspace.
+ * @summary List reports
+ */
+export const reportsControllerGetMany = (
+  params?: ReportsControllerGetManyParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyReportResponseDtoDto>(
+    { url: `/api/reports`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getReportsControllerGetManyInfiniteQueryKey = (
+  params?: ReportsControllerGetManyParams,
+) => {
+  return ['infinite', `/api/reports`, ...(params ? [params] : [])] as const;
+};
+
+export const getReportsControllerGetManyQueryKey = (
+  params?: ReportsControllerGetManyParams,
+) => {
+  return [`/api/reports`, ...(params ? [params] : [])] as const;
+};
+
+export const getReportsControllerGetManyInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof reportsControllerGetMany>>,
+    ReportsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ReportsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ReportsControllerGetManyParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getReportsControllerGetManyInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof reportsControllerGetMany>>,
+    QueryKey,
+    ReportsControllerGetManyParams['page']
+  > = ({ signal, pageParam }) =>
+    reportsControllerGetMany(
+      { ...params, page: pageParam || params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof reportsControllerGetMany>>,
+    TError,
+    TData,
+    QueryKey,
+    ReportsControllerGetManyParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ReportsControllerGetManyInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerGetMany>>
+>;
+export type ReportsControllerGetManyInfiniteQueryError = unknown;
+
+export function useReportsControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof reportsControllerGetMany>>,
+    ReportsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | ReportsControllerGetManyParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ReportsControllerGetManyParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerGetMany>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof reportsControllerGetMany>>,
+    ReportsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ReportsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ReportsControllerGetManyParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerGetMany>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof reportsControllerGetMany>>,
+    ReportsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ReportsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ReportsControllerGetManyParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List reports
+ */
+
+export function useReportsControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof reportsControllerGetMany>>,
+    ReportsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ReportsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ReportsControllerGetManyParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getReportsControllerGetManyInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getReportsControllerGetManyQueryOptions = <
+  TData = Awaited<ReturnType<typeof reportsControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ReportsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getReportsControllerGetManyQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof reportsControllerGetMany>>
+  > = ({ signal }) => reportsControllerGetMany(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof reportsControllerGetMany>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ReportsControllerGetManyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerGetMany>>
+>;
+export type ReportsControllerGetManyQueryError = unknown;
+
+export function useReportsControllerGetMany<
+  TData = Awaited<ReturnType<typeof reportsControllerGetMany>>,
+  TError = unknown,
+>(
+  params: undefined | ReportsControllerGetManyParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerGetMany>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerGetMany<
+  TData = Awaited<ReturnType<typeof reportsControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ReportsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerGetMany>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerGetMany<
+  TData = Awaited<ReturnType<typeof reportsControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ReportsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List reports
+ */
+
+export function useReportsControllerGetMany<
+  TData = Awaited<ReturnType<typeof reportsControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ReportsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getReportsControllerGetManyQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Renders HTML template with mock data for debugging.
+ * @summary Test render HTML
+ */
+export const reportsControllerTestRender = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/reports/test`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getReportsControllerTestRenderQueryKey = () => {
+  return [`/api/reports/test`] as const;
+};
+
+export const getReportsControllerTestRenderQueryOptions = <
+  TData = Awaited<ReturnType<typeof reportsControllerTestRender>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof reportsControllerTestRender>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getReportsControllerTestRenderQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof reportsControllerTestRender>>
+  > = ({ signal }) => reportsControllerTestRender(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof reportsControllerTestRender>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ReportsControllerTestRenderQueryResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerTestRender>>
+>;
+export type ReportsControllerTestRenderQueryError = unknown;
+
+export function useReportsControllerTestRender<
+  TData = Awaited<ReturnType<typeof reportsControllerTestRender>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerTestRender>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerTestRender>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerTestRender>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerTestRender<
+  TData = Awaited<ReturnType<typeof reportsControllerTestRender>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerTestRender>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerTestRender>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerTestRender>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerTestRender<
+  TData = Awaited<ReturnType<typeof reportsControllerTestRender>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerTestRender>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Test render HTML
+ */
+
+export function useReportsControllerTestRender<
+  TData = Awaited<ReturnType<typeof reportsControllerTestRender>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerTestRender>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getReportsControllerTestRenderQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Generates a PDF report with mock data.
+ * @summary Generate PDF report
+ */
+export const reportsControllerGenerateReport = (
+  generateReportBodyDto: GenerateReportBodyDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/reports/generate`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: generateReportBodyDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getReportsControllerGenerateReportMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reportsControllerGenerateReport>>,
+    TError,
+    { data: GenerateReportBodyDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reportsControllerGenerateReport>>,
+  TError,
+  { data: GenerateReportBodyDto },
+  TContext
+> => {
+  const mutationKey = ['reportsControllerGenerateReport'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reportsControllerGenerateReport>>,
+    { data: GenerateReportBodyDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reportsControllerGenerateReport(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReportsControllerGenerateReportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerGenerateReport>>
+>;
+export type ReportsControllerGenerateReportMutationBody = GenerateReportBodyDto;
+export type ReportsControllerGenerateReportMutationError = unknown;
+
+/**
+ * @summary Generate PDF report
+ */
+export const useReportsControllerGenerateReport = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reportsControllerGenerateReport>>,
+      TError,
+      { data: GenerateReportBodyDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reportsControllerGenerateReport>>,
+  TError,
+  { data: GenerateReportBodyDto },
+  TContext
+> => {
+  return useMutation(
+    getReportsControllerGenerateReportMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes a generated report PDF.
+ * @summary Delete report
+ */
+export const reportsControllerDeleteReport = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/reports/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getReportsControllerDeleteReportMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reportsControllerDeleteReport>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reportsControllerDeleteReport>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['reportsControllerDeleteReport'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reportsControllerDeleteReport>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return reportsControllerDeleteReport(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReportsControllerDeleteReportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerDeleteReport>>
+>;
+
+export type ReportsControllerDeleteReportMutationError = unknown;
+
+/**
+ * @summary Delete report
+ */
+export const useReportsControllerDeleteReport = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reportsControllerDeleteReport>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reportsControllerDeleteReport>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getReportsControllerDeleteReportMutationOptions(options),
     queryClient,
   );
 };
