@@ -36,13 +36,30 @@ import {
 } from './dto/mcp-config.dto';
 import { MessageResponseDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
+import { AgentEmbeddingConfig } from './entities/agent-embedding.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
+import { AgentSkill } from './entities/agent-skill.entity';
 import {
   getLLMProviderConfig,
   llmProviderSupported,
-} from './llm-provider-supported';
+  getEmbeddingModel,
+} from './agents.llm';
+import {
+  embeddingProviderSupported,
+  getEmbeddingProviderConfig,
+} from './agents.embedding';
+import * as matter from 'gray-matter';
+import { embed } from 'ai';
+import { UpsertSkillDto, SkillResponseDto } from './dto/skill.dto';
+import {
+  CreateEmbeddingConfigDto,
+  EmbeddingConfigResponseDto,
+  EmbeddingProviderStatusDto,
+  UpdateEmbeddingConfigDto,
+} from './dto/embedding-config.dto';
+import { EmbeddingProvider, SkillStatus } from './enums/agent.enums';
 
 @Injectable()
 export class AgentsService {
@@ -57,6 +74,10 @@ export class AgentsService {
     private readonly messageRepository: Repository<AgentMessage>,
     @InjectRepository(AgentMCPConfig)
     private readonly mcpConfigRepository: Repository<AgentMCPConfig>,
+    @InjectRepository(AgentSkill)
+    private readonly skillRepository: Repository<AgentSkill>,
+    @InjectRepository(AgentEmbeddingConfig)
+    private readonly embeddingConfigRepository: Repository<AgentEmbeddingConfig>,
     private readonly redisService: RedisService,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly httpService: HttpService,
@@ -643,5 +664,280 @@ export class AgentsService {
     } catch {
       return { status: 'offline' };
     }
+  }
+
+  async upsertSkill(
+    workspaceId: string,
+    dto: UpsertSkillDto,
+  ): Promise<SkillResponseDto> {
+    const { markdown } = dto;
+    const { data, content } = matter(markdown) as unknown as {
+      data: Record<string, unknown>;
+      content: string;
+    };
+
+    const title = ((data.title ?? data.name) as string) || 'Untitled Skill';
+
+    let embeddingString: string | null = null;
+    try {
+      const config = await this.getPreferredLLMConfig(workspaceId);
+      if (config) {
+        const embeddingModel = getEmbeddingModel(config);
+        if (embeddingModel) {
+          const { embedding } = await embed({
+            model: embeddingModel,
+            value: content,
+          });
+          embeddingString = JSON.stringify(embedding);
+        }
+      }
+    } catch (e) {
+      this.logger.warn(
+        `Failed to generate embedding for skill ${title}: ${(e as Error).message}`,
+      );
+    }
+
+    let skill = await this.skillRepository.findOne({
+      where: { title, workspaceId },
+    });
+
+    if (!skill) {
+      skill = this.skillRepository.create({
+        workspaceId,
+        title,
+        description: content,
+        embedding: embeddingString,
+      });
+    } else {
+      skill.description = content;
+      if (embeddingString) {
+        skill.embedding = embeddingString;
+      }
+    }
+
+    const saved = await this.skillRepository.save(skill);
+    return this.mapSkillToResponse(saved);
+  }
+
+  async getSkills(workspaceId: string): Promise<SkillResponseDto[]> {
+    const skills = await this.skillRepository.find({
+      where: { workspaceId },
+      order: { updatedAt: 'DESC' },
+    });
+    return skills.map((s) => this.mapSkillToResponse(s));
+  }
+
+  async getSkill(id: string, workspaceId: string): Promise<SkillResponseDto> {
+    const skill = await this.skillRepository.findOne({
+      where: { id, workspaceId },
+    });
+    if (!skill) throw new NotFoundException('Skill not found');
+    return this.mapSkillToResponse(skill);
+  }
+
+  async deleteSkill(id: string, workspaceId: string): Promise<void> {
+    const skill = await this.skillRepository.findOne({
+      where: { id, workspaceId },
+    });
+    if (!skill) throw new NotFoundException('Skill not found');
+    await this.skillRepository.remove(skill);
+  }
+
+  async toggleSkillStatus(
+    id: string,
+    workspaceId: string,
+  ): Promise<SkillResponseDto> {
+    const skill = await this.skillRepository.findOne({
+      where: { id, workspaceId },
+    });
+    if (!skill) throw new NotFoundException('Skill not found');
+    skill.status =
+      skill.status === SkillStatus.ACTIVE
+        ? SkillStatus.INACTIVE
+        : SkillStatus.ACTIVE;
+    const saved = await this.skillRepository.save(skill);
+    return this.mapSkillToResponse(saved);
+  }
+
+  async findRelevantSkills(
+    workspaceId: string,
+    text: string,
+    limit = 5,
+  ): Promise<SkillResponseDto[]> {
+    try {
+      const config = await this.getPreferredLLMConfig(workspaceId);
+      if (!config) {
+        return this.getSkills(workspaceId); // Fallback to recent skills if no config
+      }
+
+      const embeddingModel = getEmbeddingModel(config);
+      if (!embeddingModel) {
+        return this.getSkills(workspaceId);
+      }
+
+      const { embedding } = await embed({
+        model: embeddingModel,
+        value: text,
+      });
+
+      const vector = JSON.stringify(embedding);
+
+      // Cast text→vector for pgvector cosine similarity (embedding stored as JSON array string)
+      const skills = await this.skillRepository
+        .createQueryBuilder('skill')
+        .where('skill.workspaceId = :workspaceId', { workspaceId })
+        .andWhere('skill.embedding IS NOT NULL')
+        .orderBy(`skill.embedding::vector <=> :vector::vector`, 'ASC')
+        .setParameters({ vector })
+        .limit(limit)
+        .getMany();
+
+      return skills.map((s) => this.mapSkillToResponse(s));
+    } catch (e) {
+      this.logger.error(
+        `Failed to find relevant skills: ${(e as Error).message}`,
+      );
+      return [];
+    }
+  }
+
+  private mapSkillToResponse(skill: AgentSkill): SkillResponseDto {
+    return {
+      id: skill.id,
+      title: skill.title,
+      description: skill.description,
+      status: skill.status,
+      createdAt: skill.createdAt,
+      updatedAt: skill.updatedAt,
+    };
+  }
+
+  // ── Embedding Config ──────────────────────────────────────────────────────
+
+  private toEmbeddingConfigResponse(
+    config: AgentEmbeddingConfig,
+  ): EmbeddingConfigResponseDto {
+    const apiKeyMasked = config.apiKey
+      ? this.maskApiKey(decrypt(config.apiKey))
+      : '****';
+    return {
+      id: config.id,
+      provider: config.provider,
+      name: config.name,
+      model: config.model,
+      apiUrl: config.apiUrl,
+      isPreferred: config.isPreferred,
+      apiKeyMasked,
+      createdAt: config.createdAt,
+      updatedAt: config.updatedAt,
+    };
+  }
+
+  async getEmbeddingProviders(
+    workspaceId: string,
+  ): Promise<EmbeddingProviderStatusDto[]> {
+    const configs = await this.embeddingConfigRepository.find({
+      where: { workspaceId },
+    });
+
+    const configMap = new Map<EmbeddingProvider, EmbeddingConfigResponseDto>();
+    for (const c of configs) {
+      if (!configMap.has(c.provider)) {
+        configMap.set(c.provider, this.toEmbeddingConfigResponse(c));
+      }
+    }
+
+    return embeddingProviderSupported.map((provider) => ({
+      id: provider.id,
+      name: provider.name,
+      logo: provider.logo,
+      models: provider.models,
+      isAcceptCustomApiUrl: provider.isAcceptCustomApiUrl,
+      isConnected: configMap.has(provider.id),
+      config: configMap.get(provider.id) ?? null,
+    }));
+  }
+
+  async createEmbeddingConfig(
+    dto: CreateEmbeddingConfigDto,
+    workspaceId: string,
+    userId: string,
+  ): Promise<EmbeddingConfigResponseDto> {
+    const provider = getEmbeddingProviderConfig(dto.provider);
+    if (!provider) {
+      throw new BadRequestException(
+        `Provider ${dto.provider} is not supported`,
+      );
+    }
+
+    const totalConfigs = await this.embeddingConfigRepository.count({
+      where: { workspaceId },
+    });
+    const isPreferred = totalConfigs === 0;
+
+    if (!dto.apiKey) {
+      dto.apiKey = 'not_set';
+    }
+
+    const config = this.embeddingConfigRepository.create({
+      workspaceId,
+      provider: dto.provider,
+      name: dto.name,
+      apiKey: encrypt(dto.apiKey),
+      model: dto.model || (provider.models[0]?.id ?? ''),
+      apiUrl: dto.apiUrl,
+      createdBy: userId,
+      isPreferred,
+    });
+
+    const saved = await this.embeddingConfigRepository.save(config);
+    return this.toEmbeddingConfigResponse(saved);
+  }
+
+  async updateEmbeddingConfig(
+    id: string,
+    dto: UpdateEmbeddingConfigDto,
+    workspaceId: string,
+  ): Promise<EmbeddingConfigResponseDto> {
+    const config = await this.embeddingConfigRepository.findOne({
+      where: { id, workspaceId },
+    });
+    if (!config) throw new NotFoundException('Embedding config not found');
+
+    if (dto.provider !== undefined) config.provider = dto.provider;
+    if (dto.name !== undefined) config.name = dto.name;
+    if (dto.apiKey !== undefined) config.apiKey = encrypt(dto.apiKey);
+    if (dto.model !== undefined) config.model = dto.model;
+    if (dto.apiUrl !== undefined) config.apiUrl = dto.apiUrl;
+    if (dto.isPreferred !== undefined) config.isPreferred = dto.isPreferred;
+
+    const saved = await this.embeddingConfigRepository.save(config);
+    return this.toEmbeddingConfigResponse(saved);
+  }
+
+  async deleteEmbeddingConfig(id: string, workspaceId: string): Promise<void> {
+    const config = await this.embeddingConfigRepository.findOne({
+      where: { id, workspaceId },
+    });
+    if (!config) throw new NotFoundException('Embedding config not found');
+    await this.embeddingConfigRepository.remove(config);
+  }
+
+  async setPreferredEmbeddingConfig(
+    id: string,
+    workspaceId: string,
+  ): Promise<EmbeddingConfigResponseDto> {
+    const config = await this.embeddingConfigRepository.findOne({
+      where: { id, workspaceId },
+    });
+    if (!config) throw new NotFoundException('Embedding config not found');
+
+    await this.embeddingConfigRepository.update(
+      { workspaceId },
+      { isPreferred: false },
+    );
+    config.isPreferred = true;
+    const saved = await this.embeddingConfigRepository.save(config);
+    return this.toEmbeddingConfigResponse(saved);
   }
 }

@@ -147,4 +147,83 @@ export class AgentsMemoriesService {
     if (!record?.content?.trim()) return '';
     return `[Long-Term Memory]\n${record.content}`;
   }
+
+  // ── Tool Results Cache (Layer 1 — Redis) ──────────────────────────────────
+  // Stores the last N tool execution results per workspace for context injection
+
+  private static readonly TOOL_RESULTS_PREFIX = 'agents:tool_results';
+  private static readonly TOOL_RESULTS_TTL_SECONDS = 24 * 60 * 60; // 24h
+  private static readonly TOOL_RESULTS_MAX = 3;
+
+  private toolResultsKey(workspaceId: string): string {
+    return `${AgentsMemoriesService.TOOL_RESULTS_PREFIX}:${workspaceId}`;
+  }
+
+  /**
+   * Cache a tool execution result. Keeps only the last MAX entries (FIFO list).
+   */
+  async cacheToolResult(
+    workspaceId: string,
+    toolName: string,
+    result: unknown,
+  ): Promise<void> {
+    const key = this.toolResultsKey(workspaceId);
+    const entry = JSON.stringify({
+      tool: toolName,
+      result,
+      executedAt: new Date().toISOString(),
+    });
+    try {
+      await this.redisService.cacheClient.lpush(key, entry);
+      await this.redisService.cacheClient.ltrim(
+        key,
+        0,
+        AgentsMemoriesService.TOOL_RESULTS_MAX - 1,
+      );
+      await this.redisService.cacheClient.expire(
+        key,
+        AgentsMemoriesService.TOOL_RESULTS_TTL_SECONDS,
+      );
+    } catch (error) {
+      this.logger.warn(`Tool results cache write failed [ws=${workspaceId}]: ${error}`);
+    }
+  }
+
+  /**
+   * Returns the cached tool results formatted as a context block.
+   * Used in the BUILD step to inject last-N tool outputs into the LLM context.
+   */
+  async getLastToolResultsContext(workspaceId: string): Promise<string> {
+    const key = this.toolResultsKey(workspaceId);
+    try {
+      const entries = await this.redisService.cacheClient.lrange(
+        key,
+        0,
+        AgentsMemoriesService.TOOL_RESULTS_MAX - 1,
+      );
+      if (!entries || entries.length === 0) return '';
+
+      const lines = entries.map((raw) => {
+        try {
+          const { tool, result, executedAt } = JSON.parse(raw) as {
+            tool: string;
+            result: unknown;
+            executedAt: string;
+          };
+          const summary =
+            typeof result === 'string'
+              ? result.slice(0, 500)
+              : JSON.stringify(result).slice(0, 500);
+          return `- [${executedAt}] ${tool}: ${summary}`;
+        } catch {
+          return `- ${raw.slice(0, 200)}`;
+        }
+      });
+
+      return `[Recent Tool Results]\n${lines.join('\n')}`;
+    } catch (error) {
+      this.logger.warn(`Tool results cache read failed [ws=${workspaceId}]: ${error}`);
+      return '';
+    }
+  }
 }

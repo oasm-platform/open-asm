@@ -15,12 +15,13 @@ import { Repository } from 'typeorm';
 import { decrypt } from '@/common/utils/encryption.util';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentTool } from './agents.tools';
+import { AgentsSkillsService } from './agents.skills';
 import { SendMessageDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
-import { getLLMProviderConfig } from './llm-provider-supported';
+import { getLLMProviderConfig } from './agents.llm';
 import { AgentsMcpService } from './agents.mcp';
 
 export interface StreamMessageResult {
@@ -54,6 +55,7 @@ export class AgentsCompletionsService {
     private readonly agentTool: AgentTool,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly agentsMcpService: AgentsMcpService,
+    private readonly agentsSkillsService: AgentsSkillsService,
   ) {
     this.loadAllPrompts();
   }
@@ -114,7 +116,7 @@ export class AgentsCompletionsService {
     });
   }
 
-  private async resolveLLMConfig(
+  public async resolveLLMConfig(
     workspaceId: string,
     provider?: string,
     model?: string,
@@ -146,6 +148,21 @@ export class AgentsCompletionsService {
    * Throws BadRequestException BEFORE the stream starts so the caller can still
    * return a proper HTTP 400 response.
    */
+  /**
+   * Unified tool-support check. Returns true if the model supports tool calling.
+   * Throws BadRequestException for OpenRouter models that provably do not support tools
+   * (so the error reaches the client before the stream starts).
+   */
+  async checkToolSupport(config: AgentLLMConfig): Promise<boolean> {
+    if (config.provider === LLMProvider.CUSTOM && config.apiUrl) {
+      return this.customModelSupportsTools(config.apiUrl, config.model);
+    }
+    if (config.provider === LLMProvider.OPENROUTER) {
+      await this.validateToolSupport(config); // throws if not supported
+    }
+    return true;
+  }
+
   private async validateToolSupport(config: AgentLLMConfig): Promise<void> {
     if (config.provider !== LLMProvider.OPENROUTER) {
       return;
@@ -188,7 +205,7 @@ export class AgentsCompletionsService {
    * Checks if a CUSTOM (Ollama-compatible) model supports tool calling.
    * Uses /api/show endpoint; falls back to true (assume capable) on error.
    */
-  private async customModelSupportsTools(
+  async customModelSupportsTools(
     baseURL: string,
     model: string,
   ): Promise<boolean> {
@@ -228,7 +245,7 @@ export class AgentsCompletionsService {
     }
   }
 
-  private createLanguageModel(config: AgentLLMConfig): LanguageModel {
+  public createLanguageModel(config: AgentLLMConfig): LanguageModel {
     const apiKey = config.apiKey ? decrypt(config.apiKey) : '';
     const providerConfig = getLLMProviderConfig(config.provider);
 
@@ -244,7 +261,7 @@ export class AgentsCompletionsService {
     return providerConfig.handler(apiKey, config.model, baseURL);
   }
 
-  private async generateTitle(
+  async generateTitle(
     conversationId: string,
     llmConfig: AgentLLMConfig,
   ): Promise<void> {
@@ -274,17 +291,7 @@ export class AgentsCompletionsService {
         messages: [{ role: 'user', content: prompt }],
       });
 
-      let titleText = '';
-      if (typeof titleResult.content === 'string') {
-        titleText = titleResult.content;
-      } else if (Array.isArray(titleResult.content)) {
-        const textPart = titleResult.content.find(
-          (part) => part.type === 'text',
-        );
-        titleText = textPart?.type === 'text' ? textPart.text : '';
-      }
-
-      const title = titleText.trim().slice(0, 500);
+      const title = titleResult.text.trim().slice(0, 500);
 
       if (title) {
         await this.conversationRepository.update(
@@ -308,16 +315,23 @@ export class AgentsCompletionsService {
         VULNERABILITY_JSON: vulnerabilityJson,
       });
 
+      let toolsEnabled = true;
+      if (llmConfig.provider === LLMProvider.CUSTOM && llmConfig.apiUrl) {
+        toolsEnabled = await this.customModelSupportsTools(
+          llmConfig.apiUrl,
+          llmConfig.model,
+        );
+      }
+
       const model = this.createLanguageModel(llmConfig);
-      const tools = this.agentTool.getTools(workspaceId);
+      const tools = toolsEnabled ? this.agentTool.getTools(workspaceId) : undefined;
 
       let accumulatedText = '';
 
       const result = streamText({
         model,
         messages: [{ role: 'user', content: prompt }],
-        tools,
-        stopWhen: stepCountIs(10),
+        ...(tools ? { tools, stopWhen: stepCountIs(10) } : {}),
         onChunk: ({ chunk }) => {
           if (chunk.type === 'text-delta') {
             accumulatedText += chunk.text;
@@ -335,6 +349,7 @@ export class AgentsCompletionsService {
     }
   }
 
+  /** @deprecated Use AgentsGraphService.streamMessage instead */
   async streamMessage(
     dto: SendMessageDto,
     workspaceId: string,
@@ -462,6 +477,7 @@ export class AgentsCompletionsService {
       ? {
           ...this.agentTool.getTools(workspaceId),
           ...(await this.agentsMcpService.getTools(workspaceId)),
+          ...this.agentsSkillsService.getTools(workspaceId),
         }
       : undefined;
     const systemPrompt = this.getPrompt('SYSTEM.md');
@@ -471,12 +487,15 @@ export class AgentsCompletionsService {
 
     const now = new Date();
     const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
-    const [stmContext, ltmContext] = await Promise.all([
+    const [stmContext, ltmContext, skillsPrompt] = await Promise.all([
       this.agentsMemories.stmFormatForPrompt(conversation.id),
       this.agentsMemories.ltmFormatForPrompt(workspaceId),
+      this.agentsSkillsService.buildSkillsPrompt(workspaceId),
     ]);
 
-    const contextParts = [currentTimeContext, ltmContext, stmContext].filter(Boolean);
+    const contextParts = [currentTimeContext, ltmContext, stmContext, skillsPrompt].filter(
+      Boolean,
+    );
 
     const result = streamText({
       model,
