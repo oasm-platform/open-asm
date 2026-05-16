@@ -20,6 +20,7 @@ import {
   OneToOne,
 } from 'typeorm';
 import { WorkspaceMembers } from './workspace-members.entity';
+import { AgentSkill } from '@/modules/agents/entities/agent-skill.entity';
 
 @Entity('workspaces')
 export class Workspace extends BaseEntity {
@@ -110,4 +111,7 @@ export class Workspace extends BaseEntity {
   @IsBoolean()
   @Column({ default: true })
   isAutoEnableAssetAfterDiscovered: boolean;
+
+  @OneToMany(() => AgentSkill, (agentSkill) => agentSkill.workspace)
+  agentSkills: AgentSkill[];
 }
