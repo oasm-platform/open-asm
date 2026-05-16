@@ -1317,6 +1317,8 @@ export const LLMConfigResponseDtoProvider = {
   openrouter: 'openrouter',
   gemini: 'gemini',
   anthropic: 'anthropic',
+  mistral: 'mistral',
+  cohere: 'cohere',
   kilo_code: 'kilo_code',
   custom: 'custom',
 } as const;
@@ -1342,6 +1344,8 @@ export const CreateLLMConfigDtoProvider = {
   openrouter: 'openrouter',
   gemini: 'gemini',
   anthropic: 'anthropic',
+  mistral: 'mistral',
+  cohere: 'cohere',
   kilo_code: 'kilo_code',
   custom: 'custom',
 } as const;
@@ -1365,6 +1369,8 @@ export const LLMConfigWithProviderDtoProviderId = {
   openrouter: 'openrouter',
   gemini: 'gemini',
   anthropic: 'anthropic',
+  mistral: 'mistral',
+  cohere: 'cohere',
   kilo_code: 'kilo_code',
   custom: 'custom',
 } as const;
@@ -1413,6 +1419,8 @@ export const UpdateLLMConfigDtoProvider = {
   openrouter: 'openrouter',
   gemini: 'gemini',
   anthropic: 'anthropic',
+  mistral: 'mistral',
+  cohere: 'cohere',
   kilo_code: 'kilo_code',
   custom: 'custom',
 } as const;
@@ -1562,6 +1570,118 @@ export type MCPServerPingResponseDto = {
   status: MCPServerPingResponseDtoStatus;
   /** Latency in ms */
   latency?: number;
+};
+
+export type SkillResponseDtoStatus =
+  (typeof SkillResponseDtoStatus)[keyof typeof SkillResponseDtoStatus];
+
+export const SkillResponseDtoStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+
+export type SkillResponseDto = {
+  id: string;
+  title: string;
+  description: string;
+  status: SkillResponseDtoStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpsertSkillDto = {
+  /** Markdown content with YAML frontmatter (title required) */
+  markdown: string;
+};
+
+export type EmbeddingModelInfoDto = {
+  id: string;
+  name: string;
+  dimensions: number;
+};
+
+export type EmbeddingConfigResponseDtoProvider =
+  (typeof EmbeddingConfigResponseDtoProvider)[keyof typeof EmbeddingConfigResponseDtoProvider];
+
+export const EmbeddingConfigResponseDtoProvider = {
+  openai: 'openai',
+  gemini: 'gemini',
+  mistral: 'mistral',
+  cohere: 'cohere',
+  custom: 'custom',
+} as const;
+
+export type EmbeddingConfigResponseDto = {
+  id: string;
+  provider: EmbeddingConfigResponseDtoProvider;
+  name?: string;
+  model: string;
+  apiUrl?: string;
+  isPreferred: boolean;
+  /** Masked API key (shows last 4 chars) */
+  apiKeyMasked: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EmbeddingProviderStatusDtoId =
+  (typeof EmbeddingProviderStatusDtoId)[keyof typeof EmbeddingProviderStatusDtoId];
+
+export const EmbeddingProviderStatusDtoId = {
+  openai: 'openai',
+  gemini: 'gemini',
+  mistral: 'mistral',
+  cohere: 'cohere',
+  custom: 'custom',
+} as const;
+
+export type EmbeddingProviderStatusDto = {
+  id: EmbeddingProviderStatusDtoId;
+  name: string;
+  logo: string;
+  isConnected: boolean;
+  models: EmbeddingModelInfoDto[];
+  isAcceptCustomApiUrl?: boolean;
+  config: EmbeddingConfigResponseDto | null;
+};
+
+export type CreateEmbeddingConfigDtoProvider =
+  (typeof CreateEmbeddingConfigDtoProvider)[keyof typeof CreateEmbeddingConfigDtoProvider];
+
+export const CreateEmbeddingConfigDtoProvider = {
+  openai: 'openai',
+  gemini: 'gemini',
+  mistral: 'mistral',
+  cohere: 'cohere',
+  custom: 'custom',
+} as const;
+
+export type CreateEmbeddingConfigDto = {
+  provider: CreateEmbeddingConfigDtoProvider;
+  name?: string;
+  apiKey: string;
+  model?: string;
+  apiUrl?: string;
+};
+
+export type UpdateEmbeddingConfigDtoProvider =
+  (typeof UpdateEmbeddingConfigDtoProvider)[keyof typeof UpdateEmbeddingConfigDtoProvider];
+
+export const UpdateEmbeddingConfigDtoProvider = {
+  openai: 'openai',
+  gemini: 'gemini',
+  mistral: 'mistral',
+  cohere: 'cohere',
+  custom: 'custom',
+} as const;
+
+export type UpdateEmbeddingConfigDto = {
+  provider?: UpdateEmbeddingConfigDtoProvider;
+  name?: string;
+  apiKey?: string;
+  model?: string;
+  apiUrl?: string;
+  isPreferred?: boolean;
 };
 
 export type NotificationResponseDtoStatus =
@@ -2350,6 +2470,15 @@ export type AgentsControllerGetMessagesParams = {
   sortBy?: string;
   sortOrder?: string;
 };
+
+export type AgentsControllerGetSkills200 = AppResponseSerialization & {
+  data?: SkillResponseDto[];
+};
+
+export type AgentsControllerGetEmbeddingProviders200 =
+  AppResponseSerialization & {
+    data?: EmbeddingProviderStatusDto[];
+  };
 
 export type NotificationsControllerGetNotificationsParams = {
   search?: string;
@@ -19226,6 +19355,1117 @@ export function useAgentsControllerPingMCPServer<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Add or update a security skill using Markdown + Frontmatter
+ * @summary Upsert skill
+ */
+export const agentsControllerUpsertSkill = (
+  upsertSkillDto: UpsertSkillDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SkillResponseDto>(
+    {
+      url: `/api/agents/skills`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: upsertSkillDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerUpsertSkillMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerUpsertSkill>>,
+    TError,
+    { data: UpsertSkillDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpsertSkill>>,
+  TError,
+  { data: UpsertSkillDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpsertSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpsertSkill>>,
+    { data: UpsertSkillDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerUpsertSkill(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerUpsertSkillMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerUpsertSkill>>
+>;
+export type AgentsControllerUpsertSkillMutationBody = UpsertSkillDto;
+export type AgentsControllerUpsertSkillMutationError = unknown;
+
+/**
+ * @summary Upsert skill
+ */
+export const useAgentsControllerUpsertSkill = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpsertSkill>>,
+      TError,
+      { data: UpsertSkillDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpsertSkill>>,
+  TError,
+  { data: UpsertSkillDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpsertSkillMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Get all security skills for the workspace
+ * @summary List skills
+ */
+export const agentsControllerGetSkills = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentsControllerGetSkills200>(
+    { url: `/api/agents/skills`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetSkillsQueryKey = () => {
+  return [`/api/agents/skills`] as const;
+};
+
+export const getAgentsControllerGetSkillsQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetSkillsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetSkills>>
+  > = ({ signal }) => agentsControllerGetSkills(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetSkillsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetSkills>>
+>;
+export type AgentsControllerGetSkillsQueryError = unknown;
+
+export function useAgentsControllerGetSkills<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetSkills>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetSkills<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetSkills>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetSkills<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List skills
+ */
+
+export function useAgentsControllerGetSkills<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetSkillsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Get a specific security skill by ID
+ * @summary Get skill
+ */
+export const agentsControllerGetSkill = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SkillResponseDto>(
+    { url: `/api/agents/skills/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetSkillQueryKey = (id: string) => {
+  return [`/api/agents/skills/${id}`] as const;
+};
+
+export const getAgentsControllerGetSkillQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetSkillQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetSkill>>
+  > = ({ signal }) => agentsControllerGetSkill(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetSkillQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetSkill>>
+>;
+export type AgentsControllerGetSkillQueryError = unknown;
+
+export function useAgentsControllerGetSkill<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetSkill>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetSkill<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetSkill>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetSkill<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get skill
+ */
+
+export function useAgentsControllerGetSkill<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkill>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetSkillQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Remove a security skill
+ * @summary Delete skill
+ */
+export const agentsControllerDeleteSkill = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/skills/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteSkillMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteSkill(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteSkillMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteSkill>>
+>;
+
+export type AgentsControllerDeleteSkillMutationError = unknown;
+
+/**
+ * @summary Delete skill
+ */
+export const useAgentsControllerDeleteSkill = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteSkillMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Toggle a skill between active and inactive
+ * @summary Toggle skill status
+ */
+export const agentsControllerToggleSkillStatus = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SkillResponseDto>(
+    { url: `/api/agents/skills/${id}/toggle-status`, method: 'PATCH', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerToggleSkillStatusMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerToggleSkillStatus>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerToggleSkillStatus>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerToggleSkillStatus'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerToggleSkillStatus>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerToggleSkillStatus(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerToggleSkillStatusMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerToggleSkillStatus>>
+>;
+
+export type AgentsControllerToggleSkillStatusMutationError = unknown;
+
+/**
+ * @summary Toggle skill status
+ */
+export const useAgentsControllerToggleSkillStatus = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerToggleSkillStatus>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerToggleSkillStatus>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerToggleSkillStatusMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Get embedding providers status
+ */
+export const agentsControllerGetEmbeddingProviders = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentsControllerGetEmbeddingProviders200>(
+    { url: `/api/agents/embedding`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetEmbeddingProvidersQueryKey = () => {
+  return [`/api/agents/embedding`] as const;
+};
+
+export const getAgentsControllerGetEmbeddingProvidersQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetEmbeddingProvidersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>
+  > = ({ signal }) =>
+    agentsControllerGetEmbeddingProviders(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetEmbeddingProvidersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>
+>;
+export type AgentsControllerGetEmbeddingProvidersQueryError = unknown;
+
+export function useAgentsControllerGetEmbeddingProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetEmbeddingProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetEmbeddingProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get embedding providers status
+ */
+
+export function useAgentsControllerGetEmbeddingProviders<
+  TData = Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetEmbeddingProviders>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAgentsControllerGetEmbeddingProvidersQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add embedding provider config
+ */
+export const agentsControllerCreateEmbeddingConfig = (
+  createEmbeddingConfigDto: CreateEmbeddingConfigDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<EmbeddingConfigResponseDto>(
+    {
+      url: `/api/agents/embedding`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createEmbeddingConfigDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerCreateEmbeddingConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerCreateEmbeddingConfig>>,
+    TError,
+    { data: CreateEmbeddingConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerCreateEmbeddingConfig>>,
+  TError,
+  { data: CreateEmbeddingConfigDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerCreateEmbeddingConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerCreateEmbeddingConfig>>,
+    { data: CreateEmbeddingConfigDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerCreateEmbeddingConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerCreateEmbeddingConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerCreateEmbeddingConfig>>
+>;
+export type AgentsControllerCreateEmbeddingConfigMutationBody =
+  CreateEmbeddingConfigDto;
+export type AgentsControllerCreateEmbeddingConfigMutationError = unknown;
+
+/**
+ * @summary Add embedding provider config
+ */
+export const useAgentsControllerCreateEmbeddingConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerCreateEmbeddingConfig>>,
+      TError,
+      { data: CreateEmbeddingConfigDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerCreateEmbeddingConfig>>,
+  TError,
+  { data: CreateEmbeddingConfigDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerCreateEmbeddingConfigMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Update embedding provider config
+ */
+export const agentsControllerUpdateEmbeddingConfig = (
+  id: string,
+  updateEmbeddingConfigDto: UpdateEmbeddingConfigDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<EmbeddingConfigResponseDto>(
+    {
+      url: `/api/agents/embedding/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateEmbeddingConfigDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerUpdateEmbeddingConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerUpdateEmbeddingConfig>>,
+    TError,
+    { id: string; data: UpdateEmbeddingConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpdateEmbeddingConfig>>,
+  TError,
+  { id: string; data: UpdateEmbeddingConfigDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpdateEmbeddingConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpdateEmbeddingConfig>>,
+    { id: string; data: UpdateEmbeddingConfigDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerUpdateEmbeddingConfig(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerUpdateEmbeddingConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerUpdateEmbeddingConfig>>
+>;
+export type AgentsControllerUpdateEmbeddingConfigMutationBody =
+  UpdateEmbeddingConfigDto;
+export type AgentsControllerUpdateEmbeddingConfigMutationError = unknown;
+
+/**
+ * @summary Update embedding provider config
+ */
+export const useAgentsControllerUpdateEmbeddingConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpdateEmbeddingConfig>>,
+      TError,
+      { id: string; data: UpdateEmbeddingConfigDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpdateEmbeddingConfig>>,
+  TError,
+  { id: string; data: UpdateEmbeddingConfigDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpdateEmbeddingConfigMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Delete embedding provider config
+ */
+export const agentsControllerDeleteEmbeddingConfig = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/agents/embedding/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteEmbeddingConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteEmbeddingConfig>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteEmbeddingConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteEmbeddingConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteEmbeddingConfig>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteEmbeddingConfig(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteEmbeddingConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteEmbeddingConfig>>
+>;
+
+export type AgentsControllerDeleteEmbeddingConfigMutationError = unknown;
+
+/**
+ * @summary Delete embedding provider config
+ */
+export const useAgentsControllerDeleteEmbeddingConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteEmbeddingConfig>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteEmbeddingConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteEmbeddingConfigMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Set preferred embedding config
+ */
+export const agentsControllerSetPreferredEmbeddingConfig = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<EmbeddingConfigResponseDto>(
+    { url: `/api/agents/embedding/${id}/preferred`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerSetPreferredEmbeddingConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerSetPreferredEmbeddingConfig>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerSetPreferredEmbeddingConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerSetPreferredEmbeddingConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerSetPreferredEmbeddingConfig>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerSetPreferredEmbeddingConfig(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerSetPreferredEmbeddingConfigMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof agentsControllerSetPreferredEmbeddingConfig>>
+  >;
+
+export type AgentsControllerSetPreferredEmbeddingConfigMutationError = unknown;
+
+/**
+ * @summary Set preferred embedding config
+ */
+export const useAgentsControllerSetPreferredEmbeddingConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerSetPreferredEmbeddingConfig>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerSetPreferredEmbeddingConfig>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerSetPreferredEmbeddingConfigMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Retrieve a paginated list of notifications for the current user
