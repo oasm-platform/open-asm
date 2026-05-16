@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
-import { Search, Plus, Pencil, Trash2, Workflow } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, Workflow, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown as mdLang } from '@codemirror/lang-markdown';
@@ -222,7 +222,7 @@ function SkillEditor({
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-2 px-4 py-3 border-t bg-muted/20">
+      <div className="flex items-center justify-end gap-2 px-4 py-3">
         <Button
           type="button"
           variant="outline"
@@ -243,25 +243,6 @@ function SkillEditor({
         </Button>
       </div>
     </div>
-  );
-}
-
-function Loader2(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   );
 }
 
