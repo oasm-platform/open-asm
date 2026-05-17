@@ -160,7 +160,7 @@ function SkillEditor({
       return;
     }
 
-    const markdown = `---\ntitle: "${title.replace(/"/g, '\\"')}"\n---\n\n${body}`;
+    const markdown = `---\ntitle: "${title.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n---\n\n${body}`;
 
     upsertSkill(
       { data: { markdown } },
