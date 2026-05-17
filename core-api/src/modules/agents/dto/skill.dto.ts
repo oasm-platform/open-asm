@@ -1,8 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
 import { SkillStatus } from '../enums/agent.enums';
 
 export class UpsertSkillDto {
+  @ApiPropertyOptional({ description: 'Skill ID for update (omit to create new)' })
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   @ApiProperty({ description: 'Markdown content with YAML frontmatter (title required)' })
   @IsString()
   @IsNotEmpty()

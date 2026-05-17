@@ -471,13 +471,14 @@ export class AgentsGraphService {
     });
 
     // Prepend conversation-created event before the first chunk
+    type StreamChunk = UIMessageChunk | { type: `data-${string}`; data: unknown };
     const wrappedStream = result.toUIMessageStream().pipeThrough(
-      new TransformStream<UIMessageChunk, UIMessageChunk>({
+      new TransformStream<StreamChunk, StreamChunk>({
         start(controller) {
           controller.enqueue({
             type: 'data-conversation-created',
             data: { conversationId: resolvedConversationId },
-          } as UIMessageChunk);
+          });
         },
       }),
     );

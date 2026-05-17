@@ -163,7 +163,7 @@ function SkillEditor({
     const markdown = `---\ntitle: "${title.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n---\n\n${body}`;
 
     upsertSkill(
-      { data: { markdown } },
+      { data: { markdown, ...(id ? { id } : {}) } },
       {
         onSuccess: () => {
           void queryClient.invalidateQueries({

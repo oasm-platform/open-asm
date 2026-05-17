@@ -671,7 +671,7 @@ export class AgentsService {
     workspaceId: string,
     dto: UpsertSkillDto,
   ): Promise<SkillResponseDto> {
-    const { markdown } = dto;
+    const { markdown, id } = dto;
     const { data, content } = matter(markdown) as unknown as {
       data: Record<string, unknown>;
       content: string;
@@ -698,22 +698,32 @@ export class AgentsService {
       );
     }
 
-    let skill = await this.skillRepository.findOne({
-      where: { title, workspaceId },
-    });
-
-    if (!skill) {
+    let skill: AgentSkill | null;
+    if (id) {
+      skill = await this.skillRepository.findOne({
+        where: { id, workspaceId },
+      });
+      if (!skill) throw new NotFoundException('Skill not found');
+      skill.title = title;
+      skill.description = content;
+      if (embeddingString) {
+        skill.embedding = embeddingString;
+      }
+    } else {
+      const existing = await this.skillRepository.findOne({
+        where: { title, workspaceId },
+      });
+      if (existing) {
+        throw new BadRequestException(
+          `A skill with title "${title}" already exists in this workspace`,
+        );
+      }
       skill = this.skillRepository.create({
         workspaceId,
         title,
         description: content,
         embedding: embeddingString,
       });
-    } else {
-      skill.description = content;
-      if (embeddingString) {
-        skill.embedding = embeddingString;
-      }
     }
 
     const saved = await this.skillRepository.save(skill);
