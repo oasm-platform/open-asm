@@ -8,8 +8,9 @@ service WorkersService {
   rpc Join(JoinRequest) returns (JoinResponse);
   rpc Alive(AliveRequest) returns (stream AliveResponse);
   rpc GetManifest(GetManifestRequest) returns (GetManifestResponse);
-  rpc DownloadTools(DownloadToolsRequest) returns (stream DownloadToolsResponse);
+  rpc Storage(StorageRequest) returns (stream StorageResponse);
   rpc ConnectInternalNetwork(ConnectInternalNetworkRequest) returns (ConnectInternalNetworkResponse);
+  rpc BuiltinToolRegistry(BuiltinToolRegistryRequest) returns (BuiltinToolRegistryResponse);
 }
 
 message JoinRequest {
@@ -46,11 +47,11 @@ message GetManifestResponse {
   repeated string      init_commands      = 2;
 }
 
-message DownloadToolsRequest {
-  string url = 1;
+message StorageRequest {
+  string path = 1;
 }
 
-message DownloadToolsResponse {
+message StorageResponse {
   bytes chunk  = 1;
   int32 offset = 2;
   bool  eof    = 3;
@@ -72,4 +73,12 @@ message ConnectInternalNetworkRequest {
 
 message ConnectInternalNetworkResponse {
   string message = 1;
+}
+
+message BuiltinToolRegistryRequest {}
+
+message BuiltinToolRegistryResponse {
+  repeated string linux = 1;
+  repeated string windows = 2;
+  repeated string macos = 3;
 }
