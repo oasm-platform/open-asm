@@ -69,9 +69,8 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'GetManifest')
-  grpcGetManifest(): { downloadToolsUrl: string; initCommands: string[] } {
+  grpcGetManifest(): { initCommands: string[] } {
     return {
-      downloadToolsUrl: '/public/archived/tools.tar.gz',
       initCommands: ['nuclei -ut'],
     };
   }
