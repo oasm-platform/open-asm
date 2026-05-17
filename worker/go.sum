@@ -60,6 +60,8 @@ github.com/oasm-platform/oasm-sdk-go v0.1.9-0.20260517101035-4bbf30e6d921 h1:L4C
 github.com/oasm-platform/oasm-sdk-go v0.1.9-0.20260517101035-4bbf30e6d921/go.mod h1:X7eJ4wTtvC88G/ettvlbMmGhYWXpJVisu63bqgdsLic=
 github.com/oasm-platform/oasm-sdk-go v0.1.9-0.20260517102011-b6f24f0b2e11 h1:140fVXgM8+tqZQQRB9H/17Kop7p+11YPSc+ADPV+8yQ=
 github.com/oasm-platform/oasm-sdk-go v0.1.9-0.20260517102011-b6f24f0b2e11/go.mod h1:X7eJ4wTtvC88G/ettvlbMmGhYWXpJVisu63bqgdsLic=
+github.com/oasm-platform/oasm-sdk-go v0.1.9-0.20260517103925-bcb67ba6eb30 h1:sH4pe1C1PC/gDDMKZF56LKvGXx4V57f6BYbGXma5Xhs=
+github.com/oasm-platform/oasm-sdk-go v0.1.9-0.20260517103925-bcb67ba6eb30/go.mod h1:X7eJ4wTtvC88G/ettvlbMmGhYWXpJVisu63bqgdsLic=
 github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260428111953-044d56938cef h1:Erss3VnnVcVxZ5E8ruU6+QCtJtLCoXtjPRe7cHsbKMY=
 github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260428111953-044d56938cef/go.mod h1:dHyOVfH7p+2EP+eQo7zQKu7Aj1c1b4uZv1BzzOijsZg=
 github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260517093339-41cc1a622cc0 h1:ZEKSXBQ0QDm4M8bljK7RmVrP+YqkGBXsHJVjfRKS/gI=
