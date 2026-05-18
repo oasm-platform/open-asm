@@ -197,6 +197,120 @@ export interface BuiltinToolRegistryResponse {
      */
     macos: string[];
 }
+/**
+ * @generated from protobuf message workers.RemoteExecuteSubscribeRequest
+ */
+export interface RemoteExecuteSubscribeRequest {
+}
+/**
+ * @generated from protobuf message workers.RemoteExecuteSubscribeResponse
+ */
+export interface RemoteExecuteSubscribeResponse {
+    /**
+     * @generated from protobuf field: string id = 1
+     */
+    id: string;
+    /**
+     * @generated from protobuf field: string worker_id = 2
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: workers.RemoteExecuteSubscribeEventType type = 3
+     */
+    type: RemoteExecuteSubscribeEventType;
+    /**
+     * @generated from protobuf field: string session_id = 4
+     */
+    sessionId: string;
+    /**
+     * @generated from protobuf field: string command = 5
+     */
+    command: string;
+}
+/**
+ * @generated from protobuf message workers.RemoteExecuteResultStream
+ */
+export interface RemoteExecuteResultStream {
+    /**
+     * @generated from protobuf field: string worker_id = 1
+     */
+    workerId: string;
+    /**
+     * @generated from protobuf field: string session_id = 2
+     */
+    sessionId: string;
+    /**
+     * @generated from protobuf field: workers.RemoteExecuteResultEventType type = 3
+     */
+    type: RemoteExecuteResultEventType;
+    /**
+     * @generated from protobuf field: bytes data = 4
+     */
+    data: Uint8Array;
+    /**
+     * @generated from protobuf field: int32 exit_code = 5
+     */
+    exitCode: number;
+    /**
+     * @generated from protobuf field: string error_message = 6
+     */
+    errorMessage: string;
+}
+/**
+ * @generated from protobuf message workers.RemoteExecuteResultAck
+ */
+export interface RemoteExecuteResultAck {
+    /**
+     * @generated from protobuf field: bool success = 1
+     */
+    success: boolean;
+    /**
+     * @generated from protobuf field: string message = 2
+     */
+    message: string;
+}
+/**
+ * @generated from protobuf enum workers.RemoteExecuteSubscribeEventType
+ */
+export enum RemoteExecuteSubscribeEventType {
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN = 0;
+     */
+    REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN = 0,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED = 1;
+     */
+    REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED = 1,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND = 2;
+     */
+    REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND = 2
+}
+/**
+ * @generated from protobuf enum workers.RemoteExecuteResultEventType
+ */
+export enum RemoteExecuteResultEventType {
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_UNKNOWN = 0;
+     */
+    REMOTE_EXECUTE_RESULT_UNKNOWN = 0,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_STDOUT = 1;
+     */
+    REMOTE_EXECUTE_RESULT_STDOUT = 1,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_STDERR = 2;
+     */
+    REMOTE_EXECUTE_RESULT_STDERR = 2,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_EXIT = 3;
+     */
+    REMOTE_EXECUTE_RESULT_EXIT = 3,
+    /**
+     * @generated from protobuf enum value: REMOTE_EXECUTE_RESULT_ERROR = 4;
+     */
+    REMOTE_EXECUTE_RESULT_ERROR = 4
+}
 // @generated message type with reflection information, may provide speed optimized methods
 class JoinRequest$Type extends MessageType<JoinRequest> {
     constructor() {
@@ -969,6 +1083,265 @@ class BuiltinToolRegistryResponse$Type extends MessageType<BuiltinToolRegistryRe
  * @generated MessageType for protobuf message workers.BuiltinToolRegistryResponse
  */
 export const BuiltinToolRegistryResponse = new BuiltinToolRegistryResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RemoteExecuteSubscribeRequest$Type extends MessageType<RemoteExecuteSubscribeRequest> {
+    constructor() {
+        super("workers.RemoteExecuteSubscribeRequest", []);
+    }
+    create(value?: PartialMessage<RemoteExecuteSubscribeRequest>): RemoteExecuteSubscribeRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<RemoteExecuteSubscribeRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RemoteExecuteSubscribeRequest): RemoteExecuteSubscribeRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RemoteExecuteSubscribeRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.RemoteExecuteSubscribeRequest
+ */
+export const RemoteExecuteSubscribeRequest = new RemoteExecuteSubscribeRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RemoteExecuteSubscribeResponse$Type extends MessageType<RemoteExecuteSubscribeResponse> {
+    constructor() {
+        super("workers.RemoteExecuteSubscribeResponse", [
+            { no: 1, name: "id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "type", kind: "enum", T: () => ["workers.RemoteExecuteSubscribeEventType", RemoteExecuteSubscribeEventType] },
+            { no: 4, name: "session_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "command", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RemoteExecuteSubscribeResponse>): RemoteExecuteSubscribeResponse {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.id = "";
+        message.workerId = "";
+        message.type = 0;
+        message.sessionId = "";
+        message.command = "";
+        if (value !== undefined)
+            reflectionMergePartial<RemoteExecuteSubscribeResponse>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RemoteExecuteSubscribeResponse): RemoteExecuteSubscribeResponse {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string id */ 1:
+                    message.id = reader.string();
+                    break;
+                case /* string worker_id */ 2:
+                    message.workerId = reader.string();
+                    break;
+                case /* workers.RemoteExecuteSubscribeEventType type */ 3:
+                    message.type = reader.int32();
+                    break;
+                case /* string session_id */ 4:
+                    message.sessionId = reader.string();
+                    break;
+                case /* string command */ 5:
+                    message.command = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RemoteExecuteSubscribeResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string id = 1; */
+        if (message.id !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.id);
+        /* string worker_id = 2; */
+        if (message.workerId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.workerId);
+        /* workers.RemoteExecuteSubscribeEventType type = 3; */
+        if (message.type !== 0)
+            writer.tag(3, WireType.Varint).int32(message.type);
+        /* string session_id = 4; */
+        if (message.sessionId !== "")
+            writer.tag(4, WireType.LengthDelimited).string(message.sessionId);
+        /* string command = 5; */
+        if (message.command !== "")
+            writer.tag(5, WireType.LengthDelimited).string(message.command);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.RemoteExecuteSubscribeResponse
+ */
+export const RemoteExecuteSubscribeResponse = new RemoteExecuteSubscribeResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RemoteExecuteResultStream$Type extends MessageType<RemoteExecuteResultStream> {
+    constructor() {
+        super("workers.RemoteExecuteResultStream", [
+            { no: 1, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "session_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "type", kind: "enum", T: () => ["workers.RemoteExecuteResultEventType", RemoteExecuteResultEventType] },
+            { no: 4, name: "data", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
+            { no: 5, name: "exit_code", kind: "scalar", T: 5 /*ScalarType.INT32*/ },
+            { no: 6, name: "error_message", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RemoteExecuteResultStream>): RemoteExecuteResultStream {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.workerId = "";
+        message.sessionId = "";
+        message.type = 0;
+        message.data = new Uint8Array(0);
+        message.exitCode = 0;
+        message.errorMessage = "";
+        if (value !== undefined)
+            reflectionMergePartial<RemoteExecuteResultStream>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RemoteExecuteResultStream): RemoteExecuteResultStream {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string worker_id */ 1:
+                    message.workerId = reader.string();
+                    break;
+                case /* string session_id */ 2:
+                    message.sessionId = reader.string();
+                    break;
+                case /* workers.RemoteExecuteResultEventType type */ 3:
+                    message.type = reader.int32();
+                    break;
+                case /* bytes data */ 4:
+                    message.data = reader.bytes();
+                    break;
+                case /* int32 exit_code */ 5:
+                    message.exitCode = reader.int32();
+                    break;
+                case /* string error_message */ 6:
+                    message.errorMessage = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RemoteExecuteResultStream, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string worker_id = 1; */
+        if (message.workerId !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.workerId);
+        /* string session_id = 2; */
+        if (message.sessionId !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.sessionId);
+        /* workers.RemoteExecuteResultEventType type = 3; */
+        if (message.type !== 0)
+            writer.tag(3, WireType.Varint).int32(message.type);
+        /* bytes data = 4; */
+        if (message.data.length)
+            writer.tag(4, WireType.LengthDelimited).bytes(message.data);
+        /* int32 exit_code = 5; */
+        if (message.exitCode !== 0)
+            writer.tag(5, WireType.Varint).int32(message.exitCode);
+        /* string error_message = 6; */
+        if (message.errorMessage !== "")
+            writer.tag(6, WireType.LengthDelimited).string(message.errorMessage);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.RemoteExecuteResultStream
+ */
+export const RemoteExecuteResultStream = new RemoteExecuteResultStream$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RemoteExecuteResultAck$Type extends MessageType<RemoteExecuteResultAck> {
+    constructor() {
+        super("workers.RemoteExecuteResultAck", [
+            { no: 1, name: "success", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 2, name: "message", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RemoteExecuteResultAck>): RemoteExecuteResultAck {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.success = false;
+        message.message = "";
+        if (value !== undefined)
+            reflectionMergePartial<RemoteExecuteResultAck>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RemoteExecuteResultAck): RemoteExecuteResultAck {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* bool success */ 1:
+                    message.success = reader.bool();
+                    break;
+                case /* string message */ 2:
+                    message.message = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RemoteExecuteResultAck, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* bool success = 1; */
+        if (message.success !== false)
+            writer.tag(1, WireType.Varint).bool(message.success);
+        /* string message = 2; */
+        if (message.message !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.message);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.RemoteExecuteResultAck
+ */
+export const RemoteExecuteResultAck = new RemoteExecuteResultAck$Type();
 /**
  * @generated ServiceType for protobuf service workers.WorkersService
  */
@@ -978,5 +1351,7 @@ export const WorkersService = new ServiceType("workers.WorkersService", [
     { name: "GetManifest", options: {}, I: GetManifestRequest, O: GetManifestResponse },
     { name: "Storage", serverStreaming: true, options: {}, I: StorageRequest, O: StorageResponse },
     { name: "ConnectInternalNetwork", options: {}, I: ConnectInternalNetworkRequest, O: ConnectInternalNetworkResponse },
-    { name: "BuiltinToolRegistry", options: {}, I: BuiltinToolRegistryRequest, O: BuiltinToolRegistryResponse }
+    { name: "BuiltinToolRegistry", options: {}, I: BuiltinToolRegistryRequest, O: BuiltinToolRegistryResponse },
+    { name: "RemoteExecuteSubscribe", serverStreaming: true, options: {}, I: RemoteExecuteSubscribeRequest, O: RemoteExecuteSubscribeResponse },
+    { name: "RemoteExecuteResult", clientStreaming: true, options: {}, I: RemoteExecuteResultStream, O: RemoteExecuteResultAck }
 ]);

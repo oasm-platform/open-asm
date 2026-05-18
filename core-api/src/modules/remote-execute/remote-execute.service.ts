@@ -1,47 +1,62 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from '@/services/redis/redis.service';
-import { nanoid } from 'nanoid';
-import { randomUUID } from 'node:crypto';
+import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { Observable } from 'rxjs';
 import type { MessageEvent } from '@nestjs/common';
 
 export interface RemoteCommandPayload {
   id: string;
+  workerId: string;
   sessionId: string;
   command: string;
 }
 
-const REDIS_CHANNEL = 'remote-execute:commands';
-
 @Injectable()
 export class RemoteExecuteService {
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly remoteExecuteSubscribeService: RemoteExecuteSubscribeService,
+  ) {}
 
-  async runCommand(command: string): Promise<RemoteCommandPayload> {
-    const payload: RemoteCommandPayload = {
-      id: nanoid(),
-      sessionId: randomUUID(),
+  runCommand(
+    command: string,
+    sessionId: string,
+  ): RemoteCommandPayload | null {
+    const workerId = this.remoteExecuteSubscribeService.getAvailableWorker();
+
+    if (!workerId) {
+      return null;
+    }
+
+    const result = this.remoteExecuteSubscribeService.pushCommand(
+      workerId,
+      sessionId,
       command,
-    };
-
-    await this.redisService.publish(
-      REDIS_CHANNEL,
-      JSON.stringify(payload),
     );
 
-    return payload;
+    if (!result) {
+      return null;
+    }
+
+    return {
+      id: result.id,
+      workerId: result.workerId,
+      sessionId,
+      command,
+    };
   }
 
-  subscribeToStream(): Observable<MessageEvent> {
+  subscribeToStream(sessionId: string): Observable<MessageEvent> {
+    const channel = `remote-execute:results:${sessionId}`;
     return new Observable<MessageEvent>((observer) => {
       const handler = (_channel: string, message: string) => {
         observer.next({ data: message });
       };
 
-      void this.redisService.subscribe(REDIS_CHANNEL, handler);
+      void this.redisService.subscribe(channel, handler);
 
       return () => {
-        void this.redisService.unsubscribe(REDIS_CHANNEL);
+        void this.redisService.unsubscribe(channel);
       };
     });
   }

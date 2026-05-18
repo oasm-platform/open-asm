@@ -6,6 +6,7 @@ import {
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
+import { RedisService } from '@/services/redis/redis.service';
 import { generateToken } from '@/utils/genToken';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
@@ -65,6 +66,8 @@ export class WorkersService {
 
     @Inject(forwardRef(() => ToolsService))
     private toolsService: ToolsService,
+
+    private redisService: RedisService,
   ) {}
 
   /**
@@ -541,5 +544,27 @@ export class WorkersService {
       .execute();
 
     return { message: 'Connect success' };
+  }
+
+  public async handleRemoteExecuteResult(result: {
+    workerId: string;
+    sessionId: string;
+    type: number;
+    data: Uint8Array;
+    exitCode: number;
+    errorMessage: string;
+  }) {
+    const channel = `remote-execute:results:${result.sessionId}`;
+    await this.redisService.publish(
+      channel,
+      JSON.stringify({
+        workerId: result.workerId,
+        sessionId: result.sessionId,
+        type: result.type,
+        data: Buffer.from(result.data).toString('utf-8'),
+        exitCode: result.exitCode,
+        errorMessage: result.errorMessage,
+      }),
+    );
   }
 }

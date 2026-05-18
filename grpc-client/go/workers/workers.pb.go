@@ -21,6 +21,110 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type RemoteExecuteSubscribeEventType int32
+
+const (
+	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN   RemoteExecuteSubscribeEventType = 0
+	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED RemoteExecuteSubscribeEventType = 1
+	RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND   RemoteExecuteSubscribeEventType = 2
+)
+
+// Enum value maps for RemoteExecuteSubscribeEventType.
+var (
+	RemoteExecuteSubscribeEventType_name = map[int32]string{
+		0: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN",
+		1: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED",
+		2: "REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND",
+	}
+	RemoteExecuteSubscribeEventType_value = map[string]int32{
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN":   0,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED": 1,
+		"REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND":   2,
+	}
+)
+
+func (x RemoteExecuteSubscribeEventType) Enum() *RemoteExecuteSubscribeEventType {
+	p := new(RemoteExecuteSubscribeEventType)
+	*p = x
+	return p
+}
+
+func (x RemoteExecuteSubscribeEventType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RemoteExecuteSubscribeEventType) Descriptor() protoreflect.EnumDescriptor {
+	return file_workers_proto_enumTypes[0].Descriptor()
+}
+
+func (RemoteExecuteSubscribeEventType) Type() protoreflect.EnumType {
+	return &file_workers_proto_enumTypes[0]
+}
+
+func (x RemoteExecuteSubscribeEventType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RemoteExecuteSubscribeEventType.Descriptor instead.
+func (RemoteExecuteSubscribeEventType) EnumDescriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{0}
+}
+
+type RemoteExecuteResultEventType int32
+
+const (
+	RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_UNKNOWN RemoteExecuteResultEventType = 0
+	RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_STDOUT  RemoteExecuteResultEventType = 1
+	RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_STDERR  RemoteExecuteResultEventType = 2
+	RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_EXIT    RemoteExecuteResultEventType = 3
+	RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR   RemoteExecuteResultEventType = 4
+)
+
+// Enum value maps for RemoteExecuteResultEventType.
+var (
+	RemoteExecuteResultEventType_name = map[int32]string{
+		0: "REMOTE_EXECUTE_RESULT_UNKNOWN",
+		1: "REMOTE_EXECUTE_RESULT_STDOUT",
+		2: "REMOTE_EXECUTE_RESULT_STDERR",
+		3: "REMOTE_EXECUTE_RESULT_EXIT",
+		4: "REMOTE_EXECUTE_RESULT_ERROR",
+	}
+	RemoteExecuteResultEventType_value = map[string]int32{
+		"REMOTE_EXECUTE_RESULT_UNKNOWN": 0,
+		"REMOTE_EXECUTE_RESULT_STDOUT":  1,
+		"REMOTE_EXECUTE_RESULT_STDERR":  2,
+		"REMOTE_EXECUTE_RESULT_EXIT":    3,
+		"REMOTE_EXECUTE_RESULT_ERROR":   4,
+	}
+)
+
+func (x RemoteExecuteResultEventType) Enum() *RemoteExecuteResultEventType {
+	p := new(RemoteExecuteResultEventType)
+	*p = x
+	return p
+}
+
+func (x RemoteExecuteResultEventType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RemoteExecuteResultEventType) Descriptor() protoreflect.EnumDescriptor {
+	return file_workers_proto_enumTypes[1].Descriptor()
+}
+
+func (RemoteExecuteResultEventType) Type() protoreflect.EnumType {
+	return &file_workers_proto_enumTypes[1]
+}
+
+func (x RemoteExecuteResultEventType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RemoteExecuteResultEventType.Descriptor instead.
+func (RemoteExecuteResultEventType) EnumDescriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{1}
+}
+
 type JoinRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ApiKey        string                 `protobuf:"bytes,1,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
@@ -757,6 +861,254 @@ func (x *BuiltinToolRegistryResponse) GetMacos() []string {
 	return nil
 }
 
+type RemoteExecuteSubscribeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoteExecuteSubscribeRequest) Reset() {
+	*x = RemoteExecuteSubscribeRequest{}
+	mi := &file_workers_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoteExecuteSubscribeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoteExecuteSubscribeRequest) ProtoMessage() {}
+
+func (x *RemoteExecuteSubscribeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoteExecuteSubscribeRequest.ProtoReflect.Descriptor instead.
+func (*RemoteExecuteSubscribeRequest) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{14}
+}
+
+type RemoteExecuteSubscribeResponse struct {
+	state         protoimpl.MessageState          `protogen:"open.v1"`
+	Id            string                          `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkerId      string                          `protobuf:"bytes,2,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	Type          RemoteExecuteSubscribeEventType `protobuf:"varint,3,opt,name=type,proto3,enum=workers.RemoteExecuteSubscribeEventType" json:"type,omitempty"`
+	SessionId     string                          `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Command       string                          `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoteExecuteSubscribeResponse) Reset() {
+	*x = RemoteExecuteSubscribeResponse{}
+	mi := &file_workers_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoteExecuteSubscribeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoteExecuteSubscribeResponse) ProtoMessage() {}
+
+func (x *RemoteExecuteSubscribeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoteExecuteSubscribeResponse.ProtoReflect.Descriptor instead.
+func (*RemoteExecuteSubscribeResponse) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RemoteExecuteSubscribeResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RemoteExecuteSubscribeResponse) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *RemoteExecuteSubscribeResponse) GetType() RemoteExecuteSubscribeEventType {
+	if x != nil {
+		return x.Type
+	}
+	return RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN
+}
+
+func (x *RemoteExecuteSubscribeResponse) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RemoteExecuteSubscribeResponse) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+type RemoteExecuteResultStream struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	WorkerId      string                       `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	SessionId     string                       `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Type          RemoteExecuteResultEventType `protobuf:"varint,3,opt,name=type,proto3,enum=workers.RemoteExecuteResultEventType" json:"type,omitempty"`
+	Data          []byte                       `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	ExitCode      int32                        `protobuf:"varint,5,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	ErrorMessage  string                       `protobuf:"bytes,6,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoteExecuteResultStream) Reset() {
+	*x = RemoteExecuteResultStream{}
+	mi := &file_workers_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoteExecuteResultStream) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoteExecuteResultStream) ProtoMessage() {}
+
+func (x *RemoteExecuteResultStream) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoteExecuteResultStream.ProtoReflect.Descriptor instead.
+func (*RemoteExecuteResultStream) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RemoteExecuteResultStream) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *RemoteExecuteResultStream) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RemoteExecuteResultStream) GetType() RemoteExecuteResultEventType {
+	if x != nil {
+		return x.Type
+	}
+	return RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_UNKNOWN
+}
+
+func (x *RemoteExecuteResultStream) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *RemoteExecuteResultStream) GetExitCode() int32 {
+	if x != nil {
+		return x.ExitCode
+	}
+	return 0
+}
+
+func (x *RemoteExecuteResultStream) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type RemoteExecuteResultAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoteExecuteResultAck) Reset() {
+	*x = RemoteExecuteResultAck{}
+	mi := &file_workers_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoteExecuteResultAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoteExecuteResultAck) ProtoMessage() {}
+
+func (x *RemoteExecuteResultAck) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoteExecuteResultAck.ProtoReflect.Descriptor instead.
+func (*RemoteExecuteResultAck) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *RemoteExecuteResultAck) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *RemoteExecuteResultAck) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
@@ -813,14 +1165,45 @@ const file_workers_proto_rawDesc = "" +
 	"\x1bBuiltinToolRegistryResponse\x12\x14\n" +
 	"\x05linux\x18\x01 \x03(\tR\x05linux\x12\x18\n" +
 	"\awindows\x18\x02 \x03(\tR\awindows\x12\x14\n" +
-	"\x05macos\x18\x03 \x03(\tR\x05macos2\xd6\x03\n" +
+	"\x05macos\x18\x03 \x03(\tR\x05macos\"\x1f\n" +
+	"\x1dRemoteExecuteSubscribeRequest\"\xc4\x01\n" +
+	"\x1eRemoteExecuteSubscribeResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tworker_id\x18\x02 \x01(\tR\bworkerId\x12<\n" +
+	"\x04type\x18\x03 \x01(\x0e2(.workers.RemoteExecuteSubscribeEventTypeR\x04type\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x18\n" +
+	"\acommand\x18\x05 \x01(\tR\acommand\"\xe8\x01\n" +
+	"\x19RemoteExecuteResultStream\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x129\n" +
+	"\x04type\x18\x03 \x01(\x0e2%.workers.RemoteExecuteResultEventTypeR\x04type\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\x12\x1b\n" +
+	"\texit_code\x18\x05 \x01(\x05R\bexitCode\x12#\n" +
+	"\rerror_message\x18\x06 \x01(\tR\ferrorMessage\"L\n" +
+	"\x16RemoteExecuteResultAck\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage*\xa7\x01\n" +
+	"\x1fRemoteExecuteSubscribeEventType\x12*\n" +
+	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN\x10\x00\x12,\n" +
+	"(REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED\x10\x01\x12*\n" +
+	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND\x10\x02*\xc6\x01\n" +
+	"\x1cRemoteExecuteResultEventType\x12!\n" +
+	"\x1dREMOTE_EXECUTE_RESULT_UNKNOWN\x10\x00\x12 \n" +
+	"\x1cREMOTE_EXECUTE_RESULT_STDOUT\x10\x01\x12 \n" +
+	"\x1cREMOTE_EXECUTE_RESULT_STDERR\x10\x02\x12\x1e\n" +
+	"\x1aREMOTE_EXECUTE_RESULT_EXIT\x10\x03\x12\x1f\n" +
+	"\x1bREMOTE_EXECUTE_RESULT_ERROR\x10\x042\xa1\x05\n" +
 	"\x0eWorkersService\x123\n" +
 	"\x04Join\x12\x14.workers.JoinRequest\x1a\x15.workers.JoinResponse\x128\n" +
 	"\x05Alive\x12\x15.workers.AliveRequest\x1a\x16.workers.AliveResponse0\x01\x12H\n" +
 	"\vGetManifest\x12\x1b.workers.GetManifestRequest\x1a\x1c.workers.GetManifestResponse\x12>\n" +
 	"\aStorage\x12\x17.workers.StorageRequest\x1a\x18.workers.StorageResponse0\x01\x12i\n" +
 	"\x16ConnectInternalNetwork\x12&.workers.ConnectInternalNetworkRequest\x1a'.workers.ConnectInternalNetworkResponse\x12`\n" +
-	"\x13BuiltinToolRegistry\x12#.workers.BuiltinToolRegistryRequest\x1a$.workers.BuiltinToolRegistryResponseB\vZ\t./workersb\x06proto3"
+	"\x13BuiltinToolRegistry\x12#.workers.BuiltinToolRegistryRequest\x1a$.workers.BuiltinToolRegistryResponse\x12k\n" +
+	"\x16RemoteExecuteSubscribe\x12&.workers.RemoteExecuteSubscribeRequest\x1a'.workers.RemoteExecuteSubscribeResponse0\x01\x12\\\n" +
+	"\x13RemoteExecuteResult\x12\".workers.RemoteExecuteResultStream\x1a\x1f.workers.RemoteExecuteResultAck(\x01B\vZ\t./workersb\x06proto3"
 
 var (
 	file_workers_proto_rawDescOnce sync.Once
@@ -834,43 +1217,56 @@ func file_workers_proto_rawDescGZIP() []byte {
 	return file_workers_proto_rawDescData
 }
 
-var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_workers_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_workers_proto_goTypes = []any{
-	(*JoinRequest)(nil),                    // 0: workers.JoinRequest
-	(*WorkerMetadata)(nil),                 // 1: workers.WorkerMetadata
-	(*JoinResponse)(nil),                   // 2: workers.JoinResponse
-	(*AliveRequest)(nil),                   // 3: workers.AliveRequest
-	(*AliveResponse)(nil),                  // 4: workers.AliveResponse
-	(*GetManifestRequest)(nil),             // 5: workers.GetManifestRequest
-	(*GetManifestResponse)(nil),            // 6: workers.GetManifestResponse
-	(*StorageRequest)(nil),                 // 7: workers.StorageRequest
-	(*StorageResponse)(nil),                // 8: workers.StorageResponse
-	(*NetworkInterfaceMessage)(nil),        // 9: workers.NetworkInterfaceMessage
-	(*ConnectInternalNetworkRequest)(nil),  // 10: workers.ConnectInternalNetworkRequest
-	(*ConnectInternalNetworkResponse)(nil), // 11: workers.ConnectInternalNetworkResponse
-	(*BuiltinToolRegistryRequest)(nil),     // 12: workers.BuiltinToolRegistryRequest
-	(*BuiltinToolRegistryResponse)(nil),    // 13: workers.BuiltinToolRegistryResponse
+	(RemoteExecuteSubscribeEventType)(0),   // 0: workers.RemoteExecuteSubscribeEventType
+	(RemoteExecuteResultEventType)(0),      // 1: workers.RemoteExecuteResultEventType
+	(*JoinRequest)(nil),                    // 2: workers.JoinRequest
+	(*WorkerMetadata)(nil),                 // 3: workers.WorkerMetadata
+	(*JoinResponse)(nil),                   // 4: workers.JoinResponse
+	(*AliveRequest)(nil),                   // 5: workers.AliveRequest
+	(*AliveResponse)(nil),                  // 6: workers.AliveResponse
+	(*GetManifestRequest)(nil),             // 7: workers.GetManifestRequest
+	(*GetManifestResponse)(nil),            // 8: workers.GetManifestResponse
+	(*StorageRequest)(nil),                 // 9: workers.StorageRequest
+	(*StorageResponse)(nil),                // 10: workers.StorageResponse
+	(*NetworkInterfaceMessage)(nil),        // 11: workers.NetworkInterfaceMessage
+	(*ConnectInternalNetworkRequest)(nil),  // 12: workers.ConnectInternalNetworkRequest
+	(*ConnectInternalNetworkResponse)(nil), // 13: workers.ConnectInternalNetworkResponse
+	(*BuiltinToolRegistryRequest)(nil),     // 14: workers.BuiltinToolRegistryRequest
+	(*BuiltinToolRegistryResponse)(nil),    // 15: workers.BuiltinToolRegistryResponse
+	(*RemoteExecuteSubscribeRequest)(nil),  // 16: workers.RemoteExecuteSubscribeRequest
+	(*RemoteExecuteSubscribeResponse)(nil), // 17: workers.RemoteExecuteSubscribeResponse
+	(*RemoteExecuteResultStream)(nil),      // 18: workers.RemoteExecuteResultStream
+	(*RemoteExecuteResultAck)(nil),         // 19: workers.RemoteExecuteResultAck
 }
 var file_workers_proto_depIdxs = []int32{
-	1,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
-	9,  // 1: workers.ConnectInternalNetworkRequest.network_interfaces:type_name -> workers.NetworkInterfaceMessage
-	0,  // 2: workers.WorkersService.Join:input_type -> workers.JoinRequest
-	3,  // 3: workers.WorkersService.Alive:input_type -> workers.AliveRequest
-	5,  // 4: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
-	7,  // 5: workers.WorkersService.Storage:input_type -> workers.StorageRequest
-	10, // 6: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
-	12, // 7: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
-	2,  // 8: workers.WorkersService.Join:output_type -> workers.JoinResponse
-	4,  // 9: workers.WorkersService.Alive:output_type -> workers.AliveResponse
-	6,  // 10: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
-	8,  // 11: workers.WorkersService.Storage:output_type -> workers.StorageResponse
-	11, // 12: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
-	13, // 13: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
-	8,  // [8:14] is the sub-list for method output_type
-	2,  // [2:8] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	3,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
+	11, // 1: workers.ConnectInternalNetworkRequest.network_interfaces:type_name -> workers.NetworkInterfaceMessage
+	0,  // 2: workers.RemoteExecuteSubscribeResponse.type:type_name -> workers.RemoteExecuteSubscribeEventType
+	1,  // 3: workers.RemoteExecuteResultStream.type:type_name -> workers.RemoteExecuteResultEventType
+	2,  // 4: workers.WorkersService.Join:input_type -> workers.JoinRequest
+	5,  // 5: workers.WorkersService.Alive:input_type -> workers.AliveRequest
+	7,  // 6: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
+	9,  // 7: workers.WorkersService.Storage:input_type -> workers.StorageRequest
+	12, // 8: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
+	14, // 9: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
+	16, // 10: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
+	18, // 11: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
+	4,  // 12: workers.WorkersService.Join:output_type -> workers.JoinResponse
+	6,  // 13: workers.WorkersService.Alive:output_type -> workers.AliveResponse
+	8,  // 14: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
+	10, // 15: workers.WorkersService.Storage:output_type -> workers.StorageResponse
+	13, // 16: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
+	15, // 17: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
+	17, // 18: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
+	19, // 19: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
+	12, // [12:20] is the sub-list for method output_type
+	4,  // [4:12] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_workers_proto_init() }
@@ -885,13 +1281,14 @@ func file_workers_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workers_proto_rawDesc), len(file_workers_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   14,
+			NumEnums:      2,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_workers_proto_goTypes,
 		DependencyIndexes: file_workers_proto_depIdxs,
+		EnumInfos:         file_workers_proto_enumTypes,
 		MessageInfos:      file_workers_proto_msgTypes,
 	}.Build()
 	File_workers_proto = out.File

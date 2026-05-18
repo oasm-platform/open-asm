@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { IsString, IsUUID } from 'class-validator';
 
 export class RunCommandDto {
   @ApiProperty({
@@ -8,4 +8,11 @@ export class RunCommandDto {
   })
   @IsString()
   command: string;
+
+  @ApiProperty({
+    description: 'Session ID for the remote execution stream',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsUUID()
+  sessionId: string;
 }

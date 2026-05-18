@@ -2,6 +2,7 @@
 import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { tool } from 'ai';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 
 import { AssetsService } from '@/modules/assets/assets.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
@@ -550,13 +551,15 @@ export class AgentTool {
           '⚠️ CONSTRAINTS:',
           '- Commands are executed with OS-level permissions — avoid destructive operations',
           '- Output is NOT returned synchronously; use GET /stream SSE endpoint to receive results',
-          '- The command is published to Redis pub/sub channel; worker(s) must be subscribed to pick it up',
+          '- The command is sent via gRPC to an available online worker',
+          '- If no worker is available, the command will fail',
           '',
           'PARAMETERS:',
           '- command: REQUIRED. The full shell command string to execute (e.g., "nmap -p 22 10.0.0.0/24")',
           '',
           'OUTPUT (not returned directly, available via SSE stream):',
           '- id: unique command instance ID (nanoid)',
+          '- workerId: the worker that received the command',
           '- sessionId: session UUID for correlating results',
           '- command: the original command string',
         ].join('\n'),
@@ -567,7 +570,8 @@ export class AgentTool {
         }),
         execute: async (params: { command: string }) => {
           const { command } = params;
-          return this.remoteExecuteService.runCommand(command);
+          const sessionId = randomUUID();
+          return this.remoteExecuteService.runCommand(command, sessionId);
         },
       };
       return tool(toolConfig);

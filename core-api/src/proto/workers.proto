@@ -4,15 +4,6 @@ package workers;
 
 option go_package = "./workers";
 
-service WorkersService {
-  rpc Join(JoinRequest) returns (JoinResponse);
-  rpc Alive(AliveRequest) returns (stream AliveResponse);
-  rpc GetManifest(GetManifestRequest) returns (GetManifestResponse);
-  rpc Storage(StorageRequest) returns (stream StorageResponse);
-  rpc ConnectInternalNetwork(ConnectInternalNetworkRequest) returns (ConnectInternalNetworkResponse);
-  rpc BuiltinToolRegistry(BuiltinToolRegistryRequest) returns (BuiltinToolRegistryResponse);
-}
-
 message JoinRequest {
   string          api_key   = 1;
   string          signature = 2;
@@ -80,4 +71,53 @@ message BuiltinToolRegistryResponse {
   repeated string linux = 1;
   repeated string windows = 2;
   repeated string macos = 3;
+}
+
+message RemoteExecuteSubscribeRequest {}
+
+enum RemoteExecuteSubscribeEventType {
+  REMOTE_EXECUTE_SUBSCRIBE_EVENT_UNKNOWN   = 0;
+  REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED = 1;
+  REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND   = 2;
+}
+
+message RemoteExecuteSubscribeResponse {
+  string id                               = 1;
+  string worker_id                        = 2;
+  RemoteExecuteSubscribeEventType type    = 3;
+  string session_id                       = 4;
+  string command                          = 5;
+}
+
+message RemoteExecuteResultStream {
+  string worker_id                       = 1;
+  string session_id                      = 2;
+  RemoteExecuteResultEventType type      = 3;
+  bytes  data                            = 4;
+  int32  exit_code                       = 5;
+  string error_message                   = 6;
+}
+
+enum RemoteExecuteResultEventType {
+  REMOTE_EXECUTE_RESULT_UNKNOWN = 0;
+  REMOTE_EXECUTE_RESULT_STDOUT  = 1;
+  REMOTE_EXECUTE_RESULT_STDERR  = 2;
+  REMOTE_EXECUTE_RESULT_EXIT    = 3;
+  REMOTE_EXECUTE_RESULT_ERROR   = 4;
+}
+
+message RemoteExecuteResultAck {
+  bool   success = 1;
+  string message = 2;
+}
+
+service WorkersService {
+  rpc Join(JoinRequest) returns (JoinResponse);
+  rpc Alive(AliveRequest) returns (stream AliveResponse);
+  rpc GetManifest(GetManifestRequest) returns (GetManifestResponse);
+  rpc Storage(StorageRequest) returns (stream StorageResponse);
+  rpc ConnectInternalNetwork(ConnectInternalNetworkRequest) returns (ConnectInternalNetworkResponse);
+  rpc BuiltinToolRegistry(BuiltinToolRegistryRequest) returns (BuiltinToolRegistryResponse);
+  rpc RemoteExecuteSubscribe(RemoteExecuteSubscribeRequest) returns (stream RemoteExecuteSubscribeResponse);
+  rpc RemoteExecuteResult(stream RemoteExecuteResultStream) returns (RemoteExecuteResultAck);
 }
