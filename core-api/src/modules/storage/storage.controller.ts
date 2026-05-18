@@ -107,7 +107,7 @@ export class StorageController {
     // Upload file with fixed filename "logo.{extension}" to "system" bucket
     const filename = `logo-${randomUUID()}.${extension}`;
     const bucket = 'system';
-    const result = this.storageService.uploadFile(
+    const result = await this.storageService.uploadFile(
       filename,
       file.buffer,
       bucket,
@@ -164,7 +164,7 @@ export class StorageController {
     },
   })
   @Roles(Role.ADMIN)
-  uploadFile(
+  async uploadFile(
     @UploadedFile() file: Express.Multer.File,
     @Body('bucket') bucket: string = 'default',
   ) {
@@ -180,7 +180,7 @@ export class StorageController {
     }
 
     const filename = `${randomUUID()}.${extension}`;
-    const result = this.storageService.uploadFile(
+    const result = await this.storageService.uploadFile(
       filename,
       file.buffer,
       bucket,
@@ -214,19 +214,18 @@ export class StorageController {
     status: 404,
     description: 'File not found',
   })
-  getFile(
+  async getFile(
     @Param('bucket') bucket: string,
     @Param('path') path: string,
     @Res({ passthrough: true })
     res: { set: (headers: Record<string, string>) => void },
-  ): StreamableFile {
+  ): Promise<StreamableFile> {
     if (!path) {
       throw new NotFoundException('File path is required');
     }
 
-    // Remove any leading slashes from the path
     const cleanPath = path.replace(/^\/+/, '');
-    const file = this.storageService.getFile(cleanPath, bucket);
+    const file = await this.storageService.getFile(cleanPath, bucket);
 
     const extension = cleanPath.split('.').pop()?.toLowerCase();
     if (extension) {

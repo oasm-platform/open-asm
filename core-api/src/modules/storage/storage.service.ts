@@ -4,48 +4,77 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  OnModuleInit,
   StreamableFile,
 } from '@nestjs/common';
-import * as fs from 'fs';
-import { createReadStream, existsSync } from 'fs';
-import { join, resolve } from 'path';
+import {
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+  S3ServiceException,
+} from '@aws-sdk/client-s3';
+import { RustFsClient } from './rustfs.client';
+import { Readable } from 'stream';
 
 @Injectable()
-export class StorageService {
-  public readonly storagePath = join(process.cwd(), '.storage');
+export class StorageService implements OnModuleInit {
+  private readonly logger = new Logger(StorageService.name);
+  private readonly buckets = [
+    'system',
+    'screenshot',
+    'nuclei-templates',
+    'job-results',
+    'cached-static',
+    'default',
+  ];
 
-  private getBucketPath(bucket: string = 'default'): string {
-    return join(this.storagePath, bucket);
+  constructor(private readonly rustFsClient: RustFsClient) {}
+
+  async onModuleInit() {
+    await this.ensureBucketsExist();
   }
 
-  /**
-   * Upload a file to the storage directory.
-   * @param fileName The name of the file to upload.
-   * @param buffer The buffer of the file to upload.
-   * @param bucket The bucket name to store the file in (default: 'default').
-   * @returns An object containing the path of the uploaded file.
-   */
-  public uploadFile(
+  private async ensureBucketsExist() {
+    const client = this.rustFsClient.getClient();
+    for (const bucket of this.buckets) {
+      try {
+        await client.send(new HeadBucketCommand({ Bucket: bucket }));
+      } catch (error) {
+        if (error instanceof S3ServiceException && (error.$metadata.httpStatusCode === 404 || error.name === 'NoSuchBucket')) {
+          try {
+            await client.send(new CreateBucketCommand({ Bucket: bucket }));
+            this.logger.log(`Created bucket: ${bucket}`);
+          } catch (createError) {
+            if (createError instanceof S3ServiceException && createError.name === 'BucketAlreadyExists') {
+              this.logger.debug(`Bucket already exists: ${bucket}`);
+            } else {
+              this.logger.error(`Failed to create bucket ${bucket}: ${createError instanceof Error ? createError.message : 'Unknown error'}`);
+            }
+          }
+        } else {
+          this.logger.error(`Failed to check bucket ${bucket}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    }
+  }
+
+  public async uploadFile(
     fileName: string,
     buffer: Buffer,
     bucket: string = 'default',
   ) {
     try {
-      const bucketPath = this.getBucketPath(bucket);
-
-      // Ensure the bucket directory exists
-      if (!existsSync(bucketPath)) {
-        fs.mkdirSync(bucketPath, { recursive: true });
-      }
-
-      // Create full file path within the bucket
-      const filePath = join(bucketPath, fileName);
-
-      // Write the file
-      fs.writeFileSync(filePath, buffer);
-      return {
-        path: `${bucket}/${fileName}`,
-      };
+      const key = `${bucket}/${fileName}`;
+      await this.rustFsClient.getClient().send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: fileName,
+          Body: buffer,
+        }),
+      );
+      return { path: key };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
@@ -55,63 +84,57 @@ export class StorageService {
     }
   }
 
-  /**
-   * Get a file from the storage directory.
-   * @param filePath The path of the file to retrieve.
-   * @returns A StreamableFile containing the file data.
-   * @throws NotFoundException if the file doesn't exist.
-   */
-  public getFile(filePath: string, bucket: string = 'default'): StreamableFile {
-    // Remove any leading slashes or dots from the file path
+  public async getFile(filePath: string, bucket: string = 'default'): Promise<StreamableFile> {
     const cleanPath = filePath.replace(/^[./\s]+/, '');
 
-    const bucketPath = this.getBucketPath(bucket);
-    const fullPath = join(bucketPath, cleanPath);
-
-    // Prevent directory traversal attacks
-    const resolvedPath = resolve(fullPath);
-    const resolvedBucketPath = resolve(bucketPath);
-
-    if (!resolvedPath.startsWith(resolvedBucketPath)) {
-      throw new NotFoundException('File not found');
-    }
-
-    if (!existsSync(resolvedPath)) {
-      throw new NotFoundException('File not found');
-    }
-
-    const file = createReadStream(resolvedPath);
-    return new StreamableFile(file);
-  }
-
-  /**
-   * Delete a file from the storage directory.
-   * @param filePath The path of the file to delete (relative to bucket).
-   * @param bucket The bucket name where the file is stored (default: 'default').
-   * @throws NotFoundException if the file doesn't exist.
-   */
-  public deleteFile(filePath: string, bucket: string = 'default'): void {
-    // Remove any leading slashes or dots from the file path
-    const cleanPath = filePath.replace(/^[./\s]+/, '');
-
-    const bucketPath = this.getBucketPath(bucket);
-    const fullPath = join(bucketPath, cleanPath);
-
-    // Prevent directory traversal attacks
-    const resolvedPath = resolve(fullPath);
-    const resolvedBucketPath = resolve(bucketPath);
-
-    if (!resolvedPath.startsWith(resolvedBucketPath)) {
-      throw new NotFoundException('File not found');
-    }
-
-    if (!existsSync(resolvedPath)) {
+    if (!cleanPath || cleanPath.includes('..')) {
       throw new NotFoundException('File not found');
     }
 
     try {
-      fs.unlinkSync(resolvedPath);
+      const response = await this.rustFsClient.getClient().send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: cleanPath,
+        }),
+      );
+
+      if (!response.Body) {
+        throw new NotFoundException('File not found');
+      }
+
+      const body = response.Body as Readable;
+      return new StreamableFile(body);
     } catch (error: unknown) {
+      if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)) {
+        throw new NotFoundException('File not found');
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new InternalServerErrorException(
+        `Failed to get file: ${errorMessage}`,
+      );
+    }
+  }
+
+  public async deleteFile(filePath: string, bucket: string = 'default'): Promise<void> {
+    const cleanPath = filePath.replace(/^[./\s]+/, '');
+
+    if (!cleanPath || cleanPath.includes('..')) {
+      throw new NotFoundException('File not found');
+    }
+
+    try {
+      await this.rustFsClient.getClient().send(
+        new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: cleanPath,
+        }),
+      );
+    } catch (error: unknown) {
+      if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)) {
+        throw new NotFoundException('File not found');
+      }
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
       throw new InternalServerErrorException(
@@ -120,17 +143,9 @@ export class StorageService {
     }
   }
 
-  /**
-   * Forward an image from a URL.
-   * @param url The URL of the image to forward.
-   * @returns A StreamableFile containing the image data.
-   * @throws BadRequestException if the URL is invalid or doesn't point to an image.
-   * @throws NotFoundException if the image is not found at the provided URL.
-   */
   public async forwardImage(
     url: string,
   ): Promise<{ buffer: Buffer; contentType: string }> {
-    // Validate URL format
     try {
       new URL(url);
     } catch (err) {
@@ -139,15 +154,12 @@ export class StorageService {
     }
 
     try {
-      // Fetch the image from the provided URL
       const response = await fetch(url);
 
-      // Check if the request was successful
       if (!response.ok) {
         throw new NotFoundException('Image not found at the provided URL');
       }
 
-      // Check content type to ensure it's an image
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.startsWith('image/')) {
         throw new BadRequestException(
@@ -155,7 +167,6 @@ export class StorageService {
         );
       }
 
-      // Get the image data as ArrayBuffer
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
@@ -168,41 +179,50 @@ export class StorageService {
         throw error;
       }
 
-      // Handle network errors or other unexpected errors
       throw new BadRequestException(
         'Failed to fetch image from the provided URL',
       );
     }
   }
-  /**
-   * Read and parse a JSON file from storage.
-   * @param filePath The path of the file to retrieve (relative to bucket).
-   * @param bucket The bucket name where the file is stored (default: 'default').
-   * @returns The parsed JSON data.
-   * @throws NotFoundException if the file doesn't exist.
-   */
+
   public async readJsonFile<T>(
     filePath: string,
     bucket: string = 'default',
   ): Promise<T> {
     const cleanPath = filePath.replace(/^[./\s]+/, '');
-    const bucketPath = this.getBucketPath(bucket);
-    const fullPath = join(bucketPath, cleanPath);
 
-    const resolvedPath = resolve(fullPath);
-    const resolvedBucketPath = resolve(bucketPath);
-
-    if (
-      !resolvedPath.startsWith(resolvedBucketPath) ||
-      !existsSync(resolvedPath)
-    ) {
+    if (!cleanPath || cleanPath.includes('..')) {
       throw new NotFoundException('File not found');
     }
 
     try {
-      const content = await fs.promises.readFile(resolvedPath, 'utf8');
+      const response = await this.rustFsClient.getClient().send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: cleanPath,
+        }),
+      );
+
+      if (!response.Body) {
+        throw new NotFoundException('File not found');
+      }
+
+      const body = response.Body as Readable;
+      const chunks: Buffer[] = [];
+      for await (const chunk of body) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const content = Buffer.concat(chunks).toString('utf8');
       return JSON.parse(content) as T;
     } catch (error: unknown) {
+      if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)) {
+        throw new NotFoundException('File not found');
+      }
+      if (error instanceof SyntaxError) {
+        throw new InternalServerErrorException(
+          `Failed to parse JSON file: ${error.message}`,
+        );
+      }
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
       throw new InternalServerErrorException(
