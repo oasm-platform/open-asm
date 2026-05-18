@@ -26,9 +26,6 @@ export class RustFsClient {
       },
       forcePathStyle: true,
     });
-    this.logger.log(
-      `RustFS client initialized: ${this.configService.get<string>('RUSTFS_ENDPOINT')}`,
-    );
   }
 
   getClient(): S3Client {
