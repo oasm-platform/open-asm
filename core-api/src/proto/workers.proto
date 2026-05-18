@@ -90,12 +90,13 @@ message RemoteExecuteSubscribeResponse {
 }
 
 message RemoteExecuteResultStream {
-  string worker_id                       = 1;
-  string session_id                      = 2;
-  RemoteExecuteResultEventType type      = 3;
-  bytes  data                            = 4;
-  int32  exit_code                       = 5;
-  string error_message                   = 6;
+  string id                            = 1;
+  string worker_id                     = 2;
+  string session_id                    = 3;
+  RemoteExecuteResultEventType type    = 4;
+  bytes  data                          = 5;
+  int32  exit_code                     = 6;
+  string error_message                 = 7;
 }
 
 enum RemoteExecuteResultEventType {

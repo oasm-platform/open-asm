@@ -267,6 +267,7 @@ export class WorkersController {
   @GrpcStreamMethod('WorkersService', 'RemoteExecuteResult')
   grpcRemoteExecuteResult(
     requestStream: Observable<{
+      id: string;
       workerId: string;
       sessionId: string;
       type: number;

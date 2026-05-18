@@ -547,6 +547,7 @@ export class WorkersService {
   }
 
   public async handleRemoteExecuteResult(result: {
+    id: string;
     workerId: string;
     sessionId: string;
     type: number;
@@ -558,6 +559,7 @@ export class WorkersService {
     await this.redisService.publish(
       channel,
       JSON.stringify({
+        id: result.id,
         workerId: result.workerId,
         sessionId: result.sessionId,
         type: result.type,
