@@ -7,6 +7,7 @@ import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
 import { createReadStream } from 'fs';
+import { readdir } from 'fs/promises';
 import { join } from 'path';
 import { Observable } from 'rxjs';
 import {
@@ -68,19 +69,19 @@ export class WorkersController {
   }
 
   @GrpcMethod('WorkersService', 'GetManifest')
-  grpcGetManifest(): { downloadToolsUrl: string; initCommands: string[] } {
+  grpcGetManifest(): { initCommands: string[] } {
     return {
-      downloadToolsUrl: '/public/archived/tools.tar.gz',
       initCommands: ['nuclei -ut'],
     };
   }
 
-  @GrpcMethod('WorkersService', 'DownloadTools')
-  grpcDownloadTools(request: {
-    url: string;
+  @GrpcMethod('WorkersService', 'Storage')
+  grpcStorage(request: {
+    path: string;
   }): Observable<{ chunk: Buffer; offset: number; eof: boolean }> {
     return new Observable((subscriber) => {
-      const filePath = join(process.cwd(), request.url);
+      const normalizedPath = request.path.replace(/^static/, 'public');
+      const filePath = join(process.cwd(), normalizedPath);
       const stream = createReadStream(filePath, { highWaterMark: 1024 * 1024 }); // 1MB chunks
       let offset = 0;
 
@@ -179,5 +180,35 @@ export class WorkersController {
     }>;
   }): Promise<{ message: string }> {
     return this.workersService.connectInternalNetwork(request);
+  }
+
+  @GrpcMethod('WorkersService', 'BuiltinToolRegistry')
+  async grpcBuiltinToolRegistry(): Promise<{
+    linux: string[];
+    windows: string[];
+    macos: string[];
+  }> {
+    const archivedPath = join(process.cwd(), 'public/archived');
+
+    const getFiles = async (dir: string): Promise<string[]> => {
+      try {
+        const files = await readdir(dir);
+        return files;
+      } catch {
+        return [];
+      }
+    };
+
+    const [linux, windows, macos] = await Promise.all([
+      getFiles(join(archivedPath, 'linux')),
+      getFiles(join(archivedPath, 'windows')),
+      getFiles(join(archivedPath, 'macos')),
+    ]);
+
+    return {
+      linux: linux.map((f) => `static/archived/linux/${f}`),
+      windows: windows.map((f) => `static/archived/windows/${f}`),
+      macos: macos.map((f) => `static/archived/macos/${f}`),
+    };
   }
 }

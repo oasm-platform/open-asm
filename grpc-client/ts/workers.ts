@@ -94,27 +94,23 @@ export interface GetManifestRequest {
  */
 export interface GetManifestResponse {
     /**
-     * @generated from protobuf field: string download_tools_url = 1
-     */
-    downloadToolsUrl: string;
-    /**
-     * @generated from protobuf field: repeated string init_commands = 2
+     * @generated from protobuf field: repeated string init_commands = 1
      */
     initCommands: string[];
 }
 /**
- * @generated from protobuf message workers.DownloadToolsRequest
+ * @generated from protobuf message workers.StorageRequest
  */
-export interface DownloadToolsRequest {
+export interface StorageRequest {
     /**
-     * @generated from protobuf field: string url = 1
+     * @generated from protobuf field: string path = 1
      */
-    url: string;
+    path: string;
 }
 /**
- * @generated from protobuf message workers.DownloadToolsResponse
+ * @generated from protobuf message workers.StorageResponse
  */
-export interface DownloadToolsResponse {
+export interface StorageResponse {
     /**
      * @generated from protobuf field: bytes chunk = 1
      */
@@ -178,6 +174,28 @@ export interface ConnectInternalNetworkResponse {
      * @generated from protobuf field: string message = 1
      */
     message: string;
+}
+/**
+ * @generated from protobuf message workers.BuiltinToolRegistryRequest
+ */
+export interface BuiltinToolRegistryRequest {
+}
+/**
+ * @generated from protobuf message workers.BuiltinToolRegistryResponse
+ */
+export interface BuiltinToolRegistryResponse {
+    /**
+     * @generated from protobuf field: repeated string linux = 1
+     */
+    linux: string[];
+    /**
+     * @generated from protobuf field: repeated string windows = 2
+     */
+    windows: string[];
+    /**
+     * @generated from protobuf field: repeated string macos = 3
+     */
+    macos: string[];
 }
 // @generated message type with reflection information, may provide speed optimized methods
 class JoinRequest$Type extends MessageType<JoinRequest> {
@@ -508,13 +526,11 @@ export const GetManifestRequest = new GetManifestRequest$Type();
 class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
     constructor() {
         super("workers.GetManifestResponse", [
-            { no: 1, name: "download_tools_url", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "init_commands", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ }
+            { no: 1, name: "init_commands", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ }
         ]);
     }
     create(value?: PartialMessage<GetManifestResponse>): GetManifestResponse {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.downloadToolsUrl = "";
         message.initCommands = [];
         if (value !== undefined)
             reflectionMergePartial<GetManifestResponse>(this, message, value);
@@ -525,10 +541,7 @@ class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string download_tools_url */ 1:
-                    message.downloadToolsUrl = reader.string();
-                    break;
-                case /* repeated string init_commands */ 2:
+                case /* repeated string init_commands */ 1:
                     message.initCommands.push(reader.string());
                     break;
                 default:
@@ -543,12 +556,9 @@ class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
         return message;
     }
     internalBinaryWrite(message: GetManifestResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string download_tools_url = 1; */
-        if (message.downloadToolsUrl !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.downloadToolsUrl);
-        /* repeated string init_commands = 2; */
+        /* repeated string init_commands = 1; */
         for (let i = 0; i < message.initCommands.length; i++)
-            writer.tag(2, WireType.LengthDelimited).string(message.initCommands[i]);
+            writer.tag(1, WireType.LengthDelimited).string(message.initCommands[i]);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -560,26 +570,26 @@ class GetManifestResponse$Type extends MessageType<GetManifestResponse> {
  */
 export const GetManifestResponse = new GetManifestResponse$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class DownloadToolsRequest$Type extends MessageType<DownloadToolsRequest> {
+class StorageRequest$Type extends MessageType<StorageRequest> {
     constructor() {
-        super("workers.DownloadToolsRequest", [
-            { no: 1, name: "url", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        super("workers.StorageRequest", [
+            { no: 1, name: "path", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
         ]);
     }
-    create(value?: PartialMessage<DownloadToolsRequest>): DownloadToolsRequest {
+    create(value?: PartialMessage<StorageRequest>): StorageRequest {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.url = "";
+        message.path = "";
         if (value !== undefined)
-            reflectionMergePartial<DownloadToolsRequest>(this, message, value);
+            reflectionMergePartial<StorageRequest>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DownloadToolsRequest): DownloadToolsRequest {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StorageRequest): StorageRequest {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string url */ 1:
-                    message.url = reader.string();
+                case /* string path */ 1:
+                    message.path = reader.string();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -592,10 +602,10 @@ class DownloadToolsRequest$Type extends MessageType<DownloadToolsRequest> {
         }
         return message;
     }
-    internalBinaryWrite(message: DownloadToolsRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string url = 1; */
-        if (message.url !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.url);
+    internalBinaryWrite(message: StorageRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string path = 1; */
+        if (message.path !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.path);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -603,28 +613,28 @@ class DownloadToolsRequest$Type extends MessageType<DownloadToolsRequest> {
     }
 }
 /**
- * @generated MessageType for protobuf message workers.DownloadToolsRequest
+ * @generated MessageType for protobuf message workers.StorageRequest
  */
-export const DownloadToolsRequest = new DownloadToolsRequest$Type();
+export const StorageRequest = new StorageRequest$Type();
 // @generated message type with reflection information, may provide speed optimized methods
-class DownloadToolsResponse$Type extends MessageType<DownloadToolsResponse> {
+class StorageResponse$Type extends MessageType<StorageResponse> {
     constructor() {
-        super("workers.DownloadToolsResponse", [
+        super("workers.StorageResponse", [
             { no: 1, name: "chunk", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
             { no: 2, name: "offset", kind: "scalar", T: 5 /*ScalarType.INT32*/ },
             { no: 3, name: "eof", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
         ]);
     }
-    create(value?: PartialMessage<DownloadToolsResponse>): DownloadToolsResponse {
+    create(value?: PartialMessage<StorageResponse>): StorageResponse {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.chunk = new Uint8Array(0);
         message.offset = 0;
         message.eof = false;
         if (value !== undefined)
-            reflectionMergePartial<DownloadToolsResponse>(this, message, value);
+            reflectionMergePartial<StorageResponse>(this, message, value);
         return message;
     }
-    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DownloadToolsResponse): DownloadToolsResponse {
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StorageResponse): StorageResponse {
         let message = target ?? this.create(), end = reader.pos + length;
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
@@ -649,7 +659,7 @@ class DownloadToolsResponse$Type extends MessageType<DownloadToolsResponse> {
         }
         return message;
     }
-    internalBinaryWrite(message: DownloadToolsResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+    internalBinaryWrite(message: StorageResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
         /* bytes chunk = 1; */
         if (message.chunk.length)
             writer.tag(1, WireType.LengthDelimited).bytes(message.chunk);
@@ -666,9 +676,9 @@ class DownloadToolsResponse$Type extends MessageType<DownloadToolsResponse> {
     }
 }
 /**
- * @generated MessageType for protobuf message workers.DownloadToolsResponse
+ * @generated MessageType for protobuf message workers.StorageResponse
  */
-export const DownloadToolsResponse = new DownloadToolsResponse$Type();
+export const StorageResponse = new StorageResponse$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class NetworkInterfaceMessage$Type extends MessageType<NetworkInterfaceMessage> {
     constructor() {
@@ -858,6 +868,107 @@ class ConnectInternalNetworkResponse$Type extends MessageType<ConnectInternalNet
  * @generated MessageType for protobuf message workers.ConnectInternalNetworkResponse
  */
 export const ConnectInternalNetworkResponse = new ConnectInternalNetworkResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class BuiltinToolRegistryRequest$Type extends MessageType<BuiltinToolRegistryRequest> {
+    constructor() {
+        super("workers.BuiltinToolRegistryRequest", []);
+    }
+    create(value?: PartialMessage<BuiltinToolRegistryRequest>): BuiltinToolRegistryRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<BuiltinToolRegistryRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: BuiltinToolRegistryRequest): BuiltinToolRegistryRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: BuiltinToolRegistryRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.BuiltinToolRegistryRequest
+ */
+export const BuiltinToolRegistryRequest = new BuiltinToolRegistryRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class BuiltinToolRegistryResponse$Type extends MessageType<BuiltinToolRegistryResponse> {
+    constructor() {
+        super("workers.BuiltinToolRegistryResponse", [
+            { no: 1, name: "linux", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "windows", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "macos", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<BuiltinToolRegistryResponse>): BuiltinToolRegistryResponse {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.linux = [];
+        message.windows = [];
+        message.macos = [];
+        if (value !== undefined)
+            reflectionMergePartial<BuiltinToolRegistryResponse>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: BuiltinToolRegistryResponse): BuiltinToolRegistryResponse {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* repeated string linux */ 1:
+                    message.linux.push(reader.string());
+                    break;
+                case /* repeated string windows */ 2:
+                    message.windows.push(reader.string());
+                    break;
+                case /* repeated string macos */ 3:
+                    message.macos.push(reader.string());
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: BuiltinToolRegistryResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* repeated string linux = 1; */
+        for (let i = 0; i < message.linux.length; i++)
+            writer.tag(1, WireType.LengthDelimited).string(message.linux[i]);
+        /* repeated string windows = 2; */
+        for (let i = 0; i < message.windows.length; i++)
+            writer.tag(2, WireType.LengthDelimited).string(message.windows[i]);
+        /* repeated string macos = 3; */
+        for (let i = 0; i < message.macos.length; i++)
+            writer.tag(3, WireType.LengthDelimited).string(message.macos[i]);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message workers.BuiltinToolRegistryResponse
+ */
+export const BuiltinToolRegistryResponse = new BuiltinToolRegistryResponse$Type();
 /**
  * @generated ServiceType for protobuf service workers.WorkersService
  */
@@ -865,6 +976,7 @@ export const WorkersService = new ServiceType("workers.WorkersService", [
     { name: "Join", options: {}, I: JoinRequest, O: JoinResponse },
     { name: "Alive", serverStreaming: true, options: {}, I: AliveRequest, O: AliveResponse },
     { name: "GetManifest", options: {}, I: GetManifestRequest, O: GetManifestResponse },
-    { name: "DownloadTools", serverStreaming: true, options: {}, I: DownloadToolsRequest, O: DownloadToolsResponse },
-    { name: "ConnectInternalNetwork", options: {}, I: ConnectInternalNetworkRequest, O: ConnectInternalNetworkResponse }
+    { name: "Storage", serverStreaming: true, options: {}, I: StorageRequest, O: StorageResponse },
+    { name: "ConnectInternalNetwork", options: {}, I: ConnectInternalNetworkRequest, O: ConnectInternalNetworkResponse },
+    { name: "BuiltinToolRegistry", options: {}, I: BuiltinToolRegistryRequest, O: BuiltinToolRegistryResponse }
 ]);

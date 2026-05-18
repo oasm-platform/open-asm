@@ -4,10 +4,12 @@
 import type { RpcTransport } from "@protobuf-ts/runtime-rpc";
 import type { ServiceInfo } from "@protobuf-ts/runtime-rpc";
 import { WorkersService } from "./workers";
+import type { BuiltinToolRegistryResponse } from "./workers";
+import type { BuiltinToolRegistryRequest } from "./workers";
 import type { ConnectInternalNetworkResponse } from "./workers";
 import type { ConnectInternalNetworkRequest } from "./workers";
-import type { DownloadToolsResponse } from "./workers";
-import type { DownloadToolsRequest } from "./workers";
+import type { StorageResponse } from "./workers";
+import type { StorageRequest } from "./workers";
 import type { GetManifestResponse } from "./workers";
 import type { GetManifestRequest } from "./workers";
 import type { AliveResponse } from "./workers";
@@ -35,13 +37,17 @@ export interface IWorkersServiceClient {
      */
     getManifest(input: GetManifestRequest, options?: RpcOptions): UnaryCall<GetManifestRequest, GetManifestResponse>;
     /**
-     * @generated from protobuf rpc: DownloadTools
+     * @generated from protobuf rpc: Storage
      */
-    downloadTools(input: DownloadToolsRequest, options?: RpcOptions): ServerStreamingCall<DownloadToolsRequest, DownloadToolsResponse>;
+    storage(input: StorageRequest, options?: RpcOptions): ServerStreamingCall<StorageRequest, StorageResponse>;
     /**
      * @generated from protobuf rpc: ConnectInternalNetwork
      */
     connectInternalNetwork(input: ConnectInternalNetworkRequest, options?: RpcOptions): UnaryCall<ConnectInternalNetworkRequest, ConnectInternalNetworkResponse>;
+    /**
+     * @generated from protobuf rpc: BuiltinToolRegistry
+     */
+    builtinToolRegistry(input: BuiltinToolRegistryRequest, options?: RpcOptions): UnaryCall<BuiltinToolRegistryRequest, BuiltinToolRegistryResponse>;
 }
 /**
  * @generated from protobuf service workers.WorkersService
@@ -74,11 +80,11 @@ export class WorkersServiceClient implements IWorkersServiceClient, ServiceInfo 
         return stackIntercept<GetManifestRequest, GetManifestResponse>("unary", this._transport, method, opt, input);
     }
     /**
-     * @generated from protobuf rpc: DownloadTools
+     * @generated from protobuf rpc: Storage
      */
-    downloadTools(input: DownloadToolsRequest, options?: RpcOptions): ServerStreamingCall<DownloadToolsRequest, DownloadToolsResponse> {
+    storage(input: StorageRequest, options?: RpcOptions): ServerStreamingCall<StorageRequest, StorageResponse> {
         const method = this.methods[3], opt = this._transport.mergeOptions(options);
-        return stackIntercept<DownloadToolsRequest, DownloadToolsResponse>("serverStreaming", this._transport, method, opt, input);
+        return stackIntercept<StorageRequest, StorageResponse>("serverStreaming", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: ConnectInternalNetwork
@@ -86,5 +92,12 @@ export class WorkersServiceClient implements IWorkersServiceClient, ServiceInfo 
     connectInternalNetwork(input: ConnectInternalNetworkRequest, options?: RpcOptions): UnaryCall<ConnectInternalNetworkRequest, ConnectInternalNetworkResponse> {
         const method = this.methods[4], opt = this._transport.mergeOptions(options);
         return stackIntercept<ConnectInternalNetworkRequest, ConnectInternalNetworkResponse>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: BuiltinToolRegistry
+     */
+    builtinToolRegistry(input: BuiltinToolRegistryRequest, options?: RpcOptions): UnaryCall<BuiltinToolRegistryRequest, BuiltinToolRegistryResponse> {
+        const method = this.methods[5], opt = this._transport.mergeOptions(options);
+        return stackIntercept<BuiltinToolRegistryRequest, BuiltinToolRegistryResponse>("unary", this._transport, method, opt, input);
     }
 }
