@@ -9,7 +9,7 @@ require (
 	github.com/go-rod/rod v0.116.2
 	github.com/go-rod/stealth v0.4.9
 	github.com/joho/godotenv v1.5.1
-	github.com/oasm-platform/oasm-sdk-go v0.1.9
+	github.com/oasm-platform/oasm-sdk-go v0.1.10
 	github.com/oasm-platform/open-asm/grpc-client/go v0.0.0-20260517093339-41cc1a622cc0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0

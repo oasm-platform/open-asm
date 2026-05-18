@@ -81,7 +81,7 @@ export class TemplatesService {
 
     const fileBuffer = Buffer.from(fileContent, 'utf-8');
 
-    const result = this.storageService.uploadFile(
+    const result = await this.storageService.uploadFile(
       `${templateId}.yaml`,
       fileBuffer,
       'nuclei-templates',
@@ -206,7 +206,7 @@ export class TemplatesService {
     if (template.path) {
       const [bucket, path] = this.getFileAndBucket(template.path);
       try {
-        this.storageService.deleteFile(path, bucket);
+        await this.storageService.deleteFile(path, bucket);
       } catch (error) {
         // Log error but don't fail the operation
         this.logger.warn('Failed to delete file from storage:', error);

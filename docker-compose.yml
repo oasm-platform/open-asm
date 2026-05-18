@@ -40,6 +40,7 @@ services:
       - REDIS_URL=redis://:password@redis:6379/0
       - GEO_IP_URL=geo-ip:4360
       - OASM_CLOUD_APIKEY=change_me
+      - RUSTFS_ENDPOINT=http://rustfs:9000
     restart: 'always'
     logging:
       driver: json-file
@@ -53,9 +54,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rustfs:
+        condition: service_started
     volumes:
       - ./.open-api:/.open-api
-      - api-storage:/app/.storage:rw
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:6276/api/health']
       interval: 1s
@@ -161,6 +163,27 @@ services:
     volumes:
       - geoip-data:/app/data:rw
 
+  rustfs:
+    container_name: oasm-rustfs
+    image: rustfs/rustfs:latest
+    networks:
+      - oasm
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    environment:
+      - RUSTFS_ACCESS_KEY=rustfsadmin
+      - RUSTFS_SECRET_KEY=rustfssecret
+    volumes:
+      - rustfs-data:/data:rw
+    restart: 'always'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    command: ['/data']
+
   migration:
     container_name: oasm-migration
     image: oasm/oasm-api:latest
@@ -191,7 +214,7 @@ volumes:
   redis-data:
   redpanda-data:
   geoip-data:
-  api-storage:
+  rustfs-data:
   worker-tools-cache:
 
 networks:
