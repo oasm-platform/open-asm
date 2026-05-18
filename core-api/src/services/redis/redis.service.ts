@@ -3,6 +3,8 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 
+type MessageCallback = (channel: string, message: string) => void;
+
 /**
  * RedisService provides a wrapper around ioredis
  * to simplify publishing, subscribing, and key management.
@@ -29,6 +31,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Redis client instance for subscribing to messages.
    */
   public readonly subscriber: Redis;
+
+  /**
+   * Track callbacks per channel so they can be properly removed on unsubscribe.
+   */
+  private readonly channelCallbacks = new Map<string, Set<MessageCallback>>();
 
   constructor(private readonly configService: ConfigService) {
     try {
@@ -94,6 +101,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async onModuleDestroy(): Promise<void> {
     try {
+      this.unsubscribeAll();
       await Promise.all([
         this.client?.disconnect(),
         this.cacheClient?.disconnect(),
@@ -214,10 +222,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   public async subscribe(
     channel: string,
-    callback: (channel: string, message: string) => void,
+    callback: MessageCallback,
   ): Promise<void> {
     try {
       await this.subscriber.subscribe(channel);
+
+      if (!this.channelCallbacks.has(channel)) {
+        this.channelCallbacks.set(channel, new Set());
+      }
+      this.channelCallbacks.get(channel)!.add(callback);
       this.subscriber.on('message', callback);
     } catch (error) {
       const errorMessage =
@@ -230,11 +243,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Unsubscribe from a Redis channel
+   * Removes all registered callbacks for this channel to prevent memory leaks.
    *
    * @param channel - Redis channel name
    */
   public async unsubscribe(channel: string): Promise<void> {
     try {
+      const callbacks = this.channelCallbacks.get(channel);
+      if (callbacks) {
+        for (const callback of callbacks) {
+          this.subscriber.removeListener('message', callback);
+        }
+        this.channelCallbacks.delete(channel);
+      }
       await this.subscriber.unsubscribe(channel);
     } catch (error) {
       const errorMessage =
@@ -243,6 +264,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         `Failed to unsubscribe from channel ${channel}: ${errorMessage}`,
       );
     }
+  }
+
+  /**
+   * Unsubscribe from all channels and remove all listeners.
+   * Called during module destruction to prevent memory leaks.
+   */
+  public unsubscribeAll(): void {
+    for (const [channel, callbacks] of this.channelCallbacks) {
+      for (const callback of callbacks) {
+        this.subscriber.removeListener('message', callback);
+      }
+    }
+    this.channelCallbacks.clear();
   }
 
   /**

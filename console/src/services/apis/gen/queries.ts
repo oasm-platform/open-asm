@@ -1630,6 +1630,13 @@ export type CreateNotificationDto = {
   metadata?: CreateNotificationDtoMetadata;
 };
 
+export type RunCommandDto = {
+  /** Command to execute */
+  command: string;
+  /** Session ID for the remote execution stream */
+  sessionId: string;
+};
+
 export type ToolProvider = {
   id: string;
   createdAt: string;
@@ -2357,6 +2364,10 @@ export type NotificationsControllerGetNotificationsParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type RemoteExecuteControllerStreamParams = {
+  sessionId: string;
 };
 
 export type ProvidersControllerGetManyProvidersParams = {
@@ -20257,6 +20268,268 @@ export const useNotificationsControllerMarkAsRead = <
     queryClient,
   );
 };
+
+/**
+ * Publishes a command to the remote-execute channel via Redis pub/sub. The command is enriched with an id (nanoid) and sessionId (uuid) before publishing.
+ * @summary Run a remote command
+ */
+export const remoteExecuteControllerRunCommand = (
+  runCommandDto: RunCommandDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/remote-execute/run`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: runCommandDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getRemoteExecuteControllerRunCommandMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+    TError,
+    { data: RunCommandDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+  TError,
+  { data: RunCommandDto },
+  TContext
+> => {
+  const mutationKey = ['remoteExecuteControllerRunCommand'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+    { data: RunCommandDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return remoteExecuteControllerRunCommand(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemoteExecuteControllerRunCommandMutationResult = NonNullable<
+  Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>
+>;
+export type RemoteExecuteControllerRunCommandMutationBody = RunCommandDto;
+export type RemoteExecuteControllerRunCommandMutationError = unknown;
+
+/**
+ * @summary Run a remote command
+ */
+export const useRemoteExecuteControllerRunCommand = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+      TError,
+      { data: RunCommandDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof remoteExecuteControllerRunCommand>>,
+  TError,
+  { data: RunCommandDto },
+  TContext
+> => {
+  return useMutation(
+    getRemoteExecuteControllerRunCommandMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Server-Sent Events endpoint that streams commands published to the remote-execute channel for a specific sessionId in real-time. Each event is a JSON-encoded RemoteCommandPayload.
+ * @summary Subscribe to remote-execute stream
+ */
+export const remoteExecuteControllerStream = (
+  params: RemoteExecuteControllerStreamParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/remote-execute/stream`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getRemoteExecuteControllerStreamQueryKey = (
+  params?: RemoteExecuteControllerStreamParams,
+) => {
+  return [`/api/remote-execute/stream`, ...(params ? [params] : [])] as const;
+};
+
+export const getRemoteExecuteControllerStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+  TError = unknown,
+>(
+  params: RemoteExecuteControllerStreamParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getRemoteExecuteControllerStreamQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof remoteExecuteControllerStream>>
+  > = ({ signal }) =>
+    remoteExecuteControllerStream(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type RemoteExecuteControllerStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof remoteExecuteControllerStream>>
+>;
+export type RemoteExecuteControllerStreamQueryError = unknown;
+
+export function useRemoteExecuteControllerStream<
+  TData = Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+  TError = unknown,
+>(
+  params: RemoteExecuteControllerStreamParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof remoteExecuteControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useRemoteExecuteControllerStream<
+  TData = Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+  TError = unknown,
+>(
+  params: RemoteExecuteControllerStreamParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof remoteExecuteControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useRemoteExecuteControllerStream<
+  TData = Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+  TError = unknown,
+>(
+  params: RemoteExecuteControllerStreamParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Subscribe to remote-execute stream
+ */
+
+export function useRemoteExecuteControllerStream<
+  TData = Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+  TError = unknown,
+>(
+  params: RemoteExecuteControllerStreamParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof remoteExecuteControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getRemoteExecuteControllerStreamQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * Get all providers with pagination, filtered by owner

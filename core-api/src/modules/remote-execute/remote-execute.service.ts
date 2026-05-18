@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { RedisService } from '@/services/redis/redis.service';
 import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
+import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { Observable } from 'rxjs';
 import type { MessageEvent } from '@nestjs/common';
 
@@ -21,11 +22,14 @@ export class RemoteExecuteService {
   runCommand(
     command: string,
     sessionId: string,
-  ): RemoteCommandPayload | null {
+    _user?: UserContextPayload,
+  ): RemoteCommandPayload {
     const workerId = this.remoteExecuteSubscribeService.getAvailableWorker();
 
     if (!workerId) {
-      return null;
+      throw new ServiceUnavailableException(
+        'No available worker for remote execution',
+      );
     }
 
     const result = this.remoteExecuteSubscribeService.pushCommand(
@@ -35,7 +39,9 @@ export class RemoteExecuteService {
     );
 
     if (!result) {
-      return null;
+      throw new ServiceUnavailableException(
+        'Selected worker became unavailable',
+      );
     }
 
     return {
@@ -46,8 +52,11 @@ export class RemoteExecuteService {
     };
   }
 
-  subscribeToStream(sessionId: string): Observable<MessageEvent> {
-    const channel = `remote-execute:results:${sessionId}`;
+  subscribeToStream(
+    sessionId: string,
+    user: UserContextPayload,
+  ): Observable<MessageEvent> {
+    const channel = `remote-execute:results:${user.id}:${sessionId}`;
     return new Observable<MessageEvent>((observer) => {
       const handler = (_channel: string, message: string) => {
         observer.next({ data: message });
