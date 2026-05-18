@@ -2,6 +2,7 @@ import { AssetsModule } from '@/modules/assets/assets.module';
 import { StatisticModule } from '@/modules/statistic/statistic.module';
 import { TargetsModule } from '@/modules/targets/targets.module';
 import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
+import { RemoteExecuteModule } from '@/modules/remote-execute/remote-execute.module';
 import { Global, Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsCompletionsService } from './agents.completions';
@@ -31,6 +32,7 @@ import { HttpModule } from '@nestjs/axios';
     TargetsModule,
     forwardRef(() => VulnerabilitiesModule),
     StatisticModule,
+    RemoteExecuteModule,
     HttpModule,
   ],
   controllers: [AgentsController],

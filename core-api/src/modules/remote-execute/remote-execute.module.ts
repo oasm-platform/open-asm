@@ -5,5 +5,6 @@ import { RemoteExecuteService } from './remote-execute.service';
 @Module({
   controllers: [RemoteExecuteController],
   providers: [RemoteExecuteService],
+  exports: [RemoteExecuteService],
 })
 export class RemoteExecuteModule {}
