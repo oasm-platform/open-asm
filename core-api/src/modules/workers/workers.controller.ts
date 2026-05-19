@@ -254,7 +254,7 @@ export class WorkersController {
 
     subject.next({
       id: '',
-      workerId: worker.id,
+      workerId: '',
       type: 1, // REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED
       sessionId: '',
       command: '',
@@ -268,12 +268,10 @@ export class WorkersController {
   grpcRemoteExecuteResult(
     requestStream: Observable<{
       id: string;
-      workerId: string;
       sessionId: string;
       type: number;
       data: Uint8Array;
       exitCode: number;
-      errorMessage: string;
     }>,
   ): { success: boolean; message: string } {
     requestStream.subscribe({

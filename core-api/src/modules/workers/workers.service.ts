@@ -548,24 +548,20 @@ export class WorkersService {
 
   public async handleRemoteExecuteResult(result: {
     id: string;
-    workerId: string;
     sessionId: string;
     type: number;
     data: Uint8Array;
     exitCode: number;
-    errorMessage: string;
   }) {
     const channel = `remote-execute:results:${result.sessionId}`;
     await this.redisService.publish(
       channel,
       JSON.stringify({
         id: result.id,
-        workerId: result.workerId,
         sessionId: result.sessionId,
         type: result.type,
         data: Buffer.from(result.data).toString('utf-8'),
         exitCode: result.exitCode,
-        errorMessage: result.errorMessage,
       }),
     );
   }

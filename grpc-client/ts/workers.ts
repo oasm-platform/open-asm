@@ -236,29 +236,21 @@ export interface RemoteExecuteResultStream {
      */
     id: string;
     /**
-     * @generated from protobuf field: string worker_id = 2
-     */
-    workerId: string;
-    /**
-     * @generated from protobuf field: string session_id = 3
+     * @generated from protobuf field: string session_id = 2
      */
     sessionId: string;
     /**
-     * @generated from protobuf field: workers.RemoteExecuteResultEventType type = 4
+     * @generated from protobuf field: workers.RemoteExecuteResultEventType type = 3
      */
     type: RemoteExecuteResultEventType;
     /**
-     * @generated from protobuf field: bytes data = 5
+     * @generated from protobuf field: bytes data = 4
      */
     data: Uint8Array;
     /**
-     * @generated from protobuf field: int32 exit_code = 6
+     * @generated from protobuf field: int32 exit_code = 5
      */
     exitCode: number;
-    /**
-     * @generated from protobuf field: string error_message = 7
-     */
-    errorMessage: string;
 }
 /**
  * @generated from protobuf message workers.RemoteExecuteResultAck
@@ -1209,23 +1201,19 @@ class RemoteExecuteResultStream$Type extends MessageType<RemoteExecuteResultStre
     constructor() {
         super("workers.RemoteExecuteResultStream", [
             { no: 1, name: "id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 2, name: "worker_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 3, name: "session_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 4, name: "type", kind: "enum", T: () => ["workers.RemoteExecuteResultEventType", RemoteExecuteResultEventType] },
-            { no: 5, name: "data", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
-            { no: 6, name: "exit_code", kind: "scalar", T: 5 /*ScalarType.INT32*/ },
-            { no: 7, name: "error_message", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+            { no: 2, name: "session_id", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "type", kind: "enum", T: () => ["workers.RemoteExecuteResultEventType", RemoteExecuteResultEventType] },
+            { no: 4, name: "data", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
+            { no: 5, name: "exit_code", kind: "scalar", T: 5 /*ScalarType.INT32*/ }
         ]);
     }
     create(value?: PartialMessage<RemoteExecuteResultStream>): RemoteExecuteResultStream {
         const message = globalThis.Object.create((this.messagePrototype!));
         message.id = "";
-        message.workerId = "";
         message.sessionId = "";
         message.type = 0;
         message.data = new Uint8Array(0);
         message.exitCode = 0;
-        message.errorMessage = "";
         if (value !== undefined)
             reflectionMergePartial<RemoteExecuteResultStream>(this, message, value);
         return message;
@@ -1238,23 +1226,17 @@ class RemoteExecuteResultStream$Type extends MessageType<RemoteExecuteResultStre
                 case /* string id */ 1:
                     message.id = reader.string();
                     break;
-                case /* string worker_id */ 2:
-                    message.workerId = reader.string();
-                    break;
-                case /* string session_id */ 3:
+                case /* string session_id */ 2:
                     message.sessionId = reader.string();
                     break;
-                case /* workers.RemoteExecuteResultEventType type */ 4:
+                case /* workers.RemoteExecuteResultEventType type */ 3:
                     message.type = reader.int32();
                     break;
-                case /* bytes data */ 5:
+                case /* bytes data */ 4:
                     message.data = reader.bytes();
                     break;
-                case /* int32 exit_code */ 6:
+                case /* int32 exit_code */ 5:
                     message.exitCode = reader.int32();
-                    break;
-                case /* string error_message */ 7:
-                    message.errorMessage = reader.string();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -1271,24 +1253,18 @@ class RemoteExecuteResultStream$Type extends MessageType<RemoteExecuteResultStre
         /* string id = 1; */
         if (message.id !== "")
             writer.tag(1, WireType.LengthDelimited).string(message.id);
-        /* string worker_id = 2; */
-        if (message.workerId !== "")
-            writer.tag(2, WireType.LengthDelimited).string(message.workerId);
-        /* string session_id = 3; */
+        /* string session_id = 2; */
         if (message.sessionId !== "")
-            writer.tag(3, WireType.LengthDelimited).string(message.sessionId);
-        /* workers.RemoteExecuteResultEventType type = 4; */
+            writer.tag(2, WireType.LengthDelimited).string(message.sessionId);
+        /* workers.RemoteExecuteResultEventType type = 3; */
         if (message.type !== 0)
-            writer.tag(4, WireType.Varint).int32(message.type);
-        /* bytes data = 5; */
+            writer.tag(3, WireType.Varint).int32(message.type);
+        /* bytes data = 4; */
         if (message.data.length)
-            writer.tag(5, WireType.LengthDelimited).bytes(message.data);
-        /* int32 exit_code = 6; */
+            writer.tag(4, WireType.LengthDelimited).bytes(message.data);
+        /* int32 exit_code = 5; */
         if (message.exitCode !== 0)
-            writer.tag(6, WireType.Varint).int32(message.exitCode);
-        /* string error_message = 7; */
-        if (message.errorMessage !== "")
-            writer.tag(7, WireType.LengthDelimited).string(message.errorMessage);
+            writer.tag(5, WireType.Varint).int32(message.exitCode);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

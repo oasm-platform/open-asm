@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { nanoid } from 'nanoid';
-import { Subject } from 'rxjs';
+import { ReplaySubject } from 'rxjs';
 import { WorkerInstance } from './entities/worker.entity';
 
 export interface RemoteExecuteCommand {
@@ -15,12 +15,12 @@ export interface RemoteExecuteCommand {
 export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   private readonly logger = new Logger(RemoteExecuteSubscribeService.name);
 
-  private readonly workers = new Map<string, Subject<RemoteExecuteCommand>>();
+  private readonly workers = new Map<string, ReplaySubject<RemoteExecuteCommand>>();
 
   private readonly sessionWorkerMap = new Map<string, string>();
 
-  registerWorker(worker: WorkerInstance): Subject<RemoteExecuteCommand> {
-    const subject = new Subject<RemoteExecuteCommand>();
+  registerWorker(worker: WorkerInstance): ReplaySubject<RemoteExecuteCommand> {
+    const subject = new ReplaySubject<RemoteExecuteCommand>(1);
     this.workers.set(worker.id, subject);
 
     const workerId = worker.id;
@@ -34,7 +34,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     return subject;
   }
 
-  getWorkerSubject(workerId: string): Subject<RemoteExecuteCommand> | undefined {
+  getWorkerSubject(workerId: string): ReplaySubject<RemoteExecuteCommand> | undefined {
     return this.workers.get(workerId);
   }
 

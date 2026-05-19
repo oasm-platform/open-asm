@@ -976,12 +976,10 @@ func (x *RemoteExecuteSubscribeResponse) GetCommand() string {
 type RemoteExecuteResultStream struct {
 	state         protoimpl.MessageState       `protogen:"open.v1"`
 	Id            string                       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	WorkerId      string                       `protobuf:"bytes,2,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	SessionId     string                       `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Type          RemoteExecuteResultEventType `protobuf:"varint,4,opt,name=type,proto3,enum=workers.RemoteExecuteResultEventType" json:"type,omitempty"`
-	Data          []byte                       `protobuf:"bytes,5,opt,name=data,proto3" json:"data,omitempty"`
-	ExitCode      int32                        `protobuf:"varint,6,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
-	ErrorMessage  string                       `protobuf:"bytes,7,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	SessionId     string                       `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Type          RemoteExecuteResultEventType `protobuf:"varint,3,opt,name=type,proto3,enum=workers.RemoteExecuteResultEventType" json:"type,omitempty"`
+	Data          []byte                       `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	ExitCode      int32                        `protobuf:"varint,5,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1023,13 +1021,6 @@ func (x *RemoteExecuteResultStream) GetId() string {
 	return ""
 }
 
-func (x *RemoteExecuteResultStream) GetWorkerId() string {
-	if x != nil {
-		return x.WorkerId
-	}
-	return ""
-}
-
 func (x *RemoteExecuteResultStream) GetSessionId() string {
 	if x != nil {
 		return x.SessionId
@@ -1056,13 +1047,6 @@ func (x *RemoteExecuteResultStream) GetExitCode() int32 {
 		return x.ExitCode
 	}
 	return 0
-}
-
-func (x *RemoteExecuteResultStream) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
-	}
-	return ""
 }
 
 type RemoteExecuteResultAck struct {
@@ -1181,16 +1165,14 @@ const file_workers_proto_rawDesc = "" +
 	"\x04type\x18\x03 \x01(\x0e2(.workers.RemoteExecuteSubscribeEventTypeR\x04type\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x18\n" +
-	"\acommand\x18\x05 \x01(\tR\acommand\"\xf8\x01\n" +
+	"\acommand\x18\x05 \x01(\tR\acommand\"\xb6\x01\n" +
 	"\x19RemoteExecuteResultStream\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
-	"\tworker_id\x18\x02 \x01(\tR\bworkerId\x12\x1d\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x03 \x01(\tR\tsessionId\x129\n" +
-	"\x04type\x18\x04 \x01(\x0e2%.workers.RemoteExecuteResultEventTypeR\x04type\x12\x12\n" +
-	"\x04data\x18\x05 \x01(\fR\x04data\x12\x1b\n" +
-	"\texit_code\x18\x06 \x01(\x05R\bexitCode\x12#\n" +
-	"\rerror_message\x18\a \x01(\tR\ferrorMessage\"L\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x129\n" +
+	"\x04type\x18\x03 \x01(\x0e2%.workers.RemoteExecuteResultEventTypeR\x04type\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\x12\x1b\n" +
+	"\texit_code\x18\x05 \x01(\x05R\bexitCode\"L\n" +
 	"\x16RemoteExecuteResultAck\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage*\xa7\x01\n" +
