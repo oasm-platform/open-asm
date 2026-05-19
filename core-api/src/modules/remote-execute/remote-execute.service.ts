@@ -24,23 +24,14 @@ export class RemoteExecuteService {
     sessionId: string,
     _user?: UserContextPayload,
   ): RemoteCommandPayload {
-    const workerId = this.remoteExecuteSubscribeService.getAvailableWorker();
-
-    if (!workerId) {
-      throw new ServiceUnavailableException(
-        'No available worker for remote execution',
-      );
-    }
-
-    const result = this.remoteExecuteSubscribeService.pushCommand(
-      workerId,
+    const result = this.remoteExecuteSubscribeService.pushCommandWithSession(
       sessionId,
       command,
     );
 
     if (!result) {
       throw new ServiceUnavailableException(
-        'Selected worker became unavailable',
+        'No available worker for remote execution',
       );
     }
 
@@ -54,9 +45,9 @@ export class RemoteExecuteService {
 
   subscribeToStream(
     sessionId: string,
-    user: UserContextPayload,
+    _user: UserContextPayload,
   ): Observable<MessageEvent> {
-    const channel = `remote-execute:results:${user.id}:${sessionId}`;
+    const channel = `remote-execute:results:${sessionId}`;
     return new Observable<MessageEvent>((observer) => {
       const handler = (_channel: string, message: string) => {
         observer.next({ data: message });
