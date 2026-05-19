@@ -476,7 +476,7 @@ export class AgentsCompletionsService {
       this.agentsMemories.ltmFormatForPrompt(workspaceId),
     ]);
 
-    const contextParts = [currentTimeContext, ltmContext, stmContext].filter(Boolean);
+    const contextParts = [systemPrompt, currentTimeContext, ltmContext, stmContext].filter(Boolean);
 
     const result = streamText({
       model,
@@ -487,7 +487,6 @@ export class AgentsCompletionsService {
         },
         ...modelMessages,
       ],
-      system: systemPrompt,
       ...(tools ? { tools, stopWhen: stepCountIs(10) } : {}),
       onChunk: ({ chunk }) => {
         if (chunk.type === 'text-delta') {

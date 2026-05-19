@@ -1259,6 +1259,7 @@ export type Vulnerability = {
   publicationDate: string;
   modificationDate: string;
   tool: Tool;
+  asset: Asset;
   vulnerabilityDismissal: VulnerabilityDismissal;
   analyzeStatus: VulnerabilityAnalyzeStatus;
   analyzeResult: string;

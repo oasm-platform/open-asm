@@ -325,7 +325,7 @@ const ChatMessage = memo(function ChatMessage({
               isStreaming={isStreamingActive}
             >
               {(displayText) => (
-                <Markdown content={displayText} preview={false} />
+                <Markdown content={displayText} preview={false} className="text-base" />
               )}
             </AnimatedMessageContent>
           )}
