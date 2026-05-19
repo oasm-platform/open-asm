@@ -266,7 +266,7 @@ describe('TargetsService', () => {
       expect(mockEventEmitter.emit).toHaveBeenCalledTimes(3);
     });
 
-    it('should skip duplicate targets and create new ones', async () => {
+    it('should throw BadRequestException when duplicate targets exist', async () => {
       // Arrange
       const targetValues = [
         'existing.com',
@@ -275,24 +275,10 @@ describe('TargetsService', () => {
         'new2.com',
       ];
       const dto = { targets: targetValues.map((value) => ({ value })) };
-      const newTargets = [
-        {
-          id: randomUUID(),
-          value: 'new1.com',
-          type: TargetType.DOMAIN,
-          scanSchedule: 'DISABLED',
-        },
-        {
-          id: randomUUID(),
-          value: 'new2.com',
-          type: TargetType.DOMAIN,
-          scanSchedule: 'DISABLED',
-        },
-      ] as unknown as Target[];
 
       const mockManager = createMockEntityManager({
         existingTargets: ['existing.com', 'existing2.com'],
-        createdTargets: newTargets,
+        createdTargets: [],
       });
 
       (mockTargetRepository.manager as EntityManager).transaction = jest
@@ -302,23 +288,13 @@ describe('TargetsService', () => {
             callback(mockManager),
         );
 
-      // Act
-      const result = await service.createMultipleTargets(
-        dto,
-        workspaceId,
-        userContext,
-      );
-
-      // Assert
-      expect(result.created).toHaveLength(2);
-      expect(result.totalCreated).toBe(2);
-      expect(result.totalSkipped).toBe(2);
-      expect(result.skipped).toContain('existing.com');
-      expect(result.skipped).toContain('existing2.com');
-      expect(result.totalRequested).toBe(4);
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow('Target already exists: existing.com, existing2.com');
     });
 
-    it('should skip all targets when all are duplicates', async () => {
+    it('should throw BadRequestException when all targets are duplicates', async () => {
       // Arrange
       const targetValues = ['dup1.com', 'dup2.com'];
       const dto = { targets: targetValues.map((value) => ({ value })) };
@@ -335,20 +311,10 @@ describe('TargetsService', () => {
             callback(mockManager),
         );
 
-      // Act
-      const result = await service.createMultipleTargets(
-        dto,
-        workspaceId,
-        userContext,
-      );
-
-      // Assert
-      expect(result.created).toHaveLength(0);
-      expect(result.totalCreated).toBe(0);
-      expect(result.totalSkipped).toBe(2);
-      expect(result.skipped).toEqual(['dup1.com', 'dup2.com']);
-      expect(result.totalRequested).toBe(2);
-      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+      // Act & Assert
+      await expect(
+        service.createMultipleTargets(dto, workspaceId, userContext),
+      ).rejects.toThrow('Target already exists: dup1.com, dup2.com');
     });
 
     it('should handle empty targets array', async () => {
