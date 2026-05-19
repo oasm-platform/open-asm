@@ -1185,7 +1185,7 @@ const file_workers_proto_rawDesc = "" +
 	"\x1cREMOTE_EXECUTE_RESULT_STDOUT\x10\x01\x12 \n" +
 	"\x1cREMOTE_EXECUTE_RESULT_STDERR\x10\x02\x12\x1e\n" +
 	"\x1aREMOTE_EXECUTE_RESULT_EXIT\x10\x03\x12\x1f\n" +
-	"\x1bREMOTE_EXECUTE_RESULT_ERROR\x10\x042\xa1\x05\n" +
+	"\x1bREMOTE_EXECUTE_RESULT_ERROR\x10\x042\x9f\x05\n" +
 	"\x0eWorkersService\x123\n" +
 	"\x04Join\x12\x14.workers.JoinRequest\x1a\x15.workers.JoinResponse\x128\n" +
 	"\x05Alive\x12\x15.workers.AliveRequest\x1a\x16.workers.AliveResponse0\x01\x12H\n" +
@@ -1193,8 +1193,8 @@ const file_workers_proto_rawDesc = "" +
 	"\aStorage\x12\x17.workers.StorageRequest\x1a\x18.workers.StorageResponse0\x01\x12i\n" +
 	"\x16ConnectInternalNetwork\x12&.workers.ConnectInternalNetworkRequest\x1a'.workers.ConnectInternalNetworkResponse\x12`\n" +
 	"\x13BuiltinToolRegistry\x12#.workers.BuiltinToolRegistryRequest\x1a$.workers.BuiltinToolRegistryResponse\x12k\n" +
-	"\x16RemoteExecuteSubscribe\x12&.workers.RemoteExecuteSubscribeRequest\x1a'.workers.RemoteExecuteSubscribeResponse0\x01\x12\\\n" +
-	"\x13RemoteExecuteResult\x12\".workers.RemoteExecuteResultStream\x1a\x1f.workers.RemoteExecuteResultAck(\x01B\vZ\t./workersb\x06proto3"
+	"\x16RemoteExecuteSubscribe\x12&.workers.RemoteExecuteSubscribeRequest\x1a'.workers.RemoteExecuteSubscribeResponse0\x01\x12Z\n" +
+	"\x13RemoteExecuteResult\x12\".workers.RemoteExecuteResultStream\x1a\x1f.workers.RemoteExecuteResultAckB\vZ\t./workersb\x06proto3"
 
 var (
 	file_workers_proto_rawDescOnce sync.Once

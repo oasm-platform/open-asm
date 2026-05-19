@@ -6,7 +6,6 @@ import type { ServiceInfo } from "@protobuf-ts/runtime-rpc";
 import { WorkersService } from "./workers";
 import type { RemoteExecuteResultAck } from "./workers";
 import type { RemoteExecuteResultStream } from "./workers";
-import type { ClientStreamingCall } from "@protobuf-ts/runtime-rpc";
 import type { RemoteExecuteSubscribeResponse } from "./workers";
 import type { RemoteExecuteSubscribeRequest } from "./workers";
 import type { BuiltinToolRegistryResponse } from "./workers";
@@ -60,7 +59,7 @@ export interface IWorkersServiceClient {
     /**
      * @generated from protobuf rpc: RemoteExecuteResult
      */
-    remoteExecuteResult(options?: RpcOptions): ClientStreamingCall<RemoteExecuteResultStream, RemoteExecuteResultAck>;
+    remoteExecuteResult(input: RemoteExecuteResultStream, options?: RpcOptions): UnaryCall<RemoteExecuteResultStream, RemoteExecuteResultAck>;
 }
 /**
  * @generated from protobuf service workers.WorkersService
@@ -123,8 +122,8 @@ export class WorkersServiceClient implements IWorkersServiceClient, ServiceInfo 
     /**
      * @generated from protobuf rpc: RemoteExecuteResult
      */
-    remoteExecuteResult(options?: RpcOptions): ClientStreamingCall<RemoteExecuteResultStream, RemoteExecuteResultAck> {
+    remoteExecuteResult(input: RemoteExecuteResultStream, options?: RpcOptions): UnaryCall<RemoteExecuteResultStream, RemoteExecuteResultAck> {
         const method = this.methods[7], opt = this._transport.mergeOptions(options);
-        return stackIntercept<RemoteExecuteResultStream, RemoteExecuteResultAck>("clientStreaming", this._transport, method, opt);
+        return stackIntercept<RemoteExecuteResultStream, RemoteExecuteResultAck>("unary", this._transport, method, opt, input);
     }
 }

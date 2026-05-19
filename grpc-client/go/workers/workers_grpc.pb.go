@@ -40,7 +40,7 @@ type WorkersServiceClient interface {
 	ConnectInternalNetwork(ctx context.Context, in *ConnectInternalNetworkRequest, opts ...grpc.CallOption) (*ConnectInternalNetworkResponse, error)
 	BuiltinToolRegistry(ctx context.Context, in *BuiltinToolRegistryRequest, opts ...grpc.CallOption) (*BuiltinToolRegistryResponse, error)
 	RemoteExecuteSubscribe(ctx context.Context, in *RemoteExecuteSubscribeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RemoteExecuteSubscribeResponse], error)
-	RemoteExecuteResult(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[RemoteExecuteResultStream, RemoteExecuteResultAck], error)
+	RemoteExecuteResult(ctx context.Context, in *RemoteExecuteResultStream, opts ...grpc.CallOption) (*RemoteExecuteResultAck, error)
 }
 
 type workersServiceClient struct {
@@ -148,18 +148,15 @@ func (c *workersServiceClient) RemoteExecuteSubscribe(ctx context.Context, in *R
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkersService_RemoteExecuteSubscribeClient = grpc.ServerStreamingClient[RemoteExecuteSubscribeResponse]
 
-func (c *workersServiceClient) RemoteExecuteResult(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[RemoteExecuteResultStream, RemoteExecuteResultAck], error) {
+func (c *workersServiceClient) RemoteExecuteResult(ctx context.Context, in *RemoteExecuteResultStream, opts ...grpc.CallOption) (*RemoteExecuteResultAck, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &WorkersService_ServiceDesc.Streams[3], WorkersService_RemoteExecuteResult_FullMethodName, cOpts...)
+	out := new(RemoteExecuteResultAck)
+	err := c.cc.Invoke(ctx, WorkersService_RemoteExecuteResult_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[RemoteExecuteResultStream, RemoteExecuteResultAck]{ClientStream: stream}
-	return x, nil
+	return out, nil
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type WorkersService_RemoteExecuteResultClient = grpc.ClientStreamingClient[RemoteExecuteResultStream, RemoteExecuteResultAck]
 
 // WorkersServiceServer is the server API for WorkersService service.
 // All implementations must embed UnimplementedWorkersServiceServer
@@ -172,7 +169,7 @@ type WorkersServiceServer interface {
 	ConnectInternalNetwork(context.Context, *ConnectInternalNetworkRequest) (*ConnectInternalNetworkResponse, error)
 	BuiltinToolRegistry(context.Context, *BuiltinToolRegistryRequest) (*BuiltinToolRegistryResponse, error)
 	RemoteExecuteSubscribe(*RemoteExecuteSubscribeRequest, grpc.ServerStreamingServer[RemoteExecuteSubscribeResponse]) error
-	RemoteExecuteResult(grpc.ClientStreamingServer[RemoteExecuteResultStream, RemoteExecuteResultAck]) error
+	RemoteExecuteResult(context.Context, *RemoteExecuteResultStream) (*RemoteExecuteResultAck, error)
 	mustEmbedUnimplementedWorkersServiceServer()
 }
 
@@ -204,8 +201,8 @@ func (UnimplementedWorkersServiceServer) BuiltinToolRegistry(context.Context, *B
 func (UnimplementedWorkersServiceServer) RemoteExecuteSubscribe(*RemoteExecuteSubscribeRequest, grpc.ServerStreamingServer[RemoteExecuteSubscribeResponse]) error {
 	return status.Error(codes.Unimplemented, "method RemoteExecuteSubscribe not implemented")
 }
-func (UnimplementedWorkersServiceServer) RemoteExecuteResult(grpc.ClientStreamingServer[RemoteExecuteResultStream, RemoteExecuteResultAck]) error {
-	return status.Error(codes.Unimplemented, "method RemoteExecuteResult not implemented")
+func (UnimplementedWorkersServiceServer) RemoteExecuteResult(context.Context, *RemoteExecuteResultStream) (*RemoteExecuteResultAck, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoteExecuteResult not implemented")
 }
 func (UnimplementedWorkersServiceServer) mustEmbedUnimplementedWorkersServiceServer() {}
 func (UnimplementedWorkersServiceServer) testEmbeddedByValue()                        {}
@@ -333,12 +330,23 @@ func _WorkersService_RemoteExecuteSubscribe_Handler(srv interface{}, stream grpc
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkersService_RemoteExecuteSubscribeServer = grpc.ServerStreamingServer[RemoteExecuteSubscribeResponse]
 
-func _WorkersService_RemoteExecuteResult_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(WorkersServiceServer).RemoteExecuteResult(&grpc.GenericServerStream[RemoteExecuteResultStream, RemoteExecuteResultAck]{ServerStream: stream})
+func _WorkersService_RemoteExecuteResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoteExecuteResultStream)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkersServiceServer).RemoteExecuteResult(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkersService_RemoteExecuteResult_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkersServiceServer).RemoteExecuteResult(ctx, req.(*RemoteExecuteResultStream))
+	}
+	return interceptor(ctx, in, info, handler)
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type WorkersService_RemoteExecuteResultServer = grpc.ClientStreamingServer[RemoteExecuteResultStream, RemoteExecuteResultAck]
 
 // WorkersService_ServiceDesc is the grpc.ServiceDesc for WorkersService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -363,6 +371,10 @@ var WorkersService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "BuiltinToolRegistry",
 			Handler:    _WorkersService_BuiltinToolRegistry_Handler,
 		},
+		{
+			MethodName: "RemoteExecuteResult",
+			Handler:    _WorkersService_RemoteExecuteResult_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -379,11 +391,6 @@ var WorkersService_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "RemoteExecuteSubscribe",
 			Handler:       _WorkersService_RemoteExecuteSubscribe_Handler,
 			ServerStreams: true,
-		},
-		{
-			StreamName:    "RemoteExecuteResult",
-			Handler:       _WorkersService_RemoteExecuteResult_Handler,
-			ClientStreams: true,
 		},
 	},
 	Metadata: "workers.proto",

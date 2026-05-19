@@ -1,8 +1,9 @@
+import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
 import { Public } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
+import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Metadata } from '@grpc/grpc-js';
 import {
@@ -14,12 +15,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  GrpcMethod,
-  GrpcStreamMethod,
-  RpcException,
-} from '@nestjs/microservices';
-import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
+import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
 import { createReadStream } from 'fs';
 import { readdir } from 'fs/promises';
@@ -31,11 +27,11 @@ import {
   WorkerJoinDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
-import { WorkersService } from './workers.service';
 import {
-  RemoteExecuteSubscribeService,
   RemoteExecuteCommand,
+  RemoteExecuteSubscribeService,
 } from './remote-execute-subscribe.service';
+import { WorkersService } from './workers.service';
 
 interface GrpcCall {
   getPeer?(): string | undefined;
@@ -264,25 +260,15 @@ export class WorkersController {
   }
 
   @UseGuards(GrpcWorkerTokenGuard)
-  @GrpcStreamMethod('WorkersService', 'RemoteExecuteResult')
-  grpcRemoteExecuteResult(
-    requestStream: Observable<{
-      id: string;
-      sessionId: string;
-      type: number;
-      data: Uint8Array;
-      exitCode: number;
-    }>,
-  ): { success: boolean; message: string } {
-    requestStream.subscribe({
-      next: (result) => {
-        void this.workersService.handleRemoteExecuteResult(result);
-      },
-      error: (err) => {
-        this.logger.error('RemoteExecuteResult stream error', err);
-      },
-    });
-
-    return { success: true, message: 'Result stream acknowledged' };
+  @GrpcMethod('WorkersService', 'RemoteExecuteResult')
+  async grpcRemoteExecuteResult(request: {
+    id: string;
+    sessionId: string;
+    type: number;
+    data: Uint8Array;
+    exitCode: number;
+  }): Promise<{ success: boolean; message: string }> {
+    await this.workersService.handleRemoteExecuteResult(request);
+    return { success: true, message: 'Result acknowledged' };
   }
 }

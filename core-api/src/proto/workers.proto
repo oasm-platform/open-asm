@@ -118,5 +118,5 @@ service WorkersService {
   rpc ConnectInternalNetwork(ConnectInternalNetworkRequest) returns (ConnectInternalNetworkResponse);
   rpc BuiltinToolRegistry(BuiltinToolRegistryRequest) returns (BuiltinToolRegistryResponse);
   rpc RemoteExecuteSubscribe(RemoteExecuteSubscribeRequest) returns (stream RemoteExecuteSubscribeResponse);
-  rpc RemoteExecuteResult(stream RemoteExecuteResultStream) returns (RemoteExecuteResultAck);
+  rpc RemoteExecuteResult(RemoteExecuteResultStream) returns (RemoteExecuteResultAck);
 }

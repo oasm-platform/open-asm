@@ -1341,5 +1341,5 @@ export const WorkersService = new ServiceType("workers.WorkersService", [
     { name: "ConnectInternalNetwork", options: {}, I: ConnectInternalNetworkRequest, O: ConnectInternalNetworkResponse },
     { name: "BuiltinToolRegistry", options: {}, I: BuiltinToolRegistryRequest, O: BuiltinToolRegistryResponse },
     { name: "RemoteExecuteSubscribe", serverStreaming: true, options: {}, I: RemoteExecuteSubscribeRequest, O: RemoteExecuteSubscribeResponse },
-    { name: "RemoteExecuteResult", clientStreaming: true, options: {}, I: RemoteExecuteResultStream, O: RemoteExecuteResultAck }
+    { name: "RemoteExecuteResult", options: {}, I: RemoteExecuteResultStream, O: RemoteExecuteResultAck }
 ]);
