@@ -114,6 +114,7 @@ export class VulnerabilitiesService {
     const queryBuilder = this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')
       .leftJoin('vulnerabilities.asset', 'assets')
+      .addSelect(['assets.id', 'assets.value'])
       .leftJoin('assets.target', 'targets')
       .leftJoin('targets.workspaceTargets', 'workspace_targets')
       .leftJoin('workspace_targets.workspace', 'workspaces')
@@ -199,6 +200,7 @@ export class VulnerabilitiesService {
     const queryBuilder = this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')
       .leftJoin('vulnerabilities.asset', 'assets')
+      .addSelect(['assets.id', 'assets.value'])
       .leftJoin('assets.target', 'targets')
       .leftJoin('targets.workspaceTargets', 'workspace_targets')
       .leftJoin('workspace_targets.workspace', 'workspaces')
