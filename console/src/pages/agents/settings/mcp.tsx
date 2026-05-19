@@ -122,14 +122,14 @@ function StatusDot({ status }: { status: MCPServerStatus }) {
     { bg: string; shadow: string; label: string; animate?: string }
   > = {
     online: {
-      bg: 'bg-emerald-500',
-      shadow: 'shadow-[0_0_8px_rgba(16,185,129,0.6)]',
+      bg: 'bg-green-500',
+      shadow: 'shadow-[0_0_8px_rgba(239,68,68,0.6)]',
       label: 'Online',
       animate: 'animate-pulse',
     },
     offline: {
-      bg: 'bg-rose-500',
-      shadow: 'shadow-[0_0_8px_rgba(244,63,94,0.4)]',
+      bg: 'bg-red-500',
+      shadow: 'shadow-[0_0_8px_rgba(239,68,68,0.4)]',
       label: 'Offline',
     },
     unknown: {
@@ -158,8 +158,6 @@ function StatusDot({ status }: { status: MCPServerStatus }) {
     </div>
   );
 }
-
-// ─── Add Server Form ─────────────────────────────────────────────────────────
 
 function AddServerForm({
   onSuccess,
@@ -242,9 +240,19 @@ function AddServerForm({
             )}
           >
             {t === 'sse' ? (
-              <Wifi className={cn('size-3.5', currentTransport === t && 'text-blue-500')} />
+              <Wifi
+                className={cn(
+                  'size-3.5',
+                  currentTransport === t && 'text-blue-500',
+                )}
+              />
             ) : (
-              <Terminal className={cn('size-3.5', currentTransport === t && 'text-amber-500')} />
+              <Terminal
+                className={cn(
+                  'size-3.5',
+                  currentTransport === t && 'text-amber-500',
+                )}
+              />
             )}
             {t === 'sse' ? 'SSE / HTTP' : 'stdio'}
           </button>
@@ -255,7 +263,9 @@ function AddServerForm({
 
       <div className="grid gap-3">
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Server Name</label>
+          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+            Server Name
+          </label>
           <Input
             {...register('name')}
             placeholder="e.g. filesystem-server"
@@ -267,7 +277,9 @@ function AddServerForm({
         {currentTransport === 'sse' && (
           <>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Endpoint URL</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+                Endpoint URL
+              </label>
               <Input
                 {...register('url')}
                 type="url"
@@ -277,7 +289,9 @@ function AddServerForm({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">API Key (Optional)</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+                API Key (Optional)
+              </label>
               <Input
                 {...register('apiKey')}
                 type="password"
@@ -292,7 +306,9 @@ function AddServerForm({
         {currentTransport === 'stdio' && (
           <>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Command</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+                Command
+              </label>
               <Input
                 {...register('command')}
                 placeholder="npx"
@@ -301,7 +317,9 @@ function AddServerForm({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Arguments</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+                Arguments
+              </label>
               <Input
                 {...register('args')}
                 placeholder="-y @modelcontextprotocol/server-filesystem /path"
@@ -329,10 +347,21 @@ function AddServerForm({
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={onCancel} className="font-semibold h-8">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            className="font-semibold h-8"
+          >
             Cancel
           </Button>
-          <Button type="submit" size="sm" disabled={upsert.isPending} className="font-bold h-8">
+          <Button
+            type="submit"
+            size="sm"
+            disabled={upsert.isPending}
+            className="font-bold h-8"
+          >
             {upsert.isPending ? (
               <Loader2 className="size-3 animate-spin mr-2" />
             ) : (
@@ -395,11 +424,19 @@ function ServerRow({
     <div className="group relative rounded-xl border bg-card transition-all duration-200 hover:shadow-md hover:border-border/80 overflow-hidden">
       <div className="flex items-center gap-3 p-4">
         {/* Status & Icon container */}
-        <div className={cn(
-          "relative flex items-center justify-center size-10 rounded-xl shrink-0 transition-all duration-300",
-          "bg-primary/10 text-primary dark:bg-primary/5 dark:text-primary group-hover:bg-primary/20 dark:group-hover:bg-primary/10"
-        )}>
-          <Server className="size-5" />
+        <div
+          className={cn(
+            'relative flex items-center justify-center size-10 rounded-xl shrink-0 transition-all duration-300',
+            transport === 'sse'
+              ? 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/5 dark:text-blue-500 group-hover:bg-blue-500/20 dark:group-hover:bg-blue-500/10'
+              : 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/5 dark:text-amber-500 group-hover:bg-amber-500/20 dark:group-hover:bg-amber-500/10',
+          )}
+        >
+          {transport === 'sse' ? (
+            <Wifi className="size-5" />
+          ) : (
+            <Terminal className="size-5" />
+          )}
           <div className="absolute -top-1 -right-1 bg-card rounded-full p-0.5">
             <StatusDot status={server.disabled ? 'offline' : status} />
           </div>
@@ -407,7 +444,9 @@ function ServerRow({
 
         <div className="flex-1 min-w-0 space-y-0.5">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold tracking-tight truncate">{server.name}</p>
+            <p className="text-sm font-semibold tracking-tight truncate">
+              {server.name}
+            </p>
             {server.disabled && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">
                 Disabled
@@ -430,7 +469,12 @@ function ServerRow({
             className="text-muted-foreground hover:text-foreground"
             title="Re-check status"
           >
-            <RefreshCw className={cn("size-3.5", status === 'checking' && "animate-spin")} />
+            <RefreshCw
+              className={cn(
+                'size-3.5',
+                status === 'checking' && 'animate-spin',
+              )}
+            />
           </Button>
 
           <div className="px-2 h-8 flex items-center">
@@ -446,7 +490,10 @@ function ServerRow({
             variant="ghost"
             size="icon-sm"
             onClick={() => setExpanded((v) => !v)}
-            className={cn("text-muted-foreground", expanded && "bg-accent text-accent-foreground")}
+            className={cn(
+              'text-muted-foreground',
+              expanded && 'bg-accent text-accent-foreground',
+            )}
           >
             {expanded ? (
               <ChevronUp className="size-4" />
@@ -475,14 +522,22 @@ function ServerRow({
       </div>
 
       {expanded && (
-        <div className={cn(
-          "border-t px-4 py-3 space-y-2 text-[11px] animate-in fade-in slide-in-from-top-1 duration-200",
-          transport === 'sse' ? "bg-blue-500/[0.04] dark:bg-blue-500/[0.02]" : "bg-amber-500/[0.04] dark:bg-amber-500/[0.02]"
-        )}>
+        <div
+          className={cn(
+            'border-t px-4 py-3 space-y-2 text-[11px] animate-in fade-in slide-in-from-top-1 duration-200',
+            transport === 'sse'
+              ? 'bg-blue-500/[0.04] dark:bg-blue-500/[0.02]'
+              : 'bg-amber-500/[0.04] dark:bg-amber-500/[0.02]',
+          )}
+        >
           {server.url && (
             <div className="flex gap-4">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">URL</span>
-              <span className="truncate font-mono text-muted-foreground/90 selection:bg-primary/20">{server.url}</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
+                URL
+              </span>
+              <span className="truncate font-mono text-muted-foreground/90 selection:bg-primary/20">
+                {server.url}
+              </span>
             </div>
           )}
           {server.command && (
@@ -512,28 +567,39 @@ function ServerRow({
                   Tools
                 </span>
                 <span className="flex flex-wrap gap-1">
-                  {(server.allowed_tools as unknown as string[]).map(t => (
-                    <span key={t} className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/50">{t}</span>
+                  {(server.allowed_tools as unknown as string[]).map((t) => (
+                    <span
+                      key={t}
+                      className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/50"
+                    >
+                      {t}
+                    </span>
                   ))}
                 </span>
               </div>
             )}
           <div className="flex gap-4">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Timeout</span>
-            <span className="text-muted-foreground/90 font-semibold">{server.timeout ?? 60}s</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
+              Timeout
+            </span>
+            <span className="text-muted-foreground/90 font-semibold">
+              {server.timeout ?? 60}s
+            </span>
           </div>
           <div className="flex gap-4">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Status</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
+              Status
+            </span>
             <span
               className={cn(
-                "font-bold uppercase tracking-wider text-[10px]",
+                'font-bold uppercase tracking-wider text-[10px]',
                 server.disabled
                   ? 'text-muted-foreground'
                   : status === 'online'
                     ? 'text-emerald-500'
                     : status === 'offline'
                       ? 'text-rose-500'
-                      : 'text-slate-500'
+                      : 'text-slate-500',
               )}
             >
               {server.disabled
@@ -555,7 +621,7 @@ function ServerRow({
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function MCPServersManager() {
+export default function AgentSettingsMcp() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -611,22 +677,33 @@ export function MCPServersManager() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  if (!selectedWorkspaceId) return null;
+  if (!selectedWorkspaceId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <Loader2 className="size-8 animate-spin text-muted-foreground mb-4" />
+        <p className="text-sm text-muted-foreground font-medium">
+          Initializing workspace context...
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {servers.length === 0
-            ? 'No MCP servers configured'
-            : `${servers.length} server${servers.length !== 1 ? 's' : ''}`}
-        </p>
+        <div>
+          <h3 className="text-lg font-medium">MCP Servers</h3>
+          <p className="text-sm text-muted-foreground">
+            Extend agent capabilities with external servers.
+            {servers.length > 0 && ` (${servers.length} configured)`}
+          </p>
+        </div>
         {!showAddForm && (
           <Button
             size="sm"
             variant="outline"
             onClick={() => setShowAddForm(true)}
-            className="gap-1.5"
+            className="gap-1.5 border-dashed"
           >
             <Plus className="size-3.5" />
             Add Server
@@ -651,11 +728,25 @@ export function MCPServersManager() {
           ))}
         </div>
       ) : servers.length === 0 && !showAddForm ? (
-        <div className="rounded-lg border border-dashed p-6 text-center">
-          <Server className="size-8 mx-auto text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground">
-            Add MCP servers to extend the agent with external tools
+        <div className="flex-1 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-muted/50 p-12 text-center bg-muted/5">
+          <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Server className="size-8 text-muted-foreground" />
+          </div>
+          <p className="text-lg font-semibold text-foreground mb-1">
+            No MCP servers configured
           </p>
+          <p className="text-sm text-muted-foreground max-w-xs mb-6">
+            Add MCP servers to extend the agent with external tools and
+            capabilities.
+          </p>
+          <Button
+            size="sm"
+            onClick={() => setShowAddForm(true)}
+            className="gap-2"
+          >
+            <Plus className="size-4" />
+            Add Your First Server
+          </Button>
         </div>
       ) : (
         <div className="flex flex-col gap-2">

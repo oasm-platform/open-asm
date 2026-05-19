@@ -1,4 +1,4 @@
-import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
+import { AgentSettingsDialog } from '@/pages/agents/components/agent-settings-dialog';
 import type {
   LLMConfigWithProviderDto,
   ProviderModelDto,

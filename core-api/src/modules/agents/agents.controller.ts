@@ -28,6 +28,7 @@ import { ApiTags } from '@nestjs/swagger';
 
 import type { Response } from 'express';
 import { AgentsCompletionsService } from './agents.completions';
+import { AgentsGraphService } from './agents.graph';
 import { AgentsService } from './agents.service';
 import {
   ConversationResponseDto,
@@ -48,6 +49,14 @@ import {
   ToggleMCPServerDto,
 } from './dto/mcp-config.dto';
 import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
+import { UpsertSkillDto, SkillResponseDto } from './dto/skill.dto';
+import {
+  CreateEmbeddingConfigDto,
+  EmbeddingConfigResponseDto,
+  EmbeddingProviderStatusDto,
+  UpdateEmbeddingConfigDto,
+  EmbeddingModelInfoDto,
+} from './dto/embedding-config.dto';
 
 @ApiTags('Agents')
 @Controller('agents')
@@ -56,6 +65,7 @@ export class AgentsController {
   constructor(
     private readonly agentsService: AgentsService,
     private readonly agentsCompletionsService: AgentsCompletionsService,
+    private readonly agentsGraphService: AgentsGraphService,
   ) {}
 
   @Post('llm-configs')
@@ -158,10 +168,6 @@ export class AgentsController {
     return this.agentsService.setPreferredLLMConfig(id, workspaceId);
   }
 
-  // ==========================================
-  // Conversation Endpoints
-  // ==========================================
-
   @Get('conversations')
   @Doc({
     summary: 'List conversations',
@@ -227,10 +233,6 @@ export class AgentsController {
     return { message: 'Conversation deleted successfully' };
   }
 
-  // ==========================================
-  // Message / Chat Endpoints
-  // ==========================================
-
   @Get('conversations/:id/messages')
   @Doc({
     summary: 'Get messages',
@@ -266,7 +268,7 @@ export class AgentsController {
   ): Promise<void> {
     try {
       const { stream, conversationId } =
-        await this.agentsCompletionsService.streamMessage(
+        await this.agentsGraphService.streamMessage(
           dto,
           workspaceId,
           userId,
@@ -425,5 +427,178 @@ export class AgentsController {
     @WorkspaceId() workspaceId: string,
   ): Promise<MCPServerPingResponseDto> {
     return this.agentsService.pingMCPServer(workspaceId, name);
+  }
+
+  @Post('skills')
+  @Doc({
+    summary: 'Upsert skill',
+    description: 'Add or update a security skill using Markdown + Frontmatter',
+    request: { getWorkspaceId: true },
+    response: { serialization: SkillResponseDto },
+  })
+  async upsertSkill(
+    @Body() dto: UpsertSkillDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<SkillResponseDto> {
+    return this.agentsService.upsertSkill(workspaceId, dto);
+  }
+
+  @Get('skills')
+  @Doc({
+    summary: 'List skills',
+    description: 'Get all security skills for the workspace',
+    request: { getWorkspaceId: true },
+    response: { serialization: SkillResponseDto, isArray: true },
+  })
+  async getSkills(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<SkillResponseDto[]> {
+    return this.agentsService.getSkills(workspaceId);
+  }
+
+  @Get('skills/:id')
+  @Doc({
+    summary: 'Get skill',
+    description: 'Get a specific security skill by ID',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Skill ID' }],
+    },
+    response: { serialization: SkillResponseDto },
+  })
+  async getSkill(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<SkillResponseDto> {
+    return this.agentsService.getSkill(id, workspaceId);
+  }
+
+  @Delete('skills/:id')
+  @Doc({
+    summary: 'Delete skill',
+    description: 'Remove a security skill',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Skill ID' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteSkill(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsService.deleteSkill(id, workspaceId);
+    return { message: 'Skill deleted successfully' };
+  }
+
+  @Patch('skills/:id/toggle-status')
+  @Doc({
+    summary: 'Toggle skill status',
+    description: 'Toggle a skill between active and inactive',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Skill ID' }],
+    },
+    response: { serialization: SkillResponseDto },
+  })
+  async toggleSkillStatus(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<SkillResponseDto> {
+    return this.agentsService.toggleSkillStatus(id, workspaceId);
+  }
+
+  @Get('embedding')
+  @Doc({
+    summary: 'Get embedding providers status',
+    request: { getWorkspaceId: true },
+    response: { serialization: EmbeddingProviderStatusDto, isArray: true },
+  })
+  getEmbeddingProviders(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<EmbeddingProviderStatusDto[]> {
+    return this.agentsService.getEmbeddingProviders(workspaceId);
+  }
+
+  @Post('embedding')
+  @Doc({
+    summary: 'Add embedding provider config',
+    request: { getWorkspaceId: true },
+    response: { serialization: EmbeddingConfigResponseDto },
+  })
+  createEmbeddingConfig(
+    @Body() dto: CreateEmbeddingConfigDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<EmbeddingConfigResponseDto> {
+    return this.agentsService.createEmbeddingConfig(dto, workspaceId, userId);
+  }
+
+  @Patch('embedding/:id')
+  @Doc({
+    summary: 'Update embedding provider config',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Embedding config ID' }],
+    },
+    response: { serialization: EmbeddingConfigResponseDto },
+  })
+  updateEmbeddingConfig(
+    @Param() { id }: IdQueryParamDto,
+    @Body() dto: UpdateEmbeddingConfigDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<EmbeddingConfigResponseDto> {
+    return this.agentsService.updateEmbeddingConfig(id, dto, workspaceId);
+  }
+
+  @Delete('embedding/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Doc({
+    summary: 'Delete embedding provider config',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Embedding config ID' }],
+    },
+    response: { httpStatus: HttpStatus.NO_CONTENT },
+  })
+  deleteEmbeddingConfig(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<void> {
+    return this.agentsService.deleteEmbeddingConfig(id, workspaceId);
+  }
+
+  @Post('embedding/:id/preferred')
+  @Doc({
+    summary: 'Set preferred embedding config',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Embedding config ID' }],
+    },
+    response: { serialization: EmbeddingConfigResponseDto },
+  })
+  setPreferredEmbeddingConfig(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<EmbeddingConfigResponseDto> {
+    return this.agentsService.setPreferredEmbeddingConfig(id, workspaceId);
+  }
+
+  @Get('embedding/:id/models')
+  @Doc({
+    summary: 'List models for an embedding config',
+    description:
+      'Get available models for a specific embedding provider configuration',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Embedding config ID' }],
+    },
+    response: { serialization: EmbeddingModelInfoDto, isArray: true },
+  })
+  async getEmbeddingProviderModels(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<EmbeddingModelInfoDto[]> {
+    return this.agentsService.getEmbeddingModelsForProvider(id, workspaceId);
   }
 }

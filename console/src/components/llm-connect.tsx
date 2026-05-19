@@ -23,7 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
-  PlugZap,
+  Plus,
   Star,
   Unplug,
 } from 'lucide-react';
@@ -447,7 +447,28 @@ export default function LlmConnect() {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-medium">LLM Providers</h3>
+          <p className="text-sm text-muted-foreground">
+            Configure your AI models and API connections.
+          </p>
+        </div>
+        {!showAddPanel && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-dashed"
+            onClick={() => setShowAddPanel(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Connect provider
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
       {/* Connected configs */}
       {connectedConfigs.map((item) => {
         const key = rowKey(item);
@@ -508,26 +529,14 @@ export default function LlmConnect() {
         );
       })}
 
-      <div className="flex justify-center items-center w-full">
-        {/* Add new config panel */}
-        {showAddPanel ? (
-          <AddConfigPanel
-            providersList={providersList}
-            onSubmit={handleConnect}
-            onCancel={() => setShowAddPanel(false)}
-            isSubmitting={isSubmitting}
-          />
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAddPanel(true)}
-            className="gap-2 self-start"
-          >
-            <PlugZap size={16} />
-            Connect provider
-          </Button>
-        )}
+      {showAddPanel && (
+        <AddConfigPanel
+          providersList={providersList}
+          onSubmit={handleConnect}
+          onCancel={() => setShowAddPanel(false)}
+          isSubmitting={isSubmitting}
+        />
+      )}
       </div>
     </div>
   );

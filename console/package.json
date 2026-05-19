@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.146",
+    "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/lang-yaml": "^6.1.2",
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -91,8 +92,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
-    "@types/node": "^22.0.0",
     "@types/leaflet": "^1.9.21",
+    "@types/node": "^22.0.0",
     "@types/qs": "^6.14.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
