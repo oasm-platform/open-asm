@@ -552,7 +552,7 @@ export class TechnologyForwarderService implements OnModuleInit {
     try {
       const { url, fileName } = this.buildIconPaths(iconName);
       const { buffer } = await this.storageService.forwardImage(url);
-      const uploadResult = this.storageService.uploadFile(
+      const uploadResult = await this.storageService.uploadFile(
         fileName,
         buffer,
         this.ICONS_BUCKET,

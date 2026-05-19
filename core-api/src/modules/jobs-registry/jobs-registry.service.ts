@@ -563,7 +563,7 @@ export class JobsRegistryService {
     dto: UpdateResultDto,
   ): Promise<{ jobId: string; queueId: string }> {
     const fileName = `${dto.jobId}-${Date.now()}.json`;
-    const { path: resultRef } = this.storageService.uploadFile(
+    const { path: resultRef } = await this.storageService.uploadFile(
       fileName,
       Buffer.from(JSON.stringify(dto.data)),
       'job-results',

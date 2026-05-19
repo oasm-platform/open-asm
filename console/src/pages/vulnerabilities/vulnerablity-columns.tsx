@@ -11,7 +11,7 @@ import {
 import { AnalyzeStatusButton } from '@/components/vulnerabilities/analyze-status-button';
 import type { Vulnerability } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
-import { BellOff, CircleCheck, ExternalLink, Info } from 'lucide-react';
+import { BellOff, CircleCheck, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import BadgeList from '../assets/components/badge-list';
 
@@ -98,35 +98,15 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
     },
   },
   {
-    accessorKey: 'affectedUrl',
-    header: 'Affected URL',
+    accessorKey: 'asset',
+    header: 'Asset',
     size: 200,
     cell: ({ row }) => {
-      const value: string = row.getValue('affectedUrl');
+      const data = row.original;
+      const value: string = data.asset?.value || data.affectedUrl;
       return (
         <div className="flex items-center min-h-[60px]">
-          {value ? (
-            <div className="flex items-center gap-1">
-              <a
-                href={value}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 shrink-0 flex items-center gap-1"
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="truncate max-w-[200px]">{value}</span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{value}</p>
-                  </TooltipContent>
-                </Tooltip>
-                <ExternalLink size={14} />
-              </a>
-            </div>
-          ) : (
-            <div className="text-muted-foreground">Not matched</div>
-          )}
+          <b>{value}</b>
         </div>
       );
     },

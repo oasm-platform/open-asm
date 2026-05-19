@@ -333,7 +333,7 @@ export class DataAdapterService {
     }
 
     const buffer = Buffer.from(data.screenshot, 'base64');
-    const { path } = this.storageService.uploadFile(
+    const { path } = await this.storageService.uploadFile(
       `${crypto.createHash('md5').update(job.asset.value).digest('hex')}.png`,
       buffer,
       'screenshot',

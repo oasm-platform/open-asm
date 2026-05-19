@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -72,7 +73,13 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 			}
 		}
 	} else {
-		cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
+		var cmd *exec.Cmd
+
+		if runtime.GOOS == "windows" {
+			cmd = exec.CommandContext(ctx, "cmd", "/C", cmdStr)
+		} else {
+			cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
+		}
 		cmd.SysProcAttr = newSysProcAttr()
 		cmd.Env = append(os.Environ(), fmt.Sprintf("PATH=%s%c%s", toolPath, os.PathListSeparator, os.Getenv("PATH")))
 

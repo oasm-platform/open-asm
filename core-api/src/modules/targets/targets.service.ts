@@ -308,18 +308,33 @@ export class TargetsService implements OnModuleInit {
           existingTargetsMap.get(et.value)!.add(et.internalNetworkId);
         });
 
-        // Filter out duplicates (same value AND same internalNetworkId)
+        // Check for duplicates and throw error immediately if any found
+        const duplicateValues: string[] = [];
         const newTargets = targets.filter((t) => {
           const networks = existingTargetsMap.get(t.value);
           if (!networks) return true;
-          return !networks.has(internalNetworkId || null);
+
+          // External target: check if value exists in ANY network or as external
+          if (!internalNetworkId) {
+            duplicateValues.push(t.value);
+            return false;
+          }
+
+          // Internal target: only skip if same value AND same network
+          const isDuplicate = networks.has(internalNetworkId);
+          if (isDuplicate) {
+            duplicateValues.push(t.value);
+          }
+          return !isDuplicate;
         });
-        const skippedValues = targets
-          .filter((t) => {
-            const networks = existingTargetsMap.get(t.value);
-            return networks && networks.has(internalNetworkId || null);
-          })
-          .map((t) => t.value);
+
+        if (duplicateValues.length > 0) {
+          throw new BadRequestException(
+            `Target already exists: ${duplicateValues.join(', ')}`,
+          );
+        }
+
+        const skippedValues: string[] = [];
 
         const createdTargets: Target[] = [];
 

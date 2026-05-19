@@ -324,7 +324,9 @@ export class AgentsCompletionsService {
       }
 
       const model = this.createLanguageModel(llmConfig);
-      const tools = toolsEnabled ? this.agentTool.getTools(workspaceId) : undefined;
+      const tools = toolsEnabled
+        ? this.agentTool.getTools(workspaceId)
+        : undefined;
 
       let accumulatedText = '';
 
@@ -493,9 +495,12 @@ export class AgentsCompletionsService {
       this.agentsSkillsService.buildSkillsPrompt(workspaceId),
     ]);
 
-    const contextParts = [currentTimeContext, ltmContext, stmContext, skillsPrompt].filter(
-      Boolean,
-    );
+    const contextParts = [
+      currentTimeContext,
+      ltmContext,
+      stmContext,
+      skillsPrompt,
+    ].filter(Boolean);
 
     const result = streamText({
       model,

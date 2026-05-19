@@ -334,11 +334,10 @@ func (*GetManifestRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetManifestResponse struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	DownloadToolsUrl string                 `protobuf:"bytes,1,opt,name=download_tools_url,json=downloadToolsUrl,proto3" json:"download_tools_url,omitempty"`
-	InitCommands     []string               `protobuf:"bytes,2,rep,name=init_commands,json=initCommands,proto3" json:"init_commands,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	InitCommands  []string               `protobuf:"bytes,1,rep,name=init_commands,json=initCommands,proto3" json:"init_commands,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetManifestResponse) Reset() {
@@ -371,13 +370,6 @@ func (*GetManifestResponse) Descriptor() ([]byte, []int) {
 	return file_workers_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *GetManifestResponse) GetDownloadToolsUrl() string {
-	if x != nil {
-		return x.DownloadToolsUrl
-	}
-	return ""
-}
-
 func (x *GetManifestResponse) GetInitCommands() []string {
 	if x != nil {
 		return x.InitCommands
@@ -385,27 +377,27 @@ func (x *GetManifestResponse) GetInitCommands() []string {
 	return nil
 }
 
-type DownloadToolsRequest struct {
+type StorageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DownloadToolsRequest) Reset() {
-	*x = DownloadToolsRequest{}
+func (x *StorageRequest) Reset() {
+	*x = StorageRequest{}
 	mi := &file_workers_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DownloadToolsRequest) String() string {
+func (x *StorageRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DownloadToolsRequest) ProtoMessage() {}
+func (*StorageRequest) ProtoMessage() {}
 
-func (x *DownloadToolsRequest) ProtoReflect() protoreflect.Message {
+func (x *StorageRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_workers_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -417,19 +409,19 @@ func (x *DownloadToolsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DownloadToolsRequest.ProtoReflect.Descriptor instead.
-func (*DownloadToolsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use StorageRequest.ProtoReflect.Descriptor instead.
+func (*StorageRequest) Descriptor() ([]byte, []int) {
 	return file_workers_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *DownloadToolsRequest) GetUrl() string {
+func (x *StorageRequest) GetPath() string {
 	if x != nil {
-		return x.Url
+		return x.Path
 	}
 	return ""
 }
 
-type DownloadToolsResponse struct {
+type StorageResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Chunk         []byte                 `protobuf:"bytes,1,opt,name=chunk,proto3" json:"chunk,omitempty"`
 	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
@@ -438,20 +430,20 @@ type DownloadToolsResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DownloadToolsResponse) Reset() {
-	*x = DownloadToolsResponse{}
+func (x *StorageResponse) Reset() {
+	*x = StorageResponse{}
 	mi := &file_workers_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DownloadToolsResponse) String() string {
+func (x *StorageResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DownloadToolsResponse) ProtoMessage() {}
+func (*StorageResponse) ProtoMessage() {}
 
-func (x *DownloadToolsResponse) ProtoReflect() protoreflect.Message {
+func (x *StorageResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_workers_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -463,26 +455,26 @@ func (x *DownloadToolsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DownloadToolsResponse.ProtoReflect.Descriptor instead.
-func (*DownloadToolsResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use StorageResponse.ProtoReflect.Descriptor instead.
+func (*StorageResponse) Descriptor() ([]byte, []int) {
 	return file_workers_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *DownloadToolsResponse) GetChunk() []byte {
+func (x *StorageResponse) GetChunk() []byte {
 	if x != nil {
 		return x.Chunk
 	}
 	return nil
 }
 
-func (x *DownloadToolsResponse) GetOffset() int32 {
+func (x *StorageResponse) GetOffset() int32 {
 	if x != nil {
 		return x.Offset
 	}
 	return 0
 }
 
-func (x *DownloadToolsResponse) GetEof() bool {
+func (x *StorageResponse) GetEof() bool {
 	if x != nil {
 		return x.Eof
 	}
@@ -669,6 +661,102 @@ func (x *ConnectInternalNetworkResponse) GetMessage() string {
 	return ""
 }
 
+type BuiltinToolRegistryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BuiltinToolRegistryRequest) Reset() {
+	*x = BuiltinToolRegistryRequest{}
+	mi := &file_workers_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BuiltinToolRegistryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BuiltinToolRegistryRequest) ProtoMessage() {}
+
+func (x *BuiltinToolRegistryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BuiltinToolRegistryRequest.ProtoReflect.Descriptor instead.
+func (*BuiltinToolRegistryRequest) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{12}
+}
+
+type BuiltinToolRegistryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Linux         []string               `protobuf:"bytes,1,rep,name=linux,proto3" json:"linux,omitempty"`
+	Windows       []string               `protobuf:"bytes,2,rep,name=windows,proto3" json:"windows,omitempty"`
+	Macos         []string               `protobuf:"bytes,3,rep,name=macos,proto3" json:"macos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BuiltinToolRegistryResponse) Reset() {
+	*x = BuiltinToolRegistryResponse{}
+	mi := &file_workers_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BuiltinToolRegistryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BuiltinToolRegistryResponse) ProtoMessage() {}
+
+func (x *BuiltinToolRegistryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BuiltinToolRegistryResponse.ProtoReflect.Descriptor instead.
+func (*BuiltinToolRegistryResponse) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *BuiltinToolRegistryResponse) GetLinux() []string {
+	if x != nil {
+		return x.Linux
+	}
+	return nil
+}
+
+func (x *BuiltinToolRegistryResponse) GetWindows() []string {
+	if x != nil {
+		return x.Windows
+	}
+	return nil
+}
+
+func (x *BuiltinToolRegistryResponse) GetMacos() []string {
+	if x != nil {
+		return x.Macos
+	}
+	return nil
+}
+
 var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
@@ -696,13 +784,12 @@ const file_workers_proto_rawDesc = "" +
 	"\flast_seen_at\x18\x02 \x01(\tR\n" +
 	"lastSeenAt\x12\x1b\n" +
 	"\tworker_id\x18\x03 \x01(\tR\bworkerId\"\x14\n" +
-	"\x12GetManifestRequest\"h\n" +
-	"\x13GetManifestResponse\x12,\n" +
-	"\x12download_tools_url\x18\x01 \x01(\tR\x10downloadToolsUrl\x12#\n" +
-	"\rinit_commands\x18\x02 \x03(\tR\finitCommands\"(\n" +
-	"\x14DownloadToolsRequest\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url\"W\n" +
-	"\x15DownloadToolsResponse\x12\x14\n" +
+	"\x12GetManifestRequest\":\n" +
+	"\x13GetManifestResponse\x12#\n" +
+	"\rinit_commands\x18\x01 \x03(\tR\finitCommands\"$\n" +
+	"\x0eStorageRequest\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\"Q\n" +
+	"\x0fStorageResponse\x12\x14\n" +
 	"\x05chunk\x18\x01 \x01(\fR\x05chunk\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x10\n" +
 	"\x03eof\x18\x03 \x01(\bR\x03eof\"\xb3\x01\n" +
@@ -721,13 +808,19 @@ const file_workers_proto_rawDesc = "" +
 	"network_id\x18\x02 \x01(\tR\tnetworkId\x12O\n" +
 	"\x12network_interfaces\x18\x03 \x03(\v2 .workers.NetworkInterfaceMessageR\x11networkInterfaces\":\n" +
 	"\x1eConnectInternalNetworkResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage2\x86\x03\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
+	"\x1aBuiltinToolRegistryRequest\"c\n" +
+	"\x1bBuiltinToolRegistryResponse\x12\x14\n" +
+	"\x05linux\x18\x01 \x03(\tR\x05linux\x12\x18\n" +
+	"\awindows\x18\x02 \x03(\tR\awindows\x12\x14\n" +
+	"\x05macos\x18\x03 \x03(\tR\x05macos2\xd6\x03\n" +
 	"\x0eWorkersService\x123\n" +
 	"\x04Join\x12\x14.workers.JoinRequest\x1a\x15.workers.JoinResponse\x128\n" +
 	"\x05Alive\x12\x15.workers.AliveRequest\x1a\x16.workers.AliveResponse0\x01\x12H\n" +
-	"\vGetManifest\x12\x1b.workers.GetManifestRequest\x1a\x1c.workers.GetManifestResponse\x12P\n" +
-	"\rDownloadTools\x12\x1d.workers.DownloadToolsRequest\x1a\x1e.workers.DownloadToolsResponse0\x01\x12i\n" +
-	"\x16ConnectInternalNetwork\x12&.workers.ConnectInternalNetworkRequest\x1a'.workers.ConnectInternalNetworkResponseB\vZ\t./workersb\x06proto3"
+	"\vGetManifest\x12\x1b.workers.GetManifestRequest\x1a\x1c.workers.GetManifestResponse\x12>\n" +
+	"\aStorage\x12\x17.workers.StorageRequest\x1a\x18.workers.StorageResponse0\x01\x12i\n" +
+	"\x16ConnectInternalNetwork\x12&.workers.ConnectInternalNetworkRequest\x1a'.workers.ConnectInternalNetworkResponse\x12`\n" +
+	"\x13BuiltinToolRegistry\x12#.workers.BuiltinToolRegistryRequest\x1a$.workers.BuiltinToolRegistryResponseB\vZ\t./workersb\x06proto3"
 
 var (
 	file_workers_proto_rawDescOnce sync.Once
@@ -741,7 +834,7 @@ func file_workers_proto_rawDescGZIP() []byte {
 	return file_workers_proto_rawDescData
 }
 
-var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_workers_proto_goTypes = []any{
 	(*JoinRequest)(nil),                    // 0: workers.JoinRequest
 	(*WorkerMetadata)(nil),                 // 1: workers.WorkerMetadata
@@ -750,11 +843,13 @@ var file_workers_proto_goTypes = []any{
 	(*AliveResponse)(nil),                  // 4: workers.AliveResponse
 	(*GetManifestRequest)(nil),             // 5: workers.GetManifestRequest
 	(*GetManifestResponse)(nil),            // 6: workers.GetManifestResponse
-	(*DownloadToolsRequest)(nil),           // 7: workers.DownloadToolsRequest
-	(*DownloadToolsResponse)(nil),          // 8: workers.DownloadToolsResponse
+	(*StorageRequest)(nil),                 // 7: workers.StorageRequest
+	(*StorageResponse)(nil),                // 8: workers.StorageResponse
 	(*NetworkInterfaceMessage)(nil),        // 9: workers.NetworkInterfaceMessage
 	(*ConnectInternalNetworkRequest)(nil),  // 10: workers.ConnectInternalNetworkRequest
 	(*ConnectInternalNetworkResponse)(nil), // 11: workers.ConnectInternalNetworkResponse
+	(*BuiltinToolRegistryRequest)(nil),     // 12: workers.BuiltinToolRegistryRequest
+	(*BuiltinToolRegistryResponse)(nil),    // 13: workers.BuiltinToolRegistryResponse
 }
 var file_workers_proto_depIdxs = []int32{
 	1,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
@@ -762,15 +857,17 @@ var file_workers_proto_depIdxs = []int32{
 	0,  // 2: workers.WorkersService.Join:input_type -> workers.JoinRequest
 	3,  // 3: workers.WorkersService.Alive:input_type -> workers.AliveRequest
 	5,  // 4: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
-	7,  // 5: workers.WorkersService.DownloadTools:input_type -> workers.DownloadToolsRequest
+	7,  // 5: workers.WorkersService.Storage:input_type -> workers.StorageRequest
 	10, // 6: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
-	2,  // 7: workers.WorkersService.Join:output_type -> workers.JoinResponse
-	4,  // 8: workers.WorkersService.Alive:output_type -> workers.AliveResponse
-	6,  // 9: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
-	8,  // 10: workers.WorkersService.DownloadTools:output_type -> workers.DownloadToolsResponse
-	11, // 11: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
-	7,  // [7:12] is the sub-list for method output_type
-	2,  // [2:7] is the sub-list for method input_type
+	12, // 7: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
+	2,  // 8: workers.WorkersService.Join:output_type -> workers.JoinResponse
+	4,  // 9: workers.WorkersService.Alive:output_type -> workers.AliveResponse
+	6,  // 10: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
+	8,  // 11: workers.WorkersService.Storage:output_type -> workers.StorageResponse
+	11, // 12: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
+	13, // 13: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
+	8,  // [8:14] is the sub-list for method output_type
+	2,  // [2:8] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
 	2,  // [2:2] is the sub-list for extension extendee
 	0,  // [0:2] is the sub-list for field type_name
@@ -789,7 +886,7 @@ func file_workers_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workers_proto_rawDesc), len(file_workers_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

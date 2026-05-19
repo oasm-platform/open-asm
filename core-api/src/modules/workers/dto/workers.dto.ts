@@ -11,10 +11,11 @@ import { Type } from 'class-transformer';
 
 export class WorkerManifestResponseDto {
   @ApiProperty({
-    description: 'URL to the worker tools archive package',
-    example: '/static/archived/tools.tar.gz',
+    description: 'Commands to initialize worker tools',
+    example: ['nuclei -ut'],
+    type: [String],
   })
-  downloadToolsUrl: string;
+  initCommands: string[];
 }
 
 export class WorkerMetadataDto {
