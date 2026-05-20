@@ -558,15 +558,19 @@ export class WorkersService {
     exitCode: number;
   }) {
     const channel = `remote-execute:results:${result.sessionId}`;
-    await this.redisService.publish(
-      channel,
-      JSON.stringify({
-        id: result.id,
-        sessionId: result.sessionId,
-        type: result.type,
-        data: Buffer.from(result.data).toString('utf-8'),
-        exitCode: result.exitCode,
-      }),
+    const payload = JSON.stringify({
+      id: result.id,
+      sessionId: result.sessionId,
+      type: result.type,
+      data: Buffer.from(result.data).toString('utf-8'),
+      exitCode: result.exitCode,
+    });
+
+    Logger.log(
+      `[handleRemoteExecuteResult] Publishing to ${channel}: ${payload.substring(0, 100)}`,
+      'WorkersService',
     );
+
+    await this.redisService.publish(channel, payload);
   }
 }

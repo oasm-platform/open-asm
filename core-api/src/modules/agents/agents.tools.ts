@@ -1,36 +1,36 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await */
 import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { tool } from 'ai';
-import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 
 import { AssetsService } from '@/modules/assets/assets.service';
-import { StatisticService } from '@/modules/statistic/statistic.service';
-import { TargetsService } from '@/modules/targets/targets.service';
-import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import { IssuesService } from '@/modules/issues/issues.service';
-import { ToolsService } from '@/modules/tools/tools.service';
-import { WorkersService } from '@/modules/workers/workers.service';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
+import { StatisticService } from '@/modules/statistic/statistic.service';
+import { TargetsService } from '@/modules/targets/targets.service';
+import { ToolsService } from '@/modules/tools/tools.service';
+import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
+import { WorkersService } from '@/modules/workers/workers.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   detailAssetSchema,
+  detailIssueSchema,
   detailVulnSchema,
   getAssetsSchema,
   getPortsSchema,
-  getTechnologiesSchema,
-  getTlsSchema,
   getStatisticOutPutSchema,
   getTargetsSchema,
+  getTechnologiesSchema,
+  getTlsSchema,
   getVulnerabilitiesSchema,
   listAssetsInTargetSchema,
   listIssuesSchema,
-  detailIssueSchema,
+  listJobsSchema,
   listToolsSchema,
   listWorkersSchema,
-  listJobsSchema,
 } from '@/mcp/mcp.schema';
 
 // Web fetch tool schema
@@ -476,6 +476,7 @@ export class AgentTool {
             sortBy: 'createdAt',
             sortOrder: SortOrder.DESC,
             search: q,
+            workspaceId,
           });
           return {
             ...response,
@@ -550,28 +551,32 @@ export class AgentTool {
           '',
           '⚠️ CONSTRAINTS:',
           '- Commands are executed with OS-level permissions — avoid destructive operations',
-          '- Output is NOT returned synchronously; use GET /stream SSE endpoint to receive results',
           '- The command is sent via gRPC to an available online worker',
           '- If no worker is available, the command will fail',
+          '- Waits for command completion (stdout, stderr, exit code) before returning',
           '',
           'PARAMETERS:',
           '- command: REQUIRED. The full shell command string to execute (e.g., "nmap -p 22 10.0.0.0/24")',
           '',
-          'OUTPUT (not returned directly, available via SSE stream):',
-          '- id: unique command instance ID (nanoid)',
-          '- workerId: the worker that received the command',
-          '- sessionId: session UUID for correlating results',
-          '- command: the original command string',
+          'OUTPUT:',
+          '- stdout: Standard output from the command',
+          '- stderr: Standard error output from the command',
+          '- exitCode: Process exit code (0 = success, non-zero = failure)',
+          '- error: Error message if the command failed',
+          '- timedOut: Whether the command timed out before completion',
         ].join('\n'),
         parameters: z.object({
-          command: z.string().min(1).describe(
-            'The full shell command to execute (e.g., "nmap -sV 10.0.0.1", "curl -s https://example.com", "dig A google.com")',
-          ),
+          command: z
+            .string()
+            .min(1)
+            .describe(
+              'The full shell command to execute (e.g., "nmap -sV 10.0.0.1", "curl -s https://example.com", "dig A google.com")',
+            ),
         }),
         execute: async (params: { command: string }) => {
           const { command } = params;
           const sessionId = randomUUID();
-          return this.remoteExecuteService.runCommand(command, sessionId);
+          return this.remoteExecuteService.waitForResult(command, sessionId);
         },
       };
       return tool(toolConfig);

@@ -269,6 +269,9 @@ export class WorkersController {
     data: Uint8Array;
     exitCode: number;
   }): Promise<{ success: boolean; message: string }> {
+    this.logger.log(
+      `[grpcRemoteExecuteResult] Received: sessionId=${request.sessionId}, type=${request.type}, exitCode=${request.exitCode}`,
+    );
     await this.workersService.handleRemoteExecuteResult(request);
     return { success: true, message: 'Result acknowledged' };
   }
