@@ -18,13 +18,16 @@ describe('AgentsController', () => {
 
   beforeEach(async () => {
     mockAgentsService = {
-      getAgentModes: jest.fn().mockReturnValue([
-        {
-          id: 'ask',
-          name: 'ask',
-          description: 'Ask anything about security',
-        },
-      ]),
+      getAgentModesWithWorkers: jest.fn().mockResolvedValue({
+        modes: [
+          {
+            id: 'ask',
+            name: 'ask',
+            description: 'Ask anything about security',
+          },
+        ],
+        workers: [],
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -49,29 +52,31 @@ describe('AgentsController', () => {
   });
 
   describe('getAgentModes', () => {
-    it('should return array of modes', () => {
-      const modes = controller.getAgentModes();
+    it('should return object with modes and workers', async () => {
+      const result = await controller.getAgentModes();
 
-      expect(Array.isArray(modes)).toBe(true);
-      expect(modes.length).toBeGreaterThan(0);
-      expect(modes[0]).toHaveProperty('id');
-      expect(modes[0]).toHaveProperty('name');
-      expect(modes[0]).toHaveProperty('description');
+      expect(result).toHaveProperty('modes');
+      expect(result).toHaveProperty('workers');
+      expect(Array.isArray(result.modes)).toBe(true);
+      expect(result.modes.length).toBeGreaterThan(0);
+      expect(result.modes[0]).toHaveProperty('id');
+      expect(result.modes[0]).toHaveProperty('name');
+      expect(result.modes[0]).toHaveProperty('description');
     });
 
-    it('should contain ask mode', () => {
-      const modes = controller.getAgentModes();
-      const askMode = modes.find((m) => m.id === 'ask');
+    it('should contain ask mode', async () => {
+      const result = await controller.getAgentModes();
+      const askMode = result.modes.find((m) => m.id === 'ask');
 
       expect(askMode).toBeDefined();
       expect(askMode?.name).toBe('ask');
       expect(askMode?.description).toContain('security');
     });
 
-    it('should call agentsService.getAgentModes', () => {
-      controller.getAgentModes();
+    it('should call agentsService.getAgentModesWithWorkers', async () => {
+      await controller.getAgentModes();
 
-      expect(mockAgentsService.getAgentModes).toHaveBeenCalled();
+      expect(mockAgentsService.getAgentModesWithWorkers).toHaveBeenCalled();
     });
   });
 });

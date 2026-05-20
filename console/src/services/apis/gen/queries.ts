@@ -967,6 +967,7 @@ export type WorkerInstance = {
   tool: Tool;
   internalNetworkId: string;
   tools: Tool[];
+  enabledAgentMode?: boolean;
 };
 
 export type WorkerMetadataDto = {
@@ -1316,6 +1317,11 @@ export type AgentModeDto = {
   description: string;
   color: string;
   isAvailable: boolean;
+};
+
+export type GetAgentModesResponseDto = {
+  modes: AgentModeDto[];
+  workers: WorkerInstance[];
 };
 
 export type LLMConfigResponseDtoProvider =
@@ -2212,6 +2218,7 @@ export type WorkersControllerGetWorkersParams = {
   sortBy?: string;
   sortOrder?: string;
   workspaceId?: string;
+  enabledAgentMode?: boolean;
 };
 
 export type ToolsControllerGetManyToolsParams = {
@@ -16729,14 +16736,14 @@ export const useVulnerabilitiesControllerBulkReopenVulnerabilities = <
 };
 
 /**
- * Get all available modes for AI chat box
+ * Get all available modes for AI chat box and enabled workers
  * @summary Get agent modes
  */
 export const agentsControllerGetAgentModes = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AgentModeDto[]>(
+  return orvalClient<GetAgentModesResponseDto>(
     { url: `/api/agents/modes`, method: 'GET', signal },
     options,
   );

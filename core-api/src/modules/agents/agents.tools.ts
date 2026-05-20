@@ -477,6 +477,7 @@ export class AgentTool {
             sortOrder: SortOrder.DESC,
             search: q,
             workspaceId,
+            enabledAgentMode: true,
           });
           return {
             ...response,

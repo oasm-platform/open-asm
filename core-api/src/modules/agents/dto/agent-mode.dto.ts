@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
+import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 
 export class AgentModeDto {
   @ApiProperty({ example: 'ask' })
@@ -25,4 +26,7 @@ export class AgentModeDto {
 export class GetAgentModesResponseDto {
   @ApiProperty({ type: [AgentModeDto] })
   modes: AgentModeDto[];
+
+  @ApiProperty({ type: [WorkerInstance] })
+  workers: WorkerInstance[];
 }

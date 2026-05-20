@@ -1,13 +1,14 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsOptional,
   IsString,
   IsUUID,
   IsObject,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class WorkerManifestResponseDto {
   @ApiProperty({
@@ -68,4 +69,14 @@ export class GetManyWorkersDto extends GetManyBaseQueryParams {
   @IsUUID('4')
   @IsOptional()
   workspaceId?: string;
+
+  @ApiProperty({ required: false })
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  })
+  enabledAgentMode?: boolean;
 }

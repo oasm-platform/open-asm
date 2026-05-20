@@ -147,7 +147,7 @@ export class WorkersService {
   public async getWorkers(
     query: GetManyWorkersDto,
   ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
-    const { page, limit, sortOrder, workspaceId } = query;
+    const { page, limit, sortOrder, workspaceId, enabledAgentMode } = query;
     let { sortBy } = query;
     if (!sortBy) {
       sortBy = '"createdAt"';
@@ -162,6 +162,13 @@ export class WorkersService {
       )
       .leftJoinAndSelect('w.tool', 't')
       .where('1=1');
+
+    // Add enabledAgentMode filter if provided
+    if (enabledAgentMode !== undefined) {
+      queryBuilder.andWhere('w."enabledAgentMode" = :enabledAgentMode', {
+        enabledAgentMode,
+      });
+    }
 
     // Add workspace filter if workspaceId is provided, or if worker has cloud scope
     if (workspaceId) {
@@ -183,8 +190,8 @@ export class WorkersService {
         ))`,
         { workspaceId },
       );
-    } else {
-      // If no workspaceId provided, we still want to include cloud workers
+    } else if (enabledAgentMode === undefined) {
+      // If no workspaceId and no enabledAgentMode filter, include only cloud workers
       queryBuilder.andWhere('w."scope" = :cloudScope', {
         cloudScope: WorkerScope.CLOUD,
       });

@@ -18,13 +18,17 @@ export const AgentModeSelect = memo(function AgentModeSelect({
   value,
   onChange,
 }: AgentModeSelectProps) {
-  const { data: modes } = useAgentsControllerGetAgentModes();
+  const { data } = useAgentsControllerGetAgentModes();
+  const modes = data?.modes;
+  const workers = data?.workers;
   const [open, setOpen] = useState(false);
 
   const selectedMode = useMemo(
     () => modes?.find((m) => m.id === value),
     [modes, value],
   );
+
+  const hasAvailableWorkers = workers && workers.length > 0;
 
   if (!modes || modes.length === 0) {
     return null;
@@ -64,6 +68,26 @@ export const AgentModeSelect = memo(function AgentModeSelect({
             {value === mode.id && <Check size={14} className="shrink-0" />}
           </DropdownMenuItem>
         ))}
+        {hasAvailableWorkers && (
+          <>
+            <div className="my-1 h-px bg-border" />
+            {workers.map((worker) => (
+              <DropdownMenuItem
+                key={worker.id}
+                disabled={!worker.enabledAgentMode}
+                className="flex items-center justify-between gap-2 data-[disabled]:opacity-50"
+              >
+                <div className="flex flex-col">
+                  <span className="font-medium">{worker.name ?? 'Worker'}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {worker.os ?? 'Unknown OS'}
+                  </span>
+                </div>
+                <div className="h-2 w-2 rounded-full bg-green-500" />
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
       </DropdownMenuContent>
       </DropdownMenu>
     </div>

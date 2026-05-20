@@ -3,6 +3,7 @@ import { StatisticModule } from '@/modules/statistic/statistic.module';
 import { TargetsModule } from '@/modules/targets/targets.module';
 import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
 import { RemoteExecuteModule } from '@/modules/remote-execute/remote-execute.module';
+import { WorkersModule } from '@/modules/workers/workers.module';
 import { Global, Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsCompletionsService } from './agents.completions';
@@ -34,6 +35,7 @@ import { HttpModule } from '@nestjs/axios';
     StatisticModule,
     RemoteExecuteModule,
     HttpModule,
+    WorkersModule,
   ],
   controllers: [AgentsController],
   providers: [

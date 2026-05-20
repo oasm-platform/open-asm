@@ -1,9 +1,12 @@
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
+  SortOrder,
 } from '@/common/dtos/get-many-base.dto';
 import { AgentMode } from '@/common/enums/enum';
 import { decrypt, encrypt } from '@/common/utils/encryption.util';
+import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
+import { WorkersService } from '@/modules/workers/workers.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { HttpService } from '@nestjs/axios';
@@ -17,7 +20,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
 import { Repository } from 'typeorm';
 import { AgentsMemoriesService } from './agents.memories';
-import { AgentModeDto } from './dto/agent-mode.dto';
+import { AgentModeDto, GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
   ConversationResponseDto,
   UpdateConversationDto,
@@ -62,6 +65,7 @@ export class AgentsService {
     private readonly redisService: RedisService,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly httpService: HttpService,
+    private readonly workersService: WorkersService,
   ) {}
 
   private maskApiKey(apiKey: string): string {
@@ -86,6 +90,27 @@ export class AgentsService {
         isAvailable: true,
       },
     ];
+  }
+
+  async getAgentModesWithWorkers(): Promise<GetAgentModesResponseDto> {
+    const modes = this.getAgentModes();
+    const workersResponse = await this.workersService.getWorkers({
+      page: 1,
+      limit: 1000,
+      sortBy: '"createdAt"',
+      sortOrder: SortOrder.DESC,
+      enabledAgentMode: true,
+    });
+    return {
+      modes,
+      workers: workersResponse.data.map((w) => ({
+        id: w.id,
+        name: w.name,
+        scope: w.scope,
+        os: w.os,
+        ipAddress: w.ipAddress,
+      })) as WorkerInstance[],
+    };
   }
 
   private toLLMConfigResponse(config: AgentLLMConfig): LLMConfigResponseDto {
