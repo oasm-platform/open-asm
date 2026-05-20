@@ -74,7 +74,7 @@ func (s *sessionSandbox) close() error {
 	return os.RemoveAll(s.rootPath)
 }
 
-func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspaceRoot string) {
+func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspaceRoot string, toolPath string) {
 	log := oasm.NewLogger("RemoteExec")
 
 	log.Info("Subscribing to remote execute stream...")
@@ -170,7 +170,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 				continue
 			}
 
-			go executeRemoteCommand(ctx, handler, command, sb, log, client, workspaceRoot)
+			go executeRemoteCommand(ctx, handler, command, sb, log, toolPath)
 
 		default:
 			log.Warning("Unknown remote execute event type: %v", resp.Type)
@@ -178,7 +178,7 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 	}
 }
 
-func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, command string, sandbox *sessionSandbox, log *oasm.LoggerType, client *oasm.Client, workspaceRoot string) {
+func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, command string, sandbox *sessionSandbox, log *oasm.LoggerType, toolPath string) {
 	log.Info("Executing command in session %s: %s", handler.SessionID(), command)
 
 	if err := sandbox.chroot(); err != nil {
@@ -196,6 +196,7 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 	}
 
 	cmd.SysProcAttr = newSysProcAttr()
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PATH=%s%c%s", toolPath, os.PathListSeparator, os.Getenv("PATH")))
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {

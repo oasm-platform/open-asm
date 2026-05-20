@@ -132,7 +132,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 	}
 
 	remoteLog := oasm.NewLogger("RemoteExec")
-	go startRemoteExecuteHandler(ctx, client, workspaceRoot)
+	go startRemoteExecuteHandler(ctx, client, workspaceRoot, cfg.ToolPath)
 	remoteLog.Info("Remote execute handler started (workspace: %s)", workspaceRoot)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
