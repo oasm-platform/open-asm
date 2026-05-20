@@ -7,12 +7,12 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
-import { AgentModeToggle } from '@/components/ui/agent-mode-toggle';
+import { AgentModeSelect } from '@/components/ui/agent-mode-toggle';
 import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
 import { useState } from 'react';
 
 interface AgentPromptInputProps {
-  onSubmit: (content: string, options?: { agentMode?: boolean }) => void;
+  onSubmit: (content: string, options?: { agentMode?: string }) => void;
   isSending?: boolean;
   selectedModel?: {
     provider: string;
@@ -20,8 +20,8 @@ interface AgentPromptInputProps {
     configId: string;
   } | null;
   onSelectModel?: (provider: string, model: string, configId: string) => void;
-  agentMode?: boolean;
-  onAgentModeChange?: (enabled: boolean) => void;
+  agentMode?: string;
+  onAgentModeChange?: (mode: string) => void;
   placeholder?: string;
   className?: string;
 }
@@ -31,7 +31,7 @@ export default function AgentPromptInput({
   isSending = false,
   selectedModel,
   onSelectModel,
-  agentMode = false,
+  agentMode = 'ask',
   onAgentModeChange,
   placeholder = 'Ask anything about security...',
   className,
@@ -68,9 +68,9 @@ export default function AgentPromptInput({
           </PromptInputTools>
           <div className="flex items-center gap-2">
             {onAgentModeChange && (
-              <AgentModeToggle
-                enabled={agentMode}
-                onToggle={onAgentModeChange}
+              <AgentModeSelect
+                value={agentMode}
+                onChange={onAgentModeChange}
               />
             )}
             <PromptInputSubmit

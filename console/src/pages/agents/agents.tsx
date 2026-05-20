@@ -20,7 +20,7 @@ interface SelectedModel {
 interface LocationState {
   pendingMessage?: string;
   selectedModel?: SelectedModel;
-  agentMode?: boolean;
+  agentMode?: string;
 }
 
 export default function AgentsChatPage() {
@@ -46,8 +46,8 @@ export default function AgentsChatPage() {
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
 
-  const [agentMode, setAgentMode] = useState(false);
-  const agentModeRef = useRef(false);
+  const [agentMode, setAgentMode] = useState('ask');
+  const agentModeRef = useRef('ask');
 
   useEffect(() => {
     agentModeRef.current = agentMode;
@@ -196,7 +196,7 @@ export default function AgentsChatPage() {
   }, [displayMessages]);
 
   const handleSendMessage = useCallback(
-    async (content: string, options?: { agentMode?: boolean }) => {
+    async (content: string, options?: { agentMode?: string }) => {
       setStreamError(null);
       if (options?.agentMode !== undefined) {
         agentModeRef.current = options.agentMode;

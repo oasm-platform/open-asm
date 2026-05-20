@@ -43,7 +43,7 @@ interface ToolCallState {
 
 interface ChatConversationProps {
   messages: UIMessage[];
-  onSendMessage: (content: string, options?: { agentMode?: boolean }) => void;
+  onSendMessage: (content: string, options?: { agentMode?: string }) => void;
   onRetry?: () => void;
   isStreaming?: boolean;
   isLoadingMessages?: boolean;
@@ -56,8 +56,8 @@ interface ChatConversationProps {
   onLoadMore?: () => void;
   hasMoreMessages?: boolean;
   isLoadingMoreMessages?: boolean;
-  agentMode?: boolean;
-  onAgentModeChange?: (enabled: boolean) => void;
+  agentMode?: string;
+  onAgentModeChange?: (mode: string) => void;
 }
 
 const getTextContent = (message: UIMessage): string => {

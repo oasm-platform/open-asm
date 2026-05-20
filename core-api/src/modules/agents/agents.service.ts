@@ -2,24 +2,26 @@ import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
+import { AgentMode } from '@/common/enums/enum';
 import { decrypt, encrypt } from '@/common/utils/encryption.util';
 import { RedisService } from '@/services/redis/redis.service';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { HttpService } from '@nestjs/axios';
 import {
   BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
 import { Repository } from 'typeorm';
+import { AgentsMemoriesService } from './agents.memories';
+import { AgentModeDto } from './dto/agent-mode.dto';
 import {
   ConversationResponseDto,
   UpdateConversationDto,
 } from './dto/conversation.dto';
-import { AgentsMemoriesService } from './agents.memories';
 import {
   CreateLLMConfigDto,
   LLMConfigResponseDto,
@@ -65,6 +67,25 @@ export class AgentsService {
   private maskApiKey(apiKey: string): string {
     if (apiKey.length <= 4) return '****';
     return '*'.repeat(apiKey.length - 4) + apiKey.slice(-4);
+  }
+
+  getAgentModes(): AgentModeDto[] {
+    return [
+      {
+        id: AgentMode.ASK,
+        name: 'Ask',
+        description: 'Ask anything about security',
+        color: '#6b7280',
+        isAvailable: true,
+      },
+      {
+        id: AgentMode.AGENT,
+        name: 'Agent',
+        description: 'Auto pentest, connect terminal, and more',
+        color: '#3b82f6',
+        isAvailable: true,
+      },
+    ];
   }
 
   private toLLMConfigResponse(config: AgentLLMConfig): LLMConfigResponseDto {

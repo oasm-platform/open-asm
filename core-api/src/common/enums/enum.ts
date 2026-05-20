@@ -221,3 +221,8 @@ export enum TargetScopeType {
   /** Targets belonging to external networks (public) */
   EXTERNAL = 'EXTERNAL',
 }
+
+export enum AgentMode {
+  ASK = 'ask',
+  AGENT = 'agent',
+}

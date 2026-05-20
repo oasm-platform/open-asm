@@ -1310,6 +1310,14 @@ export type BulkReopenVulnerabilitiesDto = {
   ids: string[];
 };
 
+export type AgentModeDto = {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  isAvailable: boolean;
+};
+
 export type LLMConfigResponseDtoProvider =
   (typeof LLMConfigResponseDtoProvider)[keyof typeof LLMConfigResponseDtoProvider];
 
@@ -1487,6 +1495,14 @@ export type GetManyMessageResponseDtoDto = {
   pageCount: number;
 };
 
+export type SendMessageDtoAgentMode =
+  (typeof SendMessageDtoAgentMode)[keyof typeof SendMessageDtoAgentMode];
+
+export const SendMessageDtoAgentMode = {
+  ask: 'ask',
+  agent: 'agent',
+} as const;
+
 export type SendMessageDto = {
   question: string;
   /** Continue existing conversation. If not provided, a new conversation is created. */
@@ -1495,7 +1511,7 @@ export type SendMessageDto = {
   model?: string;
   /** Override provider for new conversations */
   provider?: string;
-  agentMode?: boolean;
+  agentMode?: SendMessageDtoAgentMode;
 };
 
 export type MCPServerResponseDtoHeaders = { [key: string]: unknown };
@@ -2329,19 +2345,6 @@ export const VulnerabilitiesControllerGetVulnerabilitiesSeverityItem = {
 export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
   workspaceId: string;
   targetIds?: string[];
-};
-
-export type VulnerabilitiesControllerBulkDismissVulnerabilities200 =
-  AppResponseSerialization & {
-    data?: VulnerabilityDismissal[];
-  };
-
-export type AgentsControllerGetLLMConfigs200 = AppResponseSerialization & {
-  data?: LLMConfigWithProviderDto[];
-};
-
-export type AgentsControllerGetProviderModels200 = AppResponseSerialization & {
-  data?: ProviderModelDto[];
 };
 
 export type AgentsControllerGetConversationsParams = {
@@ -16510,7 +16513,7 @@ export const vulnerabilitiesControllerBulkDismissVulnerabilities = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<VulnerabilitiesControllerBulkDismissVulnerabilities200>(
+  return orvalClient<VulnerabilityDismissal[]>(
     {
       url: `/api/vulnerabilities/dismiss`,
       method: 'POST',
@@ -16726,6 +16729,160 @@ export const useVulnerabilitiesControllerBulkReopenVulnerabilities = <
 };
 
 /**
+ * Get all available modes for AI chat box
+ * @summary Get agent modes
+ */
+export const agentsControllerGetAgentModes = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentModeDto[]>(
+    { url: `/api/agents/modes`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetAgentModesQueryKey = () => {
+  return [`/api/agents/modes`] as const;
+};
+
+export const getAgentsControllerGetAgentModesQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetAgentModesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetAgentModes>>
+  > = ({ signal }) => agentsControllerGetAgentModes(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetAgentModesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetAgentModes>>
+>;
+export type AgentsControllerGetAgentModesQueryError = unknown;
+
+export function useAgentsControllerGetAgentModes<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetAgentModes>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetAgentModes<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetAgentModes>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetAgentModes<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get agent modes
+ */
+
+export function useAgentsControllerGetAgentModes<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentModes>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetAgentModesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * Create a new LLM provider configuration
  * @summary Create LLM config
  */
@@ -16827,7 +16984,7 @@ export const agentsControllerGetLLMConfigs = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AgentsControllerGetLLMConfigs200>(
+  return orvalClient<LLMConfigWithProviderDto[]>(
     { url: `/api/agents/llm-configs`, method: 'GET', signal },
     options,
   );
@@ -16982,7 +17139,7 @@ export const agentsControllerGetProviderModels = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AgentsControllerGetProviderModels200>(
+  return orvalClient<ProviderModelDto[]>(
     { url: `/api/agents/llm-configs/${id}/models`, method: 'GET', signal },
     options,
   );

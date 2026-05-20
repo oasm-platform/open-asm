@@ -12,6 +12,7 @@ import * as Mustache from 'mustache';
 import * as path from 'path';
 import { Repository } from 'typeorm';
 
+import { AgentMode } from '@/common/enums/enum';
 import { decrypt } from '@/common/utils/encryption.util';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentTool } from './agents.tools';
@@ -451,8 +452,8 @@ export class AgentsCompletionsService {
     const messageRepo = this.messageRepository;
     const assistantMsgId = assistantMessage.id;
     const assistantMsgMetadata = assistantMessage.metadata;
-    let toolsEnabled = true;
-    if (llmConfig.provider === LLMProvider.CUSTOM && llmConfig.apiUrl) {
+    let toolsEnabled = dto.agentMode === AgentMode.AGENT;
+    if (toolsEnabled && llmConfig.provider === LLMProvider.CUSTOM && llmConfig.apiUrl) {
       toolsEnabled = await this.customModelSupportsTools(
         llmConfig.apiUrl,
         llmConfig.model,

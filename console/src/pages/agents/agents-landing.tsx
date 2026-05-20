@@ -65,7 +65,7 @@ export default function AgentsLandingPage() {
     model: string;
     configId: string;
   } | null>(null);
-  const [agentMode, setAgentMode] = useState(false);
+  const [agentMode, setAgentMode] = useState('ask');
 
   const {
     state: { selectedWorkspaceId },
@@ -113,7 +113,7 @@ export default function AgentsLandingPage() {
   const queryText = searchParams.get('text');
 
   const handleSendMessage = useCallback(
-    (content: string, options?: { agentMode?: boolean }) => {
+    (content: string, options?: { agentMode?: string }) => {
       if (!content.trim() || isSending) return;
 
       setIsSending(true);
