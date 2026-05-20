@@ -1,7 +1,8 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { nanoid } from 'nanoid';
 import { ReplaySubject } from 'rxjs';
 import { WorkerInstance } from './entities/worker.entity';
+import { WorkersService } from './workers.service';
 
 export interface RemoteExecuteCommand {
   id: string;
@@ -15,11 +16,21 @@ export interface RemoteExecuteCommand {
 export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   private readonly logger = new Logger(RemoteExecuteSubscribeService.name);
 
-  private readonly workers = new Map<string, ReplaySubject<RemoteExecuteCommand>>();
+  private readonly workers = new Map<
+    string,
+    ReplaySubject<RemoteExecuteCommand>
+  >();
 
   private readonly sessionWorkerMap = new Map<string, string>();
 
+  constructor(
+    @Inject(forwardRef(() => WorkersService))
+    private readonly workersService: WorkersService,
+  ) {}
+
   registerWorker(worker: WorkerInstance): ReplaySubject<RemoteExecuteCommand> {
+    this.workersService.enableAgentMode(worker.id);
+
     const subject = new ReplaySubject<RemoteExecuteCommand>(1);
     this.workers.set(worker.id, subject);
 
@@ -34,7 +45,9 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     return subject;
   }
 
-  getWorkerSubject(workerId: string): ReplaySubject<RemoteExecuteCommand> | undefined {
+  getWorkerSubject(
+    workerId: string,
+  ): ReplaySubject<RemoteExecuteCommand> | undefined {
     return this.workers.get(workerId);
   }
 
@@ -81,9 +94,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   ): RemoteExecuteCommand | null {
     const subject = this.workers.get(workerId);
     if (!subject || subject.closed) {
-      this.logger.warn(
-        `Worker ${workerId} is not subscribed or stream closed`,
-      );
+      this.logger.warn(`Worker ${workerId} is not subscribed or stream closed`);
       return null;
     }
 

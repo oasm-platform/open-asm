@@ -546,6 +546,10 @@ export class WorkersService {
     return { message: 'Connect success' };
   }
 
+  public async enableAgentMode(workerId: string): Promise<void> {
+    await this.repo.update(workerId, { enabledAgentMode: true });
+  }
+
   public async handleRemoteExecuteResult(result: {
     id: string;
     sessionId: string;

@@ -72,7 +72,7 @@ export class WorkerInstance extends BaseEntity {
   internalNetwork?: InternalNetwork;
 
   /**
-   * Active tools on this worker.
+   * Active tools on this worker.oin
    * For BUILT_IN workers: returns all built-in tools (array).
    * For PROVIDER workers: returns the current tool (array with single element).
    */
@@ -81,4 +81,8 @@ export class WorkerInstance extends BaseEntity {
 
   @OneToMany(() => NetworkInterface, (ni) => ni.worker)
   networkInterfaces: NetworkInterface[];
+
+  @ApiProperty({ required: false })
+  @Column({ nullable: true, default: false })
+  enabledAgentMode: boolean;
 }
