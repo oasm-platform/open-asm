@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/oasm-platform/oasm-sdk-go/oasm"
 	pb "github.com/oasm-platform/open-asm/grpc-client/go/workers"
@@ -77,104 +78,123 @@ func (s *sessionSandbox) close() error {
 func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspaceRoot string, toolPath string) {
 	log := oasm.NewLogger("RemoteExec")
 
-	log.Info("Subscribing to remote execute stream...")
-
-	handler, err := client.RemoteExecuteSubscribe(ctx)
-	if err != nil {
-		log.ErrorE("Failed to subscribe to remote execute", err)
-		return
-	}
-
-	log.Success("Connected to remote execute stream (worker: %s)", client.WorkerID())
-
-	activeSessions := make(map[string]*sessionSandbox)
-	var sessionsMu sync.Mutex
-
-	getOrCreateSandbox := func(sessionID string) (*sessionSandbox, error) {
-		sessionsMu.Lock()
-		defer sessionsMu.Unlock()
-
-		if sb, ok := activeSessions[sessionID]; ok {
-			return sb, nil
-		}
-
-		sb, err := newSessionSandbox(workspaceRoot, sessionID)
-		if err != nil {
-			return nil, err
-		}
-
-		activeSessions[sessionID] = sb
-		log.Info("Created session sandbox: %s -> %s", sessionID, sb.rootPath)
-		return sb, nil
-	}
-
-	cleanupSandbox := func(sessionID string) {
-		sessionsMu.Lock()
-		sb, ok := activeSessions[sessionID]
-		if ok {
-			delete(activeSessions, sessionID)
-		}
-		sessionsMu.Unlock()
-
-		if ok && sb != nil {
-			if err := sb.close(); err != nil {
-				log.ErrorE("Failed to cleanup session sandbox", err)
-			} else {
-				log.Info("Cleaned up session sandbox: %s", sessionID)
-			}
-		}
-	}
-
 	for {
 		select {
 		case <-ctx.Done():
 			log.Info("Remote execute handler shutting down...")
-			for sessionID := range activeSessions {
-				cleanupSandbox(sessionID)
-			}
 			return
 		default:
 		}
 
-		resp, err := handler.Next(ctx)
+		log.Info("Subscribing to remote execute stream...")
+
+		handler, err := client.RemoteExecuteSubscribe(ctx)
 		if err != nil {
-			log.ErrorE("Failed to receive remote execute event", err)
-			continue
-		}
-
-		if resp == nil {
-			log.Info("Remote execute stream closed")
-			return
-		}
-
-		switch resp.Type {
-		case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED:
-			log.Success("Session connected: %s (id: %s)", resp.SessionId, resp.Id)
-
-		case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND:
-			sessionID := resp.SessionId
-			command := resp.Command
-
-			if sessionID == "" || command == "" {
-				log.Warning("Received command with empty session or command field")
-				if handler.SessionID() != "" {
-					_ = handler.SendError(ctx, "empty session or command")
-				}
+			log.ErrorE("Failed to subscribe to remote execute, retrying in 5s...", err)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
 				continue
 			}
+		}
 
-			sb, err := getOrCreateSandbox(sessionID)
+		log.Success("Connected to remote execute stream (worker: %s)", client.WorkerID())
+
+		activeSessions := make(map[string]*sessionSandbox)
+		var sessionsMu sync.Mutex
+
+		getOrCreateSandbox := func(sessionID string) (*sessionSandbox, error) {
+			sessionsMu.Lock()
+			defer sessionsMu.Unlock()
+
+			if sb, ok := activeSessions[sessionID]; ok {
+				return sb, nil
+			}
+
+			sb, err := newSessionSandbox(workspaceRoot, sessionID)
 			if err != nil {
-				log.ErrorE("Failed to create session sandbox", err)
-				_ = handler.SendError(ctx, fmt.Sprintf("failed to create session workspace: %v", err))
-				continue
+				return nil, err
 			}
 
-			go executeRemoteCommand(ctx, handler, command, sb, log, toolPath)
-
-		default:
-			log.Warning("Unknown remote execute event type: %v", resp.Type)
+			activeSessions[sessionID] = sb
+			log.Info("Created session sandbox: %s -> %s", sessionID, sb.rootPath)
+			return sb, nil
 		}
+
+		cleanupSandbox := func(sessionID string) {
+			sessionsMu.Lock()
+			sb, ok := activeSessions[sessionID]
+			if ok {
+				delete(activeSessions, sessionID)
+			}
+			sessionsMu.Unlock()
+
+			if ok && sb != nil {
+				if err := sb.close(); err != nil {
+					log.ErrorE("Failed to cleanup session sandbox", err)
+				} else {
+					log.Info("Cleaned up session sandbox: %s", sessionID)
+				}
+			}
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				log.Info("Remote execute handler shutting down...")
+				for sessionID := range activeSessions {
+					cleanupSandbox(sessionID)
+				}
+				return
+			default:
+			}
+
+			resp, err := handler.Next(ctx)
+			if err != nil {
+				log.ErrorE("Failed to receive remote execute event, reconnecting...", err)
+				break
+			}
+
+			if resp == nil {
+				log.Info("Remote execute stream closed, reconnecting...")
+				break
+			}
+
+			switch resp.Type {
+			case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED:
+				log.Success("Session connected: %s (id: %s)", resp.SessionId, resp.Id)
+
+			case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND:
+				sessionID := resp.SessionId
+				command := resp.Command
+
+				if sessionID == "" || command == "" {
+					log.Warning("Received command with empty session or command field")
+					if handler.SessionID() != "" {
+						_ = handler.SendError(ctx, "empty session or command")
+					}
+					continue
+				}
+
+				sb, err := getOrCreateSandbox(sessionID)
+				if err != nil {
+					log.ErrorE("Failed to create session sandbox", err)
+					_ = handler.SendError(ctx, fmt.Sprintf("failed to create session workspace: %v", err))
+					continue
+				}
+
+				go executeRemoteCommand(ctx, handler, command, sb, log, toolPath)
+
+			default:
+				log.Warning("Unknown remote execute event type: %v", resp.Type)
+			}
+		}
+
+		for sessionID := range activeSessions {
+			cleanupSandbox(sessionID)
+		}
+		activeSessions = make(map[string]*sessionSandbox)
 	}
 }
 

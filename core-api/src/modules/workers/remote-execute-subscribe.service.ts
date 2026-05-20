@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { nanoid } from 'nanoid';
-import { ReplaySubject } from 'rxjs';
+import { finalize, ReplaySubject } from 'rxjs';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
 
@@ -10,6 +10,11 @@ export interface RemoteExecuteCommand {
   type: number;
   sessionId: string;
   command: string;
+}
+
+export interface WorkerRegistration {
+  subject: ReplaySubject<RemoteExecuteCommand>;
+  observable: ReturnType<ReplaySubject<RemoteExecuteCommand>['asObservable']>;
 }
 
 @Injectable()
@@ -28,8 +33,8 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     private readonly workersService: WorkersService,
   ) {}
 
-  registerWorker(worker: WorkerInstance): ReplaySubject<RemoteExecuteCommand> {
-    this.workersService.enableAgentMode(worker.id);
+  registerWorker(worker: WorkerInstance): WorkerRegistration {
+    void this.workersService.enableAgentMode(worker.id);
 
     const subject = new ReplaySubject<RemoteExecuteCommand>(1);
     this.workers.set(worker.id, subject);
@@ -38,11 +43,12 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     const cleanup = () => {
       this.handleWorkerDisconnect(workerId);
       this.workers.delete(workerId);
-      this.logger.log(`Worker ${workerId} unsubscribed`);
+      this.logger.log(`Worker ${workerId} disconnected, cleaned up`);
     };
-    subject.subscribe({ complete: cleanup, error: cleanup });
 
-    return subject;
+    const observable = subject.asObservable().pipe(finalize(cleanup));
+
+    return { subject, observable };
   }
 
   getWorkerSubject(

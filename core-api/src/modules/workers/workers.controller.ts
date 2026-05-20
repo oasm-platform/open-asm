@@ -246,7 +246,8 @@ export class WorkersController {
       throw new RpcException('Worker not found in context');
     }
 
-    const subject = this.remoteExecuteSubscribeService.registerWorker(worker);
+    const { subject, observable } =
+      this.remoteExecuteSubscribeService.registerWorker(worker);
 
     subject.next({
       id: '',
@@ -256,7 +257,7 @@ export class WorkersController {
       command: '',
     });
 
-    return subject.asObservable();
+    return observable;
   }
 
   @UseGuards(GrpcWorkerTokenGuard)
