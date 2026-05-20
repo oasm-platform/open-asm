@@ -1,18 +1,10 @@
-import {
-  PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputTools,
-  type PromptInputMessage,
-} from '@/components/ai-elements/prompt-input';
-import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 import Page from '@/components/common/page';
 import LlmConnect from '@/components/llm-connect';
 import TypewriterText from '@/components/typewriter-text';
-import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
+import AgentPromptInput from '@/components/agent-prompt-input';
+import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type {
   ConversationResponseDto,
   LLMConfigWithProviderDto,
@@ -24,7 +16,6 @@ import {
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
 
@@ -68,13 +59,13 @@ const ALL_QUICK_SUGGESTIONS = [
 export default function AgentsLandingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
     provider: string;
     model: string;
     configId: string;
   } | null>(null);
+  const [agentMode, setAgentMode] = useState(false);
 
   const {
     state: { selectedWorkspaceId },
@@ -122,7 +113,7 @@ export default function AgentsLandingPage() {
   const queryText = searchParams.get('text');
 
   const handleSendMessage = useCallback(
-    (content: string) => {
+    (content: string, options?: { agentMode?: boolean }) => {
       if (!content.trim() || isSending) return;
 
       setIsSending(true);
@@ -133,27 +124,21 @@ export default function AgentsLandingPage() {
         state: {
           pendingMessage: content.trim(),
           ...(selectedModel && { selectedModel }),
+          agentMode: options?.agentMode ?? agentMode,
         },
       });
     },
-    [isSending, navigate, selectedModel],
+    [isSending, navigate, selectedModel, agentMode],
   );
 
   useEffect(() => {
-    if (queryText && !isSending && !input) {
+    if (queryText && !isSending) {
       handleSendMessage(queryText);
       const url = new URL(window.location.href);
       url.searchParams.delete('text');
       window.history.replaceState({}, '', url.toString());
     }
-  }, [queryText, isSending, input, handleSendMessage]);
-
-  const handleSubmit = (message: PromptInputMessage) => {
-    if (message.text.trim()) {
-      handleSendMessage(message.text);
-      setInput('');
-    }
-  };
+  }, [queryText, isSending, handleSendMessage]);
 
   const handleSuggestionClick = (suggestion: string) => {
     handleSendMessage(suggestion);
@@ -208,31 +193,16 @@ export default function AgentsLandingPage() {
 
         {/* Input area */}
         <div className="w-full max-w-2xl flex flex-col gap-3">
-          <PromptInput onSubmit={handleSubmit} className="w-full shadow-sm">
-            <PromptInputBody>
-              <PromptInputTextarea
-                value={input}
-                placeholder="Ask anything about security..."
-                onChange={(e) => setInput(e.currentTarget.value)}
-                disabled={isSending}
-              />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <PromptInputTools>
-                <ChatModelSwitcher
-                  selectedConfigId={selectedModel?.configId ?? null}
-                  selectedModel={selectedModel?.model ?? null}
-                  onSelectModel={(provider, model, configId) => {
-                    setSelectedModel({ provider, model, configId });
-                  }}
-                />
-              </PromptInputTools>
-              <PromptInputSubmit
-                status={isSending ? 'streaming' : 'ready'}
-                disabled={!input.trim() || isSending}
-              />
-            </PromptInputFooter>
-          </PromptInput>
+          <AgentPromptInput
+            onSubmit={handleSendMessage}
+            isSending={isSending}
+            selectedModel={selectedModel}
+            onSelectModel={(provider, model, configId) => {
+              setSelectedModel({ provider, model, configId });
+            }}
+            agentMode={agentMode}
+            onAgentModeChange={setAgentMode}
+          />
 
           {/* Quick suggestions */}
           <Suggestions>

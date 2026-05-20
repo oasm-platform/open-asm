@@ -10,17 +10,8 @@ import {
   MessageActions,
   MessageContent,
 } from '@/components/ai-elements/message';
-import {
-  PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputTools,
-  type PromptInputMessage,
-} from '@/components/ai-elements/prompt-input';
+import AgentPromptInput from '@/components/agent-prompt-input';
 import { Markdown } from '@/components/common/markdown';
-import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
 import type { TextUIPart, UIMessage } from 'ai';
 import {
   AlertCircle,
@@ -52,7 +43,7 @@ interface ToolCallState {
 
 interface ChatConversationProps {
   messages: UIMessage[];
-  onSendMessage: (content: string) => void;
+  onSendMessage: (content: string, options?: { agentMode?: boolean }) => void;
   onRetry?: () => void;
   isStreaming?: boolean;
   isLoadingMessages?: boolean;
@@ -65,6 +56,8 @@ interface ChatConversationProps {
   onLoadMore?: () => void;
   hasMoreMessages?: boolean;
   isLoadingMoreMessages?: boolean;
+  agentMode?: boolean;
+  onAgentModeChange?: (enabled: boolean) => void;
 }
 
 const getTextContent = (message: UIMessage): string => {
@@ -325,7 +318,11 @@ const ChatMessage = memo(function ChatMessage({
               isStreaming={isStreamingActive}
             >
               {(displayText) => (
-                <Markdown content={displayText} preview={false} className="text-base" />
+                <Markdown
+                  content={displayText}
+                  preview={false}
+                  className="text-base"
+                />
               )}
             </AnimatedMessageContent>
           )}
@@ -374,8 +371,9 @@ export const ChatConversation = memo(function ChatConversation({
   onLoadMore,
   hasMoreMessages = false,
   isLoadingMoreMessages = false,
+  agentMode = false,
+  onAgentModeChange,
 }: ChatConversationProps) {
-  const [input, setInput] = useState('');
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const prevStreamingRef = useRef(false);
   const isLoadingMoreRef = useRef(false);
@@ -489,16 +487,6 @@ export const ChatConversation = memo(function ChatConversation({
   useEffect(() => {
     prevStreamingRef.current = isStreaming;
   }, [isStreaming]);
-
-  const handleSubmit = useCallback(
-    (message: PromptInputMessage) => {
-      if (message.text.trim() && !isStreaming) {
-        onSendMessage(message.text.trim());
-        setInput('');
-      }
-    },
-    [isStreaming, onSendMessage],
-  );
 
   const handleRetry = useCallback(() => {
     if (onRetry) {
@@ -629,36 +617,29 @@ export const ChatConversation = memo(function ChatConversation({
 
       <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pt-3 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
-          <PromptInput onSubmit={handleSubmit} className="w-full shadow-sm">
-            <PromptInputBody>
-              <PromptInputTextarea
-                value={input}
-                onChange={(e) => setInput(e.currentTarget.value)}
-                placeholder={
-                  isStreaming
-                    ? 'Waiting for response…'
-                    : 'Ask anything about security…'
-                }
-                disabled={isStreaming}
-                className="min-h-[52px] max-h-[33vh]"
-              />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <PromptInputTools>
-                {onSelectModel && (
-                  <ChatModelSwitcher
-                    selectedConfigId={selectedConfigId ?? null}
-                    selectedModel={selectedModel ?? null}
-                    onSelectModel={onSelectModel}
-                  />
-                )}
-              </PromptInputTools>
-              <PromptInputSubmit
-                status={isStreaming ? 'streaming' : 'ready'}
-                disabled={!input.trim() || isStreaming}
-              />
-            </PromptInputFooter>
-          </PromptInput>
+          <AgentPromptInput
+            onSubmit={(content, options) =>
+              onSendMessage(content, { agentMode: options?.agentMode })
+            }
+            isSending={isStreaming}
+            selectedModel={
+              selectedConfigId && selectedModel
+                ? {
+                    provider: '',
+                    model: selectedModel,
+                    configId: selectedConfigId,
+                  }
+                : null
+            }
+            onSelectModel={onSelectModel}
+            agentMode={agentMode}
+            onAgentModeChange={onAgentModeChange}
+            placeholder={
+              isStreaming
+                ? 'Waiting for response…'
+                : 'Ask anything about security…'
+            }
+          />
         </div>
       </div>
     </div>

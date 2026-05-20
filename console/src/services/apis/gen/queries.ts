@@ -1495,6 +1495,7 @@ export type SendMessageDto = {
   model?: string;
   /** Override provider for new conversations */
   provider?: string;
+  agentMode?: boolean;
 };
 
 export type MCPServerResponseDtoHeaders = { [key: string]: unknown };

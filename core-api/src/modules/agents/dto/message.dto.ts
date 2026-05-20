@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
 import { MessageRole, MessageType } from '../enums/agent.enums';
 
 export class SendMessageDto {
@@ -32,6 +32,11 @@ export class SendMessageDto {
   @IsOptional()
   @IsString()
   provider?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  agentMode?: boolean;
 }
 
 export class MessageResponseDto {
