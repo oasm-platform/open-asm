@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"oasm-worker/internal/config"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -116,6 +117,23 @@ func Start(ctx context.Context, cfg *config.Config) {
 		workerCancel()
 		return
 	}
+
+	workspaceRoot, err := filepath.Abs(cfg.WorkspaceRoot)
+	if err != nil {
+		sysLog.ErrorE("Failed to resolve workspace root", err)
+		workerCancel()
+		return
+	}
+
+	if err := os.MkdirAll(workspaceRoot, 0o755); err != nil {
+		sysLog.ErrorE("Failed to create workspace root", err)
+		workerCancel()
+		return
+	}
+
+	remoteLog := oasm.NewLogger("RemoteExec")
+	go startRemoteExecuteHandler(ctx, client, workspaceRoot)
+	remoteLog.Info("Remote execute handler started (workspace: %s)", workspaceRoot)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
 	scheduler := gocron.NewScheduler(time.UTC)
