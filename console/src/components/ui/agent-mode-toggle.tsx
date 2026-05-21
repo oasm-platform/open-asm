@@ -1,13 +1,17 @@
-import { PromptInputButton } from '@/components/ai-elements/prompt-input';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useAgentsControllerGetAgentModes } from '@/services/apis/gen/queries';
-import { Check, ChevronDown } from 'lucide-react';
-import { memo, useMemo, useState } from 'react';
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuItem,
+  PromptInputActionMenuTrigger,
+  PromptInputButton,
+} from '@/components/ai-elements/prompt-input';
+import {
+  SendMessageDtoAgentMode,
+  useAgentsControllerGetAgentModes,
+} from '@/services/apis/gen/queries';
+import { GlobeIcon, MonitorIcon } from 'lucide-react';
+import { memo } from 'react';
+import { toast } from 'sonner';
 
 interface AgentModeSelectProps {
   value: string;
@@ -18,78 +22,61 @@ export const AgentModeSelect = memo(function AgentModeSelect({
   value,
   onChange,
 }: AgentModeSelectProps) {
+  const isAgent = value === SendMessageDtoAgentMode.agent;
   const { data } = useAgentsControllerGetAgentModes();
-  const modes = data?.modes;
-  const workers = data?.workers;
-  const [open, setOpen] = useState(false);
 
-  const selectedMode = useMemo(
-    () => modes?.find((m) => m.id === value),
-    [modes, value],
-  );
+  const workers = data?.workers ?? [];
 
-  const hasAvailableWorkers = workers && workers.length > 0;
-
-  if (!modes || modes.length === 0) {
-    return null;
-  }
+  const handleToggle = () => {
+    const next = isAgent
+      ? SendMessageDtoAgentMode.ask
+      : SendMessageDtoAgentMode.agent;
+    if (next === SendMessageDtoAgentMode.agent) {
+      toast.success('Agent mode enabled');
+    }
+    onChange(next);
+  };
 
   return (
-    <div className="rounded-md bg-muted/50">
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <PromptInputButton>
-          <span className="hidden sm:inline" style={{ color: selectedMode?.color }}>
-            {selectedMode?.name ?? 'Mode'}
-          </span>
-          <ChevronDown size={14} className="ml-1 opacity-60" />
-        </PromptInputButton>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {modes.map((mode) => (
-          <DropdownMenuItem
-            key={mode.id}
-            disabled={!mode.isAvailable}
-            onClick={() => {
-              if (!mode.isAvailable) return;
-              onChange(mode.id);
-              setOpen(false);
-            }}
-            className="flex items-center justify-between gap-2 data-[disabled]:opacity-50"
-          >
-            <div className="flex flex-col">
-              <span className="font-medium" style={{ color: mode.color }}>
-                {mode.name}
-              </span>
-              <span className="text-xs" style={{ color: mode.color, opacity: 0.7 }}>
-                {mode.description}
-              </span>
-            </div>
-            {value === mode.id && <Check size={14} className="shrink-0" />}
-          </DropdownMenuItem>
-        ))}
-        {hasAvailableWorkers && (
-          <>
-            <div className="my-1 h-px bg-border" />
-            {workers.map((worker) => (
-              <DropdownMenuItem
-                key={worker.id}
-                disabled={!worker.enabledAgentMode}
-                className="flex items-center justify-between gap-2 data-[disabled]:opacity-50"
-              >
-                <div className="flex flex-col">
-                  <span className="font-medium">{worker.name ?? 'Worker'}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {worker.os ?? 'Unknown OS'}
+    <>
+      {isAgent && (
+        <PromptInputActionMenu>
+          <PromptInputActionMenuTrigger tooltip="Connected workers">
+            <MonitorIcon size={16} className={workers.length > 0 ? 'text-green-500 hover:!text-green-500' : ''} />
+          </PromptInputActionMenuTrigger>
+          <PromptInputActionMenuContent>
+            {workers.length > 0 ? (
+              workers.map((worker) => (
+                <PromptInputActionMenuItem key={worker.id} className="flex items-center gap-2">
+                  {worker.os && (
+                    <img
+                      className="size-5 dark:brightness-0 dark:invert"
+                      src={`/${worker.os}.svg`}
+                      alt={worker.os}
+                    />
+                  )}
+                  <span className="flex-1">{worker.name ?? worker.id.slice(0, 8)}</span>
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
                   </span>
-                </div>
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-              </DropdownMenuItem>
-            ))}
-          </>
-        )}
-      </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+                </PromptInputActionMenuItem>
+              ))
+            ) : (
+              <PromptInputActionMenuItem disabled>
+                No workers connected
+              </PromptInputActionMenuItem>
+            )}
+          </PromptInputActionMenuContent>
+        </PromptInputActionMenu>
+      )}
+      <PromptInputButton
+        onClick={handleToggle}
+        className={isAgent ? 'text-blue-500 bg-blue-500/10' : ''}
+      >
+        <GlobeIcon size={16} />
+        <span>Agent</span>
+      </PromptInputButton>
+    </>
   );
 });
