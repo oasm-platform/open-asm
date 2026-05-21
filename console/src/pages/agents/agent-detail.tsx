@@ -12,6 +12,7 @@ import {
   useAgentsControllerDeleteLLMConfig,
   useAgentsControllerGetLLMConfigs,
   useAgentsControllerSetPreferredLLMConfig,
+  type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { format } from 'date-fns';
 import { Loader2, MoreHorizontal, Pencil, Star, Trash2 } from 'lucide-react';
@@ -45,7 +46,9 @@ export function AgentDetail() {
   const { mutate: setPreferred, isPending: isSettingPreferred } =
     useAgentsControllerSetPreferredLLMConfig();
 
-  const agent = data?.data?.find((a) => a.configId === id);
+  const agent = (data as LLMConfigWithProviderDto[] | undefined)?.find(
+    (a) => a.configId === id,
+  );
 
   const handleDelete = () => {
     deleteConfig(

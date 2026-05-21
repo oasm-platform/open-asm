@@ -17,10 +17,13 @@ import {
   AlertCircle,
   Bot,
   CheckIcon,
+  ChevronDown,
+  ChevronUp,
   CopyIcon,
   Loader2,
   RefreshCcwIcon,
   ShieldAlert,
+  Terminal,
   Wrench,
   X,
 } from 'lucide-react';
@@ -70,47 +73,6 @@ const getTextContent = (message: UIMessage): string => {
     .join('');
 };
 
-const getToolCallsFromParts = (message: UIMessage): ToolCallState[] => {
-  const parts = message.parts;
-  if (!parts || parts.length === 0) return [];
-
-  const toolCalls: ToolCallState[] = [];
-
-  for (const part of parts) {
-    if (part.type === 'dynamic-tool') {
-      toolCalls.push({
-        toolCallId: part.toolCallId,
-        toolName: part.toolName,
-        status:
-          part.state === 'output-available'
-            ? ('completed' as const)
-            : ('pending' as const),
-        input: part.input as Record<string, unknown>,
-        output: part.output as unknown,
-      });
-    } else if (part.type.startsWith('tool-')) {
-      const toolPart = part as {
-        toolCallId: string;
-        state?: string;
-        input?: unknown;
-        output?: unknown;
-      };
-      toolCalls.push({
-        toolCallId: toolPart.toolCallId,
-        toolName: part.type.replace('tool-', ''),
-        status:
-          toolPart.state === 'output-available'
-            ? ('completed' as const)
-            : ('pending' as const),
-        input: toolPart.input as Record<string, unknown>,
-        output: toolPart.output,
-      });
-    }
-  }
-
-  return toolCalls;
-};
-
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -136,12 +98,128 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <div className="flex items-center gap-1 rounded-full bg-muted px-3 py-2">
+        <span
+          className="size-1.5 rounded-full bg-muted-foreground animate-bounce"
+          style={{ animationDelay: '0ms' }}
+        />
+        <span
+          className="size-1.5 rounded-full bg-muted-foreground animate-bounce"
+          style={{ animationDelay: '150ms' }}
+        />
+        <span
+          className="size-1.5 rounded-full bg-muted-foreground animate-bounce"
+          style={{ animationDelay: '300ms' }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function formatToolName(name: string): string {
   return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function RemoteExecuteTerminal({ toolCall }: { toolCall: ToolCallState }) {
+  const [expanded, setExpanded] = useState(true);
+
+  const command = String(
+    toolCall.input?.command ||
+      toolCall.input?.cmd ||
+      (typeof toolCall.input === 'string' ? toolCall.input : ''),
+  );
+
+  const parseTerminalOutput = (output: unknown): string => {
+    if (typeof output === 'string') return output;
+    if (output && typeof output === 'object') {
+      const obj = output as Record<string, unknown>;
+      const parts: string[] = [];
+      if (typeof obj.stdout === 'string' && obj.stdout) {
+        parts.push(obj.stdout);
+      }
+      if (typeof obj.stderr === 'string' && obj.stderr) {
+        parts.push(obj.stderr);
+      }
+      if (parts.length > 0) return parts.join('\n');
+      return JSON.stringify(output, null, 2);
+    }
+    return '';
+  };
+
+  const terminalOutput = parseTerminalOutput(toolCall.output);
+
+  const statusIcon = {
+    pending: <Loader2 className="size-3.5 animate-spin text-yellow-500" />,
+    executing: <Loader2 className="size-3.5 animate-spin text-yellow-500" />,
+    completed: <CheckIcon className="size-3.5 text-green-500" />,
+    error: <AlertCircle className="size-3.5 text-red-500" />,
+  }[toolCall.status];
+
+  const statusColor = {
+    pending: 'text-yellow-500',
+    executing: 'text-yellow-500',
+    completed: 'text-green-500',
+    error: 'text-red-500',
+  }[toolCall.status];
+
+  const statusText = {
+    pending: 'Queued',
+    executing: 'Running…',
+    completed: 'Done',
+    error: 'Failed',
+  }[toolCall.status];
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-[#0d1117] text-sm w-full max-w-2xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-white/5 transition-colors w-full"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <Terminal className="size-3.5 text-green-500 shrink-0" />
+          <span className="font-mono text-xs text-green-400 truncate">
+            {command}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-xs ${statusColor}`}>{statusIcon}</span>
+          <span className="text-xs text-muted-foreground">{statusText}</span>
+          {expanded ? (
+            <ChevronUp className="size-3.5 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="size-3.5 text-muted-foreground" />
+          )}
+        </div>
+      </button>
+
+      {expanded && terminalOutput && (
+        <div className="border-t border-white/10 px-3 py-2">
+          <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-all max-h-64 overflow-y-auto scrollbar-hide">
+            {terminalOutput}
+          </pre>
+        </div>
+      )}
+      {!terminalOutput && toolCall.status === 'executing' && (
+        <div className="border-t border-white/10 px-3 py-2">
+          <span className="text-xs font-mono text-muted-foreground animate-pulse">
+            Waiting for output...
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
   const [expanded, setExpanded] = useState(false);
+
+  if (toolCall.toolName === 'remote_execute') {
+    return <RemoteExecuteTerminal toolCall={toolCall} />;
+  }
 
   const statusIcon = {
     pending: (
@@ -292,58 +370,104 @@ const ChatMessage = memo(function ChatMessage({
   isStreaming: boolean;
 }) {
   const textContent = getTextContent(message);
-  const toolCalls = getToolCallsFromParts(message);
-  const hasContent = textContent.length > 0 || toolCalls.length > 0;
+  const hasContent = textContent.length > 0 || message.parts.some(
+    (p) => p.type === 'dynamic-tool' || p.type.startsWith('tool-'),
+  );
   const isLastAssistant =
     message.role === 'assistant' && idx === messagesLength - 1;
   const isStreamingActive = isLastAssistant && isStreaming;
 
+  // Render parts in order - interleaving text and tool calls as they occur
+  const parts = message.parts;
+  const renderedParts: React.ReactNode[] = [];
+  let textBuffer = '';
+  let textSegmentIndex = 0;
+
+  const flushText = () => {
+    if (textBuffer) {
+      const currentText = textBuffer;
+      const segmentKey = `text-${textSegmentIndex++}`;
+      renderedParts.push(
+        <AnimatedMessageContent
+          key={segmentKey}
+          text={currentText}
+          isStreaming={isStreamingActive}
+        >
+          {(displayText) => (
+            <Markdown
+              content={displayText}
+              preview={false}
+              className="text-base"
+            />
+          )}
+        </AnimatedMessageContent>,
+      );
+      textBuffer = '';
+    }
+  };
+
+  if (parts && parts.length > 0) {
+    for (const part of parts) {
+      if (part.type === 'text') {
+        textBuffer += part.text;
+      } else if (part.type === 'dynamic-tool') {
+        flushText();
+        const dynamicPart = part as {
+          toolCallId: string;
+          toolName: string;
+          state?: string;
+          input?: unknown;
+          output?: unknown;
+        };
+        const toolCall: ToolCallState = {
+          toolCallId: dynamicPart.toolCallId,
+          toolName: dynamicPart.toolName,
+          status:
+            dynamicPart.state === 'output-available'
+              ? 'completed'
+              : 'pending',
+          input: dynamicPart.input as Record<string, unknown>,
+          output: dynamicPart.output,
+        };
+        renderedParts.push(
+          <ToolCallDisplay key={toolCall.toolCallId} toolCall={toolCall} />,
+        );
+      } else if (part.type.startsWith('tool-')) {
+        flushText();
+        const toolPart = part as {
+          toolCallId: string;
+          state?: string;
+          input?: unknown;
+          output?: unknown;
+        };
+        const toolCall: ToolCallState = {
+          toolCallId: toolPart.toolCallId,
+          toolName: part.type.replace('tool-', ''),
+          status:
+            toolPart.state === 'output-available'
+              ? 'completed'
+              : 'pending',
+          input: toolPart.input as Record<string, unknown>,
+          output: toolPart.output,
+        };
+        renderedParts.push(
+          <ToolCallDisplay key={toolCall.toolCallId} toolCall={toolCall} />,
+        );
+      }
+    }
+    flushText();
+  }
+
   return (
     <Message from={message.role}>
       <MessageContent expandable={message.role === 'user'}>
-        <div className={message.role === 'user' ? '' : 'space-y-3'}>
-          {toolCalls.length > 0 && (
-            <div className="space-y-2">
-              {toolCalls.map((toolCall) => (
-                <ToolCallDisplay
-                  key={toolCall.toolCallId}
-                  toolCall={toolCall}
-                />
-              ))}
-            </div>
-          )}
-          {textContent && (
-            <AnimatedMessageContent
-              text={textContent}
-              isStreaming={isStreamingActive}
-            >
-              {(displayText) => (
-                <Markdown
-                  content={displayText}
-                  preview={false}
-                  className="text-base"
-                />
-              )}
-            </AnimatedMessageContent>
-          )}
+        {renderedParts.length > 0 ? (
+          <div className="space-y-3">{renderedParts}</div>
+        ) : null}
 
-          {message.role === 'assistant' && isStreamingActive && (
-            <div className="min-h-[26px]">
-              <div
-                className={`flex items-center gap-2 ${hasContent ? 'mt-2' : 'py-1'}`}
-              >
-                <Loader2
-                  className={`${hasContent ? 'size-4' : 'size-5'} animate-spin text-muted-foreground`}
-                />
-                <span
-                  className={`${hasContent ? 'text-sm' : 'text-base'} font-medium text-muted-foreground`}
-                >
-                  Thinking…
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+        {message.role === 'assistant' && isStreamingActive && !hasContent && (
+          <div className="min-h-[26px]" />
+        )}
       </MessageContent>
 
       {message.role === 'assistant' &&
@@ -371,7 +495,7 @@ export const ChatConversation = memo(function ChatConversation({
   onLoadMore,
   hasMoreMessages = false,
   isLoadingMoreMessages = false,
-  agentMode = false,
+  agentMode = 'false',
   onAgentModeChange,
 }: ChatConversationProps) {
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
@@ -574,6 +698,12 @@ export const ChatConversation = memo(function ChatConversation({
                   isStreaming={isStreaming}
                 />
               ))}
+
+              {isStreaming &&
+                messages.length > 0 &&
+                messages[messages.length - 1].role !== 'assistant' && (
+                  <TypingIndicator />
+                )}
             </>
           )}
 

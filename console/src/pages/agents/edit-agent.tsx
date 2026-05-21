@@ -3,6 +3,7 @@ import {
   useAgentsControllerGetLLMConfigs,
   useAgentsControllerUpdateLLMConfig,
   type UpdateLLMConfigDto,
+  type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -26,7 +27,9 @@ export default function EditAgentPage() {
 
   const { mutate, isPending } = useAgentsControllerUpdateLLMConfig();
 
-  const agent = data?.data?.find((a) => a.configId === id);
+  const agent = (data as LLMConfigWithProviderDto[] | undefined)?.find(
+    (a) => a.configId === id,
+  );
 
   const onSubmit = (formData: AgentFormData) => {
     const updateData: UpdateLLMConfigDto = {

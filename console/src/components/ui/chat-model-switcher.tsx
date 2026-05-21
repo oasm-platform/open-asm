@@ -156,11 +156,7 @@ export function ChatModelSwitcher({
   const deferredSearch = useDeferredValue(searchQuery);
 
   const filteredModels = useMemo((): ProviderModelDto[] => {
-    const list: ProviderModelDto[] = Array.isArray(models)
-      ? models
-      : Array.isArray((models as { data?: ProviderModelDto[] })?.data)
-        ? (models as { data: ProviderModelDto[] }).data
-        : [];
+    const list: ProviderModelDto[] = Array.isArray(models) ? models : [];
     if (!deferredSearch) {
       if (!selectedModel) return list;
       return [...list].sort((a) => (a.id === selectedModel ? -1 : 1));
