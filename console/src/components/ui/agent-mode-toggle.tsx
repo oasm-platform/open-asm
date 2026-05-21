@@ -9,7 +9,7 @@ import {
   SendMessageDtoAgentMode,
   useAgentsControllerGetAgentModes,
 } from '@/services/apis/gen/queries';
-import { GlobeIcon, MonitorIcon } from 'lucide-react';
+import { InfinityIcon, MonitorIcon } from 'lucide-react';
 import { memo } from 'react';
 import { toast } from 'sonner';
 
@@ -42,12 +42,20 @@ export const AgentModeSelect = memo(function AgentModeSelect({
       {isAgent && (
         <PromptInputActionMenu>
           <PromptInputActionMenuTrigger tooltip="Connected workers">
-            <MonitorIcon size={16} className={workers.length > 0 ? 'text-green-500 hover:!text-green-500' : ''} />
+            <MonitorIcon
+              size={16}
+              className={
+                workers.length > 0 ? 'text-green-500 hover:!text-green-500' : ''
+              }
+            />
           </PromptInputActionMenuTrigger>
           <PromptInputActionMenuContent>
             {workers.length > 0 ? (
               workers.map((worker) => (
-                <PromptInputActionMenuItem key={worker.id} className="flex items-center gap-2">
+                <PromptInputActionMenuItem
+                  key={worker.id}
+                  className="flex items-center gap-2"
+                >
                   {worker.os && (
                     <img
                       className="size-5 dark:brightness-0 dark:invert"
@@ -55,7 +63,9 @@ export const AgentModeSelect = memo(function AgentModeSelect({
                       alt={worker.os}
                     />
                   )}
-                  <span className="flex-1">{worker.name ?? worker.id.slice(0, 8)}</span>
+                  <span className="flex-1">
+                    {worker.name ?? worker.id.slice(0, 8)}
+                  </span>
                   <span className="relative flex h-2 w-2 shrink-0">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
@@ -72,9 +82,13 @@ export const AgentModeSelect = memo(function AgentModeSelect({
       )}
       <PromptInputButton
         onClick={handleToggle}
-        className={isAgent ? 'text-blue-500 bg-blue-500/10' : ''}
+        className={
+          isAgent
+            ? 'text-orange-500 bg-orange-500/10 border border-orange-500 hover:bg-orange-500/20 hover:text-orange-500'
+            : ''
+        }
       >
-        <GlobeIcon size={16} />
+        <InfinityIcon size={16} />
         <span>Agent</span>
       </PromptInputButton>
     </>
