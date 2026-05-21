@@ -6,6 +6,7 @@ import {
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
+import { RedisService } from '@/services/redis/redis.service';
 import { generateToken } from '@/utils/genToken';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
@@ -65,6 +66,8 @@ export class WorkersService {
 
     @Inject(forwardRef(() => ToolsService))
     private toolsService: ToolsService,
+
+    private redisService: RedisService,
   ) {}
 
   /**
@@ -144,7 +147,7 @@ export class WorkersService {
   public async getWorkers(
     query: GetManyWorkersDto,
   ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
-    const { page, limit, sortOrder, workspaceId } = query;
+    const { page, limit, sortOrder, workspaceId, enabledAgentMode } = query;
     let { sortBy } = query;
     if (!sortBy) {
       sortBy = '"createdAt"';
@@ -159,6 +162,13 @@ export class WorkersService {
       )
       .leftJoinAndSelect('w.tool', 't')
       .where('1=1');
+
+    // Add enabledAgentMode filter if provided
+    if (enabledAgentMode !== undefined) {
+      queryBuilder.andWhere('w."enabledAgentMode" = :enabledAgentMode', {
+        enabledAgentMode,
+      });
+    }
 
     // Add workspace filter if workspaceId is provided, or if worker has cloud scope
     if (workspaceId) {
@@ -180,8 +190,8 @@ export class WorkersService {
         ))`,
         { workspaceId },
       );
-    } else {
-      // If no workspaceId provided, we still want to include cloud workers
+    } else if (enabledAgentMode === undefined) {
+      // If no workspaceId and no enabledAgentMode filter, include only cloud workers
       queryBuilder.andWhere('w."scope" = :cloudScope', {
         cloudScope: WorkerScope.CLOUD,
       });
@@ -541,5 +551,33 @@ export class WorkersService {
       .execute();
 
     return { message: 'Connect success' };
+  }
+
+  public async enableAgentMode(workerId: string): Promise<void> {
+    await this.repo.update(workerId, { enabledAgentMode: true });
+  }
+
+  public async handleRemoteExecuteResult(result: {
+    id: string;
+    sessionId: string;
+    type: number;
+    data: Uint8Array;
+    exitCode: number;
+  }) {
+    const channel = `remote-execute:results:${result.sessionId}`;
+    const payload = JSON.stringify({
+      id: result.id,
+      sessionId: result.sessionId,
+      type: result.type,
+      data: Buffer.from(result.data).toString('utf-8'),
+      exitCode: result.exitCode,
+    });
+
+    Logger.log(
+      `[handleRemoteExecuteResult] Publishing to ${channel}: ${payload.substring(0, 100)}`,
+      'WorkersService',
+    );
+
+    await this.redisService.publish(channel, payload);
   }
 }

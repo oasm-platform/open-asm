@@ -1,34 +1,36 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await */
 import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { tool } from 'ai';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { AssetsService } from '@/modules/assets/assets.service';
+import { IssuesService } from '@/modules/issues/issues.service';
+import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
+import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
-import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
-import { IssuesService } from '@/modules/issues/issues.service';
 import { ToolsService } from '@/modules/tools/tools.service';
+import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import { WorkersService } from '@/modules/workers/workers.service';
-import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   detailAssetSchema,
+  detailIssueSchema,
   detailVulnSchema,
   getAssetsSchema,
   getPortsSchema,
-  getTechnologiesSchema,
-  getTlsSchema,
   getStatisticOutPutSchema,
   getTargetsSchema,
+  getTechnologiesSchema,
+  getTlsSchema,
   getVulnerabilitiesSchema,
   listAssetsInTargetSchema,
   listIssuesSchema,
-  detailIssueSchema,
+  listJobsSchema,
   listToolsSchema,
   listWorkersSchema,
-  listJobsSchema,
 } from '@/mcp/mcp.schema';
 
 // Web fetch tool schema
@@ -62,6 +64,7 @@ export class AgentTool {
     private readonly workersService: WorkersService,
     @Inject(forwardRef(() => JobsRegistryService))
     private readonly jobsRegistryService: JobsRegistryService,
+    private readonly remoteExecuteService: RemoteExecuteService,
   ) {}
 
   /**
@@ -473,6 +476,8 @@ export class AgentTool {
             sortBy: 'createdAt',
             sortOrder: SortOrder.DESC,
             search: q,
+            workspaceId,
+            enabledAgentMode: true,
           });
           return {
             ...response,
@@ -520,6 +525,66 @@ export class AgentTool {
   }
 
   /**
+   * Remote execute tool - returns a factory that accepts workspaceId
+   */
+  get remoteExecuteTool(): (workspaceId: string) => any {
+    return (_workspaceId: string) => {
+      const toolConfig: any = {
+        description: [
+          'EXECUTE REMOTE COMMANDS on scanning infrastructure.',
+          '',
+          'Publishes arbitrary system commands (e.g., nmap, curl, dig, nslookup, ping, traceroute, whois, openssl s_client, python scripts) to be executed by remote worker nodes.',
+          '',
+          '✅ WHEN TO USE:',
+          '- Run an ad-hoc nmap scan (e.g., "nmap -sV -p 80,443 10.0.0.1")',
+          '- Fetch HTTP responses with curl (e.g., "curl -sI https://example.com")',
+          '- DNS lookups via dig/nslookup (e.g., "dig A example.com")',
+          '- Network diagnostics (e.g., "ping -c 3 8.8.8.8", "traceroute example.com")',
+          '- WHOIS lookups (e.g., "whois example.com")',
+          '- SSL/TLS inspection (e.g., "openssl s_client -connect example.com:443")',
+          '- Run any CLI tool available on the worker infrastructure',
+          '',
+          '❌ WHEN NOT TO USE:',
+          '- For scanning scope/target definitions → use get_targets or list_assets_in_target',
+          '- For reading existing data → use get_assets, get_vulnerabilities, etc.',
+          '- For fetching web page content → use web_fetch instead',
+          '- For interactive or long-running commands (no PTY, no stdin, strict timeout)',
+          '',
+          '⚠️ CONSTRAINTS:',
+          '- Commands are executed with OS-level permissions — avoid destructive operations',
+          '- The command is sent via gRPC to an available online worker',
+          '- If no worker is available, the command will fail',
+          '- Waits for command completion (stdout, stderr, exit code) before returning',
+          '',
+          'PARAMETERS:',
+          '- command: REQUIRED. The full shell command string to execute (e.g., "nmap -p 22 10.0.0.0/24")',
+          '',
+          'OUTPUT:',
+          '- stdout: Standard output from the command',
+          '- stderr: Standard error output from the command',
+          '- exitCode: Process exit code (0 = success, non-zero = failure)',
+          '- error: Error message if the command failed',
+          '- timedOut: Whether the command timed out before completion',
+        ].join('\n'),
+        parameters: z.object({
+          command: z
+            .string()
+            .min(1)
+            .describe(
+              'The full shell command to execute (e.g., "nmap -sV 10.0.0.1", "curl -s https://example.com", "dig A google.com")',
+            ),
+        }),
+        execute: async (params: { command: string }) => {
+          const { command } = params;
+          const sessionId = randomUUID();
+          return this.remoteExecuteService.waitForResult(command, sessionId);
+        },
+      };
+      return tool(toolConfig);
+    };
+  }
+
+  /**
    * Returns all available tools as a record, bound to the given workspaceId
    */
   getTools(workspaceId: string): Record<string, ToolType> {
@@ -540,6 +605,7 @@ export class AgentTool {
       list_tools: this.listToolsTool(workspaceId),
       list_workers: this.listWorkersTool(workspaceId),
       list_jobs: this.listJobsTool(workspaceId),
+      remote_execute: this.remoteExecuteTool(workspaceId),
     };
   }
 }

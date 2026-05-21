@@ -14,6 +14,7 @@ type Config struct {
 	GrpcPort       int    `mapstructure:"grpc_port"`
 	ToolPath       string `mapstructure:"tool_path"`
 	Network        string `mapstructure:"network"`
+	WorkspaceRoot  string `mapstructure:"workspace_root"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -29,6 +30,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("grpc_host", "localhost")
 	viper.SetDefault("grpc_port", 16276)
 	viper.SetDefault("tool_path", "oasm-tools")
+	viper.SetDefault("workspace_root", "oasm-workspace")
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {

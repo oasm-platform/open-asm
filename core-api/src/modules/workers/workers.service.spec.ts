@@ -10,6 +10,7 @@ import { InternalNetwork } from '../internal-networks/entities/internal-network.
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
+import { RedisService } from '@/services/redis/redis.service';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
 
@@ -24,6 +25,7 @@ describe('WorkersService', () => {
   let mockApiKeysService: Partial<ApiKeysService>;
   let mockConfigService: Partial<ConfigService>;
   let mockToolsService: Partial<ToolsService>;
+  let mockRedisService: Partial<RedisService>;
 
   beforeEach(async () => {
     mockWorkerInstanceRepository = {
@@ -87,6 +89,10 @@ describe('WorkersService', () => {
       getBuiltInTools: jest.fn().mockResolvedValue({ data: [] }),
     } as any;
 
+    mockRedisService = {
+      publish: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkersService,
@@ -125,6 +131,10 @@ describe('WorkersService', () => {
         {
           provide: ToolsService,
           useValue: mockToolsService,
+        },
+        {
+          provide: RedisService,
+          useValue: mockRedisService,
         },
       ],
     }).compile();

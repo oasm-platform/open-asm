@@ -20,6 +20,7 @@ interface SelectedModel {
 interface LocationState {
   pendingMessage?: string;
   selectedModel?: SelectedModel;
+  agentMode?: string;
 }
 
 export default function AgentsChatPage() {
@@ -44,6 +45,13 @@ export default function AgentsChatPage() {
   useEffect(() => {
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
+
+  const [agentMode, setAgentMode] = useState('ask');
+  const agentModeRef = useRef('ask');
+
+  useEffect(() => {
+    agentModeRef.current = agentMode;
+  }, [agentMode]);
 
   const {
     state: { selectedWorkspaceId },
@@ -144,6 +152,7 @@ export default function AgentsChatPage() {
               model: modelInfo.model,
               provider: modelInfo.provider,
             }),
+            agentMode: agentModeRef.current,
           },
         };
       },
@@ -187,8 +196,12 @@ export default function AgentsChatPage() {
   }, [displayMessages]);
 
   const handleSendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, options?: { agentMode?: string }) => {
       setStreamError(null);
+      if (options?.agentMode !== undefined) {
+        agentModeRef.current = options.agentMode;
+        setAgentMode(options.agentMode);
+      }
       await sendMessage({ text: content });
     },
     [sendMessage],
@@ -233,6 +246,10 @@ export default function AgentsChatPage() {
         setSelectedModel(state.selectedModel);
         selectedModelRef.current = state.selectedModel;
       }
+      if (state.agentMode !== undefined) {
+        setAgentMode(state.agentMode);
+        agentModeRef.current = state.agentMode;
+      }
       void handleSendMessage(state.pendingMessage);
       void navigate(location.pathname, {
         replace: true,
@@ -261,6 +278,8 @@ export default function AgentsChatPage() {
         onLoadMore={onLoadMoreAction}
         hasMoreMessages={hasNextPage ?? false}
         isLoadingMoreMessages={isFetchingNextPage}
+        agentMode={agentMode}
+        onAgentModeChange={setAgentMode}
       />
     </div>
   );

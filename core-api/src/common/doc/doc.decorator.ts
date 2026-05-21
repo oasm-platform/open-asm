@@ -140,12 +140,8 @@ function DocDefault<T>({
     decorators.push(ApiExtraModels(serialization));
     if (isArray) {
       Object.assign(schema, {
-        properties: {
-          data: {
-            type: 'array',
-            items: { $ref: getSchemaPath(serialization) },
-          },
-        },
+        type: 'array',
+        items: { $ref: getSchemaPath(serialization) },
       });
     } else {
       Object.assign(schema, {

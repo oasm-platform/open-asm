@@ -10,6 +10,8 @@ import { ToolsModule } from '../tools/tools.module';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersController } from './workers.controller';
 import { WorkersService } from './workers.service';
+import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
+import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 
 @Global()
 @Module({
@@ -26,7 +28,7 @@ import { WorkersService } from './workers.service';
     forwardRef(() => ToolsModule),
   ],
   controllers: [WorkersController],
-  providers: [WorkersService],
-  exports: [WorkersService],
+  providers: [WorkersService, RemoteExecuteSubscribeService, GrpcWorkerContext],
+  exports: [WorkersService, RemoteExecuteSubscribeService, GrpcWorkerContext],
 })
 export class WorkersModule {}

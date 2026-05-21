@@ -87,7 +87,7 @@ export function ListAgents() {
     },
   });
 
-  const agents = data?.data ?? [];
+  const agents = (data as LLMConfigWithProviderDto[] | undefined) ?? [];
   const total = agents.length;
 
   const handleRowClick = (row: LLMConfigWithProviderDto) => {

@@ -1,6 +1,7 @@
 // import { BaseEntity } from '@/common/entities/base.entity';
+import { AgentMode } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import {
   Column,
   Entity,
@@ -47,4 +48,9 @@ export class AgentConversation {
 
   @OneToMany(() => AgentMessage, (message) => message.conversation)
   messages: AgentMessage[];
+
+  @ApiProperty({ example: AgentMode.ASK })
+  @IsEnum(AgentMode)
+  @Column({ default: AgentMode.ASK })
+  agentMode: AgentMode;
 }

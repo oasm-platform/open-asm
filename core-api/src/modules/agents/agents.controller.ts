@@ -29,6 +29,7 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
+import { GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
   ConversationResponseDto,
   UpdateConversationDto,
@@ -57,6 +58,17 @@ export class AgentsController {
     private readonly agentsService: AgentsService,
     private readonly agentsCompletionsService: AgentsCompletionsService,
   ) {}
+
+  @Get('modes')
+  @Doc({
+    summary: 'Get agent modes',
+    description: 'Get all available modes for AI chat box and enabled workers',
+    request: {},
+    response: { serialization: GetAgentModesResponseDto },
+  })
+  getAgentModes(): Promise<GetAgentModesResponseDto> {
+    return this.agentsService.getAgentModesWithWorkers();
+  }
 
   @Post('llm-configs')
   @Doc({

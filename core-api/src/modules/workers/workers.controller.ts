@@ -1,10 +1,21 @@
+import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
 import { Public } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
+import { Metadata } from '@grpc/grpc-js';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
 import { createReadStream } from 'fs';
 import { readdir } from 'fs/promises';
@@ -16,6 +27,10 @@ import {
   WorkerJoinDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+import {
+  RemoteExecuteCommand,
+  RemoteExecuteSubscribeService,
+} from './remote-execute-subscribe.service';
 import { WorkersService } from './workers.service';
 
 interface GrpcCall {
@@ -25,7 +40,12 @@ interface GrpcCall {
 @ApiTags('Workers')
 @Controller('workers')
 export class WorkersController {
-  constructor(private readonly workersService: WorkersService) {}
+  private readonly logger = new Logger(WorkersController.name);
+  constructor(
+    private readonly workersService: WorkersService,
+    private readonly remoteExecuteSubscribeService: RemoteExecuteSubscribeService,
+    private readonly grpcWorkerContext: GrpcWorkerContext,
+  ) {}
 
   @Doc({
     summary: 'Worker alive',
@@ -210,5 +230,49 @@ export class WorkersController {
       windows: windows.map((f) => `static/archived/windows/${f}`),
       macos: macos.map((f) => `static/archived/macos/${f}`),
     };
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('WorkersService', 'RemoteExecuteSubscribe')
+  grpcRemoteExecuteSubscribe(
+    _request: Record<string, never>,
+    metadata: Metadata,
+  ): Observable<RemoteExecuteCommand> {
+    const tokenValues = metadata.get(WORKER_TOKEN_HEADER);
+    const workerToken = tokenValues?.[0] as string | undefined;
+    const worker = this.grpcWorkerContext.getWorker(workerToken!);
+
+    if (!worker) {
+      throw new RpcException('Worker not found in context');
+    }
+
+    const { subject, observable } =
+      this.remoteExecuteSubscribeService.registerWorker(worker);
+
+    subject.next({
+      id: '',
+      workerId: '',
+      type: 1, // REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED
+      sessionId: '',
+      command: '',
+    });
+
+    return observable;
+  }
+
+  @UseGuards(GrpcWorkerTokenGuard)
+  @GrpcMethod('WorkersService', 'RemoteExecuteResult')
+  async grpcRemoteExecuteResult(request: {
+    id: string;
+    sessionId: string;
+    type: number;
+    data: Uint8Array;
+    exitCode: number;
+  }): Promise<{ success: boolean; message: string }> {
+    this.logger.log(
+      `[grpcRemoteExecuteResult] Received: sessionId=${request.sessionId}, type=${request.type}, exitCode=${request.exitCode}`,
+    );
+    await this.workersService.handleRemoteExecuteResult(request);
+    return { success: true, message: 'Result acknowledged' };
   }
 }

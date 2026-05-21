@@ -156,11 +156,7 @@ export function ChatModelSwitcher({
   const deferredSearch = useDeferredValue(searchQuery);
 
   const filteredModels = useMemo((): ProviderModelDto[] => {
-    const list: ProviderModelDto[] = Array.isArray(models)
-      ? models
-      : Array.isArray((models as { data?: ProviderModelDto[] })?.data)
-        ? (models as { data: ProviderModelDto[] }).data
-        : [];
+    const list: ProviderModelDto[] = Array.isArray(models) ? models : [];
     if (!deferredSearch) {
       if (!selectedModel) return list;
       return [...list].sort((a) => (a.id === selectedModel ? -1 : 1));
@@ -241,49 +237,51 @@ export function ChatModelSwitcher({
   return (
     <>
       <div className="flex items-center gap-1">
-        <Popover open={open} onOpenChange={handleOpenChange}>
-          <PopoverTrigger asChild>
-            <button
-              disabled={isUpdating}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
-              aria-label="Select model"
+        <div className="hidden md:block">
+          <Popover open={open} onOpenChange={handleOpenChange}>
+            <PopoverTrigger asChild>
+              <button
+                disabled={isUpdating}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+                aria-label="Select model"
+              >
+                {currentDisplay && (
+                  <Image
+                    url={currentDisplay.logo}
+                    height={16}
+                    className="bg-white rounded p-0.5"
+                  />
+                )}
+                <span className="text-muted-foreground max-w-[140px] truncate">
+                  {currentDisplay?.label ?? 'Select model'}
+                </span>
+                <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-[280px] p-0"
+              align="start"
+              sideOffset={4}
             >
-              {currentDisplay && (
-                <Image
-                  url={currentDisplay.logo}
-                  height={16}
-                  className="bg-white rounded p-0.5"
+              <Command shouldFilter={false} className="p-1">
+                <CommandInput
+                  placeholder="Search models..."
+                  value={searchQuery}
+                  onValueChange={setSearchQuery}
                 />
-              )}
-              <span className="text-muted-foreground max-w-[140px] truncate">
-                {currentDisplay?.label ?? 'Select model'}
-              </span>
-              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            className="w-[280px] p-0"
-            align="start"
-            sideOffset={4}
-          >
-            <Command shouldFilter={false} className="p-1">
-              <CommandInput
-                placeholder="Search models..."
-                value={searchQuery}
-                onValueChange={setSearchQuery}
-              />
-              <ModelListContent
-                models={filteredModels}
-                isLoading={isLoading}
-                searchQuery={deferredSearch}
-                selectedModel={selectedModel}
-                isActiveConfig={isActiveConfig}
-                activeProviderLogo={activeConfig?.logo}
-                onSelect={handleSelect}
-              />
-            </Command>
-          </PopoverContent>
-        </Popover>
+                <ModelListContent
+                  models={filteredModels}
+                  isLoading={isLoading}
+                  searchQuery={deferredSearch}
+                  selectedModel={selectedModel}
+                  isActiveConfig={isActiveConfig}
+                  activeProviderLogo={activeConfig?.logo}
+                  onSelect={handleSelect}
+                />
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
