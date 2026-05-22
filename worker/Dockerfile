@@ -29,7 +29,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     bash \
-    chromium=148.0.7778.167-1~deb12u1 \
+    chromium \
     libpcap0.8 \
     && rm -rf /var/lib/apt/lists/*
 

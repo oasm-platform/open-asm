@@ -663,7 +663,7 @@ export class AgentTool {
       },
       execute_remote_command: {
         method: this.remoteExecuteTool(workspaceId),
-        permissions: [AGENT, ASK],
+        permissions: [AGENT],
       },
     };
 

@@ -131,34 +131,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       const timer = setTimeout(() => {
         if (!isResolved) {
           isResolved = true;
-          this.subscriber.removeListener('message', onMessage);
           resolve(null);
         }
       }, timeout);
 
-      const onMessage = (receivedChannel: string, message: string): void => {
+      this.subscribe(channel, (receivedChannel: string, message: string) => {
         if (receivedChannel === channel && !isResolved) {
           isResolved = true;
           clearTimeout(timer);
-          this.subscriber.removeListener('message', onMessage);
           resolve(message);
         }
-      };
-
-      // Subscribe to channel first
-      this.subscriber.subscribe(channel).catch((error: unknown) => {
+      }).catch((error: unknown) => {
         if (!isResolved) {
           isResolved = true;
           clearTimeout(timer);
-          // Using process.env.NODE_ENV check to allow console.error in non-production environments
           if (process.env.NODE_ENV !== 'production') {
             console.error(`Failed to subscribe to channel ${channel}:`, error);
           }
           resolve(null);
         }
       });
-
-      this.subscriber.on('message', onMessage);
     });
   }
 

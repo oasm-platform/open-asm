@@ -41,9 +41,16 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
 
     const workerId = worker.id;
     const cleanup = () => {
-      this.handleWorkerDisconnect(workerId);
-      this.workers.delete(workerId);
-      this.logger.log(`Worker ${workerId} disconnected, cleaned up`);
+      const currentSubject = this.workers.get(workerId);
+      if (currentSubject === subject) {
+        this.handleWorkerDisconnect(workerId);
+        this.workers.delete(workerId);
+        this.logger.log(`Worker ${workerId} disconnected, cleaned up`);
+      } else {
+        this.logger.verbose(
+          `Worker ${workerId} stream finalized but a newer subscription exists — skipping cleanup`,
+        );
+      }
     };
 
     const observable = subject.asObservable().pipe(finalize(cleanup));
@@ -127,6 +134,10 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     }
 
     return this.pushCommand(workerId, sessionId, command);
+  }
+
+  removeSession(sessionId: string): void {
+    this.sessionWorkerMap.delete(sessionId);
   }
 
   getSessionWorkerId(sessionId: string): string | undefined {

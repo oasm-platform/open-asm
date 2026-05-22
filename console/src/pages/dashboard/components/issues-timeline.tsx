@@ -26,7 +26,6 @@ import { useStatisticControllerGetIssuesTimeline } from '@/services/apis/gen/que
 const chartConfig = {
   vuls: {
     label: 'Vulnerabilities',
-    color: 'var(--chart-4)',
   },
 } satisfies ChartConfig;
 
@@ -84,22 +83,8 @@ export default function IssuesTimeline() {
         >
           <AreaChart
             data={chartData}
-            margin={{ left: 0, right: 0, top: 10, bottom: 0 }}
+            margin={{ left: 0, right: 0, top: 20, bottom: 0 }}
           >
-            <defs>
-              <linearGradient id="fillVuls" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-vuls)"
-                  stopOpacity={0.4}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-vuls)"
-                  stopOpacity={0}
-                />
-              </linearGradient>
-            </defs>
             <CartesianGrid
               vertical={false}
               strokeDasharray="3 3"
@@ -136,9 +121,9 @@ export default function IssuesTimeline() {
             />
             <Area
               dataKey="vuls"
-              type="monotone"
-              fill="url(#fillVuls)"
-              stroke="var(--color-vuls)"
+              type="linear"
+              fill="none"
+              stroke="#a1a1aa"
               strokeWidth={2}
               stackId="a"
               isAnimationActive={true}

@@ -1,3 +1,4 @@
+import AgentPromptInput from '@/components/agent-prompt-input';
 import {
   Conversation,
   ConversationContent,
@@ -10,21 +11,24 @@ import {
   MessageActions,
   MessageContent,
 } from '@/components/ai-elements/message';
-import AgentPromptInput from '@/components/agent-prompt-input';
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from '@/components/ai-elements/reasoning';
+import { TypingIndicator } from '@/components/ai-elements/typing-indicator';
 import { Markdown } from '@/components/common/markdown';
+import type { ToolCallState } from '@/components/common/tool-call-display';
+import { ToolCallDisplay } from '@/components/common/tool-call-display';
 import type { TextUIPart, UIMessage } from 'ai';
 import {
   AlertCircle,
   Bot,
   CheckIcon,
-  ChevronDown,
-  ChevronUp,
   CopyIcon,
   Loader2,
   RefreshCcwIcon,
   ShieldAlert,
-  Terminal,
-  Wrench,
   X,
 } from 'lucide-react';
 import {
@@ -32,17 +36,10 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
-
-interface ToolCallState {
-  toolCallId: string;
-  toolName: string;
-  status: 'pending' | 'executing' | 'completed' | 'error';
-  input?: Record<string, unknown>;
-  output?: unknown;
-}
 
 interface ChatConversationProps {
   messages: UIMessage[];
@@ -95,192 +92,6 @@ function CopyButton({ text }: { text: string }) {
         <CopyIcon className="size-3.5" />
       )}
     </MessageAction>
-  );
-}
-
-function TypingIndicator() {
-  return (
-    <div className="flex items-center gap-2 py-1">
-      <div className="flex items-center gap-1 rounded-full bg-muted px-3 py-2">
-        <span
-          className="size-1.5 rounded-full bg-muted-foreground animate-bounce"
-          style={{ animationDelay: '0ms' }}
-        />
-        <span
-          className="size-1.5 rounded-full bg-muted-foreground animate-bounce"
-          style={{ animationDelay: '150ms' }}
-        />
-        <span
-          className="size-1.5 rounded-full bg-muted-foreground animate-bounce"
-          style={{ animationDelay: '300ms' }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function formatToolName(name: string): string {
-  return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function RemoteExecuteTerminal({ toolCall }: { toolCall: ToolCallState }) {
-  const [expanded, setExpanded] = useState(true);
-
-  const command = String(
-    toolCall.input?.command ||
-      toolCall.input?.cmd ||
-      (typeof toolCall.input === 'string' ? toolCall.input : ''),
-  );
-
-  const parseTerminalOutput = (output: unknown): string => {
-    if (typeof output === 'string') return output;
-    if (output && typeof output === 'object') {
-      const obj = output as Record<string, unknown>;
-      const parts: string[] = [];
-      if (typeof obj.stdout === 'string' && obj.stdout) {
-        parts.push(obj.stdout);
-      }
-      if (typeof obj.stderr === 'string' && obj.stderr) {
-        parts.push(obj.stderr);
-      }
-      if (parts.length > 0) return parts.join('\n');
-      return JSON.stringify(output, null, 2);
-    }
-    return '';
-  };
-
-  const terminalOutput = parseTerminalOutput(toolCall.output);
-
-  const statusIcon = {
-    pending: <Loader2 className="size-3.5 animate-spin text-yellow-500" />,
-    executing: <Loader2 className="size-3.5 animate-spin text-yellow-500" />,
-    completed: <CheckIcon className="size-3.5 text-green-500" />,
-    error: <AlertCircle className="size-3.5 text-red-500" />,
-  }[toolCall.status];
-
-  const statusColor = {
-    pending: 'text-yellow-500',
-    executing: 'text-yellow-500',
-    completed: 'text-green-500',
-    error: 'text-red-500',
-  }[toolCall.status];
-
-  const statusText = {
-    pending: 'Queued',
-    executing: 'Running…',
-    completed: 'Done',
-    error: 'Failed',
-  }[toolCall.status];
-
-  return (
-    <div className="rounded-lg border border-border/60 bg-[#0d1117] text-sm w-full max-w-2xl overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-white/5 transition-colors w-full"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <Terminal className="size-3.5 text-green-500 shrink-0" />
-          <span className="font-mono text-xs text-green-400 truncate">
-            {command}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-xs ${statusColor}`}>{statusIcon}</span>
-          <span className="text-xs text-muted-foreground">{statusText}</span>
-          {expanded ? (
-            <ChevronUp className="size-3.5 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="size-3.5 text-muted-foreground" />
-          )}
-        </div>
-      </button>
-
-      {expanded && terminalOutput && (
-        <div className="border-t border-white/10 px-3 py-2">
-          <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-all max-h-64 overflow-y-auto scrollbar-hide">
-            {terminalOutput}
-          </pre>
-        </div>
-      )}
-      {!terminalOutput && toolCall.status === 'executing' && (
-        <div className="border-t border-white/10 px-3 py-2">
-          <span className="text-xs font-mono text-muted-foreground animate-pulse">
-            Waiting for output...
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (toolCall.toolName === 'remote_execute') {
-    return <RemoteExecuteTerminal toolCall={toolCall} />;
-  }
-
-  const statusIcon = {
-    pending: (
-      <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
-    ),
-    executing: <Loader2 className="size-3.5 animate-spin text-blue-500" />,
-    completed: <CheckIcon className="size-3.5 text-green-500" />,
-    error: <AlertCircle className="size-3.5 text-destructive" />,
-  }[toolCall.status];
-
-  const statusText = {
-    pending: 'Waiting…',
-    executing: 'Executing…',
-    completed: 'Completed',
-    error: 'Failed',
-  }[toolCall.status];
-
-  return (
-    <div className="rounded-md border border-border/60 bg-muted/30 text-sm w-fit min-w-[320px] max-w-full">
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/50 transition-colors w-full"
-      >
-        <Wrench className="size-3.5 text-muted-foreground shrink-0" />
-        <span className="font-medium truncate">
-          {formatToolName(toolCall.toolName)}
-        </span>
-        <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-          {statusIcon}
-          {statusText}
-        </span>
-      </button>
-
-      {expanded && (
-        <div className="border-t border-border/60 px-3 py-2 space-y-2">
-          {toolCall.input && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-1">
-                Input
-              </p>
-              <pre className="text-xs bg-background/50 rounded p-2 overflow-x-auto">
-                {JSON.stringify(toolCall.input, null, 2)}
-              </pre>
-            </div>
-          )}
-          {toolCall.output !== undefined && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-1">
-                Output
-              </p>
-              <pre className="text-xs bg-background/50 rounded p-2 overflow-x-auto max-h-48">
-                {typeof toolCall.output === 'string'
-                  ? toolCall.output
-                  : JSON.stringify(toolCall.output, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -370,15 +181,28 @@ const ChatMessage = memo(function ChatMessage({
   isStreaming: boolean;
 }) {
   const textContent = getTextContent(message);
-  const hasContent = textContent.length > 0 || message.parts.some(
-    (p) => p.type === 'dynamic-tool' || p.type.startsWith('tool-'),
-  );
+  const hasContent =
+    textContent.length > 0 ||
+    message.parts.some(
+      (p) => p.type === 'dynamic-tool' || p.type.startsWith('tool-'),
+    );
   const isLastAssistant =
     message.role === 'assistant' && idx === messagesLength - 1;
   const isStreamingActive = isLastAssistant && isStreaming;
 
-  // Render parts in order - interleaving text and tool calls as they occur
+  // Consolidate all reasoning parts into one collapsible block
   const parts = message.parts;
+  const reasoningParts = parts.filter(
+    (part): part is Extract<typeof part, { type: 'reasoning' }> =>
+      part.type === 'reasoning',
+  );
+  const reasoningText = reasoningParts.map((part) => part.text).join('\n\n');
+  const hasReasoning = reasoningParts.length > 0;
+  const lastPart = parts.at(-1);
+  const isReasoningStreaming =
+    isStreamingActive && lastPart?.type === 'reasoning';
+
+  // Render parts in order - interleaving text and tool calls as they occur
   const renderedParts: React.ReactNode[] = [];
   let textBuffer = '';
   let textSegmentIndex = 0;
@@ -408,7 +232,10 @@ const ChatMessage = memo(function ChatMessage({
 
   if (parts && parts.length > 0) {
     for (const part of parts) {
-      if (part.type === 'text') {
+      if (part.type === 'reasoning') {
+        // Handled separately above as a consolidated block
+        continue;
+      } else if (part.type === 'text') {
         textBuffer += part.text;
       } else if (part.type === 'dynamic-tool') {
         flushText();
@@ -423,9 +250,7 @@ const ChatMessage = memo(function ChatMessage({
           toolCallId: dynamicPart.toolCallId,
           toolName: dynamicPart.toolName,
           status:
-            dynamicPart.state === 'output-available'
-              ? 'completed'
-              : 'pending',
+            dynamicPart.state === 'output-available' ? 'completed' : 'pending',
           input: dynamicPart.input as Record<string, unknown>,
           output: dynamicPart.output,
         };
@@ -444,9 +269,7 @@ const ChatMessage = memo(function ChatMessage({
           toolCallId: toolPart.toolCallId,
           toolName: part.type.replace('tool-', ''),
           status:
-            toolPart.state === 'output-available'
-              ? 'completed'
-              : 'pending',
+            toolPart.state === 'output-available' ? 'completed' : 'pending',
           input: toolPart.input as Record<string, unknown>,
           output: toolPart.output,
         };
@@ -456,6 +279,16 @@ const ChatMessage = memo(function ChatMessage({
       }
     }
     flushText();
+  }
+
+  // Prepend consolidated reasoning block before other content
+  if (hasReasoning) {
+    renderedParts.unshift(
+      <Reasoning className="w-full" isStreaming={isReasoningStreaming}>
+        <ReasoningTrigger />
+        <ReasoningContent>{reasoningText}</ReasoningContent>
+      </Reasoning>,
+    );
   }
 
   return (
@@ -620,6 +453,22 @@ export const ChatConversation = memo(function ChatConversation({
 
   // Loading: show when fetching history for existing conversation with no messages yet
   // Empty: show when no messages and not streaming (not during initial load or streaming)
+  // Whether there's a user message waiting for an assistant response.
+  // Uses pair-counting instead of last-role check to avoid false negatives
+  // when `messages` is `savedMessages` (history) during state transitions.
+  const hasUnansweredMessage = useMemo(() => {
+    if (!isStreaming || messages.length === 0) return false;
+    let userCount = 0;
+    let assistantCount = 0;
+    for (const m of messages) {
+      if (m.role === 'user') userCount++;
+      else if (m.role === 'assistant') assistantCount++;
+    }
+    return userCount > assistantCount;
+  }, [isStreaming, messages]);
+
+  // Loading: show when fetching history for existing conversation with no messages yet
+  // Empty: show when no messages and not streaming (not during initial load or streaming)
   const isLoadingHistory = isLoadingMessages && messages.length === 0;
   const isEmpty = !isLoadingMessages && messages.length === 0 && !isStreaming;
 
@@ -699,11 +548,7 @@ export const ChatConversation = memo(function ChatConversation({
                 />
               ))}
 
-              {isStreaming &&
-                messages.length > 0 &&
-                messages[messages.length - 1].role !== 'assistant' && (
-                  <TypingIndicator />
-                )}
+              {hasUnansweredMessage && <TypingIndicator />}
             </>
           )}
 
