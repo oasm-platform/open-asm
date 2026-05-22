@@ -254,6 +254,43 @@ export class AgentsCompletionsService {
     }
   }
 
+  private async handleStreamFinish(
+    assistantMsgId: string,
+    conversationId: string,
+    assistantMsgMetadata: any,
+    accumulatedText: string,
+    llmConfig: AgentLLMConfig,
+  ): Promise<void> {
+    try {
+      await this.messageRepository.update(
+        { id: assistantMsgId },
+        {
+          content: accumulatedText,
+          metadata: {
+            ...assistantMsgMetadata,
+            status: 'completed',
+          },
+        },
+      );
+      const allMessages = await this.messageRepository.find({
+        where: { conversationId },
+        order: { createdAt: 'ASC' },
+      });
+      if (allMessages.length >= 2) {
+        const hasCompletedAssistant = allMessages.some(
+          (msg) =>
+            msg.role === MessageRole.ASSISTANT &&
+            msg.metadata?.['status'] === 'completed',
+        );
+        if (hasCompletedAssistant) {
+          await this.generateTitle(conversationId, llmConfig);
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to complete stream finish tasks', error);
+    }
+  }
+
   async vulAnalyze(
     vulnerabilityJson: string,
     workspaceId: string,
@@ -475,32 +512,15 @@ export class AgentsCompletionsService {
         }
         throw error;
       },
-      onFinish: async () => {
+      onFinish: () => {
         if (accumulatedText) {
-          await messageRepo.update(
-            { id: assistantMsgId },
-            {
-              content: accumulatedText,
-              metadata: {
-                ...assistantMsgMetadata,
-                status: 'completed',
-              },
-            },
-          );
-          const allMessages = await messageRepo.find({
-            where: { conversationId: conversationIdStr },
-            order: { createdAt: 'ASC' },
-          });
-          if (allMessages.length >= 2) {
-            const hasCompletedAssistant = allMessages.some(
-              (msg) =>
-                msg.role === MessageRole.ASSISTANT &&
-                msg.metadata?.['status'] === 'completed',
-            );
-            if (hasCompletedAssistant) {
-              await this.generateTitle(conversationIdStr, currentLlvmConfig);
-            }
-          }
+          this.handleStreamFinish(
+            assistantMsgId,
+            conversationIdStr,
+            assistantMsgMetadata,
+            accumulatedText,
+            currentLlvmConfig,
+          ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
         }
       },
     });
