@@ -1,4 +1,10 @@
-import { forwardRef, Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { nanoid } from 'nanoid';
 import { finalize, ReplaySubject } from 'rxjs';
 import { WorkerInstance } from './entities/worker.entity';
@@ -41,9 +47,16 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
 
     const workerId = worker.id;
     const cleanup = () => {
-      this.handleWorkerDisconnect(workerId);
-      this.workers.delete(workerId);
-      this.logger.log(`Worker ${workerId} disconnected, cleaned up`);
+      const currentSubject = this.workers.get(workerId);
+      if (currentSubject === subject) {
+        this.handleWorkerDisconnect(workerId);
+        this.workers.delete(workerId);
+        this.logger.log(`Worker ${workerId} disconnected, cleaned up`);
+      } else {
+        this.logger.verbose(
+          `Worker ${workerId} stream finalized but a newer subscription exists — skipping cleanup`,
+        );
+      }
     };
 
     const observable = subject.asObservable().pipe(finalize(cleanup));
