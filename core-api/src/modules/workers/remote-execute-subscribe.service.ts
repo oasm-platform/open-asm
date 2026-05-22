@@ -1,10 +1,4 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-} from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { nanoid } from 'nanoid';
 import { finalize, ReplaySubject } from 'rxjs';
 import { WorkerInstance } from './entities/worker.entity';
