@@ -15,6 +15,7 @@ import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilitie
 import { WorkersService } from '@/modules/workers/workers.service';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
+import { AgentMode } from '@/common/enums/enum';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -587,25 +588,89 @@ export class AgentTool {
   /**
    * Returns all available tools as a record, bound to the given workspaceId
    */
-  getTools(workspaceId: string): Record<string, ToolType> {
-    return {
-      get_assets: this.getAssetsTool(workspaceId),
-      get_vulnerabilities: this.getVulnerabilitiesTool(workspaceId),
-      get_targets: this.getTargetsTool(workspaceId),
-      get_statistics: this.getStatisticsTool(workspaceId),
-      detail_asset: this.detailAssetTool(workspaceId),
-      list_assets_in_target: this.listAssetsInTargetTool(workspaceId),
-      detail_vuln: this.detailVulnTool(workspaceId),
-      get_ports: this.getPortsTool(workspaceId),
-      get_technologies: this.getTechnologiesTool(workspaceId),
-      get_tls: this.getTlsTool(workspaceId),
-      web_fetch: this.webFetchTool(workspaceId),
-      list_issues: this.listIssuesTool(workspaceId),
-      detail_issue: this.detailIssueTool(workspaceId),
-      list_tools: this.listToolsTool(workspaceId),
-      list_workers: this.listWorkersTool(workspaceId),
-      list_jobs: this.listJobsTool(workspaceId),
-      remote_execute: this.remoteExecuteTool(workspaceId),
+  getTools(
+    workspaceId: string,
+    agentMode: AgentMode,
+  ): Record<string, ToolType> {
+    const { AGENT, ASK } = AgentMode;
+    const tools: Record<
+      string,
+      { method: ToolType; permissions: AgentMode[] }
+    > = {
+      enumerate_assets: {
+        method: this.getAssetsTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      discover_vulnerabilities: {
+        method: this.getVulnerabilitiesTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      retrieve_targets: {
+        method: this.getTargetsTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      gather_statistics: {
+        method: this.getStatisticsTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      inspect_asset: {
+        method: this.detailAssetTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      examine_target_assets: {
+        method: this.listAssetsInTargetTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      investigate_vulnerability: {
+        method: this.detailVulnTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      list_network_ports: {
+        method: this.getPortsTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      fingerprint_technologies: {
+        method: this.getTechnologiesTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      verify_tls_settings: {
+        method: this.getTlsTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      retrieve_web_page: {
+        method: this.webFetchTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      enumerate_open_issues: {
+        method: this.listIssuesTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      inspect_issue: {
+        method: this.detailIssueTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      display_available_tools: {
+        method: this.listToolsTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      list_active_workers: {
+        method: this.listWorkersTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      review_jobs: {
+        method: this.listJobsTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
+      execute_remote_command: {
+        method: this.remoteExecuteTool(workspaceId),
+        permissions: [AGENT, ASK],
+      },
     };
+
+    return Object.fromEntries(
+      Object.entries(tools)
+        .filter(([, config]) => config.permissions.includes(agentMode))
+        .map(([key, config]) => [key, config.method]),
+    ) as Record<string, ToolType>;
   }
 }

@@ -1,6 +1,6 @@
+import { AgentMode } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { AgentMode } from '@/common/enums/enum';
 import { MessageRole, MessageType } from '../enums/agent.enums';
 
 export class SendMessageDto {
@@ -37,7 +37,7 @@ export class SendMessageDto {
   @ApiProperty({ enum: AgentMode, required: false })
   @IsOptional()
   @IsEnum(AgentMode)
-  agentMode?: AgentMode;
+  agentMode: AgentMode;
 }
 
 export class MessageResponseDto {
