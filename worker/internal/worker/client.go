@@ -108,10 +108,6 @@ func Start(ctx context.Context, cfg *config.Config) {
 		schedulerStarted bool
 	)
 
-	remoteLog := oasm.NewLogger("RemoteExec")
-	go startRemoteExecuteHandler(ctx, client, workspaceRoot, cfg.ToolPath)
-	remoteLog.Info("Remote execute handler started (workspace: %s)", workspaceRoot)
-
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
 	scheduler := gocron.NewScheduler(time.UTC)
 	var wg sync.WaitGroup
