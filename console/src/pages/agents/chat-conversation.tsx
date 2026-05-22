@@ -193,7 +193,7 @@ const ChatMessage = memo(function ChatMessage({
   // Consolidate all reasoning parts into one collapsible block
   const parts = message.parts;
   const reasoningParts = parts.filter(
-    (part): part is { type: 'reasoning'; text: string; state?: string } =>
+    (part): part is Extract<typeof part, { type: 'reasoning' }> =>
       part.type === 'reasoning',
   );
   const reasoningText = reasoningParts.map((part) => part.text).join('\n\n');
