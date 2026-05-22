@@ -136,6 +136,10 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     return this.pushCommand(workerId, sessionId, command);
   }
 
+  removeSession(sessionId: string): void {
+    this.sessionWorkerMap.delete(sessionId);
+  }
+
   getSessionWorkerId(sessionId: string): string | undefined {
     return this.sessionWorkerMap.get(sessionId);
   }

@@ -63,11 +63,13 @@ export class AgentsController {
   @Doc({
     summary: 'Get agent modes',
     description: 'Get all available modes for AI chat box and enabled workers',
-    request: {},
+    request: { getWorkspaceId: true },
     response: { serialization: GetAgentModesResponseDto },
   })
-  getAgentModes(): Promise<GetAgentModesResponseDto> {
-    return this.agentsService.getAgentModesWithWorkers();
+  getAgentModes(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<GetAgentModesResponseDto> {
+    return this.agentsService.getAgentModesWithWorkers(workspaceId);
   }
 
   @Post('llm-configs')

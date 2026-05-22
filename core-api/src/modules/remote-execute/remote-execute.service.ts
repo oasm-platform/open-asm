@@ -127,6 +127,7 @@ export class RemoteExecuteService {
 
     const events: ResultEvent[] = [];
     let resolved = false;
+    let waitResolve: (() => void) | null = null;
 
     this.logger.log(`[waitForResult] Subscribing to channel: ${channel}`);
 
@@ -168,6 +169,8 @@ export class RemoteExecuteService {
             `[waitForResult] Command finished, type=${event.type}`,
           );
 
+          this.remoteExecuteSubscribeService.removeSession(sessionId);
+
           this.redisService
             .unsubscribe(channel)
             .catch((err) => {
@@ -175,6 +178,10 @@ export class RemoteExecuteService {
                 `Failed to unsubscribe from ${channel}: ${err}`,
               );
             });
+
+          if (waitResolve) {
+            waitResolve();
+          }
         }
       } catch (err) {
         this.logger.warn(`Failed to parse Redis message: ${err}`);
@@ -205,13 +212,7 @@ export class RemoteExecuteService {
     );
 
     await new Promise<void>((resolve) => {
-      const checkDone = () => {
-        if (resolved) {
-          resolve();
-          return;
-        }
-        setTimeout(checkDone, 50);
-      };
+      waitResolve = resolve;
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -226,7 +227,6 @@ export class RemoteExecuteService {
         }
         resolve();
       }, timeoutMs);
-      checkDone();
     });
 
     const exitEvent = events.find((e) => e.type === ResultEventType.EXIT);

@@ -63,12 +63,6 @@ func (s *sessionSandbox) resolvePath(path string) (string, error) {
 	return absResolved, nil
 }
 
-func (s *sessionSandbox) chroot() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return os.Chdir(s.rootPath)
-}
-
 func (s *sessionSandbox) close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -201,18 +195,14 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, command string, sandbox *sessionSandbox, log *oasm.LoggerType, toolPath string) {
 	log.Info("Executing command in session %s: %s", handler.SessionID(), command)
 
-	if err := sandbox.chroot(); err != nil {
-		log.ErrorE("Failed to change to session directory", err)
-		_ = handler.SendError(ctx, fmt.Sprintf("failed to enter session workspace: %v", err))
-		return
-	}
-
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
 	} else {
 		cmd = exec.CommandContext(ctx, "sh", "-c", command)
 	}
+
+	cmd.Dir = sandbox.rootPath
 
 	cmd.SysProcAttr = newSysProcAttr()
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PATH=%s%c%s", toolPath, os.PathListSeparator, os.Getenv("PATH")))

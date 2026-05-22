@@ -92,13 +92,16 @@ export class AgentsService {
     ];
   }
 
-  async getAgentModesWithWorkers(): Promise<GetAgentModesResponseDto> {
+  async getAgentModesWithWorkers(
+    workspaceId: string,
+  ): Promise<GetAgentModesResponseDto> {
     const modes = this.getAgentModes();
     const workersResponse = await this.workersService.getWorkers({
       page: 1,
       limit: 1000,
       sortBy: '"createdAt"',
       sortOrder: SortOrder.DESC,
+      workspaceId,
       enabledAgentMode: true,
     });
     return {

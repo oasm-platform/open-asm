@@ -52,8 +52,10 @@ describe('AgentsController', () => {
   });
 
   describe('getAgentModes', () => {
+    const testWorkspaceId = '550e8400-e29b-41d4-a716-446655440000';
+
     it('should return object with modes and workers', async () => {
-      const result = await controller.getAgentModes();
+      const result = await controller.getAgentModes(testWorkspaceId);
 
       expect(result).toHaveProperty('modes');
       expect(result).toHaveProperty('workers');
@@ -65,7 +67,7 @@ describe('AgentsController', () => {
     });
 
     it('should contain ask mode', async () => {
-      const result = await controller.getAgentModes();
+      const result = await controller.getAgentModes(testWorkspaceId);
       const askMode = result.modes.find((m) => m.id === 'ask');
 
       expect(askMode).toBeDefined();
@@ -73,10 +75,12 @@ describe('AgentsController', () => {
       expect(askMode?.description).toContain('security');
     });
 
-    it('should call agentsService.getAgentModesWithWorkers', async () => {
-      await controller.getAgentModes();
+    it('should call agentsService.getAgentModesWithWorkers with workspaceId', async () => {
+      await controller.getAgentModes(testWorkspaceId);
 
-      expect(mockAgentsService.getAgentModesWithWorkers).toHaveBeenCalled();
+      expect(
+        mockAgentsService.getAgentModesWithWorkers,
+      ).toHaveBeenCalledWith(testWorkspaceId);
     });
   });
 });
