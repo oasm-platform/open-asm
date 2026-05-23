@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { LanguageModel, UIMessageChunk } from 'ai';
+import type { LanguageModel, ToolSet, UIMessageChunk } from 'ai';
 import { generateText, stepCountIs, streamText } from 'ai';
 import * as fs from 'fs';
 import * as Mustache from 'mustache';
@@ -30,6 +30,30 @@ import { getLLMProviderConfig } from './llm-provider-supported';
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
   conversationId: string;
+}
+
+/** Parameters for creating the merged ReadableStream result */
+interface StreamCreationParams {
+  aiStream: ReadableStream<UIMessageChunk>;
+  conversationId: string;
+  todosEmitter: EventEmitter;
+}
+
+/** Parameters for building streamText call options */
+interface StreamTextOptions {
+  llmConfig: AgentLLMConfig;
+  model: LanguageModel;
+  modelMessages: Array<{
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+  }>;
+  contextParts: string[];
+  assistantMessageId: string;
+  conversationId: string;
+  assistantMessageMetadata: Record<string, unknown> | undefined;
+  tools: ToolSet | undefined;
+  /** Shared event emitter for broadcasting todo updates to the stream */
+  todosEmitter: EventEmitter;
 }
 
 @Injectable()
@@ -284,7 +308,7 @@ export class AgentsCompletionsService {
     conversationId: string,
     accumulatedText: string,
     llmConfig: AgentLLMConfig,
-    assistantMsgMetadata?: Record<string, unknown>,
+    assistantMsgMetadata: Record<string, unknown> | undefined,
   ): Promise<void> {
     try {
       await this.messageRepository.update(
@@ -354,62 +378,106 @@ export class AgentsCompletionsService {
     }
   }
 
-  async streamMessage(
+  // ================================================================
+  //  Private helper methods for streamMessage - extracted into small,
+  //  focused functions for readability, maintainability and testability.
+  // ================================================================
+
+  /**
+   * Finds an existing conversation by ID or creates a new one.
+   * - If dto.conversationId exists in DB → reuse it
+   * - If dto.conversationId is provided but not found → create with that ID
+   * - If no conversationId → create a brand new conversation
+   */
+  private async getOrCreateConversation(
     dto: SendMessageDto,
     workspaceId: string,
     userId: string,
-  ): Promise<StreamMessageResult> {
-    let conversation: AgentConversation;
+  ): Promise<AgentConversation> {
+    // If conversationId is provided, try to find it in DB
     if (dto.conversationId) {
       const existing = await this.conversationRepository.findOne({
         where: { id: dto.conversationId, workspaceId },
       });
       if (existing) {
-        conversation = existing;
-      } else {
-        const llmConfig = await this.resolveLLMConfig(
-          workspaceId,
-          dto.provider,
-          dto.model,
-        );
-        conversation = this.conversationRepository.create({
-          id: dto.conversationId,
-          workspaceId,
-          llmConfigId: llmConfig.id,
-          title: dto.question.slice(0, 500),
-          createdBy: userId,
-        });
-        conversation = await this.conversationRepository.save(conversation);
+        return existing; // Return existing conversation
       }
-    } else {
+
+      // Not found (client may have pre-generated the ID), create with that ID
       const llmConfig = await this.resolveLLMConfig(
         workspaceId,
         dto.provider,
         dto.model,
       );
-      conversation = this.conversationRepository.create({
+      const newConversation = this.conversationRepository.create({
+        id: dto.conversationId,
         workspaceId,
         llmConfigId: llmConfig.id,
         title: dto.question.slice(0, 500),
         createdBy: userId,
       });
-      conversation = await this.conversationRepository.save(conversation);
+      return this.conversationRepository.save(newConversation);
     }
 
+    // No conversationId provided, create a new conversation
+    const llmConfig = await this.resolveLLMConfig(
+      workspaceId,
+      dto.provider,
+      dto.model,
+    );
+    const newConversation = this.conversationRepository.create({
+      workspaceId,
+      llmConfigId: llmConfig.id,
+      title: dto.question.slice(0, 500),
+      createdBy: userId,
+    });
+    return this.conversationRepository.save(newConversation);
+  }
+
+  /**
+   * Saves the user's message to the database.
+   * The message is associated with the conversationId, role is USER, messageType is TEXT.
+   */
+  private async saveUserMessage(
+    conversationId: string,
+    question: string,
+  ): Promise<AgentMessage> {
     const userMessage = this.messageRepository.create({
-      conversationId: conversation.id,
+      conversationId,
       role: MessageRole.USER,
-      content: dto.question,
+      content: question,
       messageType: MessageType.TEXT,
     });
-    await this.messageRepository.save(userMessage);
+    return this.messageRepository.save(userMessage);
+  }
 
-    const historyMessages = await this.messageRepository.find({
-      where: { conversationId: conversation.id },
-      order: { createdAt: 'DESC' },
-      take: 20,
+  /**
+   * Fetches up to 20 most recent messages from the conversation, sorted chronologically.
+   * Used to build conversation context for the model.
+   */
+  private async getConversationHistory(
+    conversationId: string,
+  ): Promise<AgentMessage[]> {
+    const messages = await this.messageRepository.find({
+      where: { conversationId },
+      order: { createdAt: 'DESC' }, // Fetch newest first
+      take: 5,
     });
+    return messages.reverse(); // Reverse to chronological order
+  }
 
+  /**
+   * Resolves the final LLM config after applying DTO overrides.
+   * - Starts from the conversation's default config
+   * - If user switches provider → find config for that provider
+   * - If user changes model (same provider) → override model in memory (no DB write)
+   */
+  private async resolveLLMConfigWithOverrides(
+    conversation: AgentConversation,
+    dto: SendMessageDto,
+    workspaceId: string,
+  ): Promise<AgentLLMConfig> {
+    // Get the base config from the conversation
     let llmConfig = await this.llmConfigRepository.findOne({
       where: { id: conversation.llmConfigId, workspaceId },
     });
@@ -418,7 +486,7 @@ export class AgentsCompletionsService {
       throw new NotFoundException('LLM config not found');
     }
 
-    // If user switched to a different provider, resolve the correct config for it
+    // If user switched to a different provider, resolve the correct config
     if (dto.provider && (dto.provider as LLMProvider) !== llmConfig.provider) {
       const switchedConfig = await this.llmConfigRepository.findOne({
         where: { workspaceId, provider: dto.provider as LLMProvider },
@@ -428,7 +496,8 @@ export class AgentsCompletionsService {
       }
     }
 
-    // Override model in-memory (no DB write) when the provider matches
+    // If user changed model within the same provider, override in memory only
+    // (Avoids writing to DB which would affect other conversations)
     if (dto.model && (dto.provider as LLMProvider) === llmConfig.provider) {
       llmConfig = this.llmConfigRepository.create({
         ...llmConfig,
@@ -436,19 +505,34 @@ export class AgentsCompletionsService {
       });
     }
 
-    const reversedHistory = historyMessages.reverse();
-    const modelMessages = reversedHistory.map((msg) => ({
+    return llmConfig;
+  }
+
+  /**
+   * Maps DB messages to AI SDK message format.
+   * Only keeps role and content, strips unnecessary fields.
+   */
+  private mapHistoryToModelMessages(
+    messages: AgentMessage[],
+  ): Array<{ role: 'user' | 'assistant' | 'system'; content: string }> {
+    return messages.map((msg) => ({
       role: msg.role as 'user' | 'assistant' | 'system',
       content: msg.content,
     }));
+  }
 
-    await this.validateToolSupport(llmConfig);
-    const model = this.createLanguageModel(llmConfig);
-
+  /**
+   * Creates and saves a placeholder message for the assistant (streaming).
+   * Marked with status='streaming' so the frontend knows chunks are incoming.
+   */
+  private async saveAssistantMessage(
+    conversationId: string,
+    llmConfig: AgentLLMConfig,
+  ): Promise<AgentMessage> {
     const assistantMessage = this.messageRepository.create({
-      conversationId: conversation.id,
+      conversationId,
       role: MessageRole.ASSISTANT,
-      content: '',
+      content: '', // Will be updated when streaming completes
       messageType: MessageType.TEXT,
       metadata: {
         model: llmConfig.model,
@@ -456,36 +540,45 @@ export class AgentsCompletionsService {
         status: 'streaming',
       },
     });
-    await this.messageRepository.save(assistantMessage);
+    return this.messageRepository.save(assistantMessage);
+  }
 
-    const todosEmitter = new EventEmitter();
-
-    const tools = {
-      ...this.agentTool.getTools(workspaceId, dto.agentMode || AgentMode.ASK),
-      ...this.agentTool.getTodoTools(conversation.id, todosEmitter),
-    };
-
-    const conversationIdStr = conversation.id;
-    const assistantMsgId = assistantMessage.id;
-    const assistantMsgMetadata = assistantMessage.metadata;
-
-    const modePrompt = this.getPrompt(`${dto.agentMode.toUpperCase()}.md`);
+  /**
+   * Builds the system context for the model by combining multiple sources:
+   * - Mode prompt (ASK, AGENT, VUL_ANALYZE, ...)
+   * - Default system prompt
+   * - Current timestamp
+   * - Workspace long-term memory (LTM)
+   * - Conversation short-term memory (STM)
+   * - Current todo list
+   */
+  private async buildSystemContext(
+    conversation: AgentConversation,
+    workspaceId: string,
+    agentMode: AgentMode,
+  ): Promise<string[]> {
+    // Fetch prompt for the current mode (e.g. ASK.md, AGENT.md)
+    const modePrompt = this.getPrompt(`${agentMode.toUpperCase()}.md`);
+    console.log(modePrompt);
+    // Fetch the shared system prompt
     const systemPrompt = this.getPrompt('SYSTEM.md');
-    const currentLlvmConfig = llmConfig;
 
-    let accumulatedText = '';
-
+    // Generate current time context string
     const now = new Date();
     const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
+
+    // Fetch STM and LTM concurrently
     const [stmContext, ltmContext] = await Promise.all([
       this.agentsMemories.stmFormatForPrompt(conversation.id),
       this.agentsMemories.ltmFormatForPrompt(workspaceId),
     ]);
 
+    // Format the todo list as a prompt string
     const todos = conversation.todos ?? [];
     const todosContext = formatTodosToPrompt(todos);
 
-    const contextParts = [
+    // Combine all context parts, filtering out empty ones
+    return [
       modePrompt,
       systemPrompt,
       currentTimeContext,
@@ -493,77 +586,72 @@ export class AgentsCompletionsService {
       stmContext,
       todosContext,
     ].filter(Boolean);
+  }
 
-    const result = streamText({
-      model,
-      messages: [
-        {
-          role: 'system' as const,
-          content: contextParts.join('\n\n'),
-        },
-        ...modelMessages,
-      ],
-      ...(tools ? { tools, stopWhen: stepCountIs(10) } : {}),
-      onChunk: ({ chunk }) => {
-        if (chunk.type === 'text-delta') {
-          accumulatedText += chunk.text;
-        }
-      },
-      onError: ({ error }) => {
-        const message = error instanceof Error ? error.message : String(error);
-        if (
-          message.includes('tool use') ||
-          message.includes('tool_choice') ||
-          message.includes('No endpoints found that support tool') ||
-          message.includes('does not support tools') ||
-          message.includes('tool_calls') ||
-          message.includes('tools is not supported')
-        ) {
-          // Invalidate cache so next request re-checks
-          if (
-            currentLlvmConfig.provider === LLMProvider.CUSTOM &&
-            currentLlvmConfig.apiUrl
-          ) {
-            this.customToolSupportCache.set(
-              `${currentLlvmConfig.apiUrl}:${currentLlvmConfig.model}`,
-              false,
-            );
-          }
-          throw new Error(
-            `The selected model "${currentLlvmConfig.model}" does not support tool calling. ` +
-              'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
-          );
-        }
-        throw error;
-      },
-      onFinish: () => {
-        if (accumulatedText) {
-          this.handleStreamFinish(
-            assistantMsgId,
-            conversationIdStr,
-            accumulatedText,
-            currentLlvmConfig,
-            assistantMsgMetadata,
-          ).catch((err) =>
-            this.logger.error('Error in handleStreamFinish', err),
-          );
-        }
-      },
-    });
+  /**
+   * Handles tool-calling errors from streamText.
+   * Checks if the error is related to unsupported tool calling:
+   * - For CUSTOM provider, caches the negative result to avoid re-checking
+   * - Throws a user-friendly error message
+   * For other errors, re-throws the original error.
+   */
+  private handleToolError(error: unknown, llmConfig: AgentLLMConfig): never {
+    const message = error instanceof Error ? error.message : String(error);
 
-    const aiStream = result.toUIMessageStream();
+    // Check if the error message matches known tool-calling error patterns
+    const toolErrorPatterns = [
+      'tool use',
+      'tool_choice',
+      'No endpoints found that support tool',
+      'does not support tools',
+      'tool_calls',
+      'tools is not supported',
+    ];
 
-    const mergedStream = new ReadableStream<UIMessageChunk>({
+    const isToolError = toolErrorPatterns.some((pattern) =>
+      message.includes(pattern),
+    );
+
+    if (isToolError) {
+      // Cache negative result for CUSTOM provider to prevent re-requesting
+      if (llmConfig.provider === LLMProvider.CUSTOM && llmConfig.apiUrl) {
+        this.customToolSupportCache.set(
+          `${llmConfig.apiUrl}:${llmConfig.model}`,
+          false,
+        );
+      }
+      throw new Error(
+        `The selected model "${llmConfig.model}" does not support tool calling. ` +
+          'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
+      );
+    }
+
+    throw error;
+  }
+
+  /**
+   * Creates a merged ReadableStream that combines:
+   * 1. A `conversation-created` metadata chunk at the start of the stream
+   * 2. Chunks from the AI stream (text-delta, tool-call, ...)
+   * 3. Asynchronous `todos-updated` chunks (emitted by the EventEmitter)
+   */
+  private createMergedStream(
+    params: StreamCreationParams,
+  ): ReadableStream<UIMessageChunk> {
+    const { aiStream, conversationId, todosEmitter } = params;
+
+    return new ReadableStream<UIMessageChunk>({
       async start(controller) {
+        // Emit initial chunk to notify the frontend that the conversation was created
         controller.enqueue({
           type: 'data-conversation-created',
-          data: {
-            conversationId: conversationIdStr,
-          },
+          data: { conversationId },
         } as UIMessageChunk);
 
+        // Get a reader for the AI stream to forward text/tool-call chunks
         const reader = aiStream.getReader();
 
+        // Subscribe to todos-updated events from the emitter
         const onTodosUpdated = (updatedTodos: AgentTodoItem[]) => {
           controller.enqueue({
             type: 'data-todos-updated',
@@ -574,20 +662,191 @@ export class AgentsCompletionsService {
         todosEmitter.on('todos-updated', onTodosUpdated);
 
         try {
+          // Read chunks from the AI stream one by one
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
-            controller.enqueue(value);
+            if (done) break; // Stream finished
+            controller.enqueue(value); // Forward chunk to the merged stream
           }
         } finally {
+          // Cleanup: remove listener and release the reader
           todosEmitter.off('todos-updated', onTodosUpdated);
           reader.releaseLock();
         }
 
+        // Close the stream when complete
         controller.close();
       },
     });
+  }
 
+  /**
+   * Builds the streamText options and executes the call, wrapping the result
+   * into a merged stream. This is the core of the AI response streaming process.
+   */
+  private executeStreamText(options: StreamTextOptions): StreamCreationParams {
+    const {
+      llmConfig,
+      model,
+      modelMessages,
+      contextParts,
+      assistantMessageId,
+      conversationId,
+      assistantMessageMetadata,
+      tools,
+    } = options;
+
+    // Accumulate text as chunks arrive during streaming
+    let accumulatedText = '';
+
+    // Use the shared EventEmitter from caller to communicate todo events between tool calls and the stream
+    const { todosEmitter } = options;
+
+    // Invoke the AI SDK streamText with all callbacks
+    const result = streamText({
+      model,
+      // System message containing the assembled context
+      messages: [
+        {
+          role: 'system' as const,
+          content: contextParts.join('\n\n'),
+        },
+        ...modelMessages,
+      ],
+      // Only include tools if available (models without tool support will error here)
+      ...(tools ? { tools, stopWhen: stepCountIs(10) } : {}),
+      // Accumulate text-delta chunks as they arrive
+      onChunk: ({ chunk }) => {
+        if (chunk.type === 'text-delta') {
+          accumulatedText += chunk.text;
+        }
+      },
+      // Handle errors (especially tool-calling errors)
+      onError: ({ error }) => {
+        this.handleToolError(error, llmConfig);
+      },
+      // When streaming completes, persist accumulated text to DB
+      onFinish: () => {
+        if (accumulatedText) {
+          this.handleStreamFinish(
+            assistantMessageId,
+            conversationId,
+            accumulatedText,
+            llmConfig,
+            assistantMessageMetadata,
+          ).catch((err) =>
+            this.logger.error('Error in handleStreamFinish', err),
+          );
+        }
+      },
+    });
+
+    // Convert the result stream to a UIMessageStream consumable by the frontend
+    const aiStream = result.toUIMessageStream();
+
+    return { aiStream, conversationId, todosEmitter };
+  }
+
+  // ================================================================
+  //  Public API
+  // ================================================================
+
+  /**
+   * Sends a message and returns a streamed response.
+   *
+   * Overall flow:
+   * 1. Find/create conversation → save user message → fetch history
+   * 2. Resolve LLM config (provider/model overrides)
+   * 3. Validate tool support → create language model
+   * 4. Create assistant message placeholder
+   * 5. Build system context (prompts + memories + todos)
+   * 6. Call streamText → get AI stream
+   * 7. Wrap AI stream into merged stream (adds conversation metadata + todos events)
+   */
+  async streamMessage(
+    dto: SendMessageDto,
+    workspaceId: string,
+    userId: string,
+  ): Promise<StreamMessageResult> {
+    // Step 1: Find or create the conversation
+    const conversation = await this.getOrCreateConversation(
+      dto,
+      workspaceId,
+      userId,
+    );
+
+    // Step 2: Save the user's message to DB
+    await this.saveUserMessage(conversation.id, dto.question);
+
+    // Step 3: Fetch conversation history (up to 5 most recent messages)
+    const historyMessages = await this.getConversationHistory(conversation.id);
+
+    // Step 4: Resolve the final LLM config with user overrides
+    const llmConfig = await this.resolveLLMConfigWithOverrides(
+      conversation,
+      dto,
+      workspaceId,
+    );
+
+    // Step 5: Map history to AI SDK message format
+    const modelMessages = this.mapHistoryToModelMessages(historyMessages);
+
+    // Step 6: Validate that the model supports tool calling
+    await this.validateToolSupport(llmConfig);
+
+    // Step 7: Create a LanguageModel instance from the config
+    const model = this.createLanguageModel(llmConfig);
+
+    // Step 8: Create a placeholder message for the assistant (marks streaming)
+    const assistantMessage = await this.saveAssistantMessage(
+      conversation.id,
+      llmConfig,
+    );
+
+    // Step 9: Build the system context
+    const contextParts = await this.buildSystemContext(
+      conversation,
+      workspaceId,
+      dto.agentMode || AgentMode.ASK,
+    );
+
+    // Step 10: Create a shared event emitter for broadcasting todo updates to the stream
+    const todosEmitter = new EventEmitter();
+
+    // Get tools for the current agent mode
+    // Note: AgentTool.getTools() returns `any` typed tools - cast to ToolSet for type safety
+    const tools = {
+      ...(this.agentTool.getTools(
+        workspaceId,
+        dto.agentMode || AgentMode.ASK,
+      ) as ToolSet),
+      ...(this.agentTool.getTodoTools(
+        conversation.id,
+        todosEmitter, // Pass the same shared emitter so tool calls broadcast to the stream
+      ) as ToolSet),
+    };
+
+    // Step 11: Execute streamText and get AI stream + todos emitter
+    const { aiStream } = this.executeStreamText({
+      llmConfig,
+      model,
+      modelMessages,
+      contextParts,
+      assistantMessageId: assistantMessage.id,
+      conversationId: conversation.id,
+      assistantMessageMetadata: assistantMessage.metadata,
+      tools: Object.keys(tools).length > 0 ? tools : undefined,
+      todosEmitter, // Pass the same shared emitter so stream events are in sync
+    });
+
+    // Step 12: Wrap AI stream into a merged stream (conversation metadata + todos events)
+    const mergedStream = this.createMergedStream({
+      aiStream,
+      conversationId: conversation.id,
+      todosEmitter, // Same emitter used by todo tools - events will reach the stream
+    });
+
+    // Step 13: Return stream + conversationId to the controller for the frontend
     return {
       stream: mergedStream,
       conversationId: conversation.id,
