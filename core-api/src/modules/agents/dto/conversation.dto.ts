@@ -1,5 +1,6 @@
+import type { AgentTodoItem } from '../agents.todo';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateConversationDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -34,6 +35,15 @@ export class ConversationResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiProperty({
+    description: 'Agent execution plan (todo list)',
+    required: false,
+    isArray: true,
+  })
+  @IsOptional()
+  @IsArray()
+  todos?: AgentTodoItem[];
 }
 
 export class GetConversationsResponseDto {

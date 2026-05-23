@@ -1,4 +1,6 @@
 import AgentPromptInput from '@/components/agent-prompt-input';
+import type { AgentTodoItem } from '@/components/agents/agent-todo-panel';
+import { AgentTodoPanel } from '@/components/agents/agent-todo-panel';
 import {
   Conversation,
   ConversationContent,
@@ -58,6 +60,7 @@ interface ChatConversationProps {
   isLoadingMoreMessages?: boolean;
   agentMode?: string;
   onAgentModeChange?: (mode: string) => void;
+  todos?: AgentTodoItem[];
 }
 
 interface ToolPart {
@@ -281,6 +284,7 @@ export const ChatConversation = memo(function ChatConversation({
   isLoadingMoreMessages = false,
   agentMode = 'false',
   onAgentModeChange,
+  todos,
 }: ChatConversationProps) {
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const prevStreamingRef = useRef(false);
@@ -465,6 +469,12 @@ export const ChatConversation = memo(function ChatConversation({
               {isLoadingMoreMessages && (
                 <div className="flex justify-center py-2">
                   <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
+              {todos && todos.length > 0 && (
+                <div className="max-w-3xl w-full mx-auto">
+                  <AgentTodoPanel todos={todos} />
                 </div>
               )}
 

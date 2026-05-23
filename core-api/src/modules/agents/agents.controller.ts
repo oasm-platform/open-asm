@@ -176,6 +176,23 @@ export class AgentsController {
   // Conversation Endpoints
   // ==========================================
 
+  @Get('conversations/:id')
+  @Doc({
+    summary: 'Get conversation detail',
+    description: 'Get a single conversation with full details including todos',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Conversation ID' }],
+    },
+    response: { serialization: ConversationResponseDto },
+  })
+  async getConversation(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<ConversationResponseDto> {
+    return this.agentsService.getConversation(id, workspaceId);
+  }
+
   @Get('conversations')
   @Doc({
     summary: 'List conversations',

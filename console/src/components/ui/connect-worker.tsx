@@ -65,7 +65,7 @@ export function ConnectWorker({ networkId }: ConnectWorkerProps) {
           <span className="hidden lg:inline">Connect worker</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Connect worker</DialogTitle>
           <DialogDescription>
