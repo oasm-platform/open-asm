@@ -79,3 +79,4 @@ core-api/public/tools/*
 .qwen/
 .agents/plans/*
 worker/.configs.json
+console/sw.js

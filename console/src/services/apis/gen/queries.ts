@@ -1441,12 +1441,16 @@ export type UpdateLLMConfigDto = {
   isPreferred?: boolean;
 };
 
+export type ConversationResponseDtoTodosItem = { [key: string]: unknown };
+
 export type ConversationResponseDto = {
   id: string;
   llmConfigId: string;
   title?: string;
   createdAt: string;
   updatedAt: string;
+  /** Agent execution plan (todo list) */
+  todos?: ConversationResponseDtoTodosItem[];
 };
 
 export type GetManyConversationResponseDtoDto = {

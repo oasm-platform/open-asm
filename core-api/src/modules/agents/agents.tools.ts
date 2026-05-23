@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await */
 import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { tool } from 'ai';
 import { randomUUID } from 'node:crypto';
+import { EventEmitter } from 'node:events';
+import { Repository } from 'typeorm';
 import { z } from 'zod';
 
 import { AssetsService } from '@/modules/assets/assets.service';
@@ -33,6 +36,8 @@ import {
   listToolsSchema,
   listWorkersSchema,
 } from '@/mcp/mcp.schema';
+import type { AgentTodoItem } from './agents.todo';
+import { AgentConversation } from './entities/agent-conversation.entity';
 
 // Web fetch tool schema
 const webFetchSchema = z.object({
@@ -66,6 +71,8 @@ export class AgentTool {
     @Inject(forwardRef(() => JobsRegistryService))
     private readonly jobsRegistryService: JobsRegistryService,
     private readonly remoteExecuteService: RemoteExecuteService,
+    @InjectRepository(AgentConversation)
+    private readonly conversationRepository: Repository<AgentConversation>,
   ) {}
 
   /**
@@ -582,6 +589,202 @@ export class AgentTool {
         },
       };
       return tool(toolConfig);
+    };
+  }
+
+  /**
+   * Returns todo management tools bound to a specific conversation
+   */
+  getTodoTools(
+    conversationId: string,
+    emitter?: EventEmitter,
+  ): Record<string, ToolType> {
+    const repo = this.conversationRepository;
+
+    const setPlanTool: any = {
+      description: [
+        'Thiết lập toàn bộ kế hoạch thực thi cho cuộc hội thoại hiện tại.',
+        '',
+        '✅ WHEN TO USE:',
+        '- Khi bạn nhận được yêu cầu từ người dùng và cần lập kế hoạch các bước thực hiện.',
+        '- Khi cần reset toàn bộ kế hoạch cũ và tạo kế hoạch mới từ đầu.',
+        '',
+        'PARAMETERS:',
+        '- steps: Mảng các chuỗi mô tả từng bước công việc cần thực hiện (tối thiểu 1 bước).',
+        '',
+        'OUTPUT:',
+        '- success: boolean',
+        '- message: Thông báo kết quả',
+        '- todos: Danh sách các todo items đã được tạo',
+      ].join('\n'),
+      parameters: z.object({
+        steps: z
+          .array(z.string().min(1))
+          .min(1)
+          .describe('Mảng các bước công việc cần thực hiện'),
+      }),
+      execute: async (params: { steps: string[] }) => {
+        const now = new Date().toISOString();
+        const todos: AgentTodoItem[] = params.steps.map((step) => ({
+          id: randomUUID(),
+          content: step,
+          status: 'pending' as const,
+          updatedAt: now,
+        }));
+
+        await repo.update(conversationId, { todos });
+
+        if (emitter) {
+          emitter.emit('todos-updated', todos);
+        }
+
+        return {
+          success: true,
+          message: `Đã thiết lập kế hoạch gồm ${todos.length} bước.`,
+          todos,
+        };
+      },
+    };
+
+    const updateTodoStatusTool: any = {
+      description: [
+        'Cập nhật trạng thái của một bước trong kế hoạch thực thi.',
+        '',
+        '✅ WHEN TO USE:',
+        '- Khi bạn BẮT ĐẦU thực hiện một bước → chuyển sang "in_progress".',
+        '- Khi bạn HOÀN THÀNH một bước → chuyển sang "completed".',
+        '- Khi một bước thất bại → chuyển sang "failed".',
+        '',
+        '⚠️ BẮT BUỘC:',
+        '- Phải cập nhật trạng thái trước khi chuyển sang bước tiếp theo.',
+        '- Không bỏ qua bước nào.',
+        '',
+        'PARAMETERS:',
+        '- id: ID của todo item cần cập nhật (UUID).',
+        '- status: Trạng thái mới: "pending" | "in_progress" | "completed" | "failed".',
+      ].join('\n'),
+      parameters: z.object({
+        id: z.string().uuid().describe('ID của todo item cần cập nhật'),
+        status: z
+          .enum(['pending', 'in_progress', 'completed', 'failed'])
+          .describe('Trạng thái mới'),
+      }),
+      execute: async (params: { id: string; status: AgentTodoItem['status'] }) => {
+        const conversation = await repo.findOne({
+          where: { id: conversationId },
+        });
+
+        if (!conversation) {
+          return { success: false, message: 'Conversation not found' };
+        }
+
+        const todos = (conversation.todos ?? []).map((t) =>
+          t.id === params.id
+            ? { ...t, status: params.status, updatedAt: new Date().toISOString() }
+            : t,
+        );
+
+        const targetTodo = (conversation.todos ?? []).find(
+          (t) => t.id === params.id,
+        );
+        if (!targetTodo) {
+          return {
+            success: false,
+            message: `Todo với id "${params.id}" không tồn tại.`,
+          };
+        }
+
+        await repo.update(conversationId, { todos });
+
+        if (emitter) {
+          emitter.emit('todos-updated', todos);
+        }
+
+        return {
+          success: true,
+          message: `Đã cập nhật bước "${targetTodo.content}" sang trạng thái "${params.status}".`,
+          todo: todos.find((t) => t.id === params.id),
+        };
+      },
+    };
+
+    const addTodoTool: any = {
+      description: [
+        'Thêm một đầu việc mới vào cuối kế hoạch hiện tại.',
+        '',
+        '✅ WHEN TO USE:',
+        '- Khi phát sinh công việc mới cần bổ sung vào kế hoạch.',
+        '- Khi cần thêm bước phụ trợ sau các bước chính.',
+        '',
+        'PARAMETERS:',
+        '- content: Nội dung của đầu việc mới (tối thiểu 1 ký tự).',
+      ].join('\n'),
+      parameters: z.object({
+        content: z.string().min(1).describe('Nội dung đầu việc mới'),
+      }),
+      execute: async (params: { content: string }) => {
+        const conversation = await repo.findOne({
+          where: { id: conversationId },
+        });
+
+        if (!conversation) {
+          return { success: false, message: 'Conversation not found' };
+        }
+
+        const now = new Date().toISOString();
+        const newTodo: AgentTodoItem = {
+          id: randomUUID(),
+          content: params.content,
+          status: 'pending',
+          updatedAt: now,
+        };
+
+        const todos = [...(conversation.todos ?? []), newTodo];
+
+        await repo.update(conversationId, { todos });
+
+        if (emitter) {
+          emitter.emit('todos-updated', todos);
+        }
+
+        return {
+          success: true,
+          message: `Đã thêm đầu việc "${params.content}" vào kế hoạch.`,
+          todo: newTodo,
+        };
+      },
+    };
+
+    const clearPlanTool: any = {
+      description: [
+        'Xóa toàn bộ kế hoạch hiện tại để bắt đầu lại từ đầu.',
+        '',
+        '✅ WHEN TO USE:',
+        '- Khi cần reset hoàn toàn kế hoạch.',
+        '- Khi kế hoạch cũ không còn phù hợp và cần lập kế hoạch mới.',
+        '',
+        '⚠️ Lưu ý: Hành động này không thể hoàn tác. Sau khi xóa, hãy gọi set_plan để tạo kế hoạch mới.',
+      ].join('\n'),
+      parameters: z.object({}),
+      execute: async () => {
+        await repo.update(conversationId, { todos: [] });
+
+        if (emitter) {
+          emitter.emit('todos-updated', []);
+        }
+
+        return {
+          success: true,
+          message: 'Đã xóa toàn bộ kế hoạch.',
+        };
+      },
+    };
+
+    return {
+      set_plan: tool(setPlanTool),
+      update_todo_status: tool(updateTodoStatusTool),
+      add_todo: tool(addTodoTool),
+      clear_plan: tool(clearPlanTool),
     };
   }
 

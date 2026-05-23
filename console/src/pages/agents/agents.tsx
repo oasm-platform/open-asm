@@ -1,11 +1,14 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
+import type { AgentTodoItem } from '@/components/agents/agent-todo-panel';
 import {
   useAgentsControllerGetLLMConfigs,
   useAgentsControllerGetMessagesInfinite,
+  type ConversationResponseDto,
   type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
+import { orvalClient } from '@/services/apis/axios-client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChatConversation } from './chat-conversation';
@@ -31,6 +34,7 @@ export default function AgentsChatPage() {
   const chatMessagesRef = useRef<UIMessage[]>([]);
   const isStreamingRef = useRef(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [todos, setTodos] = useState<AgentTodoItem[]>([]);
   const { data: providers } =
     useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
   const prefer = providers?.find((item) => item.isPreferred);
@@ -163,6 +167,14 @@ export default function AgentsChatPage() {
       console.error('[Chat] Error:', error);
       setStreamError(error.message ?? 'An error occurred while streaming');
     },
+    onData: (data: { type: string; data: unknown }) => {
+      if (data.type === 'data-todos-updated') {
+        const payload = data.data as { todos: AgentTodoItem[] } | undefined;
+        if (payload?.todos) {
+          setTodos(payload.todos);
+        }
+      }
+    },
   });
 
   // Keep ref in sync
@@ -237,6 +249,27 @@ export default function AgentsChatPage() {
     setStreamError(null);
   }, []);
 
+  // Fetch initial todos for existing conversations
+  useEffect(() => {
+    if (!conversationId) {
+      setTodos([]);
+      return;
+    }
+
+    orvalClient<ConversationResponseDto>({
+      url: `/api/agents/conversations/${conversationId}`,
+      method: 'GET',
+    })
+      .then((data) => {
+        if (data.todos) {
+           setTodos(data.todos as unknown as AgentTodoItem[]);
+        }
+      })
+      .catch(() => {
+        // Silently fail - todos will be empty
+      });
+  }, [conversationId]);
+
   // Auto-send pending message from landing page
   useEffect(() => {
     const state = location.state as LocationState | null;
@@ -280,6 +313,7 @@ export default function AgentsChatPage() {
         isLoadingMoreMessages={isFetchingNextPage}
         agentMode={agentMode}
         onAgentModeChange={setAgentMode}
+        todos={todos}
       />
     </div>
   );
