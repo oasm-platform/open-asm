@@ -16,7 +16,7 @@ import {
   ReasoningContent,
   ReasoningTrigger,
 } from '@/components/ai-elements/reasoning';
-import { TypingIndicator } from '@/components/ai-elements/typing-indicator';
+import { Shimmer } from '@/components/ai-elements/shimmer';
 import { Markdown } from '@/components/common/markdown';
 import type { ToolCallState } from '@/components/common/tool-call-display';
 import { ToolCallDisplay } from '@/components/common/tool-call-display';
@@ -60,6 +60,14 @@ interface ChatConversationProps {
   onAgentModeChange?: (mode: string) => void;
 }
 
+interface ToolPart {
+  toolCallId: string;
+  toolName?: string;
+  state?: string;
+  input?: unknown;
+  output?: unknown;
+}
+
 const getTextContent = (message: UIMessage): string => {
   const parts = message.parts;
   if (!parts || parts.length === 0) return '';
@@ -69,6 +77,10 @@ const getTextContent = (message: UIMessage): string => {
     .map((part) => part.text)
     .join('');
 };
+
+function isToolPart(part: any): part is ToolPart {
+  return part && typeof part === 'object' && 'toolCallId' in part;
+}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -95,80 +107,6 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-// Animated Message Component - safely contains hooks per message instance
-function AnimatedMessageContent({
-  text,
-  isStreaming,
-  children,
-}: {
-  text: string;
-  isStreaming: boolean;
-  children: (displayText: string) => React.ReactNode;
-}) {
-  const [displayedText, setDisplayedText] = useState('');
-  const targetLengthRef = useRef(0);
-  const animationFrameRef = useRef<number | null>(null);
-  const lastUpdateRef = useRef(0);
-
-  useEffect(() => {
-    if (!isStreaming) {
-      setDisplayedText(text);
-      targetLengthRef.current = text.length;
-      return;
-    }
-
-    targetLengthRef.current = text.length;
-
-    const animate = (timestamp: number) => {
-      // Throttle to ~60fps smooth animation
-      if (timestamp - lastUpdateRef.current < 16) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-        return;
-      }
-
-      lastUpdateRef.current = timestamp;
-
-      setDisplayedText((current) => {
-        if (current.length >= targetLengthRef.current) {
-          return text;
-        }
-
-        const remaining = targetLengthRef.current - current.length;
-        const charsPerFrame = Math.max(
-          1,
-          Math.min(remaining, Math.ceil(targetLengthRef.current / 50)),
-        );
-        const nextLength = Math.min(
-          current.length + charsPerFrame,
-          targetLengthRef.current,
-        );
-
-        return text.slice(0, nextLength);
-      });
-
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animationFrameRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [text, isStreaming]);
-
-  // Show full text immediately when stream finishes
-  useEffect(() => {
-    if (!isStreaming) {
-      setDisplayedText(text);
-    }
-  }, [isStreaming, text]);
-
-  return <>{children(displayedText)}</>;
-}
-
-// Memoized individual message component to prevent list re-renders on every parent render
 const ChatMessage = memo(function ChatMessage({
   message,
   idx,
@@ -181,16 +119,11 @@ const ChatMessage = memo(function ChatMessage({
   isStreaming: boolean;
 }) {
   const textContent = getTextContent(message);
-  const hasContent =
-    textContent.length > 0 ||
-    message.parts.some(
-      (p) => p.type === 'dynamic-tool' || p.type.startsWith('tool-'),
-    );
+  const hasContent = textContent.length > 0;
   const isLastAssistant =
     message.role === 'assistant' && idx === messagesLength - 1;
   const isStreamingActive = isLastAssistant && isStreaming;
 
-  // Consolidate all reasoning parts into one collapsible block
   const parts = message.parts;
   const reasoningParts = parts.filter(
     (part): part is Extract<typeof part, { type: 'reasoning' }> =>
@@ -202,7 +135,19 @@ const ChatMessage = memo(function ChatMessage({
   const isReasoningStreaming =
     isStreamingActive && lastPart?.type === 'reasoning';
 
-  // Render parts in order - interleaving text and tool calls as they occur
+  const pendingToolNames = parts
+    .filter((p) => p.type === 'dynamic-tool' || p.type.startsWith('tool-'))
+    .filter((p) => {
+      const part = p as { state?: string };
+      return part.state !== 'output-available';
+    })
+    .map((p) => {
+      if (p.type === 'dynamic-tool') {
+        return (p as { toolName: string }).toolName;
+      }
+      return p.type.replace('tool-', '');
+    });
+
   const renderedParts: React.ReactNode[] = [];
   let textBuffer = '';
   let textSegmentIndex = 0;
@@ -212,19 +157,12 @@ const ChatMessage = memo(function ChatMessage({
       const currentText = textBuffer;
       const segmentKey = `text-${textSegmentIndex++}`;
       renderedParts.push(
-        <AnimatedMessageContent
+        <Markdown
           key={segmentKey}
-          text={currentText}
-          isStreaming={isStreamingActive}
-        >
-          {(displayText) => (
-            <Markdown
-              content={displayText}
-              preview={false}
-              className="text-base"
-            />
-          )}
-        </AnimatedMessageContent>,
+          content={currentText}
+          preview={false}
+          className="text-base"
+        />,
       );
       textBuffer = '';
     }
@@ -233,45 +171,33 @@ const ChatMessage = memo(function ChatMessage({
   if (parts && parts.length > 0) {
     for (const part of parts) {
       if (part.type === 'reasoning') {
-        // Handled separately above as a consolidated block
         continue;
       } else if (part.type === 'text') {
         textBuffer += part.text;
-      } else if (part.type === 'dynamic-tool') {
+      } else if (part.type === 'dynamic-tool' && isToolPart(part)) {
         flushText();
-        const dynamicPart = part as {
-          toolCallId: string;
-          toolName: string;
-          state?: string;
-          input?: unknown;
-          output?: unknown;
-        };
+        if (part.state !== 'output-available') continue;
+
         const toolCall: ToolCallState = {
-          toolCallId: dynamicPart.toolCallId,
-          toolName: dynamicPart.toolName,
-          status:
-            dynamicPart.state === 'output-available' ? 'completed' : 'pending',
-          input: dynamicPart.input as Record<string, unknown>,
-          output: dynamicPart.output,
+          toolCallId: part.toolCallId,
+          toolName: part.toolName || 'dynamic-tool',
+          status: 'completed',
+          input: part.input as Record<string, unknown>,
+          output: part.output,
         };
         renderedParts.push(
           <ToolCallDisplay key={toolCall.toolCallId} toolCall={toolCall} />,
         );
-      } else if (part.type.startsWith('tool-')) {
+      } else if (part.type.startsWith('tool-') && isToolPart(part)) {
         flushText();
-        const toolPart = part as {
-          toolCallId: string;
-          state?: string;
-          input?: unknown;
-          output?: unknown;
-        };
+        if (part.state !== 'output-available') continue;
+
         const toolCall: ToolCallState = {
-          toolCallId: toolPart.toolCallId,
+          toolCallId: part.toolCallId,
           toolName: part.type.replace('tool-', ''),
-          status:
-            toolPart.state === 'output-available' ? 'completed' : 'pending',
-          input: toolPart.input as Record<string, unknown>,
-          output: toolPart.output,
+          status: 'completed',
+          input: part.input as Record<string, unknown>,
+          output: part.output,
         };
         renderedParts.push(
           <ToolCallDisplay key={toolCall.toolCallId} toolCall={toolCall} />,
@@ -281,11 +207,27 @@ const ChatMessage = memo(function ChatMessage({
     flushText();
   }
 
-  // Prepend consolidated reasoning block before other content
+  const getThinkingMessage = (s: boolean, d?: number) => {
+    if (s || d === 0) {
+      const suffix =
+        pendingToolNames.length > 0 ? `(${pendingToolNames.join(', ')})` : '';
+      return (
+        <span className="inline-flex items-center gap-1 min-w-0">
+          <Shimmer duration={1}>{`Thinking${suffix}`}</Shimmer>
+        </span>
+      );
+    }
+    if (d === undefined) return <p>Thought for a few seconds</p>;
+    return <p>Thought for {d} seconds</p>;
+  };
+
   if (hasReasoning) {
     renderedParts.unshift(
-      <Reasoning className="w-full" isStreaming={isReasoningStreaming}>
-        <ReasoningTrigger />
+      <Reasoning
+        className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
+        isStreaming={isReasoningStreaming}
+      >
+        <ReasoningTrigger getThinkingMessage={getThinkingMessage} />
         <ReasoningContent>{reasoningText}</ReasoningContent>
       </Reasoning>,
     );
@@ -298,9 +240,18 @@ const ChatMessage = memo(function ChatMessage({
           <div className="space-y-3">{renderedParts}</div>
         ) : null}
 
-        {message.role === 'assistant' && isStreamingActive && !hasContent && (
-          <div className="min-h-[26px]" />
-        )}
+        {message.role === 'assistant' &&
+          isStreamingActive &&
+          !hasContent &&
+          !hasReasoning && (
+            <Reasoning
+              className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
+              isStreaming
+            >
+              <ReasoningTrigger getThinkingMessage={getThinkingMessage} />
+              <ReasoningContent>{''}</ReasoningContent>
+            </Reasoning>
+          )}
       </MessageContent>
 
       {message.role === 'assistant' &&
@@ -335,11 +286,9 @@ export const ChatConversation = memo(function ChatConversation({
   const prevStreamingRef = useRef(false);
   const isLoadingMoreRef = useRef(false);
 
-  // Stable refs for values used inside the IntersectionObserver callback
   const onLoadMoreRef = useRef(onLoadMore);
   const hasMoreRef = useRef(hasMoreMessages);
 
-  // Keep refs in sync with latest prop values
   useEffect(() => {
     isLoadingMoreRef.current = isLoadingMoreMessages;
   }, [isLoadingMoreMessages]);
@@ -351,14 +300,8 @@ export const ChatConversation = memo(function ChatConversation({
   }, [hasMoreMessages]);
 
   const scrollContainerRef = useRef<HTMLElement | null>(null);
-
-  // Use a ref-callback instead of useRef + useEffect so the observer is created
-  // exactly when the sentinel element mounts into the DOM.
-  // With useEffect([], []), the effect ran at component-mount time when
-  // isLoadingHistory=true → the sentinel div was not in the DOM yet →
-  // sentinelRef.current was null → the observer was never created.
-  // const [isIntersecting, setIsIntersecting] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
+
   const sentinelRef = useCallback((el: HTMLDivElement | null) => {
     if (observerRef.current) {
       observerRef.current.disconnect();
@@ -366,22 +309,12 @@ export const ChatConversation = memo(function ChatConversation({
     }
 
     if (el) {
-      let currentScrollContainer = scrollContainerRef.current;
-
-      if (!currentScrollContainer) {
-        let parent = el.parentElement;
-        while (parent) {
-          const style = window.getComputedStyle(parent);
-          if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-            currentScrollContainer = parent;
-            break;
-          }
-          parent = parent.parentElement;
-        }
-        if (!currentScrollContainer) {
-          currentScrollContainer = el.parentElement;
-        }
-        scrollContainerRef.current = currentScrollContainer;
+      if (!scrollContainerRef.current) {
+        // Safe from layout thrashing: uses query selector matching instead of dynamic styles
+        const container =
+          el.closest('.overflow-y-auto, .overflow-y-scroll') ||
+          el.parentElement;
+        scrollContainerRef.current = container as HTMLElement;
       }
 
       const observer = new IntersectionObserver(
@@ -396,7 +329,7 @@ export const ChatConversation = memo(function ChatConversation({
           }
         },
         {
-          root: currentScrollContainer,
+          root: scrollContainerRef.current,
           rootMargin: '400px 0px 0px 0px',
         },
       );
@@ -431,7 +364,6 @@ export const ChatConversation = memo(function ChatConversation({
     prevMessageCountRef.current = messages.length;
   }, [messages]);
 
-  // Track last user message for retry context
   useEffect(() => {
     const userMessages = messages.filter((m) => m.role === 'user');
     if (userMessages.length > 0) {
@@ -440,7 +372,6 @@ export const ChatConversation = memo(function ChatConversation({
     }
   }, [messages]);
 
-  // Track streaming state transitions to prevent flicker
   useEffect(() => {
     prevStreamingRef.current = isStreaming;
   }, [isStreaming]);
@@ -451,11 +382,6 @@ export const ChatConversation = memo(function ChatConversation({
     }
   }, [onRetry]);
 
-  // Loading: show when fetching history for existing conversation with no messages yet
-  // Empty: show when no messages and not streaming (not during initial load or streaming)
-  // Whether there's a user message waiting for an assistant response.
-  // Uses pair-counting instead of last-role check to avoid false negatives
-  // when `messages` is `savedMessages` (history) during state transitions.
   const hasUnansweredMessage = useMemo(() => {
     if (!isStreaming || messages.length === 0) return false;
     let userCount = 0;
@@ -467,8 +393,18 @@ export const ChatConversation = memo(function ChatConversation({
     return userCount > assistantCount;
   }, [isStreaming, messages]);
 
-  // Loading: show when fetching history for existing conversation with no messages yet
-  // Empty: show when no messages and not streaming (not during initial load or streaming)
+  const getSimpleThinkingMessage = useCallback((s: boolean, d?: number) => {
+    if (s || d === 0) {
+      return (
+        <span className="inline-flex items-center gap-1 min-w-0">
+          <Shimmer duration={1}>Thinking</Shimmer>
+        </span>
+      );
+    }
+    if (d === undefined) return <p>Thought for a few seconds</p>;
+    return <p>Thought for {d} seconds</p>;
+  }, []);
+
   const isLoadingHistory = isLoadingMessages && messages.length === 0;
   const isEmpty = !isLoadingMessages && messages.length === 0 && !isStreaming;
 
@@ -478,7 +414,6 @@ export const ChatConversation = memo(function ChatConversation({
         <ConversationContent className="max-w-3xl mx-auto w-full p-1 gap-6">
           {isLoadingHistory ? (
             <div className="space-y-6">
-              {/* User message skeleton */}
               <div className="flex justify-end">
                 <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
                   <div className="space-y-2">
@@ -488,7 +423,6 @@ export const ChatConversation = memo(function ChatConversation({
                 </div>
               </div>
 
-              {/* Assistant message skeleton */}
               <div className="flex gap-3">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
                   <Bot className="size-4 text-muted-foreground" />
@@ -501,14 +435,12 @@ export const ChatConversation = memo(function ChatConversation({
                 </div>
               </div>
 
-              {/* Second user message skeleton */}
               <div className="flex justify-end">
                 <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
                   <div className="h-4 w-56 animate-pulse rounded bg-muted-foreground/20" />
                 </div>
               </div>
 
-              {/* Second assistant message skeleton */}
               <div className="flex gap-3">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
                   <Bot className="size-4 text-muted-foreground" />
@@ -528,10 +460,8 @@ export const ChatConversation = memo(function ChatConversation({
             />
           ) : (
             <>
-              {/* Sentinel div for infinite scroll - positioned at top of messages */}
               <div ref={sentinelRef} className="h-px" aria-hidden="true" />
 
-              {/* Loading indicator for older messages */}
               {isLoadingMoreMessages && (
                 <div className="flex justify-center py-2">
                   <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -548,11 +478,20 @@ export const ChatConversation = memo(function ChatConversation({
                 />
               ))}
 
-              {hasUnansweredMessage && <TypingIndicator />}
+              {hasUnansweredMessage && (
+                <Reasoning
+                  isStreaming
+                  className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
+                >
+                  <ReasoningTrigger
+                    getThinkingMessage={getSimpleThinkingMessage}
+                  />
+                  <ReasoningContent>{''}</ReasoningContent>
+                </Reasoning>
+              )}
             </>
           )}
 
-          {/* Stream error banner */}
           {streamError && (
             <div className="mx-auto max-w-3xl w-full px-4">
               <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm">
