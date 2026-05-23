@@ -559,7 +559,6 @@ export class AgentsCompletionsService {
   ): Promise<string[]> {
     // Fetch prompt for the current mode (e.g. ASK.md, AGENT.md)
     const modePrompt = this.getPrompt(`${agentMode.toUpperCase()}.md`);
-    console.log(modePrompt);
     // Fetch the shared system prompt
     const systemPrompt = this.getPrompt('SYSTEM.md');
 
