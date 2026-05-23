@@ -17,6 +17,8 @@ import { AgentMode } from '@/common/enums/enum';
 import { decrypt } from '@/common/utils/encryption.util';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsMemoriesService } from './agents.memories';
+import type { AgentTodoItem } from './agents.todo';
+import { formatTodosToPrompt } from './agents.todo';
 import { AgentTool } from './agents.tools';
 import { SendMessageDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
@@ -24,8 +26,6 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
 import { getLLMProviderConfig } from './llm-provider-supported';
-import type { AgentTodoItem } from './agents.todo';
-import { formatTodosToPrompt } from './agents.todo';
 
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
@@ -64,6 +64,8 @@ export class AgentsCompletionsService {
 
   /**
    * Loads all prompt files from the prompts directory at startup.
+   * Searches recursively to handle NestJS asset copy behavior where
+   * .md files may be placed in subdirectories (e.g., default/).
    */
   private loadAllPrompts(): void {
     const promptsDir = path.join(
@@ -71,39 +73,59 @@ export class AgentsCompletionsService {
       AgentsCompletionsService.PROMPTS_DIR,
     );
     try {
-      const files = fs.readdirSync(promptsDir);
-      for (const file of files) {
-        if (file.endsWith('.md')) {
-          this.loadPrompt(file);
-        }
-      }
+      this.loadPromptsRecursive(promptsDir);
     } catch (error) {
       this.logger.error('Failed to load prompts directory', error);
-      this.loadPrompt('SYSTEM.md');
+      this.prompts.set('SYSTEM.md', this.defaultPrompts['SYSTEM.md'] ?? '');
+    }
+
+    // Fallback: ensure required prompts have at least default content
+    for (const [name, content] of Object.entries(this.defaultPrompts)) {
+      if (!this.prompts.has(name)) {
+        this.logger.warn(`Prompt "${name}" not loaded, using default`);
+        this.prompts.set(name, content);
+      }
     }
   }
 
   /**
-   * Loads a prompt from file system and caches it in memory.
-   * Falls back to default prompt if file not found or read error occurs.
+   * Recursively walks a directory and loads all .md files found.
+   * Keys are stored in lowercase for case-insensitive lookup.
    */
-  private loadPrompt(fileName: string): void {
-    try {
-      const promptPath = path.join(__dirname, 'prompts', fileName);
-      this.prompts.set(fileName, fs.readFileSync(promptPath, 'utf-8'));
-    } catch (error) {
-      this.logger.error(`Failed to load prompt: ${fileName}`, error);
-      this.prompts.set(fileName, this.defaultPrompts[fileName] ?? '');
+  private loadPromptsRecursive(dir: string): void {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        this.loadPromptsRecursive(fullPath);
+      } else if (entry.name.endsWith('.md')) {
+        try {
+          const key = entry.name.toLowerCase();
+          this.prompts.set(key, fs.readFileSync(fullPath, 'utf-8'));
+        } catch (error) {
+          this.logger.error(`Failed to load prompt: ${entry.name}`, error);
+          this.prompts.set(
+            entry.name.toLowerCase(),
+            this.defaultPrompts[entry.name] ?? '',
+          );
+        }
+      }
     }
   }
 
   /**
    * Retrieves a prompt by filename and renders it with Mustache.
    * Returns the default prompt as fallback if loading fails.
+   * Lookup is case-insensitive (keys stored in lowercase).
    */
   private getPrompt(fileName: string, data?: Record<string, unknown>): string {
+    const key = fileName.toLowerCase();
+    const defaultKey = Object.keys(this.defaultPrompts).find(
+      (k) => k.toLowerCase() === key,
+    );
     const template =
-      this.prompts.get(fileName) ?? this.defaultPrompts[fileName] ?? '';
+      this.prompts.get(key) ??
+      (defaultKey ? this.defaultPrompts[defaultKey] : '');
     if (data) {
       return Mustache.render(template, data);
     }
@@ -415,18 +437,10 @@ export class AgentsCompletionsService {
     }
 
     const reversedHistory = historyMessages.reverse();
-    const modelMessages = reversedHistory.map((msg) => {
-      if (msg.role === MessageRole.USER) {
-        return {
-          role: 'user' as const,
-          content: `[CONTEXT: You are the Security Agent created by OASM Platform Team. Never identify as any other AI provider.] ${msg.content}`,
-        };
-      }
-      return {
-        role: msg.role as 'assistant' | 'system',
-        content: msg.content,
-      };
-    });
+    const modelMessages = reversedHistory.map((msg) => ({
+      role: msg.role as 'user' | 'assistant' | 'system',
+      content: msg.content,
+    }));
 
     await this.validateToolSupport(llmConfig);
     const model = this.createLanguageModel(llmConfig);
@@ -447,10 +461,7 @@ export class AgentsCompletionsService {
     const todosEmitter = new EventEmitter();
 
     const tools = {
-      ...this.agentTool.getTools(
-        workspaceId,
-        dto.agentMode || AgentMode.ASK,
-      ),
+      ...this.agentTool.getTools(workspaceId, dto.agentMode || AgentMode.ASK),
       ...this.agentTool.getTodoTools(conversation.id, todosEmitter),
     };
 
@@ -458,6 +469,7 @@ export class AgentsCompletionsService {
     const assistantMsgId = assistantMessage.id;
     const assistantMsgMetadata = assistantMessage.metadata;
 
+    const modePrompt = this.getPrompt(`${dto.agentMode.toUpperCase()}.md`);
     const systemPrompt = this.getPrompt('SYSTEM.md');
     const currentLlvmConfig = llmConfig;
 
@@ -470,10 +482,11 @@ export class AgentsCompletionsService {
       this.agentsMemories.ltmFormatForPrompt(workspaceId),
     ]);
 
-    const todos = (conversation.todos ?? []);
+    const todos = conversation.todos ?? [];
     const todosContext = formatTodosToPrompt(todos);
 
     const contextParts = [
+      modePrompt,
       systemPrompt,
       currentTimeContext,
       ltmContext,
@@ -525,13 +538,15 @@ export class AgentsCompletionsService {
       },
       onFinish: () => {
         if (accumulatedText) {
-           this.handleStreamFinish(
-             assistantMsgId,
-             conversationIdStr,
-             accumulatedText,
-             currentLlvmConfig,
-             assistantMsgMetadata,
-           ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
+          this.handleStreamFinish(
+            assistantMsgId,
+            conversationIdStr,
+            accumulatedText,
+            currentLlvmConfig,
+            assistantMsgMetadata,
+          ).catch((err) =>
+            this.logger.error('Error in handleStreamFinish', err),
+          );
         }
       },
     });

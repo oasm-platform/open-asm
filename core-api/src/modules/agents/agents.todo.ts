@@ -35,7 +35,7 @@ export function formatTodosToPrompt(todos: AgentTodoItem[]): string {
     '',
     '1. Before calling any action tool, verify whether it serves the currently "IN_PROGRESS" step.',
     '2. When starting a step, update the status of that step to "IN_PROGRESS".',
-    '3. Immediately upon completing a step, you MUST call the "update_todo_status" tool to transition it to "COMPLETED" before moving to the next step.',
+    '3. Immediately upon completing a step, you MUST call the "transition_step" tool to transition it to "COMPLETED" before moving to the next step.',
     '4. Do not arbitrarily skip steps unless the previous step has failed ("FAILED") and you have an alternative plan.',
     '',
   ].join('\n');
