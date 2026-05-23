@@ -84,7 +84,7 @@ export const AgentModeSelect = memo(function AgentModeSelect({
         onClick={handleToggle}
         className={
           isAgent
-            ? 'text-orange-500 bg-orange-500/10 border border-orange-500 hover:bg-orange-500/20 hover:text-orange-500'
+            ? 'text-orange-500 flex items-center gap-2 bg-orange-500/10 border border-orange-500 hover:bg-orange-500/20 hover:text-orange-500'
             : ''
         }
       >

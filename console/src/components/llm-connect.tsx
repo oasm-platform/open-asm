@@ -71,8 +71,6 @@ function rowKey(item: LLMConfigWithProviderDto): string {
   return item.configId ?? item.providerId;
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────
-
 function ModelSelectForm({
   provider,
   onModelChange,
