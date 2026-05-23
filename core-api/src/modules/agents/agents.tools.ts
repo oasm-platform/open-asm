@@ -39,21 +39,13 @@ import {
 import type { AgentTodoItem } from './agents.todo';
 import { AgentConversation } from './entities/agent-conversation.entity';
 
-// Web fetch tool schema
 const webFetchSchema = z.object({
-  url: z
-    .string()
-    .url()
-    .describe('The URL to fetch content from (e.g., "https://example.com")'),
+  url: z.string().url().describe('Target URL'),
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolType = any;
 
-/**
- * AgentTool service that provides multiple tools for the agent
- * Can inject other services for data retrieval
- */
 @Injectable()
 export class AgentTool {
   constructor(
@@ -75,134 +67,79 @@ export class AgentTool {
     private readonly conversationRepository: Repository<AgentConversation>,
   ) {}
 
-  /**
-   * Get assets tool - returns a factory that accepts workspaceId
-   */
   get getAssetsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ USE THIS TOOL FIRST when user asks about any discovered infrastructure.\n\nLists all assets found during security scanning in the workspace. Assets = actual discovered items: domains, subdomains, IP addresses, URLs, endpoints.\n\n✅ WHEN TO USE:\n- User asks "what assets have been found?"\n- User wants list of domains / IPs\n- Looking for specific asset value\n\n❌ WHEN NOT TO USE:\n- For scanning scope definition → use get_targets instead\n- For full technical details → use detail_asset instead\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- value: Filter results containing this text (e.g. "hackerone", "api", "192.168.1")',
+          'List discovered assets (domains, IPs, URLs) in the workspace. Params: page, limit, value (filter text).',
         parameters: getAssetsSchema,
         execute: async (params: z.infer<typeof getAssetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.assetsService.getManyAsssetServices(
-            {
-              limit: limit ?? 100,
-              page: page ?? 1,
-              sortBy: 'createdAt',
-              sortOrder: SortOrder.DESC,
-              value,
-            },
+            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, value },
             workspaceId,
           );
-          return {
-            ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              value: i.value,
-            })),
-          };
+          return { ...response, data: response.data.map((i) => ({ id: i.id, value: i.value })) };
         },
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * Get vulnerabilities tool - returns a factory that accepts workspaceId
-   */
   get getVulnerabilitiesTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ PRIMARY TOOL for security vulnerability listings.\n\nReturns all identified security vulnerabilities with severity level (CRITICAL / HIGH / MEDIUM / LOW / INFO). This is the overview list. For full technical details use detail_vuln tool.\n\n✅ WHEN TO USE:\n- User asks "what vulnerabilities are there?"\n- User wants list of CVEs / security issues\n- Filter vulnerabilities by name or CVE number\n- Count security issues by severity\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- q: Search filter (e.g. "XSS", "SQL Injection", "CVE-2024", "RCE")',
+          'List security vulnerabilities with severity. Params: page, limit, q (search e.g. "XSS", "CVE-2024").',
         parameters: getVulnerabilitiesSchema,
         execute: async (params: z.infer<typeof getVulnerabilitiesSchema>) => {
           const { page, limit, q } = params;
           const response = await this.vulnerabilitiesService.getVulnerabilities(
-            {
-              limit: limit ?? 100,
-              page: page ?? 1,
-              q,
-              sortBy: 'createdAt',
-              sortOrder: SortOrder.DESC,
-            },
+            { limit: limit ?? 100, page: page ?? 1, q, sortBy: 'createdAt', sortOrder: SortOrder.DESC },
             workspaceId,
           );
-          return {
-            ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              name: i.name,
-              severity: i.severity,
-            })),
-          };
+          return { ...response, data: response.data.map((i) => ({ id: i.id, name: i.name, severity: i.severity })) };
         },
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * Get targets tool - returns a factory that accepts workspaceId
-   */
   get getTargetsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Shows the actual SCANNING SCOPE of the workspace.\n\nTargets = what was ADDED to be scanned (root domains, IP ranges, CIDR blocks). This is the defined scope, not what was actually discovered.\n\n✅ WHEN TO USE:\n- User asks "what is in the scanning scope?"\n- User wants to know what targets are configured\n- Looking for root domains / IP ranges added by user\n\n❌ WHEN NOT TO USE:\n- For actual discovered items → use get_assets instead\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- value: Filter targets containing this text',
+          'Show scanning scope (root domains, IP ranges added by user). Params: page, limit, value (filter text).',
         parameters: getTargetsSchema,
         execute: async (params: z.infer<typeof getTargetsSchema>) => {
           const { page, limit, value } = params;
           const response = await this.targetsService.getTargetsInWorkspace(
-            {
-              limit: limit ?? 100,
-              page: page ?? 1,
-              sortBy: 'createdAt',
-              sortOrder: SortOrder.DESC,
-              value,
-            },
+            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, value },
             workspaceId,
           );
-          return {
-            ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              value: i.value,
-            })),
-          };
+          return { ...response, data: response.data.map((i) => ({ id: i.id, value: i.value })) };
         },
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * Get statistics tool - returns a factory that accepts workspaceId
-   */
   get getStatisticsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ USE THIS FOR ALL SUMMARY QUESTIONS. Returns security dashboard statistics instantly.\n\n✅ WHEN TO USE:\n- "How many assets are there?"\n- "How many critical vulnerabilities?"\n- "What is the security score?"\n- "Give me summary of this workspace"\n- Any "count" question\n\nRETURNS:\n- Total assets, targets, vulnerabilities\n- Vulnerabilities grouped by severity\n- Overall security score (0-100)\n- Detected technologies count\n- No parameters required',
+          'Return security dashboard summary: asset/vulnerability counts, severity breakdown, security score. No params.',
         parameters: getStatisticOutPutSchema,
-        execute: async () => {
-          return this.statisticService.getStatistics({ workspaceId });
-        },
+        execute: async () => this.statisticService.getStatistics({ workspaceId }),
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * Detail asset tool - returns a factory that accepts workspaceId
-   */
   get detailAssetTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description:
-          '✅ Get FULL TECHNICAL DETAILS about a single asset.\n\nUse this after you have an asset ID from get_assets. Returns everything known about this specific domain / IP.\n\n✅ WHEN TO USE:\n- "Tell me more about this domain"\n- "What technologies are running on this IP?"\n- "What ports are open?"\n- User asks for technical details about specific asset\n\nPARAMETERS:\n- assetId: REQUIRED. The ID of the asset you want details for',
+        description: 'Get full technical details of a single asset by assetId.',
         parameters: detailAssetSchema,
         execute: async (params: z.infer<typeof detailAssetSchema>) => {
           const { assetId } = params;
@@ -213,26 +150,16 @@ export class AgentTool {
     };
   }
 
-  /**
-   * List assets in target tool - returns a factory that accepts workspaceId
-   */
   get listAssetsInTargetTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ List ALL assets that were discovered FROM a specific target.\n\nThis shows what was actually found under a single root domain / IP range that was added to the scope.\n\n✅ WHEN TO USE:\n- "What subdomains were found for example.com?"\n- "Show everything discovered under this target"\n- Drill down from target to actual discovered assets\n\nPARAMETERS:\n- targetId: REQUIRED. ID of the target to get assets for\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- value: Filter assets inside this target',
+          'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter).',
         parameters: listAssetsInTargetSchema,
         execute: async (params: z.infer<typeof listAssetsInTargetSchema>) => {
           const { targetId, limit, page, value } = params;
           return this.assetsService.getManyAsssetServices(
-            {
-              limit: limit ?? 100,
-              page: page ?? 1,
-              targetIds: [targetId],
-              value,
-              sortBy: 'createdAt',
-              sortOrder: SortOrder.DESC,
-            },
+            { limit: limit ?? 100, page: page ?? 1, targetIds: [targetId], value, sortBy: 'createdAt', sortOrder: SortOrder.DESC },
             workspaceId,
           );
         },
@@ -241,46 +168,30 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Detail vulnerability tool - returns a factory that accepts workspaceId
-   */
   get detailVulnTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description:
-          '✅ Get FULL TECHNICAL DETAILS about a single vulnerability.\n\nUse this after you have vulnerability ID from get_vulnerabilities. This is the complete vulnerability report.\n\n✅ WHEN TO USE:\n- "Tell me about this vulnerability"\n- "How do I fix this issue?"\n- "What is the PoC for this CVE?"\n- User wants remediation steps / solution\n\nRETURNS:\n- Full description\n- CVSS score & severity\n- Proof of Concept\n- Step by step remediation\n- References & external links\n\nPARAMETERS:\n- vulnId: REQUIRED. ID of the vulnerability',
+        description: 'Get full vulnerability report with CVSS, PoC, remediation steps. Params: vulnId.',
         parameters: detailVulnSchema,
         execute: async (params: z.infer<typeof detailVulnSchema>) => {
           const vulnId: string = (params.vulnId ?? params.id) as string;
-          return this.vulnerabilitiesService.getVulnerability(
-            vulnId,
-            workspaceId,
-          );
+          return this.vulnerabilitiesService.getVulnerability(vulnId, workspaceId);
         },
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * Get ports tool - returns a factory that accepts workspaceId
-   */
   get getPortsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Lists all open ports discovered during scanning.\n\nReturns all unique open network ports with count of assets running on each port.\n\n✅ WHEN TO USE:\n- User asks "what ports are open?"\n- Find most common open ports\n- Search for specific port number\n- Analyze network exposure\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- value: Filter ports by number (e.g. "80", "443", "22")',
+          'List open network ports with asset counts. Params: page, limit, value (port number filter).',
         parameters: getPortsSchema,
         execute: async (params: z.infer<typeof getPortsSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getPortAssets(
-            {
-              limit: limit ?? 100,
-              page: page ?? 1,
-              sortBy: 'createdAt',
-              sortOrder: SortOrder.DESC,
-              value,
-            },
+            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, value },
             workspaceId,
           );
         },
@@ -289,25 +200,16 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Get technologies tool - returns a factory that accepts workspaceId
-   */
   get getTechnologiesTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Lists all detected technologies running on assets.\n\nReturns all unique software, frameworks, servers and technologies identified with full enrichment data.\n\n✅ WHEN TO USE:\n- User asks "what technologies are running?"\n- Find specific software versions\n- Count technology usage\n- Technology stack analysis\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- value: Filter technologies by name (e.g. "Nginx", "WordPress", "React")',
+          'List detected technologies (software, frameworks, servers). Params: page, limit, value (filter by name).',
         parameters: getTechnologiesSchema,
         execute: async (params: z.infer<typeof getTechnologiesSchema>) => {
           const { page, limit, value } = params;
           return this.assetsService.getTechnologyAssets(
-            {
-              limit: limit ?? 100,
-              page: page ?? 1,
-              sortBy: 'createdAt',
-              sortOrder: SortOrder.DESC,
-              value,
-            },
+            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, value },
             workspaceId,
           );
         },
@@ -316,25 +218,16 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Get TLS certificates tool - returns a factory that accepts workspaceId
-   */
   get getTlsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ Lists all discovered SSL/TLS certificates.\n\nReturns all TLS certificates with full details: issuer, subject, expiration dates, TLS version, cipher suite.\n\n✅ WHEN TO USE:\n- User asks "what SSL certificates are there?"\n- Check certificate expiration dates\n- Find weak TLS configurations\n- Analyze certificate chain issues\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- search: Filter certificates by host name',
+          'List TLS/SSL certificates with issuer, subject, expiry. Params: page, limit, search (host name filter).',
         parameters: getTlsSchema,
         execute: async (params: z.infer<typeof getTlsSchema>) => {
           const { page, limit, search } = params;
           return this.assetsService.getManyTls(
-            {
-              limit: limit ?? 100,
-              page: page ?? 1,
-              sortBy: 'not_after',
-              sortOrder: SortOrder.ASC,
-              search,
-            },
+            { limit: limit ?? 100, page: page ?? 1, sortBy: 'not_after', sortOrder: SortOrder.ASC, search },
             workspaceId,
           );
         },
@@ -343,37 +236,21 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Web fetch tool - makes HTTP GET requests to fetch content from URLs
-   */
   get webFetchTool(): (workspaceId: string) => any {
     return (_workspaceId: string) => {
       const toolConfig: any = {
-        description:
-          '✅ Make HTTP GET request to any public URL.\n\nUse this tool when you need to read content from external websites, documentation, APIs, or any online resource.\n\n✅ WHEN TO USE:\n- Read content from a web page\n- Call public API endpoints\n- Fetch documentation / reference material\n- Verify URL is accessible\n\nPARAMETERS:\n- url: REQUIRED. Full valid URL starting with http:// or https://',
+        description: 'HTTP GET to any public URL. Returns statusCode + body. Params: url.',
         parameters: webFetchSchema,
         execute: async (params: z.infer<typeof webFetchSchema>) => {
           const { url } = params;
-
           try {
             const response = await fetch(url, {
               method: 'GET',
-              headers: {
-                'User-Agent': 'OASM-Security-Agent/1.0',
-              },
+              headers: { 'User-Agent': 'OASM-Security-Agent/1.0' },
             });
-
-            const body = await response.text();
-
-            return {
-              statusCode: response.status,
-              body,
-            };
+            return { statusCode: response.status, body: await response.text() };
           } catch (error) {
-            return {
-              error: error instanceof Error ? error.message : 'Unknown error',
-              url,
-            };
+            return { error: error instanceof Error ? error.message : 'Unknown error', url };
           }
         },
       };
@@ -381,36 +258,21 @@ export class AgentTool {
     };
   }
 
-  /**
-   * List issues tool - returns a factory that accepts workspaceId
-   */
   get listIssuesTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ List all security issues in the workspace.\n\nReturns all issues (tickets/findings) with their status.\n\n✅ WHEN TO USE:\n- User asks "what issues are there?"\n- Search for specific issues\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100, max = 500)\n- search: Filter by title or content\n- status: Filter by status (e.g. OPEN, IN_PROGRESS, RESOLVED)',
+          'List security issues with status. Params: page, limit, search, status (OPEN/IN_PROGRESS/RESOLVED).',
         parameters: listIssuesSchema,
         execute: async (params: z.infer<typeof listIssuesSchema>) => {
           const { page, limit, search, status } = params;
           const response = await this.issuesService.getMany(
-            {
-              limit: limit ?? 100,
-              page: page ?? 1,
-              sortBy: 'createdAt',
-              sortOrder: SortOrder.DESC,
-              search,
-              status: status as any,
-            },
+            { limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, search, status: status as any },
             workspaceId,
           );
           return {
             ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              title: i.title,
-              status: i.status,
-              tags: i.tags,
-            })),
+            data: response.data.map((i) => ({ id: i.id, title: i.title, status: i.status, tags: i.tags })),
           };
         },
       };
@@ -418,14 +280,10 @@ export class AgentTool {
     };
   }
 
-  /**
-   * Detail issue tool - returns a factory that accepts workspaceId
-   */
   get detailIssueTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description:
-          '✅ Get FULL DETAILS about a single issue.\n\nUse this after you have an issue ID from list_issues. Returns everything known about this specific issue.\n\nPARAMETERS:\n- issueId: REQUIRED. The ID of the issue',
+        description: 'Get full details of a single issue by issueId.',
         parameters: detailIssueSchema,
         execute: async (params: z.infer<typeof detailIssueSchema>) => {
           const { issueId } = params;
@@ -436,165 +294,81 @@ export class AgentTool {
     };
   }
 
-  /**
-   * List tools tool - returns a factory that accepts workspaceId
-   */
   get listToolsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description:
-          '✅ List all installed security tools/scanners.\n\nReturns tools configured in the workspace.\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- q: Search query to filter tools',
+        description: 'List installed security tools/scanners. Params: page, limit, q (search filter).',
         parameters: listToolsSchema,
         execute: async (params: z.infer<typeof listToolsSchema>) => {
           const { page, limit, q } = params;
           const response = await this.toolsService.getManyTools({
-            limit: limit ?? 100,
-            page: page ?? 1,
-            sortBy: 'createdAt',
-            sortOrder: SortOrder.DESC,
-            search: q,
+            limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, search: q,
           });
-          return {
-            ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              name: i.name,
-            })),
-          };
+          return { ...response, data: response.data.map((i) => ({ id: i.id, name: i.name })) };
         },
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * List workers tool - returns a factory that accepts workspaceId
-   */
   get listWorkersTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description:
-          '✅ List all worker nodes.\n\nReturns worker nodes that are connected or configured.\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- q: Search query to filter workers',
+        description: 'List connected worker nodes. Params: page, limit, q (search query).',
         parameters: listWorkersSchema,
         execute: async (params: z.infer<typeof listWorkersSchema>) => {
           const { page, limit, q } = params;
           const response = await this.workersService.getWorkers({
-            limit: limit ?? 100,
-            page: page ?? 1,
-            sortBy: 'createdAt',
-            sortOrder: SortOrder.DESC,
-            search: q,
-            workspaceId,
-            enabledAgentMode: true,
+            limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC, search: q,
+            workspaceId, enabledAgentMode: true,
           });
-          return {
-            ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              name: i.name,
-            })),
-          };
+          return { ...response, data: response.data.map((i) => ({ id: i.id, name: i.name })) };
         },
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * List jobs tool - returns a factory that accepts workspaceId
-   */
   get listJobsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
         description:
-          '✅ List background jobs.\n\nReturns background scan jobs and their status.\n\nPARAMETERS:\n- page: Page number (default = 1)\n- limit: Results per page (default = 100)\n- jobHistoryId: Filter by specific job run ID\n- jobStatus: Filter by status (completed, failed, active)',
+          'List background scan jobs with status. Params: page, limit, jobHistoryId, jobStatus (completed/failed/active).',
         parameters: listJobsSchema,
         execute: async (params: z.infer<typeof listJobsSchema>) => {
           const { page, limit, jobHistoryId, jobStatus } = params;
           const response = await this.jobsRegistryService.getManyJobs({
-            limit: limit ?? 100,
-            page: page ?? 1,
-            sortBy: 'createdAt',
-            sortOrder: SortOrder.DESC,
-            jobHistoryId: jobHistoryId,
-            jobStatus: jobStatus,
+            limit: limit ?? 100, page: page ?? 1, sortBy: 'createdAt', sortOrder: SortOrder.DESC,
+            jobHistoryId, jobStatus,
           });
-          return {
-            ...response,
-            data: response.data.map((i) => ({
-              id: i.id,
-              status: i.status,
-            })),
-          };
+          return { ...response, data: response.data.map((i) => ({ id: i.id, status: i.status })) };
         },
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * Remote execute tool - returns a factory that accepts workspaceId
-   */
   get remoteExecuteTool(): (workspaceId: string) => any {
     return (_workspaceId: string) => {
       const toolConfig: any = {
         description: [
-          'EXECUTE REMOTE COMMANDS on scanning infrastructure.',
-          '',
-          'Publishes arbitrary system commands (e.g., nmap, curl, dig, nslookup, ping, traceroute, whois, openssl s_client, python scripts) to be executed by remote worker nodes.',
-          '',
-          '✅ WHEN TO USE:',
-          '- Run an ad-hoc nmap scan (e.g., "nmap -sV -p 80,443 10.0.0.1")',
-          '- Fetch HTTP responses with curl (e.g., "curl -sI https://example.com")',
-          '- DNS lookups via dig/nslookup (e.g., "dig A example.com")',
-          '- Network diagnostics (e.g., "ping -c 3 8.8.8.8", "traceroute example.com")',
-          '- WHOIS lookups (e.g., "whois example.com")',
-          '- SSL/TLS inspection (e.g., "openssl s_client -connect example.com:443")',
-          '- Run any CLI tool available on the worker infrastructure',
-          '',
-          '❌ WHEN NOT TO USE:',
-          '- For scanning scope/target definitions → use get_targets or list_assets_in_target',
-          '- For reading existing data → use get_assets, get_vulnerabilities, etc.',
-          '- For fetching web page content → use web_fetch instead',
-          '- For interactive or long-running commands (no PTY, no stdin, strict timeout)',
-          '',
-          '⚠️ CONSTRAINTS:',
-          '- Commands are executed with OS-level permissions — avoid destructive operations',
-          '- The command is sent via gRPC to an available online worker',
-          '- If no worker is available, the command will fail',
-          '- Waits for command completion (stdout, stderr, exit code) before returning',
-          '',
-          'PARAMETERS:',
-          '- command: REQUIRED. The full shell command string to execute (e.g., "nmap -p 22 10.0.0.0/24")',
-          '',
-          'OUTPUT:',
-          '- stdout: Standard output from the command',
-          '- stderr: Standard error output from the command',
-          '- exitCode: Process exit code (0 = success, non-zero = failure)',
-          '- error: Error message if the command failed',
-          '- timedOut: Whether the command timed out before completion',
+          'Execute arbitrary shell commands on remote worker nodes (nmap, curl, dig, etc.).',
+          'Params: command (required shell command string).',
+          'Output: stdout, stderr, exitCode, error, timedOut.',
+          'Warning: OS-level permissions, no PTY, strict timeout.',
         ].join('\n'),
         parameters: z.object({
-          command: z
-            .string()
-            .min(1)
-            .describe(
-              'The full shell command to execute (e.g., "nmap -sV 10.0.0.1", "curl -s https://example.com", "dig A google.com")',
-            ),
+          command: z.string().min(1).describe('Shell command to execute'),
         }),
         execute: async (params: { command: string }) => {
           const { command } = params;
-          const sessionId = randomUUID();
-          return this.remoteExecuteService.waitForResult(command, sessionId);
+          return this.remoteExecuteService.waitForResult(command, randomUUID());
         },
       };
       return tool(toolConfig);
     };
   }
 
-  /**
-   * Returns todo management tools bound to a specific conversation
-   */
   getTodoTools(
     conversationId: string,
     emitter?: EventEmitter,
@@ -602,272 +376,103 @@ export class AgentTool {
     const repo = this.conversationRepository;
 
     const setPlanTool: any = {
-      description: [
-        'Thiết lập toàn bộ kế hoạch thực thi cho cuộc hội thoại hiện tại.',
-        '',
-        '✅ WHEN TO USE:',
-        '- Khi bạn nhận được yêu cầu từ người dùng và cần lập kế hoạch các bước thực hiện.',
-        '- Khi cần reset toàn bộ kế hoạch cũ và tạo kế hoạch mới từ đầu.',
-        '',
-        'PARAMETERS:',
-        '- steps: Mảng các chuỗi mô tả từng bước công việc cần thực hiện (tối thiểu 1 bước).',
-        '',
-        'OUTPUT:',
-        '- success: boolean',
-        '- message: Thông báo kết quả',
-        '- todos: Danh sách các todo items đã được tạo',
-      ].join('\n'),
+      description: 'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos.',
       parameters: z.object({
-        steps: z
-          .array(z.string().min(1))
-          .min(1)
-          .describe('Mảng các bước công việc cần thực hiện'),
+        steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
       }),
       execute: async (params: { steps: string[] }) => {
         const now = new Date().toISOString();
         const todos: AgentTodoItem[] = params.steps.map((step) => ({
-          id: randomUUID(),
-          content: step,
-          status: 'pending' as const,
-          updatedAt: now,
+          id: randomUUID(), content: step, status: 'pending' as const, updatedAt: now,
         }));
-
         await repo.update(conversationId, { todos });
-
-        if (emitter) {
-          emitter.emit('todos-updated', todos);
-        }
-
-        return {
-          success: true,
-          message: `Đã thiết lập kế hoạch gồm ${todos.length} bước.`,
-          todos,
-        };
+        if (emitter) emitter.emit('todos-updated', todos);
+        return { success: true, message: `Plan set with ${todos.length} steps.`, todos };
       },
     };
 
     const updateTodoStatusTool: any = {
-      description: [
-        'Cập nhật trạng thái của một bước trong kế hoạch thực thi.',
-        '',
-        '✅ WHEN TO USE:',
-        '- Khi bạn BẮT ĐẦU thực hiện một bước → chuyển sang "in_progress".',
-        '- Khi bạn HOÀN THÀNH một bước → chuyển sang "completed".',
-        '- Khi một bước thất bại → chuyển sang "failed".',
-        '',
-        '⚠️ BẮT BUỘC:',
-        '- Phải cập nhật trạng thái trước khi chuyển sang bước tiếp theo.',
-        '- Không bỏ qua bước nào.',
-        '',
-        'PARAMETERS:',
-        '- id: ID của todo item cần cập nhật (UUID).',
-        '- status: Trạng thái mới: "pending" | "in_progress" | "completed" | "failed".',
-      ].join('\n'),
+      description: 'Update step status (pending/in_progress/completed/failed). Must call before moving to next step. Params: id (UUID), status.',
       parameters: z.object({
-        id: z.string().uuid().describe('ID của todo item cần cập nhật'),
-        status: z
-          .enum(['pending', 'in_progress', 'completed', 'failed'])
-          .describe('Trạng thái mới'),
+        id: z.string().uuid().describe('Todo item ID'),
+        status: z.enum(['pending', 'in_progress', 'completed', 'failed']).describe('New status'),
       }),
       execute: async (params: { id: string; status: AgentTodoItem['status'] }) => {
-        const conversation = await repo.findOne({
-          where: { id: conversationId },
-        });
+        const conversation = await repo.findOne({ where: { id: conversationId } });
+        if (!conversation) return { success: false, message: 'Conversation not found' };
 
-        if (!conversation) {
-          return { success: false, message: 'Conversation not found' };
-        }
+        const targetTodo = (conversation.todos ?? []).find((t) => t.id === params.id);
+        if (!targetTodo) return { success: false, message: `Todo "${params.id}" not found.` };
 
         const todos = (conversation.todos ?? []).map((t) =>
-          t.id === params.id
-            ? { ...t, status: params.status, updatedAt: new Date().toISOString() }
-            : t,
+          t.id === params.id ? { ...t, status: params.status, updatedAt: new Date().toISOString() } : t,
         );
-
-        const targetTodo = (conversation.todos ?? []).find(
-          (t) => t.id === params.id,
-        );
-        if (!targetTodo) {
-          return {
-            success: false,
-            message: `Todo với id "${params.id}" không tồn tại.`,
-          };
-        }
-
         await repo.update(conversationId, { todos });
-
-        if (emitter) {
-          emitter.emit('todos-updated', todos);
-        }
-
-        return {
-          success: true,
-          message: `Đã cập nhật bước "${targetTodo.content}" sang trạng thái "${params.status}".`,
-          todo: todos.find((t) => t.id === params.id),
-        };
+        if (emitter) emitter.emit('todos-updated', todos);
+        return { success: true, message: `Updated "${targetTodo.content}" -> ${params.status}`, todo: todos.find((t) => t.id === params.id) };
       },
     };
 
     const addTodoTool: any = {
-      description: [
-        'Thêm một đầu việc mới vào cuối kế hoạch hiện tại.',
-        '',
-        '✅ WHEN TO USE:',
-        '- Khi phát sinh công việc mới cần bổ sung vào kế hoạch.',
-        '- Khi cần thêm bước phụ trợ sau các bước chính.',
-        '',
-        'PARAMETERS:',
-        '- content: Nội dung của đầu việc mới (tối thiểu 1 ký tự).',
-      ].join('\n'),
+      description: 'Append a new step to the plan. Params: content (string).',
       parameters: z.object({
-        content: z.string().min(1).describe('Nội dung đầu việc mới'),
+        content: z.string().min(1).describe('Todo content'),
       }),
       execute: async (params: { content: string }) => {
-        const conversation = await repo.findOne({
-          where: { id: conversationId },
-        });
-
-        if (!conversation) {
-          return { success: false, message: 'Conversation not found' };
-        }
+        const conversation = await repo.findOne({ where: { id: conversationId } });
+        if (!conversation) return { success: false, message: 'Conversation not found' };
 
         const now = new Date().toISOString();
-        const newTodo: AgentTodoItem = {
-          id: randomUUID(),
-          content: params.content,
-          status: 'pending',
-          updatedAt: now,
-        };
-
+        const newTodo: AgentTodoItem = { id: randomUUID(), content: params.content, status: 'pending', updatedAt: now };
         const todos = [...(conversation.todos ?? []), newTodo];
 
         await repo.update(conversationId, { todos });
-
-        if (emitter) {
-          emitter.emit('todos-updated', todos);
-        }
-
-        return {
-          success: true,
-          message: `Đã thêm đầu việc "${params.content}" vào kế hoạch.`,
-          todo: newTodo,
-        };
+        if (emitter) emitter.emit('todos-updated', todos);
+        return { success: true, message: `Added todo "${params.content}".`, todo: newTodo };
       },
     };
 
     const clearPlanTool: any = {
-      description: [
-        'Xóa toàn bộ kế hoạch hiện tại để bắt đầu lại từ đầu.',
-        '',
-        '✅ WHEN TO USE:',
-        '- Khi cần reset hoàn toàn kế hoạch.',
-        '- Khi kế hoạch cũ không còn phù hợp và cần lập kế hoạch mới.',
-        '',
-        '⚠️ Lưu ý: Hành động này không thể hoàn tác. Sau khi xóa, hãy gọi set_plan để tạo kế hoạch mới.',
-      ].join('\n'),
+      description: 'Clear entire plan (irreversible). Then call formulate_plan to create a new one.',
       parameters: z.object({}),
       execute: async () => {
         await repo.update(conversationId, { todos: [] });
-
-        if (emitter) {
-          emitter.emit('todos-updated', []);
-        }
-
-        return {
-          success: true,
-          message: 'Đã xóa toàn bộ kế hoạch.',
-        };
+        if (emitter) emitter.emit('todos-updated', []);
+        return { success: true, message: 'Plan cleared.' };
       },
     };
 
     return {
-      set_plan: tool(setPlanTool),
-      update_todo_status: tool(updateTodoStatusTool),
-      add_todo: tool(addTodoTool),
-      clear_plan: tool(clearPlanTool),
+      formulate_plan: tool(setPlanTool),
+      transition_step: tool(updateTodoStatusTool),
+      append_step: tool(addTodoTool),
+      scrap_plan: tool(clearPlanTool),
     };
   }
 
-  /**
-   * Returns all available tools as a record, bound to the given workspaceId
-   */
   getTools(
     workspaceId: string,
     agentMode: AgentMode,
   ): Record<string, ToolType> {
     const { AGENT, ASK } = AgentMode;
-    const tools: Record<
-      string,
-      { method: ToolType; permissions: AgentMode[] }
-    > = {
-      enumerate_assets: {
-        method: this.getAssetsTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      discover_vulnerabilities: {
-        method: this.getVulnerabilitiesTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      retrieve_targets: {
-        method: this.getTargetsTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      gather_statistics: {
-        method: this.getStatisticsTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      inspect_asset: {
-        method: this.detailAssetTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      examine_target_assets: {
-        method: this.listAssetsInTargetTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      investigate_vulnerability: {
-        method: this.detailVulnTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      list_network_ports: {
-        method: this.getPortsTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      fingerprint_technologies: {
-        method: this.getTechnologiesTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      verify_tls_settings: {
-        method: this.getTlsTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      retrieve_web_page: {
-        method: this.webFetchTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      enumerate_open_issues: {
-        method: this.listIssuesTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      inspect_issue: {
-        method: this.detailIssueTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      display_available_tools: {
-        method: this.listToolsTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      list_active_workers: {
-        method: this.listWorkersTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      review_jobs: {
-        method: this.listJobsTool(workspaceId),
-        permissions: [AGENT, ASK],
-      },
-      execute_remote_command: {
-        method: this.remoteExecuteTool(workspaceId),
-        permissions: [AGENT],
-      },
+    const tools: Record<string, { method: ToolType; permissions: AgentMode[] }> = {
+      enumerate_assets: { method: this.getAssetsTool(workspaceId), permissions: [AGENT, ASK] },
+      discover_vulnerabilities: { method: this.getVulnerabilitiesTool(workspaceId), permissions: [AGENT, ASK] },
+      retrieve_targets: { method: this.getTargetsTool(workspaceId), permissions: [AGENT, ASK] },
+      gather_statistics: { method: this.getStatisticsTool(workspaceId), permissions: [AGENT, ASK] },
+      inspect_asset: { method: this.detailAssetTool(workspaceId), permissions: [AGENT, ASK] },
+      examine_target_assets: { method: this.listAssetsInTargetTool(workspaceId), permissions: [AGENT, ASK] },
+      investigate_vulnerability: { method: this.detailVulnTool(workspaceId), permissions: [AGENT, ASK] },
+      list_network_ports: { method: this.getPortsTool(workspaceId), permissions: [AGENT, ASK] },
+      fingerprint_technologies: { method: this.getTechnologiesTool(workspaceId), permissions: [AGENT, ASK] },
+      verify_tls_settings: { method: this.getTlsTool(workspaceId), permissions: [AGENT, ASK] },
+      retrieve_web_page: { method: this.webFetchTool(workspaceId), permissions: [AGENT, ASK] },
+      enumerate_open_issues: { method: this.listIssuesTool(workspaceId), permissions: [AGENT, ASK] },
+      inspect_issue: { method: this.detailIssueTool(workspaceId), permissions: [AGENT, ASK] },
+      display_available_tools: { method: this.listToolsTool(workspaceId), permissions: [AGENT, ASK] },
+      list_active_workers: { method: this.listWorkersTool(workspaceId), permissions: [AGENT, ASK] },
+      review_jobs: { method: this.listJobsTool(workspaceId), permissions: [AGENT, ASK] },
+      execute_remote_command: { method: this.remoteExecuteTool(workspaceId), permissions: [AGENT] },
     };
 
     return Object.fromEntries(
