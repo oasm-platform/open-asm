@@ -260,9 +260,9 @@ export class AgentsCompletionsService {
   private async handleStreamFinish(
     assistantMsgId: string,
     conversationId: string,
-    assistantMsgMetadata: any,
     accumulatedText: string,
     llmConfig: AgentLLMConfig,
+    assistantMsgMetadata?: Record<string, unknown>,
   ): Promise<void> {
     try {
       await this.messageRepository.update(
@@ -525,13 +525,13 @@ export class AgentsCompletionsService {
       },
       onFinish: () => {
         if (accumulatedText) {
-          this.handleStreamFinish(
-            assistantMsgId,
-            conversationIdStr,
-            assistantMsgMetadata,
-            accumulatedText,
-            currentLlvmConfig,
-          ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
+           this.handleStreamFinish(
+             assistantMsgId,
+             conversationIdStr,
+             accumulatedText,
+             currentLlvmConfig,
+             assistantMsgMetadata,
+           ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
         }
       },
     });

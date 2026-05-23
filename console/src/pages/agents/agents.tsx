@@ -262,7 +262,7 @@ export default function AgentsChatPage() {
     })
       .then((data) => {
         if (data.todos) {
-          setTodos(data.todos as AgentTodoItem[]);
+           setTodos(data.todos as unknown as AgentTodoItem[]);
         }
       })
       .catch(() => {
