@@ -1,7 +1,7 @@
 // import { BaseEntity } from '@/common/entities/base.entity';
 import { AgentMode } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import {
   Column,
   Entity,
@@ -9,6 +9,7 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import type { AgentTodoItem } from '../agents.todo';
 import { AgentMessage } from './agent-message.entity';
 
 @Entity('agent_conversations')
@@ -53,4 +54,15 @@ export class AgentConversation {
   @IsEnum(AgentMode)
   @Column({ default: AgentMode.ASK })
   agentMode: AgentMode;
+
+  @ApiProperty({
+    description: 'Agent execution plan (todo list)',
+    required: false,
+    type: 'array',
+    isArray: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @Column({ type: 'jsonb', default: [] })
+  todos: AgentTodoItem[];
 }

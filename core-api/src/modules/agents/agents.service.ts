@@ -364,6 +364,28 @@ export class AgentsService {
     return models;
   }
 
+  async getConversation(
+    id: string,
+    workspaceId: string,
+  ): Promise<ConversationResponseDto> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id, workspaceId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    return {
+      id: conversation.id,
+      llmConfigId: conversation.llmConfigId,
+      title: conversation.title,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      todos: conversation.todos ?? [],
+    };
+  }
+
   async getConversations(
     workspaceId: string,
     query?: GetManyBaseQueryParams,

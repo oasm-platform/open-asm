@@ -9,6 +9,7 @@ import type { LanguageModel, UIMessageChunk } from 'ai';
 import { generateText, stepCountIs, streamText } from 'ai';
 import * as fs from 'fs';
 import * as Mustache from 'mustache';
+import { EventEmitter } from 'node:events';
 import * as path from 'path';
 import { Repository } from 'typeorm';
 
@@ -23,6 +24,8 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
 import { getLLMProviderConfig } from './llm-provider-supported';
+import type { AgentTodoItem } from './agents.todo';
+import { formatTodosToPrompt } from './agents.todo';
 
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
@@ -441,13 +444,17 @@ export class AgentsCompletionsService {
     });
     await this.messageRepository.save(assistantMessage);
 
-    const tools = this.agentTool.getTools(
-      workspaceId,
-      dto.agentMode || AgentMode.ASK,
-    );
+    const todosEmitter = new EventEmitter();
+
+    const tools = {
+      ...this.agentTool.getTools(
+        workspaceId,
+        dto.agentMode || AgentMode.ASK,
+      ),
+      ...this.agentTool.getTodoTools(conversation.id, todosEmitter),
+    };
 
     const conversationIdStr = conversation.id;
-    const messageRepo = this.messageRepository;
     const assistantMsgId = assistantMessage.id;
     const assistantMsgMetadata = assistantMessage.metadata;
 
@@ -463,11 +470,15 @@ export class AgentsCompletionsService {
       this.agentsMemories.ltmFormatForPrompt(workspaceId),
     ]);
 
+    const todos = (conversation.todos ?? []);
+    const todosContext = formatTodosToPrompt(todos);
+
     const contextParts = [
       systemPrompt,
       currentTimeContext,
       ltmContext,
       stmContext,
+      todosContext,
     ].filter(Boolean);
 
     const result = streamText({
@@ -525,21 +536,45 @@ export class AgentsCompletionsService {
       },
     });
 
-    const wrappedStream = result.toUIMessageStream().pipeThrough(
-      new TransformStream<UIMessageChunk, UIMessageChunk>({
-        start(controller) {
+    const aiStream = result.toUIMessageStream();
+
+    const mergedStream = new ReadableStream<UIMessageChunk>({
+      async start(controller) {
+        controller.enqueue({
+          type: 'data-conversation-created',
+          data: {
+            conversationId: conversationIdStr,
+          },
+        } as UIMessageChunk);
+
+        const reader = aiStream.getReader();
+
+        const onTodosUpdated = (updatedTodos: AgentTodoItem[]) => {
           controller.enqueue({
-            type: 'data-conversation-created',
-            data: {
-              conversationId: conversationIdStr,
-            },
-          } as UIMessageChunk);
-        },
-      }),
-    );
+            type: 'data-todos-updated',
+            data: { todos: updatedTodos },
+          } as unknown as UIMessageChunk);
+        };
+
+        todosEmitter.on('todos-updated', onTodosUpdated);
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+        } finally {
+          todosEmitter.off('todos-updated', onTodosUpdated);
+          reader.releaseLock();
+        }
+
+        controller.close();
+      },
+    });
 
     return {
-      stream: wrappedStream,
+      stream: mergedStream,
       conversationId: conversation.id,
     };
   }
