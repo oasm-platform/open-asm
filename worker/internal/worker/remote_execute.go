@@ -186,7 +186,7 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 
 	cmd.Dir = sandbox.rootPath
 	cmd.SysProcAttr = newSysProcAttr()
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PATH=%s%c%s", toolPath, os.PathListSeparator, os.Getenv("PATH")))
+	cmd.Env = setupCmdEnv(toolPath)
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {

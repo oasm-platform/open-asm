@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -50,27 +49,23 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		url := strings.TrimSpace(after)
 		jobLogGlobal.Debug("[%s] Capturing screenshot: %s", job.Id, url)
 
-		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
-		if err != nil {
-			payload = oasm.NewErrorResult(fmt.Sprintf("Screenshot failed: %v", err))
-		} else {
-			resultData := struct {
-				Screenshot string `json:"screenshot"`
-				URL        string `json:"url"`
-			}{
-				Screenshot: base64Image,
-				URL:        formatURL(url),
-			}
+		base64Image, _ := TakeScreenshotBase64(ctx, browser, url)
+		resultData := struct {
+			Screenshot string `json:"screenshot"`
+			URL        string `json:"url"`
+		}{
+			Screenshot: base64Image,
+			URL:        formatURL(url),
+		}
 
-			if jsonBytes, err := json.Marshal(resultData); err != nil {
-				jobLogGlobal.ErrorE(fmt.Sprintf("[%s] JSON marshal failed", job.Id), err)
-				payload = oasm.NewErrorResult(fmt.Sprintf("JSON error: %v", err))
-			} else {
-				jsonStr := string(jsonBytes)
-				payload = &jobs_registry.DataPayloadResult{
-					Error: false,
-					Raw:   &jsonStr,
-				}
+		if jsonBytes, err := json.Marshal(resultData); err != nil {
+			jobLogGlobal.ErrorE(fmt.Sprintf("[%s] JSON marshal failed", job.Id), err)
+			payload = oasm.NewErrorResult(fmt.Sprintf("JSON error: %v", err))
+		} else {
+			jsonStr := string(jsonBytes)
+			payload = &jobs_registry.DataPayloadResult{
+				Error: false,
+				Raw:   &jsonStr,
 			}
 		}
 	} else {
@@ -81,7 +76,7 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 			cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
 		}
 		cmd.SysProcAttr = newSysProcAttr()
-		cmd.Env = append(os.Environ(), fmt.Sprintf("PATH=%s%c%s", toolPath, os.PathListSeparator, os.Getenv("PATH")))
+		cmd.Env = setupCmdEnv(toolPath)
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {
