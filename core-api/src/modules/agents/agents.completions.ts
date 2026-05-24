@@ -73,7 +73,7 @@ export class AgentsCompletionsService {
   // Cache for custom/Ollama model tool support: key = `${baseURL}:${model}`, value = boolean
   private readonly customToolSupportCache = new Map<string, boolean>();
   // Default context window (128k) - used for compaction threshold calculation
-  private static readonly DEFAULT_CONTEXT_WINDOW = 20000;
+  private static readonly DEFAULT_CONTEXT_WINDOW = 128000;
   private static readonly COMPACTION_THRESHOLD_RATIO = 0.7;
 
   constructor(
