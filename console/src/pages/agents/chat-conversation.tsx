@@ -130,7 +130,6 @@ const ChatMessage = memo(function ChatMessage({
 
   const parts = message.parts || [];
 
-  // ── Reasoning ──────────────────────────────────────────────────────────────
   const reasoningParts = parts.filter(
     (part): part is Extract<typeof part, { type: 'reasoning' }> =>
       part.type === 'reasoning',
@@ -141,8 +140,6 @@ const ChatMessage = memo(function ChatMessage({
   const isReasoningStreaming =
     isStreamingActive && lastPart?.type === 'reasoning';
 
-  // ── Tool calls ─────────────────────────────────────────────────────────────
-  // Collect all completed tool parts
   const completedToolParts = parts.filter(
     (p): p is typeof p & ToolPart =>
       (p.type === 'dynamic-tool' || p.type.startsWith('tool-')) &&
@@ -153,7 +150,6 @@ const ChatMessage = memo(function ChatMessage({
     | ((typeof parts)[0] & ToolPart)
     | undefined;
 
-  // Detect if any non-empty text part appears AFTER the last tool call in parts order
   let hasTextAfterLastTool = false;
   if (lastRawTool) {
     let seenLastTool = false;
@@ -174,7 +170,6 @@ const ChatMessage = memo(function ChatMessage({
     }
   }
 
-  // Tool call is visible only when it's the latest thing (no text after it yet)
   const showToolCall = !!lastRawTool && !hasTextAfterLastTool;
 
   const toolCallState: ToolCallState | null = lastRawTool
@@ -190,7 +185,6 @@ const ChatMessage = memo(function ChatMessage({
       }
     : null;
 
-  // Show initial thinking spinner when nothing has arrived yet
   const showInitialThinking =
     isStreamingActive && !hasContent && !hasReasoning && !showToolCall;
 
@@ -210,7 +204,6 @@ const ChatMessage = memo(function ChatMessage({
     <Message from={message.role}>
       <MessageContent expandable={message.role === 'user'}>
         <div className="flex flex-col w-full gap-3">
-          {/* ① REASONING — always rendered first, above everything */}
           {(hasReasoning || showInitialThinking) && (
             <Reasoning
               className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
@@ -221,7 +214,6 @@ const ChatMessage = memo(function ChatMessage({
             </Reasoning>
           )}
 
-          {/* ② TOOL CALL — below reasoning, exits with animation when text arrives */}
           <AnimatePresence mode="popLayout">
             {showToolCall && toolCallState && (
               <ToolCallDisplay
@@ -231,7 +223,6 @@ const ChatMessage = memo(function ChatMessage({
             )}
           </AnimatePresence>
 
-          {/* ③ TEXT CONTENT — gradient fade while streaming */}
           {hasContent && (
             <div className="relative space-y-3 w-full">
               <Markdown
@@ -239,7 +230,6 @@ const ChatMessage = memo(function ChatMessage({
                 preview={false}
                 className="text-base"
               />
-              {/* Gradient overlay fades out when streaming ends */}
               <AnimatePresence>
                 {isStreamingActive && (
                   <motion.div
