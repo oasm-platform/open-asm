@@ -70,6 +70,16 @@ interface ToolPart {
   state?: string;
   input?: unknown;
   output?: unknown;
+  isError?: boolean;
+}
+
+function getToolStatus(state?: string): ToolCallState['status'] {
+  if (!state) return 'pending';
+  if (state === 'output-available' || state === 'result') return 'completed';
+  if (state === 'output-error') return 'error';
+  if (state === 'call' || state === 'input-available' || state === 'input-streaming')
+    return 'executing';
+  return 'pending';
 }
 
 const getTextContent = (message: UIMessage): string => {
@@ -140,13 +150,12 @@ const ChatMessage = memo(function ChatMessage({
   const isReasoningStreaming =
     isStreamingActive && lastPart?.type === 'reasoning';
 
-  const completedToolParts = parts.filter(
+  const allToolParts = parts.filter(
     (p): p is typeof p & ToolPart =>
       (p.type === 'dynamic-tool' || p.type.startsWith('tool-')) &&
-      isToolPart(p) &&
-      (p as ToolPart).state === 'output-available',
+      isToolPart(p),
   );
-  const lastRawTool = completedToolParts.at(-1) as
+  const lastRawTool = allToolParts.at(-1) as
     | ((typeof parts)[0] & ToolPart)
     | undefined;
 
@@ -179,7 +188,7 @@ const ChatMessage = memo(function ChatMessage({
           lastRawTool.type === 'dynamic-tool'
             ? lastRawTool.toolName || 'dynamic-tool'
             : lastRawTool.type.replace('tool-', ''),
-        status: 'completed',
+        status: getToolStatus(lastRawTool.state),
         input: lastRawTool.input as Record<string, unknown>,
         output: lastRawTool.output,
       }

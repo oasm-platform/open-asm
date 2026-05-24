@@ -18,7 +18,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentModeDto, GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
@@ -39,11 +39,12 @@ import {
   MCPServerPingResponseDto,
   MCPServerResponseDto,
 } from './dto/mcp-config.dto';
-import { MessageResponseDto } from './dto/message.dto';
+import { MessageResponseDto, ToolCallResponseDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
+import { AgentMessageToolCall } from './entities/tool-call.entity';
 import {
   getLLMProviderConfig,
   llmProviderSupported,
@@ -62,6 +63,8 @@ export class AgentsService {
     private readonly messageRepository: Repository<AgentMessage>,
     @InjectRepository(AgentMCPConfig)
     private readonly mcpConfigRepository: Repository<AgentMCPConfig>,
+    @InjectRepository(AgentMessageToolCall)
+    private readonly toolCallRepository: Repository<AgentMessageToolCall>,
     private readonly redisService: RedisService,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly httpService: HttpService,
@@ -503,6 +506,29 @@ export class AgentsService {
 
     const [messages, total] = await qb.getManyAndCount();
 
+    // Batch load tool calls for all returned messages (1 query, avoids N+1)
+    const messageIds = messages.map((m) => m.id);
+    const toolCalls: AgentMessageToolCall[] =
+      messageIds.length > 0
+        ? await this.toolCallRepository.find({
+            where: { messageId: In(messageIds) },
+            order: { createdAt: 'ASC' },
+          })
+        : [];
+
+    const toolCallsByMessageId = new Map<string, ToolCallResponseDto[]>();
+    for (const tc of toolCalls) {
+      const list = toolCallsByMessageId.get(tc.messageId) ?? [];
+      list.push({
+        toolCallId: tc.toolCallId,
+        toolName: tc.toolName,
+        args: tc.args,
+        result: tc.result,
+        isError: tc.isError,
+      });
+      toolCallsByMessageId.set(tc.messageId, list);
+    }
+
     return getManyResponse({
       query: { ...query, page, limit } as GetManyBaseQueryParams,
       data: messages.map((m) => ({
@@ -512,6 +538,7 @@ export class AgentsService {
         content: m.content,
         messageType: m.messageType,
         metadata: m.metadata,
+        toolCalls: toolCallsByMessageId.get(m.id) ?? [],
         createdAt: m.createdAt,
       })),
       total,

@@ -1,6 +1,14 @@
 import { AgentMode } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { MessageRole, MessageType } from '../enums/agent.enums';
 
 export class SendMessageDto {
@@ -40,6 +48,23 @@ export class SendMessageDto {
   agentMode: AgentMode;
 }
 
+export class ToolCallResponseDto {
+  @ApiProperty()
+  toolCallId: string;
+
+  @ApiProperty()
+  toolName: string;
+
+  @ApiProperty()
+  args: Record<string, unknown>;
+
+  @ApiProperty({ required: false })
+  result?: Record<string, unknown> | null;
+
+  @ApiProperty({ required: false, default: false })
+  isError?: boolean;
+}
+
 export class MessageResponseDto {
   @ApiProperty()
   id: string;
@@ -58,6 +83,13 @@ export class MessageResponseDto {
 
   @ApiProperty({ required: false })
   metadata?: Record<string, unknown>;
+
+  @ApiProperty({ required: false, type: [ToolCallResponseDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ToolCallResponseDto)
+  toolCalls?: ToolCallResponseDto[];
 
   @ApiProperty()
   createdAt: Date;

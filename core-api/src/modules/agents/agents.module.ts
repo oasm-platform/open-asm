@@ -16,6 +16,7 @@ import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
+import { AgentMessageToolCall } from './entities/tool-call.entity';
 import { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
 import { HttpModule } from '@nestjs/axios';
 
@@ -26,6 +27,7 @@ import { HttpModule } from '@nestjs/axios';
       AgentLLMConfig,
       AgentConversation,
       AgentMessage,
+      AgentMessageToolCall,
       AgentWorkspaceMemory,
       AgentMCPConfig,
     ]),

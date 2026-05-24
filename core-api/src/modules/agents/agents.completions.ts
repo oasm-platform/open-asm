@@ -24,6 +24,7 @@ import { SendMessageDto } from './dto/message.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
+import { AgentMessageToolCall } from './entities/tool-call.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
 import { getLLMProviderConfig } from './llm-provider-supported';
 import { TokenCounter } from './shared/token-counter';
@@ -78,6 +79,8 @@ export class AgentsCompletionsService {
     private readonly conversationRepository: Repository<AgentConversation>,
     @InjectRepository(AgentMessage)
     private readonly messageRepository: Repository<AgentMessage>,
+    @InjectRepository(AgentMessageToolCall)
+    private readonly toolCallRepository: Repository<AgentMessageToolCall>,
     private readonly agentTool: AgentTool,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly agentsMcpService: AgentsMcpService,
@@ -894,8 +897,38 @@ export class AgentsCompletionsService {
         this.handleToolError(error, llmConfig);
       },
       // When streaming completes, persist accumulated text to DB
+      // persist tool call data (for history rendering on page reload),
       // auto-complete stuck todos, and trigger compaction check
-      onFinish: () => {
+      onFinish: async (event) => {
+        // Capture tool calls from all steps and persist to tool_calls table
+        try {
+          const toolCallEntities: AgentMessageToolCall[] = [];
+          for (const step of event.steps) {
+            for (const toolCall of step.toolCalls) {
+              const toolResult = step.toolResults.find(
+                (r) => r.toolCallId === toolCall.toolCallId,
+              );
+              toolCallEntities.push(
+                this.toolCallRepository.create({
+                  messageId: assistantMessageId,
+                  conversationId,
+                  toolCallId: toolCall.toolCallId,
+                  toolName: toolCall.toolName,
+                  args: toolCall.input as Record<string, unknown>,
+                  result:
+                    (toolResult?.output as Record<string, unknown>) ?? null,
+                  isError: !toolResult,
+                }),
+              );
+            }
+          }
+          if (toolCallEntities.length > 0) {
+            await this.toolCallRepository.save(toolCallEntities);
+          }
+        } catch (err) {
+          this.logger.error('Error saving tool calls', err);
+        }
+
         if (accumulatedText) {
           this.handleStreamFinish(
             assistantMessageId,
