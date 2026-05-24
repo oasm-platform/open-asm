@@ -542,12 +542,6 @@ export const ChatConversation = memo(function ChatConversation({
                 </div>
               )}
 
-              {todos && todos.length > 0 && (
-                <div className="max-w-3xl w-full mx-auto">
-                  <AgentTodoPanel todos={todos} />
-                </div>
-              )}
-
               {messages.map((message, idx) => (
                 <ChatMessage
                   key={message.id}
@@ -600,8 +594,12 @@ export const ChatConversation = memo(function ChatConversation({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pt-3 pb-4">
-        <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
+      <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pb-4">
+        <div className="max-w-3xl mx-auto w-full flex flex-col">
+          {todos && todos.length > 0 && (
+            <AgentTodoPanel todos={todos} className="rounded-b-none border-b-0 mx-2" />
+          )}
+
           <AgentPromptInput
             onSubmit={(content, options) =>
               onSendMessage(content, { agentMode: options?.agentMode })

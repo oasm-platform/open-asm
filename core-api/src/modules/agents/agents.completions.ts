@@ -26,6 +26,7 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
 import { getLLMProviderConfig } from './llm-provider-supported';
+import { TokenCounter } from './shared/token-counter';
 
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
@@ -71,6 +72,9 @@ export class AgentsCompletionsService {
   private static readonly TOOL_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
   // Cache for custom/Ollama model tool support: key = `${baseURL}:${model}`, value = boolean
   private readonly customToolSupportCache = new Map<string, boolean>();
+  // Default context window (128k) - used for compaction threshold calculation
+  private static readonly DEFAULT_CONTEXT_WINDOW = 20000;
+  private static readonly COMPACTION_THRESHOLD_RATIO = 0.7;
 
   constructor(
     @InjectRepository(AgentLLMConfig)
@@ -340,6 +344,48 @@ export class AgentsCompletionsService {
     }
   }
 
+  /**
+   * Auto-completes any todos that the LLM left in "in_progress" state
+   * after producing a response. This is a safety net when the LLM forgets
+   * to call transition_step(id, "completed") after finishing work.
+   */
+  private async autoCompleteStuckTodos(conversationId: string): Promise<void> {
+    try {
+      const conversation = await this.conversationRepository.findOne({
+        where: { id: conversationId },
+      });
+      if (!conversation) return;
+
+      const todos = conversation.todos ?? [];
+      let changed = false;
+
+      const updatedTodos = todos.map((t) => {
+        if (t.status === 'in_progress') {
+          changed = true;
+          return {
+            ...t,
+            status: 'completed' as const,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return t;
+      });
+
+      if (changed) {
+        await this.conversationRepository.update(
+          { id: conversationId },
+          { todos: updatedTodos },
+        );
+        this.logger.log(
+          `[AutoTodo] Auto-completed stuck in_progress todos for ${conversationId}`,
+        );
+        // Note: frontend will see updated todos on next poll/fetch
+      }
+    } catch (error) {
+      this.logger.error('Failed to auto-complete stuck todos', error);
+    }
+  }
+
   async vulAnalyze(
     vulnerabilityJson: string,
     workspaceId: string,
@@ -415,6 +461,7 @@ export class AgentsCompletionsService {
         llmConfigId: llmConfig.id,
         title: dto.question.slice(0, 500),
         createdBy: userId,
+        agentMode: dto.agentMode,
       });
       return this.conversationRepository.save(newConversation);
     }
@@ -430,6 +477,7 @@ export class AgentsCompletionsService {
       llmConfigId: llmConfig.id,
       title: dto.question.slice(0, 500),
       createdBy: userId,
+      agentMode: dto.agentMode,
     });
     return this.conversationRepository.save(newConversation);
   }
@@ -461,7 +509,7 @@ export class AgentsCompletionsService {
     const messages = await this.messageRepository.find({
       where: { conversationId },
       order: { createdAt: 'DESC' }, // Fetch newest first
-      take: 5,
+      take: 20,
     });
     return messages.reverse(); // Reverse to chronological order
   }
@@ -576,10 +624,16 @@ export class AgentsCompletionsService {
     const todos = conversation.todos ?? [];
     const todosContext = formatTodosToPrompt(todos);
 
+    // Inject conversation summary if available (from auto-compaction)
+    const summaryContext = conversation.summary
+      ? `[PREVIOUS CONVERSATION SUMMARY]:\n${conversation.summary}`
+      : '';
+
     // Combine all context parts, filtering out empty ones
     return [
       modePrompt,
       systemPrompt,
+      summaryContext,
       currentTimeContext,
       ltmContext,
       stmContext,
@@ -680,6 +734,149 @@ export class AgentsCompletionsService {
   }
 
   /**
+   * Retrieves the effective context window for a given LLM config.
+   * Priority: contextWindow column (user override) > OpenRouter cache > default (8192).
+   */
+  private getModelContextWindow(_llmConfig: AgentLLMConfig): number {
+    return AgentsCompletionsService.DEFAULT_CONTEXT_WINDOW;
+  }
+
+  /**
+   * Determines whether the conversation should be compacted based on
+   * estimated token usage vs the model's context window threshold (70%).
+   */
+  private shouldCompact(
+    llmConfig: AgentLLMConfig,
+    contextParts: string[],
+    modelMessages: Array<{ role: string; content: string }>,
+  ): boolean {
+    try {
+      // Estimate total tokens from system context
+      const systemTokens = TokenCounter.estimate(contextParts.join('\n\n'));
+
+      // Estimate tokens from conversation history
+      const historyTokens = TokenCounter.estimateParts(
+        modelMessages.map((m) => `${m.role}: ${m.content}`),
+        '\n',
+      );
+
+      const totalTokens = systemTokens + historyTokens;
+
+      // Get model context window
+      const modelContext = this.getModelContextWindow(llmConfig);
+      const softLimit = Math.floor(
+        modelContext * AgentsCompletionsService.COMPACTION_THRESHOLD_RATIO,
+      );
+
+      this.logger.debug(
+        `[Compaction] tokens=${totalTokens}, modelContext=${modelContext}, ` +
+          `softLimit=${softLimit}, shouldCompact=${totalTokens > softLimit}`,
+      );
+
+      return totalTokens > softLimit;
+    } catch (error) {
+      this.logger.warn('Error in shouldCompact, skipping compaction', error);
+      return false;
+    }
+  }
+
+  /**
+   * Generates a summary of the conversation history and saves it to the
+   * conversation's `summary` field. Runs asynchronously after stream completion.
+   */
+  private async compactConversation(
+    conversationId: string,
+    llmConfig: AgentLLMConfig,
+  ): Promise<void> {
+    try {
+      // Fetch recent messages for summarization
+      const messages = await this.messageRepository.find({
+        where: { conversationId },
+        order: { createdAt: 'DESC' } as const,
+        take: 20,
+      });
+
+      if (messages.length < 2) {
+        return; // Not enough messages to summarize
+      }
+
+      // Format messages into a conversation string
+      const conversationContent = messages
+        .reverse()
+        .map((msg) => `${msg.role}: ${msg.content}`)
+        .join('\n\n');
+
+      // Get the summarization prompt
+      const prompt = this.getPrompt('SUMMARY_GENERATE.md', {
+        CONVERSATION_CONTENT: conversationContent,
+      });
+
+      // Create a model instance for summarization
+      const model = this.createLanguageModel(llmConfig);
+
+      // Generate the summary
+      const result = await generateText({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      let summaryText = '';
+      if (typeof result.content === 'string') {
+        summaryText = result.content;
+      } else if (Array.isArray(result.content)) {
+        const textPart = result.content.find(
+          (part: { type: string }) => part.type === 'text',
+        );
+        summaryText =
+          textPart && 'text' in textPart
+            ? (textPart as { text: string }).text
+            : '';
+      }
+
+      const cleanedSummary = summaryText.trim();
+
+      if (cleanedSummary) {
+        await this.conversationRepository.update(
+          { id: conversationId },
+          { summary: cleanedSummary },
+        );
+        this.logger.log(
+          `[Compaction] Summary saved for conversation ${conversationId}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to compact conversation ${conversationId}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Post-stream handler that checks if compaction is needed and triggers it.
+   * Runs asynchronously to avoid blocking the stream response.
+   */
+  private async handlePostStreamCompaction(
+    conversationId: string,
+    llmConfig: AgentLLMConfig,
+    contextParts: string[],
+    modelMessages: Array<{ role: string; content: string }>,
+  ): Promise<void> {
+    const needsCompaction = this.shouldCompact(
+      llmConfig,
+      contextParts,
+      modelMessages,
+    );
+
+    if (needsCompaction) {
+      this.logger.log(
+        `[Compaction] Triggering compaction for conversation ${conversationId}`,
+      );
+      await this.compactConversation(conversationId, llmConfig);
+    }
+  }
+
+  /**
    * Builds the streamText options and executes the call, wrapping the result
    * into a merged stream. This is the core of the AI response streaming process.
    */
@@ -725,6 +922,7 @@ export class AgentsCompletionsService {
         this.handleToolError(error, llmConfig);
       },
       // When streaming completes, persist accumulated text to DB
+      // auto-complete stuck todos, and trigger compaction check
       onFinish: () => {
         if (accumulatedText) {
           this.handleStreamFinish(
@@ -737,6 +935,22 @@ export class AgentsCompletionsService {
             this.logger.error('Error in handleStreamFinish', err),
           );
         }
+
+        // Auto-complete any todos the LLM left "in_progress" (safety net)
+        this.autoCompleteStuckTodos(conversationId).catch((err) =>
+          this.logger.error('Error in autoCompleteStuckTodos', err),
+        );
+
+        // Asynchronously check and trigger compaction if needed
+        // Fire-and-forget: does not block the stream response
+        this.handlePostStreamCompaction(
+          conversationId,
+          llmConfig,
+          contextParts,
+          modelMessages,
+        ).catch((err) =>
+          this.logger.error('Error in post-stream compaction', err),
+        );
       },
     });
 
