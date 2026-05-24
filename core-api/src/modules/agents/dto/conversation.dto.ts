@@ -44,6 +44,14 @@ export class ConversationResponseDto {
   @IsOptional()
   @IsArray()
   todos?: AgentTodoItem[];
+
+  @ApiProperty({
+    description: 'Summarized context of previous conversation turns',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  summary?: string;
 }
 
 export class GetConversationsResponseDto {

@@ -62,7 +62,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .vscode/*
 .vscode/settings.json
 core-api/.storage/*
-
 # Nix
 /result
 /.cache/
@@ -79,4 +78,5 @@ core-api/public/tools/*
 .qwen/
 .agents/plans/*
 worker/.configs.json
+worker/agent-sessions/*
 console/sw.js

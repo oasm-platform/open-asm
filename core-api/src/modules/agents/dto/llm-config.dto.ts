@@ -58,6 +58,14 @@ export class CreateLLMConfigDto {
   @IsOptional()
   @IsString()
   apiUrl?: string;
+
+  @ApiProperty({
+    example: 8192,
+    description: 'Custom context window size in tokens. Overrides API-provided value.',
+    required: false,
+  })
+  @IsOptional()
+  contextWindow?: number;
 }
 
 export class UpdateLLMConfigDto extends PartialType(CreateLLMConfigDto) {
@@ -84,6 +92,9 @@ export class LLMConfigResponseDto {
 
   @ApiProperty({ required: false })
   apiUrl?: string;
+
+  @ApiProperty({ required: false })
+  contextWindow?: number;
 
   @ApiProperty()
   isPreferred: boolean;

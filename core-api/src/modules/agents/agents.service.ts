@@ -126,6 +126,7 @@ export class AgentsService {
       name: config.name,
       model: config.model,
       apiUrl: config.apiUrl,
+      contextWindow: config.contextWindow,
       isPreferred: config.isPreferred,
       apiKeyMasked,
       createdAt: config.createdAt,
@@ -383,6 +384,7 @@ export class AgentsService {
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       todos: conversation.todos ?? [],
+      summary: conversation.summary,
     };
   }
 

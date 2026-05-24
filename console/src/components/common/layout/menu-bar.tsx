@@ -48,12 +48,7 @@ interface NavGroup {
   roles?: string[];
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const location = useLocation();
-  const { state, isMobile, setOpenMobile } = useSidebar();
-  const { data } = useSession();
-
-  const menu: NavGroup[] = [
+export const menu: NavGroup[] = [
     {
       title: 'Overview',
       url: '#',
@@ -149,6 +144,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       ],
     },
   ];
+
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const location = useLocation();
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { data } = useSession();
+
   return (
     <Sidebar {...props} collapsible="icon">
       <SidebarHeader>
