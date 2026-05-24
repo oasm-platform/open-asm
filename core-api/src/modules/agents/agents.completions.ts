@@ -61,11 +61,6 @@ interface StreamTextOptions {
 export class AgentsCompletionsService {
   private readonly logger = new Logger(AgentsCompletionsService.name);
   private readonly prompts = new Map<string, string>();
-  private readonly defaultPrompts: Record<string, string> = {
-    'SYSTEM.md': 'You are a helpful assistant.',
-    'TITLE_GENERATE.md': 'Generate a short title for this conversation.',
-    'VUL_ANALYZE.md': 'You are a security expert analyzing vulnerabilities.',
-  };
   private static readonly PROMPTS_DIR = 'prompts';
   private readonly toolCapableModelsCache = new Map<string, Set<string>>();
   private toolCapableCacheExpiry = 0;
@@ -104,15 +99,6 @@ export class AgentsCompletionsService {
       this.loadPromptsRecursive(promptsDir);
     } catch (error) {
       this.logger.error('Failed to load prompts directory', error);
-      this.prompts.set('SYSTEM.md', this.defaultPrompts['SYSTEM.md'] ?? '');
-    }
-
-    // Fallback: ensure required prompts have at least default content
-    for (const [name, content] of Object.entries(this.defaultPrompts)) {
-      if (!this.prompts.has(name)) {
-        this.logger.warn(`Prompt "${name}" not loaded, using default`);
-        this.prompts.set(name, content);
-      }
     }
   }
 
@@ -132,28 +118,14 @@ export class AgentsCompletionsService {
           this.prompts.set(key, fs.readFileSync(fullPath, 'utf-8'));
         } catch (error) {
           this.logger.error(`Failed to load prompt: ${entry.name}`, error);
-          this.prompts.set(
-            entry.name.toLowerCase(),
-            this.defaultPrompts[entry.name] ?? '',
-          );
         }
       }
     }
   }
 
-  /**
-   * Retrieves a prompt by filename and renders it with Mustache.
-   * Returns the default prompt as fallback if loading fails.
-   * Lookup is case-insensitive (keys stored in lowercase).
-   */
   private getPrompt(fileName: string, data?: Record<string, unknown>): string {
     const key = fileName.toLowerCase();
-    const defaultKey = Object.keys(this.defaultPrompts).find(
-      (k) => k.toLowerCase() === key,
-    );
-    const template =
-      this.prompts.get(key) ??
-      (defaultKey ? this.defaultPrompts[defaultKey] : '');
+    const template = this.prompts.get(key) ?? '';
     if (data) {
       return Mustache.render(template, data);
     }
