@@ -171,7 +171,7 @@ const ChatMessage = memo(function ChatMessage({
   );
 
   const showInitialThinking =
-    isStreamingActive && !hasContent && !hasReasoning && !showToolCall;
+    isStreamingActive && !hasContent && !hasReasoning && toolCallStates.length === 0;
 
   const getThinkingMessage = (s: boolean, d?: number) => {
     if (s || d === 0) {
