@@ -5,6 +5,7 @@ import {
   TerminalCopyButton,
   TerminalHeader,
   TerminalStatus,
+  TerminalTitle,
 } from '@/components/ai-elements/terminal';
 import { TerminalIcon } from 'lucide-react';
 import type { ToolCallState } from './tool-call-display';
@@ -53,6 +54,7 @@ export function RemoteExecuteTerminal({
       className="w-full max-w-2xl text-xs"
     >
       <TerminalHeader>
+        <TerminalTitle>Terminal</TerminalTitle>
         <TerminalIcon className="size-4 text-zinc-400" />
         <div className="flex items-center gap-1 ml-auto">
           <TerminalStatus />

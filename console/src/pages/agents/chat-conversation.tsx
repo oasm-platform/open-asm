@@ -33,6 +33,7 @@ import {
   ShieldAlert,
   X,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   memo,
   useCallback,
@@ -81,8 +82,8 @@ const getTextContent = (message: UIMessage): string => {
     .join('');
 };
 
-function isToolPart(part: any): part is ToolPart {
-  return part && typeof part === 'object' && 'toolCallId' in part;
+function isToolPart(part: unknown): part is ToolPart {
+  return !!part && typeof part === 'object' && 'toolCallId' in part;
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -127,96 +128,77 @@ const ChatMessage = memo(function ChatMessage({
     message.role === 'assistant' && idx === messagesLength - 1;
   const isStreamingActive = isLastAssistant && isStreaming;
 
-  const parts = message.parts;
+  const parts = message.parts || [];
+
+  // ── Reasoning ──────────────────────────────────────────────────────────────
   const reasoningParts = parts.filter(
     (part): part is Extract<typeof part, { type: 'reasoning' }> =>
       part.type === 'reasoning',
   );
-  const reasoningText = reasoningParts.map((part) => part.text).join('\n\n');
+  const reasoningText = reasoningParts.map((p) => p.text).join('\n\n');
   const hasReasoning = reasoningParts.length > 0;
   const lastPart = parts.at(-1);
   const isReasoningStreaming =
     isStreamingActive && lastPart?.type === 'reasoning';
 
-  const pendingToolNames = parts
-    .filter((p) => p.type === 'dynamic-tool' || p.type.startsWith('tool-'))
-    .filter((p) => {
-      const part = p as { state?: string };
-      return part.state !== 'output-available';
-    })
-    .map((p) => {
-      if (p.type === 'dynamic-tool') {
-        return (p as { toolName: string }).toolName;
-      }
-      return p.type.replace('tool-', '');
-    });
+  // ── Tool calls ─────────────────────────────────────────────────────────────
+  // Collect all completed tool parts
+  const completedToolParts = parts.filter(
+    (p): p is typeof p & ToolPart =>
+      (p.type === 'dynamic-tool' || p.type.startsWith('tool-')) &&
+      isToolPart(p) &&
+      (p as ToolPart).state === 'output-available',
+  );
+  const lastRawTool = completedToolParts.at(-1) as
+    | ((typeof parts)[0] & ToolPart)
+    | undefined;
 
-  const renderedParts: React.ReactNode[] = [];
-  let textBuffer = '';
-  let textSegmentIndex = 0;
-
-  const flushText = () => {
-    if (textBuffer) {
-      const currentText = textBuffer;
-      const segmentKey = `text-${textSegmentIndex++}`;
-      renderedParts.push(
-        <Markdown
-          key={segmentKey}
-          content={currentText}
-          preview={false}
-          className="text-base"
-        />,
-      );
-      textBuffer = '';
-    }
-  };
-
-  if (parts && parts.length > 0) {
-    for (const part of parts) {
-      if (part.type === 'reasoning') {
-        continue;
-      } else if (part.type === 'text') {
-        textBuffer += part.text;
-      } else if (part.type === 'dynamic-tool' && isToolPart(part)) {
-        flushText();
-        if (part.state !== 'output-available') continue;
-
-        const toolCall: ToolCallState = {
-          toolCallId: part.toolCallId,
-          toolName: part.toolName || 'dynamic-tool',
-          status: 'completed',
-          input: part.input as Record<string, unknown>,
-          output: part.output,
-        };
-        renderedParts.push(
-          <ToolCallDisplay key={toolCall.toolCallId} toolCall={toolCall} />,
-        );
-      } else if (part.type.startsWith('tool-') && isToolPart(part)) {
-        flushText();
-        if (part.state !== 'output-available') continue;
-
-        const toolCall: ToolCallState = {
-          toolCallId: part.toolCallId,
-          toolName: part.type.replace('tool-', ''),
-          status: 'completed',
-          input: part.input as Record<string, unknown>,
-          output: part.output,
-        };
-        renderedParts.push(
-          <ToolCallDisplay key={toolCall.toolCallId} toolCall={toolCall} />,
-        );
+  // Detect if any non-empty text part appears AFTER the last tool call in parts order
+  let hasTextAfterLastTool = false;
+  if (lastRawTool) {
+    let seenLastTool = false;
+    for (const p of parts) {
+      if (
+        isToolPart(p) &&
+        (p as ToolPart).toolCallId === lastRawTool.toolCallId
+      ) {
+        seenLastTool = true;
+      } else if (
+        seenLastTool &&
+        p.type === 'text' &&
+        (p as TextUIPart).text.trim().length > 0
+      ) {
+        hasTextAfterLastTool = true;
+        break;
       }
     }
-    flushText();
   }
+
+  // Tool call is visible only when it's the latest thing (no text after it yet)
+  const showToolCall = !!lastRawTool && !hasTextAfterLastTool;
+
+  const toolCallState: ToolCallState | null = lastRawTool
+    ? {
+        toolCallId: lastRawTool.toolCallId,
+        toolName:
+          lastRawTool.type === 'dynamic-tool'
+            ? lastRawTool.toolName || 'dynamic-tool'
+            : lastRawTool.type.replace('tool-', ''),
+        status: 'completed',
+        input: lastRawTool.input as Record<string, unknown>,
+        output: lastRawTool.output,
+      }
+    : null;
+
+  // Show initial thinking spinner when nothing has arrived yet
+  const showInitialThinking =
+    isStreamingActive && !hasContent && !hasReasoning && !showToolCall;
 
   const getThinkingMessage = (s: boolean, d?: number) => {
     if (s || d === 0) {
-      const suffix =
-        pendingToolNames.length > 0 ? `(${pendingToolNames.join(', ')})` : '';
       return (
         <span className="inline-flex items-center gap-1 min-w-0">
-          <Shimmer duration={1}>{`Thinking${suffix}`}</Shimmer>
+          <Shimmer duration={1}>Thinking</Shimmer>
         </span>
       );
     }
@@ -224,44 +206,65 @@ const ChatMessage = memo(function ChatMessage({
     return <p>Thought for {d} seconds</p>;
   };
 
-  if (hasReasoning) {
-    renderedParts.unshift(
-      <Reasoning
-        className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
-        isStreaming={isReasoningStreaming}
-      >
-        <ReasoningTrigger getThinkingMessage={getThinkingMessage} />
-        <ReasoningContent>{reasoningText}</ReasoningContent>
-      </Reasoning>,
-    );
-  }
-
   return (
     <Message from={message.role}>
       <MessageContent expandable={message.role === 'user'}>
-        {renderedParts.length > 0 ? (
-          <div className="space-y-3">{renderedParts}</div>
-        ) : null}
-
-        {message.role === 'assistant' &&
-          isStreamingActive &&
-          !hasContent &&
-          !hasReasoning && (
+        <div className="flex flex-col w-full gap-3">
+          {/* ① REASONING — always rendered first, above everything */}
+          {(hasReasoning || showInitialThinking) && (
             <Reasoning
               className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
-              isStreaming
+              isStreaming={showInitialThinking || isReasoningStreaming}
             >
               <ReasoningTrigger getThinkingMessage={getThinkingMessage} />
-              <ReasoningContent>{''}</ReasoningContent>
+              <ReasoningContent>{reasoningText}</ReasoningContent>
             </Reasoning>
           )}
+
+          {/* ② TOOL CALL — below reasoning, exits with animation when text arrives */}
+          <AnimatePresence mode="popLayout">
+            {showToolCall && toolCallState && (
+              <ToolCallDisplay
+                key={toolCallState.toolCallId}
+                toolCall={toolCallState}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* ③ TEXT CONTENT — gradient fade while streaming */}
+          {hasContent && (
+            <div className="relative space-y-3 w-full">
+              <Markdown
+                content={textContent}
+                preview={false}
+                className="text-base"
+              />
+              {/* Gradient overlay fades out when streaming ends */}
+              <AnimatePresence>
+                {isStreamingActive && (
+                  <motion.div
+                    key="stream-gradient"
+                    initial={{ opacity: 1 }}
+                    exit={{
+                      opacity: 0,
+                      transition: { duration: 0.6, ease: 'easeOut' },
+                    }}
+                    className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent"
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
       </MessageContent>
 
+      {/* Copy button — only appears after streaming finishes */}
       {message.role === 'assistant' &&
         hasContent &&
+        !isStreamingActive &&
         message.id !== 'streaming' && (
           <MessageActions>
-            {textContent && <CopyButton text={textContent} />}
+            <CopyButton text={textContent} />
           </MessageActions>
         )}
     </Message>
@@ -314,7 +317,6 @@ export const ChatConversation = memo(function ChatConversation({
 
     if (el) {
       if (!scrollContainerRef.current) {
-        // Safe from layout thrashing: uses query selector matching instead of dynamic styles
         const container =
           el.closest('.overflow-y-auto, .overflow-y-scroll') ||
           el.parentElement;
