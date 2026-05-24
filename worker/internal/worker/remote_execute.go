@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -210,17 +211,42 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 		return
 	}
 
+	var (
+		stdoutRes = new(bytes.Buffer)
+		stderrRes = new(bytes.Buffer)
+	)
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	go func() {
 		defer wg.Done()
-		streamPipe(ctx, stdoutPipe, handler.SendStdout, log)
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := stdoutPipe.Read(buf)
+			if n > 0 {
+				stdoutRes.Write(buf[:n])
+				_ = handler.SendStdout(ctx, buf[:n])
+			}
+			if err != nil {
+				break
+			}
+		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		streamPipe(ctx, stderrPipe, handler.SendStderr, log)
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := stderrPipe.Read(buf)
+			if n > 0 {
+				stderrRes.Write(buf[:n])
+				_ = handler.SendStderr(ctx, buf[:n])
+			}
+			if err != nil {
+				break
+			}
+		}
 	}()
 
 	wg.Wait()
@@ -229,42 +255,29 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 	if err := cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = int32(exitErr.ExitCode())
+			log.Warning("Command failed (code %d): %s\nStderr: %s", exitCode, command, stderrRes.String())
 		} else {
-			log.ErrorE("Command wait failed", err)
+			log.ErrorE(fmt.Sprintf("Command failed: %s", command), err)
 			_ = handler.SendError(ctx, fmt.Sprintf("command execution failed: %v", err))
 			_ = handler.SendExit(ctx, 1)
 			return
 		}
-	}
-
-	log.Info("Command completed with exit code %d", exitCode)
-	if err := handler.SendExit(ctx, exitCode); err != nil {
-		log.ErrorE("Failed to send exit code", err)
+	} else {
+		log.Success("Command completed successfully: %s\nOutput: %s", command, stdoutRes.String())
 	}
 }
 
 func streamPipe(ctx context.Context, pipe io.ReadCloser, sendFunc func(context.Context, []byte) error, log *oasm.LoggerType) {
 	buf := make([]byte, 32*1024)
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		n, err := pipe.Read(buf)
 		if n > 0 {
-			data := make([]byte, n)
-			copy(data, buf[:n])
-			if sendErr := sendFunc(ctx, data); sendErr != nil {
+			if sendErr := sendFunc(ctx, buf[:n]); sendErr != nil {
 				log.ErrorE("Failed to stream output", sendErr)
 				return
 			}
 		}
 		if err != nil {
-			if err != io.EOF {
-				log.ErrorE("Pipe read error", err)
-			}
 			return
 		}
 	}
