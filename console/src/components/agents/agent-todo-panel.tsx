@@ -75,6 +75,7 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
   };
 
   const activeCount = counts.in_progress + counts.pending;
+  const currentTask = todos.find((t) => t.status === 'in_progress');
 
   return (
     <Collapsible
@@ -90,21 +91,27 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
           type="button"
           className="group flex w-full items-center justify-between px-3 py-2 text-left"
         >
-          <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-foreground min-w-0">
             <ChevronDown
               className={cn(
-                'size-4 text-muted-foreground transition-transform',
+                'size-4 text-muted-foreground shrink-0 transition-transform',
                 !isOpen && '-rotate-90',
               )}
             />
-            <span>
-              Plan
-              <span className="text-muted-foreground ml-1.5 font-normal">
-                ({todos.length} step{todos.length > 1 ? 's' : ''})
+            {currentTask && !isOpen ? (
+              <span className="truncate text-muted-foreground font-normal">
+                <span className="text-foreground font-medium">Todo</span> — {currentTask.content}
               </span>
-            </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <span>Todo</span>
+                <span className="text-muted-foreground/60 tabular-nums">
+                  {counts.completed}/{todos.length}
+                </span>
+              </span>
+            )}
           </span>
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-2 shrink-0">
             {activeCount > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
                 <Loader2 className="size-3 animate-spin" />
@@ -122,7 +129,7 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
       </CollapsibleTrigger>
       <CollapsibleContent>
         <ul className="space-y-1 px-3 pb-2">
-          {todos.map((todo, index) => (
+          {todos.map((todo) => (
             <li
               key={todo.id}
               className="group flex items-start gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/50"
@@ -138,9 +145,6 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
                     todo.status === 'in_progress' && 'font-medium',
                   )}
                 >
-                  <span className="text-muted-foreground/50 mr-1.5 font-mono text-xs">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
                   {todo.content}
                 </span>
               </div>

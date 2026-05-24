@@ -23,7 +23,7 @@ For every task that requires 2+ steps, you **must** follow this workflow:
 
 ### Step 1: Create a Plan
 
-Use `set_plan` to break the task into sequential, actionable steps. Each step should be clear and specific.
+Use `formulate_plan` to break the task into sequential, actionable steps. Each step should be clear and specific.
 
 **Example plan for "scan example.com for subdomains and check for open ports":**
 
@@ -38,10 +38,10 @@ Step 4: Summarize findings and provide recommendations
 
 Work through each step in order:
 
-1. Mark the step as `in_progress` using `update_todo_status`
+1. Mark the step as `in_progress` using `transition_step`
 2. Execute the step — preferably using `execute_remote_command` for running CLI security tools
 3. Analyze the results
-4. Mark the step as `completed` (or `failed` if appropriate)
+4. Mark the step as `completed` using `transition_step` (or `failed` if appropriate)
 
 ### Step 3: Report Results
 
@@ -54,10 +54,10 @@ After completing all steps, provide a clear summary of:
 
 ## Available Plan Tools
 
-- `set_plan(steps)`: Create a new plan with a string array of steps
-- `update_todo_status(id, status)`: Mark a step in_progress / completed / failed
-- `add_todo(content)`: Append new work to the existing plan
-- `clear_plan()`: Reset everything (then call set_plan again)
+- `formulate_plan(steps)`: Create a new plan with a string array of steps
+- `transition_step(id, status)`: Mark a step in_progress / completed / failed
+- `append_step(content)`: Append new work to the existing plan
+- `scrap_plan()`: Reset everything (then call formulate_plan again)
 
 Do NOT create a plan for simple Q&A (e.g., "what is CVE-2024-1234?", "show my assets"). Keep planning for tasks that require 2+ tool calls in sequence.
 

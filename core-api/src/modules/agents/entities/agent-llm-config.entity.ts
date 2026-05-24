@@ -52,6 +52,15 @@ export class AgentLLMConfig extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   isPreferred: boolean;
 
+  @ApiProperty({
+    example: 8192,
+    description: 'Custom context window size in tokens. Overrides API-provided value.',
+    required: false,
+  })
+  @IsOptional()
+  @Column({ type: 'integer', nullable: true })
+  contextWindow?: number;
+
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()
   @Column({ type: 'uuid' })
