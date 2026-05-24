@@ -150,49 +150,25 @@ const ChatMessage = memo(function ChatMessage({
   const isReasoningStreaming =
     isStreamingActive && lastPart?.type === 'reasoning';
 
-  const allToolParts = parts.filter(
-    (p): p is typeof p & ToolPart =>
-      (p.type === 'dynamic-tool' || p.type.startsWith('tool-')) &&
-      isToolPart(p),
-  );
-  const lastRawTool = allToolParts.at(-1) as
-    | ((typeof parts)[0] & ToolPart)
-    | undefined;
-
-  let hasTextAfterLastTool = false;
-  if (lastRawTool) {
-    let seenLastTool = false;
-    for (const p of parts) {
-      if (
-        isToolPart(p) &&
-        (p as ToolPart).toolCallId === lastRawTool.toolCallId
-      ) {
-        seenLastTool = true;
-      } else if (
-        seenLastTool &&
-        p.type === 'text' &&
-        (p as TextUIPart).text.trim().length > 0
-      ) {
-        hasTextAfterLastTool = true;
-        break;
-      }
+  const toolPartsMap = new Map<string, ToolPart>();
+  for (const p of parts) {
+    if ((p.type === 'dynamic-tool' || p.type.startsWith('tool-')) && isToolPart(p)) {
+      toolPartsMap.set(p.toolCallId, p);
     }
   }
 
-  const showToolCall = !!lastRawTool && !hasTextAfterLastTool;
-
-  const toolCallState: ToolCallState | null = lastRawTool
-    ? {
-        toolCallId: lastRawTool.toolCallId,
-        toolName:
-          lastRawTool.type === 'dynamic-tool'
-            ? lastRawTool.toolName || 'dynamic-tool'
-            : lastRawTool.type.replace('tool-', ''),
-        status: getToolStatus(lastRawTool.state),
-        input: lastRawTool.input as Record<string, unknown>,
-        output: lastRawTool.output,
-      }
-    : null;
+  const toolCallStates: ToolCallState[] = Array.from(toolPartsMap.values()).map(
+    (t) => ({
+      toolCallId: t.toolCallId,
+      toolName:
+        t.type === 'dynamic-tool'
+          ? t.toolName || 'dynamic-tool'
+          : t.type.replace('tool-', ''),
+      status: getToolStatus(t.state),
+      input: t.input as Record<string, unknown>,
+      output: t.output,
+    }),
+  );
 
   const showInitialThinking =
     isStreamingActive && !hasContent && !hasReasoning && !showToolCall;
@@ -224,12 +200,9 @@ const ChatMessage = memo(function ChatMessage({
           )}
 
           <AnimatePresence mode="popLayout">
-            {showToolCall && toolCallState && (
-              <ToolCallDisplay
-                key={toolCallState.toolCallId}
-                toolCall={toolCallState}
-              />
-            )}
+            {toolCallStates.map((state) => (
+              <ToolCallDisplay key={state.toolCallId} toolCall={state} />
+            ))}
           </AnimatePresence>
 
           {hasContent && (
