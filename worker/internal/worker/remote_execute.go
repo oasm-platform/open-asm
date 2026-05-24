@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -217,37 +218,14 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 	)
 
 	var wg sync.WaitGroup
-	wg.Add(2)
 
-	go func() {
-		defer wg.Done()
-		buf := make([]byte, 32*1024)
-		for {
-			n, err := stdoutPipe.Read(buf)
-			if n > 0 {
-				stdoutRes.Write(buf[:n])
-				_ = handler.SendStdout(ctx, buf[:n])
-			}
-			if err != nil {
-				break
-			}
-		}
-	}()
+	wg.Go(func() {
+		streamPipe(ctx, stdoutPipe, handler.SendStdout, log)
+	})
 
-	go func() {
-		defer wg.Done()
-		buf := make([]byte, 32*1024)
-		for {
-			n, err := stderrPipe.Read(buf)
-			if n > 0 {
-				stderrRes.Write(buf[:n])
-				_ = handler.SendStderr(ctx, buf[:n])
-			}
-			if err != nil {
-				break
-			}
-		}
-	}()
+	wg.Go(func() {
+		streamPipe(ctx, stderrPipe, handler.SendStderr, log)
+	})
 
 	wg.Wait()
 
@@ -264,21 +242,24 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 		}
 	} else {
 		log.Success("Command completed successfully: %s\nOutput: %s", command, stdoutRes.String())
+		_ = handler.SendExit(ctx, 0)
 	}
 }
 
 func streamPipe(ctx context.Context, pipe io.ReadCloser, sendFunc func(context.Context, []byte) error, log *oasm.LoggerType) {
-	buf := make([]byte, 32*1024)
-	for {
-		n, err := pipe.Read(buf)
-		if n > 0 {
-			if sendErr := sendFunc(ctx, buf[:n]); sendErr != nil {
-				log.ErrorE("Failed to stream output", sendErr)
-				return
-			}
-		}
-		if err != nil {
+	scanner := bufio.NewScanner(pipe)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		line = append(line, '\n')
+
+		if sendErr := sendFunc(ctx, line); sendErr != nil {
+			log.ErrorE("Failed to stream output realtime", sendErr)
 			return
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.ErrorE("Error reading from pipe scanner", err)
 	}
 }
