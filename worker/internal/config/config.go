@@ -30,7 +30,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("grpc_host", "localhost")
 	viper.SetDefault("grpc_port", 16276)
 	viper.SetDefault("tool_path", "oasm-tools")
-	viper.SetDefault("workspace_root", "oasm-workspace")
+	viper.SetDefault("workspace_root", "agent-sessions")
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {

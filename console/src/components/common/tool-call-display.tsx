@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { RemoteExecuteTerminal } from './remote-execute-terminal';
 
 export interface ToolCallState {
@@ -14,63 +14,64 @@ function formatToolName(name: string): string {
 }
 
 export function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
-  const [hidden, setHidden] = useState(false);
-  const [displayedChars, setDisplayedChars] = useState(0);
-  const [shimmerPos, setShimmerPos] = useState(0);
-
   const formattedName = formatToolName(toolCall.toolName);
-  const isRevealing = displayedChars < formattedName.length;
-
-  useEffect(() => {
-    if (toolCall.status === 'completed' || toolCall.status === 'error') {
-      const timer = setTimeout(() => setHidden(true), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [toolCall.status]);
-
-  useEffect(() => {
-    if (isRevealing) {
-      const timer = setTimeout(() => setDisplayedChars((c) => c + 1), 40);
-      return () => clearTimeout(timer);
-    }
-  }, [isRevealing, displayedChars]);
-
-  useEffect(() => {
-    if (!isRevealing) {
-      setShimmerPos(0);
-      return;
-    }
-    let rafId: number;
-    let lastTime = performance.now();
-    const tick = (now: number) => {
-      const dt = now - lastTime;
-      lastTime = now;
-      setShimmerPos((p) => (p + dt * 0.04) % 100);
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [isRevealing]);
 
   if (toolCall.toolName === 'execute_remote_command') {
     return <RemoteExecuteTerminal toolCall={toolCall} />;
   }
 
-  if (hidden) return null;
+  const containerVariants = {
+    hidden: {},
+    visible: {
+      backgroundPosition: ['200% 0', '-200% 0'],
+      transition: {
+        staggerChildren: 0.04,
+        backgroundPosition: {
+          repeat: Infinity,
+          duration: 2,
+          ease: 'linear',
+        },
+      },
+    },
+    exit: {
+      transition: {
+        staggerChildren: 0.02,
+        staggerDirection: -1,
+      },
+    },
+  };
+
+  const letterVariants = {
+    hidden: { opacity: 0, display: 'none' },
+    visible: { opacity: 1, display: 'inline-block' },
+    exit: { opacity: 0, transition: { duration: 0.08 } },
+  };
 
   return (
-    <div className="flex items-center gap-1.5 text-muted-foreground italic">
-      {isRevealing ? (
-        <span
-          className="bg-gradient-to-r from-gray-400 via-white to-gray-400 bg-clip-text text-transparent bg-[length:200%_100%]"
-          style={{ backgroundPosition: `${100 - shimmerPos}% 0` }}
-        >
-          {formattedName.slice(0, displayedChars)}
-        </span>
-      ) : (
-        <span>{formattedName}</span>
-      )}
-      …
+    <div className="flex items-center gap-1.5 text-muted-foreground italic select-none">
+      <motion.span
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        className="bg-linear-to-r from-gray-400 via-white to-gray-400 bg-clip-text text-transparent bg-[length:200%_100%]"
+      >
+        {formattedName.split('').map((char, index) => (
+          <motion.span key={index} variants={letterVariants} exit="exit">
+            {char === ' ' ? '\u00A0' : char}
+          </motion.span>
+        ))}
+      </motion.span>
+      <motion.span
+        animate={
+          toolCall.status === 'executing'
+            ? { opacity: [0.3, 1, 0.3] }
+            : { opacity: 1 }
+        }
+        transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+      >
+        …
+      </motion.span>
     </div>
   );
 }

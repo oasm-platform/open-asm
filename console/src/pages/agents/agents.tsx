@@ -114,10 +114,40 @@ export default function AgentsChatPage() {
 
     return dataArray.map((msg) => {
       const m = msg as Record<string, unknown>;
+      const parts: UIMessage['parts'] = [];
+
+      const content = String(m.content ?? '');
+      if (content) {
+        parts.push({ type: 'text' as const, text: content });
+      }
+
+      const toolCalls = m.toolCalls as
+        | Array<{
+            toolCallId: string;
+            toolName: string;
+            args: Record<string, unknown>;
+            result: Record<string, unknown> | null;
+            isError?: boolean;
+          }>
+        | undefined;
+      if (toolCalls && Array.isArray(toolCalls)) {
+        for (const tc of toolCalls) {
+          const toolState = tc.isError ? 'output-error' : 'output-available';
+          parts.push({
+            type: 'dynamic-tool' as const,
+            toolCallId: tc.toolCallId,
+            toolName: tc.toolName,
+            state: toolState,
+            input: tc.args,
+            output: tc.result ?? null,
+          } as UIMessage['parts'][number]);
+        }
+      }
+
       return {
         id: String(m.id ?? ''),
         role: String(m.role ?? 'user').toLowerCase() as 'user' | 'assistant',
-        parts: [{ type: 'text' as const, text: String(m.content ?? '') }],
+        parts,
         createdAt: m.createdAt ? new Date(String(m.createdAt)) : new Date(),
       };
     });
@@ -129,6 +159,7 @@ export default function AgentsChatPage() {
     sendMessage,
     setMessages,
     regenerate,
+    stop,
   } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/agents/messages/stream',
@@ -233,6 +264,10 @@ export default function AgentsChatPage() {
     }
   }, [lastAssistantIdx, chatMessages, regenerate]);
 
+  const handleStop = useCallback(() => {
+    stop();
+  }, [stop]);
+
   const onRetryAction = useMemo(() => {
     return lastAssistantIdx !== -1 && !isLoading ? handleRetry : undefined;
   }, [lastAssistantIdx, isLoading, handleRetry]);
@@ -300,6 +335,7 @@ export default function AgentsChatPage() {
         messages={displayMessages}
         onSendMessage={handleSendMessage}
         onRetry={onRetryAction}
+        onStop={handleStop}
         isStreaming={isLoading}
         isLoadingMessages={isLoadingHistory}
         streamError={streamError}

@@ -1,12 +1,13 @@
 import {
-  AlertCircle,
-  CheckIcon,
-  ChevronDown,
-  ChevronUp,
-  Loader2,
   Terminal,
-} from 'lucide-react';
-import { useState } from 'react';
+  TerminalActions,
+  TerminalContent,
+  TerminalCopyButton,
+  TerminalHeader,
+  TerminalStatus,
+  TerminalTitle,
+} from '@/components/ai-elements/terminal';
+import { TerminalIcon } from 'lucide-react';
 import type { ToolCallState } from './tool-call-display';
 
 export function RemoteExecuteTerminal({
@@ -14,8 +15,6 @@ export function RemoteExecuteTerminal({
 }: {
   toolCall: ToolCallState;
 }) {
-  const [expanded, setExpanded] = useState(true);
-
   const command = String(
     toolCall.input?.command ||
       toolCall.input?.cmd ||
@@ -40,66 +39,31 @@ export function RemoteExecuteTerminal({
   };
 
   const terminalOutput = parseTerminalOutput(toolCall.output);
+  const isStreaming =
+    toolCall.status === 'pending' || toolCall.status === 'executing';
 
-  const statusIcon = {
-    pending: <Loader2 className="size-3.5 animate-spin text-yellow-500" />,
-    executing: <Loader2 className="size-3.5 animate-spin text-yellow-500" />,
-    completed: <CheckIcon className="size-3.5 text-green-500" />,
-    error: <AlertCircle className="size-3.5 text-red-500" />,
-  }[toolCall.status];
-
-  const statusColor = {
-    pending: 'text-yellow-500',
-    executing: 'text-yellow-500',
-    completed: 'text-green-500',
-    error: 'text-red-500',
-  }[toolCall.status];
-
-  const statusText = {
-    pending: 'Queued',
-    executing: 'Running…',
-    completed: 'Done',
-    error: 'Failed',
-  }[toolCall.status];
+  // Prepend the command as a prompt line with green $ (e.g., $ command)
+  const displayContent = command
+    ? `\u001b[32m$\u001b[0m ${command}\n${terminalOutput}`
+    : terminalOutput;
 
   return (
-    <div className="rounded-lg border border-border/60 bg-[#0d1117] text-sm w-full max-w-2xl overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-white/5 transition-colors w-full"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <Terminal className="size-3.5 text-green-500 shrink-0" />
-          <span className="font-mono text-xs text-green-400 truncate">
-            {command}
-          </span>
+    <Terminal
+      output={displayContent}
+      isStreaming={isStreaming}
+      className="w-full max-w-2xl text-xs"
+    >
+      <TerminalHeader>
+        <TerminalTitle>Terminal</TerminalTitle>
+        <TerminalIcon className="size-4 text-zinc-400" />
+        <div className="flex items-center gap-1 ml-auto">
+          <TerminalStatus />
+          <TerminalActions>
+            <TerminalCopyButton />
+          </TerminalActions>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-xs ${statusColor}`}>{statusIcon}</span>
-          <span className="text-xs text-muted-foreground">{statusText}</span>
-          {expanded ? (
-            <ChevronUp className="size-3.5 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="size-3.5 text-muted-foreground" />
-          )}
-        </div>
-      </button>
-
-      {expanded && terminalOutput && (
-        <div className="border-t border-white/10 px-3 py-2">
-          <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-all max-h-64 overflow-y-auto scrollbar-hide">
-            {terminalOutput}
-          </pre>
-        </div>
-      )}
-      {!terminalOutput && toolCall.status === 'executing' && (
-        <div className="border-t border-white/10 px-3 py-2">
-          <span className="text-xs font-mono text-muted-foreground animate-pulse">
-            Waiting for output...
-          </span>
-        </div>
-      )}
-    </div>
+      </TerminalHeader>
+      <TerminalContent />
+    </Terminal>
   );
 }

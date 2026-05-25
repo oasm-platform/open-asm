@@ -97,6 +97,12 @@ func Start(ctx context.Context, cfg *config.Config) {
 		return
 	}
 
+	toolPath, err := filepath.Abs(cfg.ToolPath)
+	if err != nil {
+		sysLog.ErrorE("Failed to resolve tool path", err)
+		return
+	}
+
 	ready := make(chan bool, 1)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
@@ -125,7 +131,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 		case semaphore <- struct{}{}:
 			wg.Go(func() {
 				defer func() { <-semaphore }()
-				processJob(currentCtx, client, browser, cfg.ToolPath)
+				processJob(currentCtx, client, browser, toolPath)
 			})
 		default:
 		}
@@ -174,7 +180,7 @@ func Start(ctx context.Context, cfg *config.Config) {
 						continue
 					}
 
-					go startRemoteExecuteHandler(sessionCtx, client, workspaceRoot, cfg.ToolPath)
+					go startRemoteExecuteHandler(sessionCtx, client, workspaceRoot, toolPath)
 
 					if !schedulerStarted {
 						scheduler.StartAsync()

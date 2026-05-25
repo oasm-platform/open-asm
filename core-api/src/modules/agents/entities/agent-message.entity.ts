@@ -7,9 +7,10 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { MessageRole, MessageType } from '../enums/agent.enums';
 import { AgentConversation } from './agent-conversation.entity';
+import { AgentMessageToolCall } from './tool-call.entity';
 
 @Entity('agent_messages')
 export class AgentMessage extends BaseEntity {
@@ -45,6 +46,11 @@ export class AgentMessage extends BaseEntity {
   @IsObject()
   @Column({ type: 'jsonb', nullable: true })
   metadata?: Record<string, unknown>;
+
+  @OneToMany(() => AgentMessageToolCall, (tc) => tc.message, {
+    cascade: true,
+  })
+  toolCalls?: AgentMessageToolCall[];
 
   @ManyToOne(() => AgentConversation, (conversation) => conversation.messages, {
     onDelete: 'CASCADE',
