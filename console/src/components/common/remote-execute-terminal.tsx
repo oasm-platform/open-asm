@@ -9,7 +9,6 @@ import {
   TerminalTitle,
 } from '@/components/ai-elements/terminal';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
-import { TerminalIcon } from 'lucide-react';
 import type { ToolCallState } from './tool-call-display';
 
 export function RemoteExecuteTerminal({
