@@ -1153,6 +1153,21 @@ export class AgentsCompletionsService {
         };
         todosEmitter.on('todos-updated', onTodosUpdated);
 
+        // Subscribe to remote-execute-output events for real-time terminal streaming
+        const onRemoteExecuteOutput = (data: {
+          toolCallId: string;
+          type: number;
+          data: string;
+          exitCode: number;
+        }) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'data-remote-execute-output',
+            data,
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
+
         // Emit initial conversation-created event
         controller.enqueue({
           type: 'data-conversation-created',
@@ -1276,6 +1291,7 @@ export class AgentsCompletionsService {
             abortSignal.removeEventListener('abort', onAbort);
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
+          todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
         }
 
         if (!controllerClosed && !abortSignal?.aborted) {
