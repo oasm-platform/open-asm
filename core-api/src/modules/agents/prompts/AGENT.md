@@ -56,7 +56,7 @@ After the user confirms, use `formulate_plan` to break the approved plan into se
 Work through each step in order:
 
 1. Mark the step as `in_progress` using `transition_step`
-2. Execute the step — load the `command-execution` skill for CLI tools via `execute_remote_command`
+2. Execute the step — load the `command-execution` skill for CLI tools via `load_skill`
 3. Analyze the results
 4. Mark the step as `completed` using `transition_step` (or `failed` if appropriate)
 

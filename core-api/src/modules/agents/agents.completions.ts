@@ -60,6 +60,8 @@ interface StreamTextOptions {
   todosEmitter: EventEmitter;
   /** Signal to abort the AI provider call */
   abortSignal?: AbortSignal;
+  /** Agent mode determines maxOutputTokens and continuation behavior */
+  agentMode?: AgentMode;
 }
 
 @Injectable()
@@ -920,6 +922,11 @@ export class AgentsCompletionsService {
       return { aiStream: emptyStream, conversationId, todosEmitter };
     }
 
+    // Determine max output tokens based on agent mode
+    // AGENT mode needs more tokens for multi-step tool execution
+    const maxOutputTokens =
+      options.agentMode === AgentMode.AGENT ? 16384 : undefined;
+
     // Invoke the AI SDK streamText with all callbacks
     const result = streamText({
       model,
@@ -933,6 +940,8 @@ export class AgentsCompletionsService {
       ],
       // Only include tools if available (models without tool support will error here)
       ...(tools ? { tools, stopWhen: stepCountIs(10) } : {}),
+      // AGENT mode needs more output tokens for multi-step execution
+      ...(maxOutputTokens ? { maxOutputTokens } : {}),
       // Accumulate text-delta chunks as they arrive
       onChunk: ({ chunk }) => {
         if (chunk.type === 'text-delta') {
@@ -950,6 +959,15 @@ export class AgentsCompletionsService {
       // auto-complete stuck todos, and trigger compaction check
       onFinish: async (event) => {
         const isAborted = () => abortSignal?.aborted ?? false;
+
+        // Log finish stats for debugging
+        this.logger.log(
+          `[Agent] Stream ${conversationId} finished: ` +
+            `finishReason=${event.finishReason}, ` +
+            `steps=${event.steps.length}, ` +
+            `toolCalls=${event.toolCalls.length}, ` +
+            `agentMode=${options.agentMode ?? 'unknown'}`,
+        );
 
         // Helper to mark the message as aborted when cancellation happens mid-flight
         const markAborted = async () => {
@@ -999,12 +1017,6 @@ export class AgentsCompletionsService {
           }
           if (toolCallEntities.length > 0) {
             await this.toolCallRepository.save(toolCallEntities);
-            // If abort fired during DB write, mark message as aborted
-            // and skip remaining persistence
-            if (isAborted()) {
-              await markAborted();
-              return;
-            }
           }
         } catch (err) {
           this.logger.error('Error saving tool calls', err);
@@ -1015,21 +1027,19 @@ export class AgentsCompletionsService {
           return;
         }
 
-        if (accumulatedText) {
-          await this.handleStreamFinish(
-            assistantMessageId,
-            conversationId,
-            accumulatedText,
-            llmConfig,
-            assistantMessageMetadata,
-          ).catch((err) =>
-            this.logger.error('Error in handleStreamFinish', err),
-          );
+        await this.handleStreamFinish(
+          assistantMessageId,
+          conversationId,
+          accumulatedText,
+          llmConfig,
+          assistantMessageMetadata,
+        ).catch((err) =>
+          this.logger.error('Error in handleStreamFinish', err),
+        );
 
-          if (isAborted()) {
-            await markAborted();
-            return;
-          }
+        if (isAborted()) {
+          await markAborted();
+          return;
         }
 
         // Auto-complete any todos the LLM left "in_progress" (safety net)
@@ -1066,6 +1076,184 @@ export class AgentsCompletionsService {
   }
 
   // ================================================================
+  //  Continuation Loop — Multi-Iteration Agent Execution
+  // ================================================================
+
+  /**
+   * Executes streamText in a loop, continuing automatically when there are
+   * remaining pending steps. This prevents the model from stopping mid-plan.
+   *
+   * Each iteration creates its own assistant message in DB.
+   * The stream stays open until all iterations complete or max iterations reached.
+   */
+  private createContinuationStream(
+    options: StreamTextOptions & { workspaceId: string; skillsContext?: string },
+  ): ReadableStream<UIMessageChunk> {
+    const {
+      llmConfig,
+      model,
+      conversationId,
+      todosEmitter,
+      abortSignal,
+      agentMode,
+      workspaceId,
+      skillsContext,
+    } = options;
+
+    const MAX_ITERATIONS = 5;
+    const isAgentMode = agentMode === AgentMode.AGENT;
+
+    let currentModelMessages = [...options.modelMessages];
+    let currentAssistantMessageId = options.assistantMessageId;
+    let currentAssistantMetadata = options.assistantMessageMetadata;
+    let currentContextParts = [...options.contextParts];
+
+    return new ReadableStream<UIMessageChunk>({
+      start: async (controller) => {
+        let controllerClosed = false;
+
+        const onAbort = () => {
+          if (controllerClosed) return;
+          controllerClosed = true;
+          try { controller.close(); } catch { /* ignore */ }
+        };
+
+        if (abortSignal) {
+          abortSignal.addEventListener('abort', onAbort, { once: true });
+        }
+
+        // Subscribe to todos-updated events from the initial emitter
+        const onTodosUpdated = (updatedTodos: AgentTodoItem[]) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'data-todos-updated',
+            data: { todos: updatedTodos },
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('todos-updated', onTodosUpdated);
+
+        // Emit initial conversation-created event
+        controller.enqueue({
+          type: 'data-conversation-created',
+          data: { conversationId },
+        } as UIMessageChunk);
+
+        try {
+          for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+            if (abortSignal?.aborted || controllerClosed) break;
+
+            // Execute a single streamText iteration
+            const { aiStream } = this.executeStreamText({
+              llmConfig,
+              model,
+              modelMessages: currentModelMessages,
+              contextParts: currentContextParts,
+              assistantMessageId: currentAssistantMessageId,
+              conversationId,
+              assistantMessageMetadata: currentAssistantMetadata,
+              tools: options.tools,
+              todosEmitter,
+              abortSignal,
+              agentMode,
+            });
+
+            // Pump chunks from this iteration's stream
+            const reader = aiStream.getReader();
+            while (true) {
+              if (abortSignal?.aborted || controllerClosed) {
+                await reader.cancel().catch(() => {});
+                break;
+              }
+              const { done, value } = await reader.read();
+              if (done || controllerClosed) break;
+              controller.enqueue(value);
+            }
+
+            if (abortSignal?.aborted || controllerClosed) break;
+
+            // Check if we should auto-continue (AGENT mode + pending steps)
+            if (!isAgentMode) break;
+
+            const conversation = await this.conversationRepository.findOne({
+              where: { id: conversationId },
+            });
+            const todos = conversation?.todos ?? [];
+            const hasPending = todos.some(
+              (t) => t.status === 'pending' || t.status === 'in_progress',
+            );
+
+            if (!hasPending) break;
+
+            // Prepare next iteration context
+            const updatedMessages = await this.getConversationHistory(conversationId);
+            currentModelMessages = this.mapHistoryToModelMessages(updatedMessages);
+
+            // Synthesized "continue" message (NOT saved to DB — memory only)
+            currentModelMessages.push({
+              role: 'user' as const,
+              content: 'Continue executing the pending plan steps. Proceed immediately without asking for confirmation.',
+            });
+
+            // Create a new assistant message in DB for the next iteration
+            const newAssistant = await this.saveAssistantMessage(conversationId, llmConfig);
+            currentAssistantMessageId = newAssistant.id;
+            currentAssistantMetadata = newAssistant.metadata;
+
+            // Rebuild context to reflect updated todos
+            const updatedConversation = await this.conversationRepository.findOne({
+              where: { id: conversationId },
+            });
+            if (updatedConversation) {
+              // Build system context fresh
+              const agentModeVal = agentMode || AgentMode.ASK;
+              const modePrompt = this.getPrompt(`${agentModeVal.toUpperCase()}.md`);
+              const systemPrompt = this.getPrompt('SYSTEM.md');
+              const now = new Date();
+              const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
+              const [stmContext, ltmContext] = await Promise.all([
+                this.agentsMemories.stmFormatForPrompt(conversationId),
+                this.agentsMemories.ltmFormatForPrompt(workspaceId),
+              ]);
+              const todosContext = formatTodosToPrompt(updatedConversation.todos ?? []);
+              const summaryContext = updatedConversation.summary
+                ? `[PREVIOUS CONVERSATION SUMMARY]:\n${updatedConversation.summary}`
+                : '';
+
+              currentContextParts = [
+                modePrompt,
+                systemPrompt,
+                summaryContext,
+                currentTimeContext,
+                ltmContext,
+                stmContext,
+                todosContext,
+              ].filter(Boolean);
+
+              if (skillsContext) {
+                currentContextParts.push(skillsContext);
+              }
+            }
+
+            this.logger.log(
+              `[Auto-continuation] Iteration ${iteration + 1} for ${conversationId}: ` +
+                `${todos.filter((t) => t.status === 'pending' || t.status === 'in_progress').length} steps remaining`,
+            );
+          }
+        } finally {
+          if (abortSignal) {
+            abortSignal.removeEventListener('abort', onAbort);
+          }
+          todosEmitter.off('todos-updated', onTodosUpdated);
+        }
+
+        if (!controllerClosed && !abortSignal?.aborted) {
+          try { controller.close(); } catch { /* ignore */ }
+        }
+      },
+    });
+  }
+
+  // ================================================================
   //  Public API
   // ================================================================
 
@@ -1078,8 +1266,8 @@ export class AgentsCompletionsService {
    * 3. Validate tool support → create language model
    * 4. Create assistant message placeholder
    * 5. Build system context (prompts + memories + todos)
-   * 6. Call streamText → get AI stream
-   * 7. Wrap AI stream into merged stream (adds conversation metadata + todos events)
+   * 6. Execute streamText with auto-continuation loop
+   * 7. Wrap stream with conversation metadata + todo events
    */
   async streamMessage(
     dto: SendMessageDto,
@@ -1132,49 +1320,55 @@ export class AgentsCompletionsService {
       };
     }
 
-    // Step 8: Create a placeholder message for the assistant (marks streaming)
+    // Step 8: Determine agent mode
+    const agentMode = dto.agentMode || AgentMode.ASK;
+
+    // Step 9: Create a placeholder message for the assistant (marks streaming)
     const assistantMessage = await this.saveAssistantMessage(
       conversation.id,
       llmConfig,
     );
 
-    // Step 9: Build the system context
+    // Step 10: Build the system context
     const contextParts = await this.buildSystemContext(
       conversation,
       workspaceId,
-      dto.agentMode || AgentMode.ASK,
+      agentMode,
     );
 
-    // Step 9.5: Add skills context and loadSkill tool
-    const skillsContext =
-      await this.agentsSkillsService.buildSkillsPrompt(workspaceId);
+    // Step 10.5: Add skills context and loadSkill tool
+    let skillsContext: string | undefined;
+    const skillsPrompt = await this.agentsSkillsService.buildSkillsPrompt(workspaceId);
     let loadSkillTool: ReturnType<
       AgentsSkillsService['createLoadSkillTool']
     > | undefined;
-    if (skillsContext) {
-      contextParts.push(skillsContext);
+    if (skillsPrompt) {
+      contextParts.push(skillsPrompt);
+      skillsContext = skillsPrompt;
       loadSkillTool = this.agentsSkillsService.createLoadSkillTool(workspaceId);
     }
 
-    // Step 10: Create a shared event emitter for broadcasting todo updates to the stream
+    // Step 11: Create a shared event emitter for broadcasting todo updates to the stream
     const todosEmitter = new EventEmitter();
 
     // Get tools for the current agent mode
-    // Note: AgentTool.getTools() returns `any` typed tools - cast to ToolSet for type safety
     const tools = {
       ...(this.agentTool.getTools(
         workspaceId,
-        dto.agentMode || AgentMode.ASK,
+        agentMode,
       ) as ToolSet),
       ...(this.agentTool.getTodoTools(
         conversation.id,
-        todosEmitter, // Pass the same shared emitter so tool calls broadcast to the stream
+        todosEmitter,
       ) as ToolSet),
       ...(loadSkillTool ? { load_skill: loadSkillTool } : {}),
     };
 
-    // Step 11: Execute streamText and get AI stream + todos emitter
-    const { aiStream } = this.executeStreamText({
+    // Step 12: Build the combined stream with auto-continuation
+    const toolSetArg: ToolSet | undefined =
+      Object.keys(tools).length > 0 ? tools : undefined;
+
+    const stream = this.createContinuationStream({
       llmConfig,
       model,
       modelMessages,
@@ -1182,22 +1376,17 @@ export class AgentsCompletionsService {
       assistantMessageId: assistantMessage.id,
       conversationId: conversation.id,
       assistantMessageMetadata: assistantMessage.metadata,
-      tools: Object.keys(tools).length > 0 ? tools : undefined,
-      todosEmitter, // Pass the same shared emitter so stream events are in sync
-      abortSignal, // Pass abort signal for cancellation
-    });
-
-    // Step 12: Wrap AI stream into a merged stream (conversation metadata + todos events)
-    const mergedStream = this.createMergedStream({
-      aiStream,
-      conversationId: conversation.id,
-      todosEmitter, // Same emitter used by todo tools - events will reach the stream
+      tools: toolSetArg,
+      todosEmitter,
       abortSignal,
+      agentMode,
+      workspaceId,
+      skillsContext,
     });
 
-    // Step 13: Return stream + conversationId to the controller for the frontend
+    // Step 13: Return stream + conversationId to the controller
     return {
-      stream: mergedStream,
+      stream,
       conversationId: conversation.id,
     };
   }

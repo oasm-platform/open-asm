@@ -190,7 +190,7 @@ export class AgentsSkillsService {
         };
       },
     };
-    return tool(toolConfig);
+    return tool(toolConfig as unknown as Parameters<typeof tool>[0]);
   }
 
   async buildSkillsPrompt(workspaceId: string): Promise<string> {
