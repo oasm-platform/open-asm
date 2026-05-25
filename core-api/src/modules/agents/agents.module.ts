@@ -12,12 +12,14 @@ import { AgentsMemoriesService } from './agents.memories';
 import { AgentsService } from './agents.service';
 import { AgentTool } from './agents.tools';
 import { AgentsMcpService } from './agents.mcp';
+import { AgentsSkillsService } from './agents.skills';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { AgentMessageToolCall } from './entities/tool-call.entity';
 import { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
+import { AgentSkill } from './entities/agent-skill.entity';
 import { HttpModule } from '@nestjs/axios';
 
 @Global()
@@ -30,6 +32,7 @@ import { HttpModule } from '@nestjs/axios';
       AgentMessageToolCall,
       AgentWorkspaceMemory,
       AgentMCPConfig,
+      AgentSkill,
     ]),
     AssetsModule,
     TargetsModule,
@@ -46,12 +49,14 @@ import { HttpModule } from '@nestjs/axios';
     AgentTool,
     AgentsMcpService,
     AgentsMemoriesService,
+    AgentsSkillsService,
   ],
   exports: [
     AgentsService,
     AgentsCompletionsService,
     AgentsMemoriesService,
     AgentsMcpService,
+    AgentsSkillsService,
   ],
 })
 export class AgentsModule {}

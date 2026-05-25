@@ -1610,6 +1610,35 @@ export type MCPServerPingResponseDto = {
   latency?: number;
 };
 
+export type SkillResponseDto = {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  isEnabled: boolean;
+  isBuiltin: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  createdBy: string | null;
+};
+
+export type CreateSkillDto = {
+  name: string;
+  description: string;
+  content: string;
+};
+
+export type UpdateSkillDto = {
+  name?: string;
+  description?: string;
+  content?: string;
+};
+
+export type ToggleSkillDto = {
+  isEnabled: boolean;
+};
+
 export type NotificationResponseDtoStatus =
   (typeof NotificationResponseDtoStatus)[keyof typeof NotificationResponseDtoStatus];
 
@@ -19596,6 +19625,532 @@ export function useAgentsControllerPingMCPServer<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Get all available skills (builtin + user) for the workspace
+ * @summary List skills
+ */
+export const agentsControllerGetSkills = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SkillResponseDto[]>(
+    { url: `/api/agents/skills`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetSkillsQueryKey = () => {
+  return [`/api/agents/skills`] as const;
+};
+
+export const getAgentsControllerGetSkillsQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetSkillsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetSkills>>
+  > = ({ signal }) => agentsControllerGetSkills(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetSkillsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetSkills>>
+>;
+export type AgentsControllerGetSkillsQueryError = unknown;
+
+export function useAgentsControllerGetSkills<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetSkills>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetSkills<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetSkills>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetSkills<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List skills
+ */
+
+export function useAgentsControllerGetSkills<
+  TData = Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetSkills>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetSkillsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Create a new user skill for the workspace (workspace owner only)
+ * @summary Create skill
+ */
+export const agentsControllerCreateSkill = (
+  createSkillDto: CreateSkillDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SkillResponseDto>(
+    {
+      url: `/api/agents/skills`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createSkillDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerCreateSkillMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+    TError,
+    { data: CreateSkillDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+  TError,
+  { data: CreateSkillDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerCreateSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+    { data: CreateSkillDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerCreateSkill(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerCreateSkillMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerCreateSkill>>
+>;
+export type AgentsControllerCreateSkillMutationBody = CreateSkillDto;
+export type AgentsControllerCreateSkillMutationError = unknown;
+
+/**
+ * @summary Create skill
+ */
+export const useAgentsControllerCreateSkill = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+      TError,
+      { data: CreateSkillDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerCreateSkill>>,
+  TError,
+  { data: CreateSkillDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerCreateSkillMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Update a user skill (workspace owner only)
+ * @summary Update skill
+ */
+export const agentsControllerUpdateSkill = (
+  id: string,
+  updateSkillDto: UpdateSkillDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SkillResponseDto>(
+    {
+      url: `/api/agents/skills/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateSkillDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerUpdateSkillMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+    TError,
+    { id: string; data: UpdateSkillDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+  TError,
+  { id: string; data: UpdateSkillDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpdateSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+    { id: string; data: UpdateSkillDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerUpdateSkill(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerUpdateSkillMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerUpdateSkill>>
+>;
+export type AgentsControllerUpdateSkillMutationBody = UpdateSkillDto;
+export type AgentsControllerUpdateSkillMutationError = unknown;
+
+/**
+ * @summary Update skill
+ */
+export const useAgentsControllerUpdateSkill = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+      TError,
+      { id: string; data: UpdateSkillDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpdateSkill>>,
+  TError,
+  { id: string; data: UpdateSkillDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpdateSkillMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Delete a user skill (workspace owner only)
+ * @summary Delete skill
+ */
+export const agentsControllerDeleteSkill = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/skills/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteSkillMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteSkill(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteSkillMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteSkill>>
+>;
+
+export type AgentsControllerDeleteSkillMutationError = unknown;
+
+/**
+ * @summary Delete skill
+ */
+export const useAgentsControllerDeleteSkill = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteSkill>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteSkillMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Enable or disable a user skill (workspace owner only)
+ * @summary Toggle skill
+ */
+export const agentsControllerToggleSkill = (
+  id: string,
+  toggleSkillDto: ToggleSkillDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SkillResponseDto>(
+    {
+      url: `/api/agents/skills/${id}/toggle`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: toggleSkillDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerToggleSkillMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+    TError,
+    { id: string; data: ToggleSkillDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+  TError,
+  { id: string; data: ToggleSkillDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerToggleSkill'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+    { id: string; data: ToggleSkillDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerToggleSkill(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerToggleSkillMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerToggleSkill>>
+>;
+export type AgentsControllerToggleSkillMutationBody = ToggleSkillDto;
+export type AgentsControllerToggleSkillMutationError = unknown;
+
+/**
+ * @summary Toggle skill
+ */
+export const useAgentsControllerToggleSkill = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+      TError,
+      { id: string; data: ToggleSkillDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerToggleSkill>>,
+  TError,
+  { id: string; data: ToggleSkillDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerToggleSkillMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Retrieve a paginated list of notifications for the current user
