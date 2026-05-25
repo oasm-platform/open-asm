@@ -348,25 +348,38 @@ export class AgentTool {
     };
   }
 
-  get remoteExecuteTool(): (workspaceId: string) => any {
-    return (_workspaceId: string) => {
-      const toolConfig: any = {
-        description: [
-          'Execute arbitrary shell commands on remote worker nodes (nmap, curl, dig, etc.).',
-          'Params: command (required shell command string).',
-          'Output: stdout, stderr, exitCode, error, timedOut.',
-          'Warning: OS-level permissions, no PTY, strict timeout.',
-        ].join('\n'),
-        parameters: z.object({
-          command: z.string().min(1).describe('Shell command to execute'),
-        }),
-        execute: async (params: { command: string }) => {
-          const { command } = params;
-          return this.remoteExecuteService.waitForResult(command, randomUUID());
-        },
-      };
-      return tool(toolConfig);
+  remoteExecuteTool(workspaceId: string, emitter?: EventEmitter): ToolType {
+    const toolConfig: any = {
+      description: [
+        'Execute arbitrary shell commands on remote worker nodes (nmap, curl, dig, etc.).',
+        'Params: command (required shell command string).',
+        'Output: stdout, stderr, exitCode, error, timedOut.',
+        'Warning: OS-level permissions, no PTY, strict timeout.',
+      ].join('\n'),
+      parameters: z.object({
+        command: z.string().min(1).describe('Shell command to execute'),
+      }),
+      execute: async (
+        params: { command: string },
+        options: { toolCallId: string },
+      ) => {
+        const { command } = params;
+        const { toolCallId } = options;
+        const sessionId = randomUUID();
+
+        return this.remoteExecuteService.waitForResult(
+          command,
+          sessionId,
+          60_000,
+          (event) => {
+            if (emitter) {
+              emitter.emit('remote-execute-output', { toolCallId, ...event });
+            }
+          },
+        );
+      },
     };
+    return tool(toolConfig);
   }
 
   getTodoTools(
@@ -453,6 +466,7 @@ export class AgentTool {
   getTools(
     workspaceId: string,
     agentMode: AgentMode,
+    emitter?: EventEmitter,
   ): Record<string, ToolType> {
     const { AGENT, ASK } = AgentMode;
     const tools: Record<string, { method: ToolType; permissions: AgentMode[] }> = {
@@ -472,7 +486,7 @@ export class AgentTool {
       display_available_tools: { method: this.listToolsTool(workspaceId), permissions: [AGENT, ASK] },
       list_active_workers: { method: this.listWorkersTool(workspaceId), permissions: [AGENT, ASK] },
       review_jobs: { method: this.listJobsTool(workspaceId), permissions: [AGENT, ASK] },
-      execute_remote_command: { method: this.remoteExecuteTool(workspaceId), permissions: [AGENT] },
+      execute_remote_command: { method: this.remoteExecuteTool(workspaceId, emitter), permissions: [AGENT] },
     };
 
     return Object.fromEntries(

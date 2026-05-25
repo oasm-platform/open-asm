@@ -9,6 +9,7 @@ import {
   type LLMConfigWithProviderDto,
 } from '@/services/apis/gen/queries';
 import { orvalClient } from '@/services/apis/axios-client';
+import { useRemoteExecuteStream, type RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChatConversation } from './chat-conversation';
@@ -35,6 +36,7 @@ export default function AgentsChatPage() {
   const isStreamingRef = useRef(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [todos, setTodos] = useState<AgentTodoItem[]>([]);
+  const { appendEvent, eventsMap } = useRemoteExecuteStream();
   const { data: providers } =
     useAgentsControllerGetLLMConfigs<LLMConfigWithProviderDto[]>();
   const prefer = providers?.find((item) => item.isPreferred);
@@ -205,6 +207,10 @@ export default function AgentsChatPage() {
           setTodos(payload.todos);
         }
       }
+      if (data.type === 'data-remote-execute-output') {
+        const event = data.data as RemoteExecuteStreamEvent;
+        appendEvent(event);
+      }
     },
   });
 
@@ -350,6 +356,7 @@ export default function AgentsChatPage() {
         agentMode={agentMode}
         onAgentModeChange={setAgentMode}
         todos={todos}
+        remoteExecuteEvents={eventsMap}
       />
     </div>
   );

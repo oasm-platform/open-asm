@@ -694,6 +694,21 @@ export class AgentsCompletionsService {
 
         todosEmitter.on('todos-updated', onTodosUpdated);
 
+        // Subscribe to remote-execute-output events from the emitter
+        const onRemoteExecuteOutput = (data: {
+          toolCallId: string;
+          type: number;
+          data: string;
+          exitCode: number;
+        }) => {
+          controller.enqueue({
+            type: 'data-remote-execute-output',
+            data,
+          } as unknown as UIMessageChunk);
+        };
+
+        todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
+
         // When abort signal fires, immediately cancel the reader and close the controller
         const onAbort = () => {
           if (controllerClosed) return;
@@ -724,6 +739,7 @@ export class AgentsCompletionsService {
             abortSignal.removeEventListener('abort', onAbort);
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
+          todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
           reader.releaseLock();
         }
 
@@ -1148,6 +1164,7 @@ export class AgentsCompletionsService {
       ...(this.agentTool.getTools(
         workspaceId,
         dto.agentMode || AgentMode.ASK,
+        todosEmitter,
       ) as ToolSet),
       ...(this.agentTool.getTodoTools(
         conversation.id,
