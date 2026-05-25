@@ -716,11 +716,10 @@ export class AgentsCompletionsService {
             if (abortSignal?.aborted || controllerClosed) break;
 
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done || controllerClosed) break;
             controller.enqueue(value);
           }
         } finally {
-          controllerClosed = true;
           if (abortSignal) {
             abortSignal.removeEventListener('abort', onAbort);
           }
@@ -729,8 +728,11 @@ export class AgentsCompletionsService {
         }
 
         if (!controllerClosed) {
-          controllerClosed = true;
-          controller.close();
+          try {
+            controller.close();
+          } catch {
+            // Stream might already be in an errored state
+          }
         }
       },
     });
