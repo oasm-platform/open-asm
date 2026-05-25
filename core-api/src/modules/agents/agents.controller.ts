@@ -29,6 +29,7 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
+import { AgentsSkillsService } from './agents.skills';
 import { GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
   ConversationResponseDto,
@@ -49,6 +50,12 @@ import {
   ToggleMCPServerDto,
 } from './dto/mcp-config.dto';
 import { MessageResponseDto, SendMessageDto } from './dto/message.dto';
+import {
+  CreateSkillDto,
+  SkillResponseDto,
+  ToggleSkillDto,
+  UpdateSkillDto,
+} from './dto/skill.dto';
 
 @ApiTags('Agents')
 @Controller('agents')
@@ -57,6 +64,7 @@ export class AgentsController {
   constructor(
     private readonly agentsService: AgentsService,
     private readonly agentsCompletionsService: AgentsCompletionsService,
+    private readonly agentsSkillsService: AgentsSkillsService,
   ) {}
 
   @Get('modes')
@@ -496,5 +504,103 @@ export class AgentsController {
     @WorkspaceId() workspaceId: string,
   ): Promise<MCPServerPingResponseDto> {
     return this.agentsService.pingMCPServer(workspaceId, name);
+  }
+
+  // ==========================================
+  // Skills Endpoints
+  // ==========================================
+
+  @Get('skills')
+  @Doc({
+    summary: 'List skills',
+    description: 'Get all available skills (builtin + user) for the workspace',
+    request: { getWorkspaceId: true },
+    response: { serialization: SkillResponseDto, isArray: true },
+  })
+  getSkills(@WorkspaceId() workspaceId: string): Promise<SkillResponseDto[]> {
+    return this.agentsSkillsService.getSkills(workspaceId);
+  }
+
+  @Post('skills')
+  @Doc({
+    summary: 'Create skill',
+    description:
+      'Create a new user skill for the workspace (workspace owner only)',
+    request: { getWorkspaceId: true },
+    response: { serialization: SkillResponseDto },
+  })
+  async createSkill(
+    @Body() dto: CreateSkillDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<SkillResponseDto> {
+    return this.agentsSkillsService.createUserSkill(workspaceId, userId, dto);
+  }
+
+  @Patch('skills/:id')
+  @Doc({
+    summary: 'Update skill',
+    description: 'Update a user skill (workspace owner only)',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Skill ID' }],
+    },
+    response: { serialization: SkillResponseDto },
+  })
+  async updateSkill(
+    @Param('id') id: string,
+    @Body() dto: UpdateSkillDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<SkillResponseDto> {
+    return this.agentsSkillsService.updateUserSkill(
+      workspaceId,
+      id,
+      dto,
+      userId,
+    );
+  }
+
+  @Delete('skills/:id')
+  @Doc({
+    summary: 'Delete skill',
+    description: 'Delete a user skill (workspace owner only)',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Skill ID' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteSkill(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsSkillsService.deleteUserSkill(workspaceId, id, userId);
+    return { message: 'Skill deleted successfully' };
+  }
+
+  @Patch('skills/:id/toggle')
+  @Doc({
+    summary: 'Toggle skill',
+    description: 'Enable or disable a user skill (workspace owner only)',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Skill ID' }],
+    },
+    response: { serialization: SkillResponseDto },
+  })
+  async toggleSkill(
+    @Param('id') id: string,
+    @Body() dto: ToggleSkillDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<SkillResponseDto> {
+    return this.agentsSkillsService.toggleUserSkill(
+      workspaceId,
+      id,
+      dto.isEnabled,
+      userId,
+    );
   }
 }

@@ -17,6 +17,7 @@ import { AgentMode } from '@/common/enums/enum';
 import { decrypt } from '@/common/utils/encryption.util';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsMemoriesService } from './agents.memories';
+import { AgentsSkillsService } from './agents.skills';
 import type { AgentTodoItem } from './agents.todo';
 import { formatTodosToPrompt } from './agents.todo';
 import { AgentTool } from './agents.tools';
@@ -87,6 +88,7 @@ export class AgentsCompletionsService {
     private readonly agentTool: AgentTool,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly agentsMcpService: AgentsMcpService,
+    private readonly agentsSkillsService: AgentsSkillsService,
   ) {
     this.loadAllPrompts();
   }
@@ -906,7 +908,9 @@ export class AgentsCompletionsService {
 
     // Check if request was already aborted before starting the AI call
     if (abortSignal?.aborted) {
-      this.logger.log(`Stream aborted before starting for conversation ${conversationId}`);
+      this.logger.log(
+        `Stream aborted before starting for conversation ${conversationId}`,
+      );
       // Return an empty stream that immediately closes
       const emptyStream = new ReadableStream<UIMessageChunk>({
         start(controller) {
@@ -1114,7 +1118,9 @@ export class AgentsCompletionsService {
 
     // Check if request was aborted before creating assistant message
     if (abortSignal?.aborted) {
-      this.logger.log(`Stream aborted before assistant message for conversation ${conversation.id}`);
+      this.logger.log(
+        `Stream aborted before assistant message for conversation ${conversation.id}`,
+      );
       const emptyStream = new ReadableStream<UIMessageChunk>({
         start(controller) {
           controller.close();
@@ -1139,6 +1145,17 @@ export class AgentsCompletionsService {
       dto.agentMode || AgentMode.ASK,
     );
 
+    // Step 9.5: Add skills context and loadSkill tool
+    const skillsContext =
+      await this.agentsSkillsService.buildSkillsPrompt(workspaceId);
+    let loadSkillTool: ReturnType<
+      AgentsSkillsService['createLoadSkillTool']
+    > | undefined;
+    if (skillsContext) {
+      contextParts.push(skillsContext);
+      loadSkillTool = this.agentsSkillsService.createLoadSkillTool(workspaceId);
+    }
+
     // Step 10: Create a shared event emitter for broadcasting todo updates to the stream
     const todosEmitter = new EventEmitter();
 
@@ -1153,6 +1170,7 @@ export class AgentsCompletionsService {
         conversation.id,
         todosEmitter, // Pass the same shared emitter so tool calls broadcast to the stream
       ) as ToolSet),
+      ...(loadSkillTool ? { load_skill: loadSkillTool } : {}),
     };
 
     // Step 11: Execute streamText and get AI stream + todos emitter
