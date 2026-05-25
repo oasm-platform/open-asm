@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { tool } from 'ai';
 import * as fs from 'fs';
@@ -113,7 +113,7 @@ export class AgentsSkillsService {
     }
 
     const userSkills = await this.skillRepository.find({
-      where: { workspaceId, isEnabled: true },
+      where: { workspaceId },
     });
 
     const builtinList: SkillResponseDto[] = Array.from(
@@ -172,7 +172,7 @@ export class AgentsSkillsService {
   }
 
   createLoadSkillTool(workspaceId: string) {
-    const toolConfig: any = {
+    const toolConfig = {
       description:
         "Load a skill to get specialized instructions. Call this when the user's request matches a skill description and you need detailed guidance.",
       parameters: z.object({
@@ -244,7 +244,7 @@ export class AgentsSkillsService {
     });
 
     if (existing) {
-      throw new NotFoundException(
+      throw new ConflictException(
         `Skill with name "${dto.name}" already exists in this workspace`,
       );
     }
@@ -292,7 +292,17 @@ export class AgentsSkillsService {
       throw new NotFoundException('Skill not found');
     }
 
-    if (dto.name !== undefined) skill.name = dto.name;
+    if (dto.name !== undefined && dto.name !== skill.name) {
+      const existing = await this.skillRepository.findOne({
+        where: { workspaceId, name: dto.name },
+      });
+      if (existing) {
+        throw new ConflictException(
+          `Skill with name "${dto.name}" already exists in this workspace`,
+        );
+      }
+      skill.name = dto.name;
+    }
     if (dto.description !== undefined) skill.description = dto.description;
     if (dto.content !== undefined) skill.content = dto.content;
 

@@ -17,6 +17,7 @@ import type {
   SkillResponseDto,
 } from '@/services/apis/gen/queries';
 import {
+  getAgentsControllerGetSkillsQueryKey,
   useAgentsControllerGetSkills,
   useAgentsControllerCreateSkill,
   useAgentsControllerUpdateSkill,
@@ -36,8 +37,6 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
-
-const SKILLS_QUERY_KEY = '/api/agents/skills';
 
 const skillSchema = z.object({
   name: z.string().min(1, 'Skill name is required'),
@@ -86,7 +85,7 @@ function SkillFormDialog({
   const createSkill = useAgentsControllerCreateSkill({
     mutation: {
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: [SKILLS_QUERY_KEY] });
+        void queryClient.invalidateQueries({ queryKey: getAgentsControllerGetSkillsQueryKey() });
         toast.success('Skill created');
         onOpenChange(false);
         reset();
@@ -98,7 +97,7 @@ function SkillFormDialog({
   const updateSkill = useAgentsControllerUpdateSkill({
     mutation: {
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: [SKILLS_QUERY_KEY] });
+        void queryClient.invalidateQueries({ queryKey: getAgentsControllerGetSkillsQueryKey() });
         toast.success('Skill updated');
         onOpenChange(false);
         reset();
@@ -199,7 +198,7 @@ function SkillRow({
   const toggle = useAgentsControllerToggleSkill({
     mutation: {
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: [SKILLS_QUERY_KEY] });
+        void queryClient.invalidateQueries({ queryKey: getAgentsControllerGetSkillsQueryKey() });
       },
       onError: () => toast.error('Failed to toggle skill'),
     },
@@ -208,7 +207,7 @@ function SkillRow({
   const remove = useAgentsControllerDeleteSkill({
     mutation: {
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: [SKILLS_QUERY_KEY] });
+        void queryClient.invalidateQueries({ queryKey: getAgentsControllerGetSkillsQueryKey() });
         toast.success('Skill removed');
       },
       onError: () => toast.error('Failed to remove skill'),
@@ -307,7 +306,6 @@ export function SkillsManager() {
 
   const { data, isLoading } = useAgentsControllerGetSkills({
     query: {
-      queryKey: [SKILLS_QUERY_KEY],
       enabled: !!selectedWorkspaceId,
     },
   });
