@@ -1220,6 +1220,7 @@ export const PromptInputSubmit = ({
   status,
   onStop,
   onClick,
+  disabled,
   children,
   ...props
 }: PromptInputSubmitProps) => {
@@ -1255,6 +1256,7 @@ export const PromptInputSubmit = ({
       size={size}
       type={isGenerating && onStop ? "button" : "submit"}
       variant={variant}
+      disabled={isGenerating && onStop ? false : disabled}
       {...props}
     >
       {children ?? Icon}

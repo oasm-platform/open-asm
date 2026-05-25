@@ -48,6 +48,7 @@ interface ChatConversationProps {
   messages: UIMessage[];
   onSendMessage: (content: string, options?: { agentMode?: string }) => void;
   onRetry?: () => void;
+  onStop?: () => void;
   isStreaming?: boolean;
   isLoadingMessages?: boolean;
   streamError?: string | null;
@@ -247,6 +248,7 @@ export const ChatConversation = memo(function ChatConversation({
   messages,
   onSendMessage,
   onRetry,
+  onStop,
   isStreaming = false,
   isLoadingMessages = false,
   streamError,
@@ -518,6 +520,7 @@ export const ChatConversation = memo(function ChatConversation({
               onSendMessage(content, { agentMode: options?.agentMode })
             }
             isSending={isStreaming}
+            onStop={onStop}
             selectedModel={
               selectedConfigId && selectedModel
                 ? {

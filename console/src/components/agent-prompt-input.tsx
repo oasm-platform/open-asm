@@ -14,6 +14,7 @@ import { useState } from 'react';
 interface AgentPromptInputProps {
   onSubmit: (content: string, options?: { agentMode?: string }) => void;
   isSending?: boolean;
+  onStop?: () => void;
   selectedModel?: {
     provider: string;
     model: string;
@@ -29,6 +30,7 @@ interface AgentPromptInputProps {
 export default function AgentPromptInput({
   onSubmit,
   isSending = false,
+  onStop,
   selectedModel,
   onSelectModel,
   agentMode = 'ask',
@@ -76,6 +78,7 @@ export default function AgentPromptInput({
             <PromptInputSubmit
               status={isSending ? 'streaming' : 'ready'}
               disabled={!input.trim() || isSending}
+              onStop={onStop}
             />
           </div>
         </PromptInputFooter>

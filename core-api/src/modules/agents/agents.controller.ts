@@ -295,12 +295,27 @@ export class AgentsController {
     @UserId() userId: string,
     @Res() res: Response,
   ): Promise<void> {
+    // Create an AbortController that will be triggered when client disconnects
+    const abortController = new AbortController();
+
+    // Detect client disconnect via req.on('close')
+    const req = res.req;
+    const onClientDisconnect = () => {
+      if (!res.writableEnded) {
+        abortController.abort();
+      }
+    };
+    if (req?.on) {
+      req.on('close', onClientDisconnect);
+    }
+
     try {
       const { stream, conversationId } =
         await this.agentsCompletionsService.streamMessage(
           dto,
           workspaceId,
           userId,
+          abortController.signal,
         );
 
       res.socket?.setNoDelay(true);
@@ -317,20 +332,41 @@ export class AgentsController {
       try {
         const reader = stream.getReader();
         while (true) {
+          if (abortController.signal.aborted) {
+            await reader.cancel();
+            break;
+          }
+
           const { done, value } = await reader.read();
           if (done) break;
           res.write(`data: ${JSON.stringify(value)}\n\n`);
         }
-        res.end();
+        if (!res.writableEnded) {
+          res.end();
+        }
       } catch (streamError) {
+        if (abortController.signal.aborted) {
+          if (!res.writableEnded) {
+            res.end();
+          }
+          return;
+        }
         const message =
           streamError instanceof Error ? streamError.message : 'Stream error';
-        res.write(
-          `data: ${JSON.stringify({ type: 'error', error: { message } })}\n\n`,
-        );
-        res.end();
+        if (!res.writableEnded) {
+          res.write(
+            `data: ${JSON.stringify({ type: 'error', error: { message } })}\n\n`,
+          );
+          res.end();
+        }
       }
     } catch (error) {
+      if (abortController.signal.aborted) {
+        if (!res.writableEnded) {
+          res.end();
+        }
+        return;
+      }
       if (error instanceof BadRequestException) {
         res.status(400).json({
           message: error.message,
@@ -344,6 +380,10 @@ export class AgentsController {
           error: 'Internal Server Error',
           statusCode: 500,
         });
+      }
+    } finally {
+      if (req?.off) {
+        req.off('close', onClientDisconnect);
       }
     }
   }

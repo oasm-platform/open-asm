@@ -39,6 +39,7 @@ interface StreamCreationParams {
   aiStream: ReadableStream<UIMessageChunk>;
   conversationId: string;
   todosEmitter: EventEmitter;
+  abortSignal?: AbortSignal;
 }
 
 /** Parameters for building streamText call options */
@@ -56,6 +57,8 @@ interface StreamTextOptions {
   tools: ToolSet | undefined;
   /** Shared event emitter for broadcasting todo updates to the stream */
   todosEmitter: EventEmitter;
+  /** Signal to abort the AI provider call */
+  abortSignal?: AbortSignal;
 }
 
 @Injectable()
@@ -666,7 +669,9 @@ export class AgentsCompletionsService {
   private createMergedStream(
     params: StreamCreationParams,
   ): ReadableStream<UIMessageChunk> {
-    const { aiStream, conversationId, todosEmitter } = params;
+    const { aiStream, conversationId, todosEmitter, abortSignal } = params;
+
+    let controllerClosed = false;
 
     return new ReadableStream<UIMessageChunk>({
       async start(controller) {
@@ -689,21 +694,44 @@ export class AgentsCompletionsService {
 
         todosEmitter.on('todos-updated', onTodosUpdated);
 
+        // When abort signal fires, immediately cancel the reader and close the controller
+        const onAbort = () => {
+          if (controllerClosed) return;
+          controllerClosed = true;
+          reader.cancel().catch(() => {});
+          try {
+            controller.close();
+          } catch {
+            // Controller might already be in an error state
+          }
+        };
+
+        if (abortSignal) {
+          abortSignal.addEventListener('abort', onAbort, { once: true });
+        }
+
         try {
           // Read chunks from the AI stream one by one
           while (true) {
+            if (abortSignal?.aborted || controllerClosed) break;
+
             const { done, value } = await reader.read();
-            if (done) break; // Stream finished
-            controller.enqueue(value); // Forward chunk to the merged stream
+            if (done) break;
+            controller.enqueue(value);
           }
         } finally {
-          // Cleanup: remove listener and release the reader
+          controllerClosed = true;
+          if (abortSignal) {
+            abortSignal.removeEventListener('abort', onAbort);
+          }
           todosEmitter.off('todos-updated', onTodosUpdated);
           reader.releaseLock();
         }
 
-        // Close the stream when complete
-        controller.close();
+        if (!controllerClosed) {
+          controllerClosed = true;
+          controller.close();
+        }
       },
     });
   }
@@ -865,6 +893,7 @@ export class AgentsCompletionsService {
       conversationId,
       assistantMessageMetadata,
       tools,
+      abortSignal,
     } = options;
 
     // Accumulate text as chunks arrive during streaming
@@ -872,6 +901,18 @@ export class AgentsCompletionsService {
 
     // Use the shared EventEmitter from caller to communicate todo events between tool calls and the stream
     const { todosEmitter } = options;
+
+    // Check if request was already aborted before starting the AI call
+    if (abortSignal?.aborted) {
+      this.logger.log(`Stream aborted before starting for conversation ${conversationId}`);
+      // Return an empty stream that immediately closes
+      const emptyStream = new ReadableStream<UIMessageChunk>({
+        start(controller) {
+          controller.close();
+        },
+      });
+      return { aiStream: emptyStream, conversationId, todosEmitter };
+    }
 
     // Invoke the AI SDK streamText with all callbacks
     const result = streamText({
@@ -896,10 +937,38 @@ export class AgentsCompletionsService {
       onError: ({ error }) => {
         this.handleToolError(error, llmConfig);
       },
+      // Pass abort signal so AI SDK can cancel the provider call
+      abortSignal,
       // When streaming completes, persist accumulated text to DB
       // persist tool call data (for history rendering on page reload),
       // auto-complete stuck todos, and trigger compaction check
       onFinish: async (event) => {
+        const isAborted = () => abortSignal?.aborted ?? false;
+
+        // Helper to mark the message as aborted when cancellation happens mid-flight
+        const markAborted = async () => {
+          try {
+            await this.messageRepository.update(
+              { id: assistantMessageId },
+              {
+                content: '',
+                metadata: {
+                  ...assistantMessageMetadata,
+                  status: 'aborted',
+                },
+              },
+            );
+          } catch (err) {
+            this.logger.error('Error saving aborted message', err);
+          }
+        };
+
+        // Skip persistence if request was already aborted before onFinish
+        if (isAborted()) {
+          await markAborted();
+          return;
+        }
+
         // Capture tool calls from all steps and persist to tool_calls table
         try {
           const toolCallEntities: AgentMessageToolCall[] = [];
@@ -924,13 +993,24 @@ export class AgentsCompletionsService {
           }
           if (toolCallEntities.length > 0) {
             await this.toolCallRepository.save(toolCallEntities);
+            // If abort fired during DB write, mark message as aborted
+            // and skip remaining persistence
+            if (isAborted()) {
+              await markAborted();
+              return;
+            }
           }
         } catch (err) {
           this.logger.error('Error saving tool calls', err);
         }
 
+        if (isAborted()) {
+          await markAborted();
+          return;
+        }
+
         if (accumulatedText) {
-          this.handleStreamFinish(
+          await this.handleStreamFinish(
             assistantMessageId,
             conversationId,
             accumulatedText,
@@ -939,12 +1019,26 @@ export class AgentsCompletionsService {
           ).catch((err) =>
             this.logger.error('Error in handleStreamFinish', err),
           );
+
+          if (isAborted()) {
+            await markAborted();
+            return;
+          }
         }
 
         // Auto-complete any todos the LLM left "in_progress" (safety net)
+        if (isAborted()) {
+          await markAborted();
+          return;
+        }
         this.autoCompleteStuckTodos(conversationId).catch((err) =>
           this.logger.error('Error in autoCompleteStuckTodos', err),
         );
+
+        if (isAborted()) {
+          await markAborted();
+          return;
+        }
 
         // Asynchronously check and trigger compaction if needed
         // Fire-and-forget: does not block the stream response
@@ -985,6 +1079,7 @@ export class AgentsCompletionsService {
     dto: SendMessageDto,
     workspaceId: string,
     userId: string,
+    abortSignal?: AbortSignal,
   ): Promise<StreamMessageResult> {
     // Step 1: Find or create the conversation
     const conversation = await this.getOrCreateConversation(
@@ -1014,6 +1109,20 @@ export class AgentsCompletionsService {
 
     // Step 7: Create a LanguageModel instance from the config
     const model = this.createLanguageModel(llmConfig);
+
+    // Check if request was aborted before creating assistant message
+    if (abortSignal?.aborted) {
+      this.logger.log(`Stream aborted before assistant message for conversation ${conversation.id}`);
+      const emptyStream = new ReadableStream<UIMessageChunk>({
+        start(controller) {
+          controller.close();
+        },
+      });
+      return {
+        stream: emptyStream,
+        conversationId: conversation.id,
+      };
+    }
 
     // Step 8: Create a placeholder message for the assistant (marks streaming)
     const assistantMessage = await this.saveAssistantMessage(
@@ -1055,6 +1164,7 @@ export class AgentsCompletionsService {
       assistantMessageMetadata: assistantMessage.metadata,
       tools: Object.keys(tools).length > 0 ? tools : undefined,
       todosEmitter, // Pass the same shared emitter so stream events are in sync
+      abortSignal, // Pass abort signal for cancellation
     });
 
     // Step 12: Wrap AI stream into a merged stream (conversation metadata + todos events)
@@ -1062,6 +1172,7 @@ export class AgentsCompletionsService {
       aiStream,
       conversationId: conversation.id,
       todosEmitter, // Same emitter used by todo tools - events will reach the stream
+      abortSignal,
     });
 
     // Step 13: Return stream + conversationId to the controller for the frontend

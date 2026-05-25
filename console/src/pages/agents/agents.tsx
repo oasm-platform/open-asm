@@ -159,6 +159,7 @@ export default function AgentsChatPage() {
     sendMessage,
     setMessages,
     regenerate,
+    stop,
   } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/agents/messages/stream',
@@ -263,6 +264,10 @@ export default function AgentsChatPage() {
     }
   }, [lastAssistantIdx, chatMessages, regenerate]);
 
+  const handleStop = useCallback(() => {
+    stop();
+  }, [stop]);
+
   const onRetryAction = useMemo(() => {
     return lastAssistantIdx !== -1 && !isLoading ? handleRetry : undefined;
   }, [lastAssistantIdx, isLoading, handleRetry]);
@@ -330,6 +335,7 @@ export default function AgentsChatPage() {
         messages={displayMessages}
         onSendMessage={handleSendMessage}
         onRetry={onRetryAction}
+        onStop={handleStop}
         isStreaming={isLoading}
         isLoadingMessages={isLoadingHistory}
         streamError={streamError}
