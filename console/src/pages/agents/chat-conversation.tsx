@@ -66,6 +66,7 @@ interface ChatConversationProps {
 }
 
 interface ToolPart {
+  type: string;
   toolCallId: string;
   toolName?: string;
   state?: string;

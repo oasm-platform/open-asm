@@ -49,7 +49,10 @@ func processJob(ctx context.Context, client *oasm.Client, browser *rod.Browser, 
 		url := strings.TrimSpace(after)
 		jobLogGlobal.Debug("[%s] Capturing screenshot: %s", job.Id, url)
 
-		base64Image, _ := TakeScreenshotBase64(ctx, browser, url)
+		base64Image, err := TakeScreenshotBase64(ctx, browser, url)
+		if err != nil {
+			jobLogGlobal.Warning("[%s] Screenshot capture failed: %v", job.Id, err)
+		}
 		resultData := struct {
 			Screenshot string `json:"screenshot"`
 			URL        string `json:"url"`
