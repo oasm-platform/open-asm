@@ -225,6 +225,7 @@ export class DataAdapterService {
         return;
       }
 
+      const now = new Date();
       const values = data.map((vuln) => {
         const stringHash = `${vuln.name}-${job.asset.id}-${job.tool.id}`;
         const fingerprint = crypto
@@ -239,6 +240,8 @@ export class DataAdapterService {
           asset: { id: job.asset.id },
           jobHistory: { id: job.jobHistory.id },
           tool: { id: job.tool.id },
+          firstDetectedDate: now,
+          lastSeenDate: now,
         };
       });
 
@@ -254,7 +257,7 @@ export class DataAdapterService {
         .values(uniqueValues)
         .orUpdate({
           conflict_target: ['fingerprint'],
-          overwrite: ['updatedAt', 'severity'],
+          overwrite: ['updatedAt', 'severity', 'lastSeenDate'],
         })
         .returning('*')
         .execute();
