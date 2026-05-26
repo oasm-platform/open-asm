@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Terminal,
   TerminalActions,
@@ -7,13 +8,15 @@ import {
   TerminalStatus,
   TerminalTitle,
 } from '@/components/ai-elements/terminal';
-import { TerminalIcon } from 'lucide-react';
+import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import type { ToolCallState } from './tool-call-display';
 
 export function RemoteExecuteTerminal({
   toolCall,
+  streamEvents,
 }: {
   toolCall: ToolCallState;
+  streamEvents?: RemoteExecuteStreamEvent[];
 }) {
   const command = String(
     toolCall.input?.command ||
@@ -38,11 +41,30 @@ export function RemoteExecuteTerminal({
     return '';
   };
 
-  const terminalOutput = parseTerminalOutput(toolCall.output);
-  const isStreaming =
-    toolCall.status === 'pending' || toolCall.status === 'executing';
+  const liveOutput = useMemo(() => {
+    if (!streamEvents || streamEvents.length === 0) {
+      return '';
+    }
+    return streamEvents
+      .filter((e) => e.type === 1 || e.type === 2)
+      .map((e) => e.data)
+      .join('');
+  }, [streamEvents]);
 
-  // Prepend the command as a prompt line with green $ (e.g., $ command)
+  const exitEvent = useMemo(
+    () => streamEvents?.find((e) => e.type === 3),
+    [streamEvents],
+  );
+
+  const errorEvent = useMemo(
+    () => streamEvents?.find((e) => e.type === 4),
+    [streamEvents],
+  );
+
+  const isStreaming = !exitEvent && !errorEvent;
+
+  const terminalOutput = liveOutput || parseTerminalOutput(toolCall.output);
+
   const displayContent = command
     ? `\u001b[32m$\u001b[0m ${command}\n${terminalOutput}`
     : terminalOutput;
@@ -55,7 +77,6 @@ export function RemoteExecuteTerminal({
     >
       <TerminalHeader>
         <TerminalTitle>Terminal</TerminalTitle>
-        <TerminalIcon className="size-4 text-zinc-400" />
         <div className="flex items-center gap-1 ml-auto">
           <TerminalStatus />
           <TerminalActions>

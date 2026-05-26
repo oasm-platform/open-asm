@@ -1,3 +1,4 @@
+import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import { motion } from 'framer-motion';
 import { RemoteExecuteTerminal } from './remote-execute-terminal';
 
@@ -13,11 +14,17 @@ function formatToolName(name: string): string {
   return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function ToolCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
+export function ToolCallDisplay({
+  toolCall,
+  streamEvents,
+}: {
+  toolCall: ToolCallState;
+  streamEvents?: RemoteExecuteStreamEvent[];
+}) {
   const formattedName = formatToolName(toolCall.toolName);
 
   if (toolCall.toolName === 'execute_remote_command') {
-    return <RemoteExecuteTerminal toolCall={toolCall} />;
+    return <RemoteExecuteTerminal toolCall={toolCall} streamEvents={streamEvents} />;
   }
 
   const containerVariants = {

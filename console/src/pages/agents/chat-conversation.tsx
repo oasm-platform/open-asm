@@ -22,6 +22,7 @@ import { Shimmer } from '@/components/ai-elements/shimmer';
 import { Markdown } from '@/components/common/markdown';
 import type { ToolCallState } from '@/components/common/tool-call-display';
 import { ToolCallDisplay } from '@/components/common/tool-call-display';
+import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import type { TextUIPart, UIMessage } from 'ai';
 import {
   AlertCircle,
@@ -63,6 +64,7 @@ interface ChatConversationProps {
   agentMode?: string;
   onAgentModeChange?: (mode: string) => void;
   todos?: AgentTodoItem[];
+  remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
 }
 
 interface ToolPart {
@@ -128,11 +130,13 @@ const ChatMessage = memo(function ChatMessage({
   idx,
   messagesLength,
   isStreaming,
+  remoteExecuteEvents,
 }: {
   message: UIMessage;
   idx: number;
   messagesLength: number;
   isStreaming: boolean;
+  remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
 }) {
   const textContent = getTextContent(message);
   const hasContent = textContent.length > 0;
@@ -203,7 +207,7 @@ const ChatMessage = memo(function ChatMessage({
 
           <AnimatePresence mode="popLayout">
             {toolCallStates.map((state) => (
-              <ToolCallDisplay key={state.toolCallId} toolCall={state} />
+              <ToolCallDisplay key={state.toolCallId} toolCall={state} streamEvents={remoteExecuteEvents?.get(state.toolCallId)} />
             ))}
           </AnimatePresence>
 
@@ -263,6 +267,7 @@ export const ChatConversation = memo(function ChatConversation({
   agentMode = 'false',
   onAgentModeChange,
   todos,
+  remoteExecuteEvents,
 }: ChatConversationProps) {
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const prevStreamingRef = useRef(false);
@@ -449,15 +454,25 @@ export const ChatConversation = memo(function ChatConversation({
                 </div>
               )}
 
-              {messages.map((message, idx) => (
-                <ChatMessage
-                  key={message.id}
-                  message={message}
-                  idx={idx}
-                  messagesLength={messages.length}
-                  isStreaming={isStreaming}
-                />
-              ))}
+              {messages.map((message, idx) => {
+                const hasToolCalls = (message.parts || []).some(
+                  (p) =>
+                    (p.type === 'dynamic-tool' || p.type.startsWith('tool-')) &&
+                    'toolCallId' in p,
+                );
+                return (
+                  <ChatMessage
+                    key={message.id}
+                    message={message}
+                    idx={idx}
+                    messagesLength={messages.length}
+                    isStreaming={isStreaming}
+                    remoteExecuteEvents={
+                      hasToolCalls ? remoteExecuteEvents : undefined
+                    }
+                  />
+                );
+              })}
 
               {hasUnansweredMessage && (
                 <Reasoning

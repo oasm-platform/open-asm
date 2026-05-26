@@ -2,14 +2,11 @@ package worker
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 
@@ -179,13 +176,8 @@ func startRemoteExecuteHandler(ctx context.Context, client *oasm.Client, workspa
 func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandler, sessionID string, command string, sandbox *sessionSandbox, log *oasm.LoggerType, toolPath string) {
 	log.Info("Executing command in session %s: %s", sessionID, command)
 
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
-	} else {
-		cmd = exec.CommandContext(ctx, "sh", "-c", command)
-	}
-
+	wrappedCmd := fmt.Sprintf("(%s) 2>&1", command)
+	cmd := exec.CommandContext(ctx, "sh", "-c", wrappedCmd)
 	cmd.Dir = sandbox.rootPath
 	cmd.SysProcAttr = newSysProcAttr()
 	cmd.Env = setupCmdEnv(toolPath)
@@ -196,15 +188,6 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 		_ = handler.SendError(ctx, fmt.Sprintf("stdout pipe failed: %v", err))
 		return
 	}
-	defer stdoutPipe.Close()
-
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		log.ErrorE("Failed to create stderr pipe", err)
-		_ = handler.SendError(ctx, fmt.Sprintf("stderr pipe failed: %v", err))
-		return
-	}
-	defer stderrPipe.Close()
 
 	if err := cmd.Start(); err != nil {
 		log.ErrorE("Failed to start command", err)
@@ -212,28 +195,26 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 		return
 	}
 
-	var (
-		stdoutRes = new(bytes.Buffer)
-		stderrRes = new(bytes.Buffer)
-	)
+	scanner := bufio.NewScanner(stdoutPipe)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		line = append(line, '\n')
 
-	var wg sync.WaitGroup
+		if sendErr := handler.SendStdout(ctx, line); sendErr != nil {
+			log.ErrorE("Failed to stream output", sendErr)
+			return
+		}
+	}
 
-	wg.Go(func() {
-		streamPipe(ctx, stdoutPipe, handler.SendStdout, log)
-	})
-
-	wg.Go(func() {
-		streamPipe(ctx, stderrPipe, handler.SendStderr, log)
-	})
-
-	wg.Wait()
+	if err := scanner.Err(); err != nil {
+		log.ErrorE("Error reading from pipe", err)
+	}
 
 	exitCode := int32(0)
 	if err := cmd.Wait(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = int32(exitErr.ExitCode())
-			log.Warning("Command failed (code %d): %s\nStderr: %s", exitCode, command, stderrRes.String())
+			log.Warning("Command failed (code %d): %s", exitCode, command)
 		} else {
 			log.ErrorE(fmt.Sprintf("Command failed: %s", command), err)
 			_ = handler.SendError(ctx, fmt.Sprintf("command execution failed: %v", err))
@@ -241,25 +222,8 @@ func executeRemoteCommand(ctx context.Context, handler *oasm.RemoteExecuteHandle
 			return
 		}
 	} else {
-		log.Success("Command completed successfully: %s\nOutput: %s", command, stdoutRes.String())
-		_ = handler.SendExit(ctx, 0)
-	}
-}
-
-func streamPipe(ctx context.Context, pipe io.ReadCloser, sendFunc func(context.Context, []byte) error, log *oasm.LoggerType) {
-	scanner := bufio.NewScanner(pipe)
-
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		line = append(line, '\n')
-
-		if sendErr := sendFunc(ctx, line); sendErr != nil {
-			log.ErrorE("Failed to stream output realtime", sendErr)
-			return
-		}
+		log.Success("Command completed successfully: %s", command)
 	}
 
-	if err := scanner.Err(); err != nil {
-		log.ErrorE("Error reading from pipe scanner", err)
-	}
+	_ = handler.SendExit(ctx, exitCode)
 }

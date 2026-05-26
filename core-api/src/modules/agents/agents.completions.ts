@@ -698,6 +698,21 @@ export class AgentsCompletionsService {
 
         todosEmitter.on('todos-updated', onTodosUpdated);
 
+        // Subscribe to remote-execute-output events from the emitter
+        const onRemoteExecuteOutput = (data: {
+          toolCallId: string;
+          type: number;
+          data: string;
+          exitCode: number;
+        }) => {
+          controller.enqueue({
+            type: 'data-remote-execute-output',
+            data,
+          } as unknown as UIMessageChunk);
+        };
+
+        todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
+
         // When abort signal fires, immediately cancel the reader and close the controller
         const onAbort = () => {
           if (controllerClosed) return;
@@ -728,6 +743,7 @@ export class AgentsCompletionsService {
             abortSignal.removeEventListener('abort', onAbort);
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
+          todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
           reader.releaseLock();
         }
 
@@ -1033,9 +1049,7 @@ export class AgentsCompletionsService {
           accumulatedText,
           llmConfig,
           assistantMessageMetadata,
-        ).catch((err) =>
-          this.logger.error('Error in handleStreamFinish', err),
-        );
+        ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
 
         if (isAborted()) {
           await markAborted();
@@ -1087,7 +1101,10 @@ export class AgentsCompletionsService {
    * The stream stays open until all iterations complete or max iterations reached.
    */
   private createContinuationStream(
-    options: StreamTextOptions & { workspaceId: string; skillsContext?: string },
+    options: StreamTextOptions & {
+      workspaceId: string;
+      skillsContext?: string;
+    },
   ): ReadableStream<UIMessageChunk> {
     const {
       llmConfig,
@@ -1115,7 +1132,11 @@ export class AgentsCompletionsService {
         const onAbort = () => {
           if (controllerClosed) return;
           controllerClosed = true;
-          try { controller.close(); } catch { /* ignore */ }
+          try {
+            controller.close();
+          } catch {
+            /* ignore */
+          }
         };
 
         if (abortSignal) {
@@ -1131,6 +1152,21 @@ export class AgentsCompletionsService {
           } as unknown as UIMessageChunk);
         };
         todosEmitter.on('todos-updated', onTodosUpdated);
+
+        // Subscribe to remote-execute-output events for real-time terminal streaming
+        const onRemoteExecuteOutput = (data: {
+          toolCallId: string;
+          type: number;
+          data: string;
+          exitCode: number;
+        }) => {
+          if (controllerClosed) return;
+          controller.enqueue({
+            type: 'data-remote-execute-output',
+            data,
+          } as unknown as UIMessageChunk);
+        };
+        todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
 
         // Emit initial conversation-created event
         controller.enqueue({
@@ -1185,28 +1221,37 @@ export class AgentsCompletionsService {
             if (!hasPending) break;
 
             // Prepare next iteration context
-            const updatedMessages = await this.getConversationHistory(conversationId);
-            currentModelMessages = this.mapHistoryToModelMessages(updatedMessages);
+            const updatedMessages =
+              await this.getConversationHistory(conversationId);
+            currentModelMessages =
+              this.mapHistoryToModelMessages(updatedMessages);
 
             // Synthesized "continue" message (NOT saved to DB — memory only)
             currentModelMessages.push({
               role: 'user' as const,
-              content: 'Continue executing the pending plan steps. Proceed immediately without asking for confirmation.',
+              content:
+                'Continue executing the pending plan steps. Proceed immediately without asking for confirmation.',
             });
 
             // Create a new assistant message in DB for the next iteration
-            const newAssistant = await this.saveAssistantMessage(conversationId, llmConfig);
+            const newAssistant = await this.saveAssistantMessage(
+              conversationId,
+              llmConfig,
+            );
             currentAssistantMessageId = newAssistant.id;
             currentAssistantMetadata = newAssistant.metadata;
 
             // Rebuild context to reflect updated todos
-            const updatedConversation = await this.conversationRepository.findOne({
-              where: { id: conversationId },
-            });
+            const updatedConversation =
+              await this.conversationRepository.findOne({
+                where: { id: conversationId },
+              });
             if (updatedConversation) {
               // Build system context fresh
               const agentModeVal = agentMode || AgentMode.ASK;
-              const modePrompt = this.getPrompt(`${agentModeVal.toUpperCase()}.md`);
+              const modePrompt = this.getPrompt(
+                `${agentModeVal.toUpperCase()}.md`,
+              );
               const systemPrompt = this.getPrompt('SYSTEM.md');
               const now = new Date();
               const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
@@ -1214,7 +1259,9 @@ export class AgentsCompletionsService {
                 this.agentsMemories.stmFormatForPrompt(conversationId),
                 this.agentsMemories.ltmFormatForPrompt(workspaceId),
               ]);
-              const todosContext = formatTodosToPrompt(updatedConversation.todos ?? []);
+              const todosContext = formatTodosToPrompt(
+                updatedConversation.todos ?? [],
+              );
               const summaryContext = updatedConversation.summary
                 ? `[PREVIOUS CONVERSATION SUMMARY]:\n${updatedConversation.summary}`
                 : '';
@@ -1244,10 +1291,15 @@ export class AgentsCompletionsService {
             abortSignal.removeEventListener('abort', onAbort);
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
+          todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
         }
 
         if (!controllerClosed && !abortSignal?.aborted) {
-          try { controller.close(); } catch { /* ignore */ }
+          try {
+            controller.close();
+          } catch {
+            /* ignore */
+          }
         }
       },
     });
@@ -1338,10 +1390,11 @@ export class AgentsCompletionsService {
 
     // Step 10.5: Add skills context and loadSkill tool
     let skillsContext: string | undefined;
-    const skillsPrompt = await this.agentsSkillsService.buildSkillsPrompt(workspaceId);
-    let loadSkillTool: ReturnType<
-      AgentsSkillsService['createLoadSkillTool']
-    > | undefined;
+    const skillsPrompt =
+      await this.agentsSkillsService.buildSkillsPrompt(workspaceId);
+    let loadSkillTool:
+      | ReturnType<AgentsSkillsService['createLoadSkillTool']>
+      | undefined;
     if (skillsPrompt) {
       contextParts.push(skillsPrompt);
       skillsContext = skillsPrompt;
@@ -1356,6 +1409,7 @@ export class AgentsCompletionsService {
       ...(this.agentTool.getTools(
         workspaceId,
         agentMode,
+        todosEmitter,
       ) as ToolSet),
       ...(this.agentTool.getTodoTools(
         conversation.id,

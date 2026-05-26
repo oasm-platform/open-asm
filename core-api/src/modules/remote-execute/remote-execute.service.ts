@@ -122,6 +122,7 @@ export class RemoteExecuteService {
     command: string,
     sessionId: string,
     timeoutMs = 60_000,
+    onEvent?: (event: { type: ResultEventType; data: string; exitCode: number }) => void,
   ): Promise<RemoteCommandResult> {
     const channel = `remote-execute:results:${sessionId}`;
 
@@ -155,6 +156,12 @@ export class RemoteExecuteService {
           exitCode: parsed.exitCode,
         };
         events.push(event);
+
+        try {
+          onEvent?.({ type: event.type, data: event.data, exitCode: event.exitCode });
+        } catch {
+          // Callback must not throw; silently ignore to avoid hanging execution
+        }
 
         this.logger.log(
           `[waitForResult] Event type: ${event.type}, exitCode: ${event.exitCode}`,
