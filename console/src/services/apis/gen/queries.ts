@@ -1259,6 +1259,8 @@ export type Vulnerability = {
   extractedResults: string[];
   publicationDate: string;
   modificationDate: string;
+  firstDetectedDate: string;
+  lastSeenDate: string;
   tool: Tool;
   asset: Asset;
   vulnerabilityDismissal: VulnerabilityDismissal;

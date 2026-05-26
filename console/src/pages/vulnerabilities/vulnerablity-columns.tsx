@@ -146,17 +146,34 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
     },
   },
   {
-    accessorKey: 'createdAt',
-    header: 'Created At',
+    accessorKey: 'firstDetectedDate',
+    header: 'First Seen',
     size: 120,
     cell: ({ row }) => {
-      const value: string = row.getValue('createdAt');
+      const value: string = row.getValue('firstDetectedDate');
       return (
         <div className="min-h-[60px] flex items-center">
           {value ? (
             <div>{new Date(value).toLocaleDateString()}</div>
           ) : (
-            <div className="text-muted-foreground">Not matched</div>
+            <div className="text-muted-foreground">-</div>
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: 'lastSeenDate',
+    header: 'Last Seen',
+    size: 120,
+    cell: ({ row }) => {
+      const value: string = row.getValue('lastSeenDate');
+      return (
+        <div className="min-h-[60px] flex items-center">
+          {value ? (
+            <div>{new Date(value).toLocaleDateString()}</div>
+          ) : (
+            <div className="text-muted-foreground">-</div>
           )}
         </div>
       );
