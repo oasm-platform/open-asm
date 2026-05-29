@@ -226,3 +226,8 @@ export enum AgentMode {
   ASK = 'ask',
   AGENT = 'agent',
 }
+
+export enum EventStreamType {
+  WORKFLOW_STARTED = 'workflow_started',
+  WORKFLOW_COMPLETED = 'workflow_completed',
+}

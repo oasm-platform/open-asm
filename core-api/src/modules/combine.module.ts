@@ -22,6 +22,7 @@ import { WorkersModule } from './workers/workers.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { AgentsModule } from './agents/agents.module';
+import { EventHubModule } from './event-hub/event-hub.module';
 import { RemoteExecuteModule } from './remote-execute/remote-execute.module';
 
 @Module({
@@ -52,6 +53,7 @@ import { RemoteExecuteModule } from './remote-execute/remote-execute.module';
     InternalNetworksModule,
     AgentsModule,
     RemoteExecuteModule,
+    EventHubModule,
   ],
 })
 export class CombineModule {}
