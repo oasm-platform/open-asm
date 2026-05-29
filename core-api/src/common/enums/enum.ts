@@ -226,3 +226,9 @@ export enum AgentMode {
   ASK = 'ask',
   AGENT = 'agent',
 }
+
+export enum DefaultWorkflow {
+  DOMAIN_DISCOVERY = 'domain_discovery.yaml',
+  IP_ADDRESS_DISCOVERY = 'ip_address_discovery.yaml',
+  VULNERABILITY_SCAN_BASIC = 'vulnerability_scan_basic.yaml',
+}
