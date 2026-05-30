@@ -121,10 +121,12 @@ export default function IssuesTimeline() {
             />
             <Area
               dataKey="vuls"
-              type="linear"
-              fill="none"
-              stroke="#a1a1aa"
+              type="basis"
+              fill="hsl(var(--primary) / 0.1)"
+              stroke="hsl(var(--primary))"
               strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
               stackId="a"
               isAnimationActive={true}
               animationDuration={1500}
