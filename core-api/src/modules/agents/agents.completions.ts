@@ -812,9 +812,14 @@ export class AgentsCompletionsService {
 
   /**
    * Retrieves the effective context window for a given LLM config.
-   * Priority: contextWindow column (user override) > OpenRouter cache > default (8192).
+   * Priority: contextWindow column (user override) > default (128k).
+   * The contextWindow column is set by the user when creating/updating
+   * an LLM config. If not set, falls back to the default.
    */
-  private getModelContextWindow(_llmConfig: AgentLLMConfig): number {
+  private getModelContextWindow(llmConfig: AgentLLMConfig): number {
+    if (llmConfig.contextWindow && llmConfig.contextWindow > 0) {
+      return llmConfig.contextWindow;
+    }
     return AgentsCompletionsService.DEFAULT_CONTEXT_WINDOW;
   }
 
@@ -1167,14 +1172,20 @@ export class AgentsCompletionsService {
           return;
         }
 
-        // Auto-complete any todos the LLM left "in_progress" (safety net)
+        // Auto-complete any todos the LLM left "in_progress" (safety net).
+        // Skip in AGENT mode — the continuation loop in createContinuationStream
+        // will call this AFTER all iterations complete, preventing a race condition
+        // where autoCompleteStuckTodos marks in_progress todos as completed before
+        // the continuation loop can detect them as still pending.
         if (isAborted()) {
           await markAborted();
           return;
         }
-        this.autoCompleteStuckTodos(conversationId).catch((err) =>
-          this.logger.error('Error in autoCompleteStuckTodos', err),
-        );
+        if (options.agentMode !== AgentMode.AGENT) {
+          this.autoCompleteStuckTodos(conversationId).catch((err) =>
+            this.logger.error('Error in autoCompleteStuckTodos', err),
+          );
+        }
 
         if (isAborted()) {
           await markAborted();
@@ -1289,31 +1300,41 @@ export class AgentsCompletionsService {
           for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
             if (abortSignal?.aborted || controllerClosed) break;
 
-            // Execute a single streamText iteration
-            const { aiStream } = this.executeStreamText({
-              llmConfig,
-              model,
-              modelMessages: currentModelMessages,
-              contextParts: currentContextParts,
-              assistantMessageId: currentAssistantMessageId,
-              conversationId,
-              assistantMessageMetadata: currentAssistantMetadata,
-              tools: options.tools,
-              todosEmitter,
-              abortSignal,
-              agentMode,
-            });
+            try {
+              // Execute a single streamText iteration
+              const { aiStream } = this.executeStreamText({
+                llmConfig,
+                model,
+                modelMessages: currentModelMessages,
+                contextParts: currentContextParts,
+                assistantMessageId: currentAssistantMessageId,
+                conversationId,
+                assistantMessageMetadata: currentAssistantMetadata,
+                tools: options.tools,
+                todosEmitter,
+                abortSignal,
+                agentMode,
+              });
 
-            // Pump chunks from this iteration's stream
-            const reader = aiStream.getReader();
-            while (true) {
-              if (abortSignal?.aborted || controllerClosed) {
-                await reader.cancel().catch(() => {});
-                break;
+              // Pump chunks from this iteration's stream
+              const reader = aiStream.getReader();
+              while (true) {
+                if (abortSignal?.aborted || controllerClosed) {
+                  await reader.cancel().catch(() => {});
+                  break;
+                }
+                const { done, value } = await reader.read();
+                if (done || controllerClosed) break;
+                controller.enqueue(value);
               }
-              const { done, value } = await reader.read();
-              if (done || controllerClosed) break;
-              controller.enqueue(value);
+            } catch (iterationError) {
+              this.logger.error(
+                `[Continuation] Error in iteration ${iteration} for ${conversationId}`,
+                iterationError,
+              );
+              // Break out of the loop but don't crash — the finally block
+              // will clean up, and autoCompleteStuckTodos runs below.
+              break;
             }
 
             if (abortSignal?.aborted || controllerClosed) break;
@@ -1403,6 +1424,17 @@ export class AgentsCompletionsService {
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
           todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+
+          // Auto-complete stuck in_progress todos AFTER all continuation
+          // iterations are done. This prevents the race condition where
+          // autoCompleteStuckTodos (previously called per-iteration in
+          // onFinish) would mark todos as completed before the continuation
+          // loop could detect them as still pending.
+          if (isAgentMode && !abortSignal?.aborted) {
+            this.autoCompleteStuckTodos(conversationId).catch((err) =>
+              this.logger.error('Error in autoCompleteStuckTodos', err),
+            );
+          }
         }
 
         if (!controllerClosed && !abortSignal?.aborted) {

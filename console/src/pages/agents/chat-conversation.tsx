@@ -254,10 +254,16 @@ const ChatMessage = memo(function ChatMessage({
           input?: unknown;
           output?: unknown;
         };
+        // ToolUIPart encodes toolName in the type field ('tool-{name}'),
+        // while DynamicToolUIPart has it as a direct field.
+        const effectiveToolName =
+          part.type === 'dynamic-tool'
+            ? tp.toolName || 'dynamic-tool'
+            : part.type.replace(/^tool-/, '');
         renderItems.push({
           kind: 'tool',
           toolCallId: tp.toolCallId,
-          toolName: tp.toolName || 'dynamic-tool',
+          toolName: effectiveToolName,
           state: getToolStatus(tp.state),
           input: tp.input,
           output: tp.output,
