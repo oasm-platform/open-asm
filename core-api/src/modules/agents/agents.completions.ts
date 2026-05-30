@@ -27,56 +27,11 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { AgentMessageToolCall } from './entities/tool-call.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
-import { getLLMProviderConfig } from './llm-provider-supported';
+import {
+  getLLMProviderConfig,
+  getReasoningProviderOptions,
+} from './llm-provider-supported';
 import { TokenCounter } from './shared/token-counter';
-
-/**
- * Returns provider-specific reasoning/thinking options for streamText.
- * Each provider has its own configuration format — the AI SDK normalizes
- * the output into a consistent `reasoning` part type on the stream.
- */
- 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getReasoningProviderOptions(
-  provider: LLMProvider,
-): Record<string, any> | undefined {
-  switch (provider) {
-    case LLMProvider.ANTHROPIC:
-      return {
-        anthropic: {
-          thinking: { type: 'enabled', budgetTokens: 10000 },
-        },
-      };
-    case LLMProvider.OPENAI:
-      return {
-        openai: {
-          reasoningEffort: 'high',
-          reasoningSummary: 'auto',
-        },
-      };
-    case LLMProvider.GEMINI:
-      return {
-        google: {
-          thinkingConfig: { thinkingBudget: 10000, includeThoughts: true },
-        },
-      };
-    case LLMProvider.OPENROUTER:
-    case LLMProvider.KILO_CODE:
-      // OpenRouter and Kilo use OpenAI-compatible APIs
-      return {
-        openai: {
-          reasoningEffort: 'high',
-          reasoningSummary: 'auto',
-        },
-      };
-    case LLMProvider.CUSTOM:
-      // Custom providers may or may not support reasoning;
-      // pass OpenAI-style options as a best-effort attempt
-      return undefined;
-    default:
-      return undefined;
-  }
-}
 
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
