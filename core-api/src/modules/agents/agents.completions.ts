@@ -30,6 +30,51 @@ import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
 import { getLLMProviderConfig } from './llm-provider-supported';
 import { TokenCounter } from './shared/token-counter';
 
+/**
+ * Returns provider-specific reasoning/thinking options for streamText.
+ * Each provider has its own configuration format — the AI SDK normalizes
+ * the output into a consistent `reasoning` part type on the stream.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getReasoningProviderOptions(provider: LLMProvider): Record<string, any> | undefined {
+  switch (provider) {
+    case LLMProvider.ANTHROPIC:
+      return {
+        anthropic: {
+          thinking: { type: 'enabled', budgetTokens: 10000 },
+        },
+      };
+    case LLMProvider.OPENAI:
+      return {
+        openai: {
+          reasoningEffort: 'high',
+          reasoningSummary: 'detailed',
+        },
+      };
+    case LLMProvider.GEMINI:
+      return {
+        google: {
+          thinkingConfig: { thinkingBudget: 10000 },
+        },
+      };
+    case LLMProvider.OPENROUTER:
+    case LLMProvider.KILO_CODE:
+      // OpenRouter and Kilo use OpenAI-compatible APIs
+      return {
+        openai: {
+          reasoningEffort: 'high',
+          reasoningSummary: 'detailed',
+        },
+      };
+    case LLMProvider.CUSTOM:
+      // Custom providers may or may not support reasoning;
+      // pass OpenAI-style options as a best-effort attempt
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
   conversationId: string;
@@ -293,10 +338,27 @@ export class AgentsCompletionsService {
     assistantMsgId: string,
     conversationId: string,
     accumulatedText: string,
+    accumulatedReasoning: string,
     llmConfig: AgentLLMConfig,
     assistantMsgMetadata: Record<string, unknown> | undefined,
   ): Promise<void> {
     try {
+      // Save reasoning text as a separate THINKING message if present
+      if (accumulatedReasoning.trim()) {
+        const thinkingMessage = this.messageRepository.create({
+          conversationId,
+          role: MessageRole.ASSISTANT,
+          content: accumulatedReasoning.trim(),
+          messageType: MessageType.THINKING,
+          metadata: {
+            model: llmConfig.model,
+            provider: llmConfig.provider,
+            status: 'completed',
+          },
+        });
+        await this.messageRepository.save(thinkingMessage);
+      }
+
       await this.messageRepository.update(
         { id: assistantMsgId },
         {
@@ -389,6 +451,10 @@ export class AgentsCompletionsService {
         messages: [{ role: 'user', content: prompt }],
         tools,
         stopWhen: stepCountIs(10),
+        ...(() => {
+          const opts = getReasoningProviderOptions(llmConfig.provider);
+          return opts ? { providerOptions: opts } : {};
+        })(),
         onChunk: ({ chunk }) => {
           if (chunk.type === 'text-delta') {
             accumulatedText += chunk.text;
@@ -918,8 +984,9 @@ export class AgentsCompletionsService {
       abortSignal,
     } = options;
 
-    // Accumulate text as chunks arrive during streaming
+    // Accumulate text and reasoning as chunks arrive during streaming
     let accumulatedText = '';
+    let accumulatedReasoning = '';
 
     // Use the shared EventEmitter from caller to communicate todo events between tool calls and the stream
     const { todosEmitter } = options;
@@ -946,22 +1013,24 @@ export class AgentsCompletionsService {
     // Invoke the AI SDK streamText with all callbacks
     const result = streamText({
       model,
-      // System message containing the assembled context
-      messages: [
-        {
-          role: 'system' as const,
-          content: contextParts.join('\n\n'),
-        },
-        ...modelMessages,
-      ],
+      // System context passed via dedicated option (avoids prompt injection risk)
+      system: contextParts.join('\n\n'),
+      messages: modelMessages,
       // Only include tools if available (models without tool support will error here)
       ...(tools ? { tools, stopWhen: stepCountIs(10) } : {}),
+      // Enable reasoning/thinking via provider-specific options
+      ...(() => {
+        const opts = getReasoningProviderOptions(llmConfig.provider);
+        return opts ? { providerOptions: opts } : {};
+      })(),
       // AGENT mode needs more output tokens for multi-step execution
       ...(maxOutputTokens ? { maxOutputTokens } : {}),
-      // Accumulate text-delta chunks as they arrive
+      // Accumulate text-delta and reasoning chunks as they arrive
       onChunk: ({ chunk }) => {
         if (chunk.type === 'text-delta') {
           accumulatedText += chunk.text;
+        } else if (chunk.type === 'reasoning-delta') {
+          accumulatedReasoning += chunk.text;
         }
       },
       // Handle errors (especially tool-calling errors)
@@ -1047,6 +1116,7 @@ export class AgentsCompletionsService {
           assistantMessageId,
           conversationId,
           accumulatedText,
+          accumulatedReasoning,
           llmConfig,
           assistantMessageMetadata,
         ).catch((err) => this.logger.error('Error in handleStreamFinish', err));

@@ -329,7 +329,8 @@ export class AgentsController {
       res.socket?.setNoDelay(true);
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
-      res.setHeader('Content-Encoding', 'none');
+      res.setHeader('Content-Encoding', 'identity');
+      res.setHeader('Connection', 'keep-alive');
       res.setHeader(
         'X-Conversation-Id',
         conversationId || dto.conversationId || '',
@@ -349,7 +350,9 @@ export class AgentsController {
           if (done) break;
           res.write(`data: ${JSON.stringify(value)}\n\n`);
         }
+        // Send [DONE] marker to properly terminate the SSE stream
         if (!res.writableEnded) {
+          res.write('data: [DONE]\n\n');
           res.end();
         }
       } catch (streamError) {
