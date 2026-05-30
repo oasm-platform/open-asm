@@ -538,6 +538,7 @@ export class AgentsService {
         content: m.content,
         messageType: m.messageType,
         metadata: m.metadata,
+        parts: m.parts,
         toolCalls: toolCallsByMessageId.get(m.id) ?? [],
         createdAt: m.createdAt,
       })),

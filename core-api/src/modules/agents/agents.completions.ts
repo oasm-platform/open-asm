@@ -35,7 +35,7 @@ import { TokenCounter } from './shared/token-counter';
  * Each provider has its own configuration format — the AI SDK normalizes
  * the output into a consistent `reasoning` part type on the stream.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function getReasoningProviderOptions(
   provider: LLMProvider,
 ): Record<string, any> | undefined {
@@ -345,33 +345,6 @@ export class AgentsCompletionsService {
     assistantMsgMetadata: Record<string, unknown> | undefined,
   ): Promise<void> {
     try {
-      // Save reasoning text as a separate THINKING message if present.
-      // The THINKING message must appear BEFORE the assistant TEXT message
-      // in chronological order so the frontend renders reasoning → tools → text.
-      // Since the assistant message was created before streaming started, we
-      // reuse its createdAt so the THINKING message sorts correctly.
-      if (accumulatedReasoning.trim()) {
-        const assistantMessage = await this.messageRepository.findOne({
-          where: { id: assistantMsgId },
-          select: ['createdAt'],
-        });
-        const thinkingCreatedAt = assistantMessage?.createdAt ?? new Date();
-
-        const thinkingMessage = this.messageRepository.create({
-          conversationId,
-          role: MessageRole.ASSISTANT,
-          content: accumulatedReasoning.trim(),
-          messageType: MessageType.THINKING,
-          createdAt: thinkingCreatedAt,
-          metadata: {
-            model: llmConfig.model,
-            provider: llmConfig.provider,
-            status: 'completed',
-          },
-        });
-        await this.messageRepository.save(thinkingMessage);
-      }
-
       await this.messageRepository.update(
         { id: assistantMsgId },
         {
@@ -1125,40 +1098,51 @@ export class AgentsCompletionsService {
           return;
         }
 
-        // Build the chronological parts array from event.steps.
-        // Each step may contain reasoning, tool calls, and text — they are
-        // assembled in the order they actually occurred so the frontend can
-        // render thought → tool call → text → thought → … correctly.
-        try {
-          const parts: Record<string, unknown>[] = [];
-          for (const step of event.steps) {
-            const stepReasoning =
-              typeof step.reasoning === 'string' ? step.reasoning : '';
-            if (stepReasoning.trim()) {
-              parts.push({ type: 'reasoning', text: stepReasoning.trim() });
+          // Build the chronological parts array from event.steps.
+          // Each step may contain reasoning, tool calls, and text — they are
+          // assembled in the order they actually occurred so the frontend can
+          // render thought → tool call → text → thought → … correctly.
+          // Also fallback to accumulatedReasoning for providers that stream
+          // reasoning-delta chunks but don't populate step.reasoning.
+          try {
+            const parts: Record<string, unknown>[] = [];
+            let hasReasoningPart = false;
+            for (const step of event.steps) {
+              const stepReasoning =
+                typeof step.reasoning === 'string' ? step.reasoning : '';
+              if (stepReasoning.trim()) {
+                parts.push({ type: 'reasoning', text: stepReasoning.trim() });
+                hasReasoningPart = true;
+              }
+              for (const tc of step.toolCalls) {
+                const toolResult = step.toolResults.find(
+                  (r) => r.toolCallId === tc.toolCallId,
+                );
+                parts.push({
+                  type: 'dynamic-tool',
+                  toolCallId: tc.toolCallId,
+                  toolName: tc.toolName,
+                  state: toolResult
+                    ? 'output-available'
+                    : 'input-available',
+                  input: tc.input,
+                  output: toolResult?.output ?? null,
+                });
+              }
+              const stepText =
+                typeof step.text === 'string' ? step.text : '';
+              if (stepText.trim()) {
+                parts.push({ type: 'text', text: stepText.trim() });
+              }
             }
-            for (const tc of step.toolCalls) {
-              const toolResult = step.toolResults.find(
-                (r) => r.toolCallId === tc.toolCallId,
-              );
-              parts.push({
-                type: 'dynamic-tool',
-                toolCallId: tc.toolCallId,
-                toolName: tc.toolName,
-                state: toolResult
-                  ? 'output-available'
-                  : 'input-available',
-                input: tc.input,
-                output: toolResult?.output ?? null,
+            // Fallback: if no reasoning from steps but we accumulated it during streaming
+            if (!hasReasoningPart && accumulatedReasoning.trim()) {
+              parts.unshift({
+                type: 'reasoning',
+                text: accumulatedReasoning.trim(),
               });
             }
-            const stepText =
-              typeof step.text === 'string' ? step.text : '';
-            if (stepText.trim()) {
-              parts.push({ type: 'text', text: stepText.trim() });
-            }
-          }
-          if (parts.length > 0) {
+            if (parts.length > 0) {
             await this.messageRepository.update(
               { id: assistantMessageId },
               // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any

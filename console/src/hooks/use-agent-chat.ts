@@ -68,7 +68,7 @@ function mapDbMessagesToUI(
 
   if (dataArray.length === 0) return [];
 
-  return dataArray.map((msg) => {
+  const result: UIMessage[] = dataArray.map((msg) => {
     const m = msg as Record<string, unknown>;
     const msgId = String(m.id ?? '');
     const role = String(m.role ?? 'user').toLowerCase() as 'user' | 'assistant';
@@ -126,6 +126,26 @@ function mapDbMessagesToUI(
       createdAt: m.createdAt ? new Date(String(m.createdAt)) : new Date(),
     };
   });
+
+  // Remove legacy THINKING-only messages whose reasoning is already captured
+  // in the next assistant message's parts (prevents duplicate reasoning display).
+  for (let i = 0; i < result.length; i++) {
+    const msg = result[i];
+    if (msg.role !== 'assistant') continue;
+    const hasOnlyReasoning =
+      msg.parts.length === 1 && msg.parts[0]?.type === 'reasoning';
+    if (!hasOnlyReasoning) continue;
+    const nextMsg = result[i + 1];
+    if (
+      nextMsg?.role === 'assistant' &&
+      nextMsg.parts.some((p) => p.type === 'reasoning')
+    ) {
+      result.splice(i, 1);
+      i--;
+    }
+  }
+
+  return result;
 }
 
 export function useAgentChat({

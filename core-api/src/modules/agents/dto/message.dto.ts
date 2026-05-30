@@ -88,6 +88,8 @@ export class MessageResponseDto {
     required: false,
     description:
       'Chronological parts array preserving the real order of reasoning, tool calls, and text.',
+    type: 'array',
+    items: { type: 'object' },
   })
   @IsOptional()
   @IsArray()
