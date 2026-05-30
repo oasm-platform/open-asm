@@ -1,5 +1,14 @@
-import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import {
+  CheckCircleIcon,
+  CircleIcon,
+  ClockIcon,
+  WrenchIcon,
+  XCircleIcon,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
+import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import { RemoteExecuteTerminal } from './remote-execute-terminal';
 
 export interface ToolCallState {
@@ -9,6 +18,16 @@ export interface ToolCallState {
   input?: Record<string, unknown>;
   output?: unknown;
 }
+
+const statusConfig: Record<
+  ToolCallState['status'],
+  { label: string; icon: typeof CheckCircleIcon; color: string }
+> = {
+  pending: { label: 'Pending', icon: CircleIcon, color: 'text-muted-foreground' },
+  executing: { label: 'Running', icon: ClockIcon, color: 'text-blue-500' },
+  completed: { label: 'Done', icon: CheckCircleIcon, color: 'text-green-500' },
+  error: { label: 'Error', icon: XCircleIcon, color: 'text-red-500' },
+};
 
 function formatToolName(name: string): string {
   return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -21,64 +40,36 @@ export function ToolCallDisplay({
   toolCall: ToolCallState;
   streamEvents?: RemoteExecuteStreamEvent[];
 }) {
-  const formattedName = formatToolName(toolCall.toolName);
-
   if (toolCall.toolName === 'execute_remote_command') {
-    return <RemoteExecuteTerminal toolCall={toolCall} streamEvents={streamEvents} />;
+    return (
+      <RemoteExecuteTerminal toolCall={toolCall} streamEvents={streamEvents} />
+    );
   }
 
-  const containerVariants = {
-    hidden: {},
-    visible: {
-      backgroundPosition: ['200% 0', '-200% 0'],
-      transition: {
-        staggerChildren: 0.04,
-        backgroundPosition: {
-          repeat: Infinity,
-          duration: 2,
-          ease: 'linear',
-        },
-      },
-    },
-    exit: {
-      transition: {
-        staggerChildren: 0.02,
-        staggerDirection: -1,
-      },
-    },
-  };
-
-  const letterVariants = {
-    hidden: { opacity: 0, display: 'none' },
-    visible: { opacity: 1, display: 'inline-block' },
-    exit: { opacity: 0, transition: { duration: 0.08 } },
-  };
+  const config = statusConfig[toolCall.status];
+  const StatusIcon = config.icon;
 
   return (
-    <div className="flex items-center gap-1.5 text-muted-foreground italic select-none">
-      <motion.span
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        className="bg-linear-to-r from-gray-400 via-white to-gray-400 bg-clip-text text-transparent bg-[length:200%_100%]"
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="flex items-center gap-2 text-sm"
+    >
+      <WrenchIcon className="size-3.5 text-muted-foreground shrink-0" />
+      <span className="font-medium truncate">
+        {formatToolName(toolCall.toolName)}
+      </span>
+      <Badge
+        variant="secondary"
+        className={cn(
+          'gap-1 rounded-full text-xs shrink-0',
+          toolCall.status === 'executing' && 'animate-pulse',
+        )}
       >
-        {formattedName.split('').map((char, index) => (
-          <motion.span key={index} variants={letterVariants} exit="exit">
-            {char === ' ' ? '\u00A0' : char}
-          </motion.span>
-        ))}
-      </motion.span>
-      <motion.span
-        animate={
-          toolCall.status === 'executing'
-            ? { opacity: [0.3, 1, 0.3] }
-            : { opacity: 1 }
-        }
-        transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
-      >
-        …
-      </motion.span>
-    </div>
+        <StatusIcon className={cn('size-3', config.color)} />
+        {config.label}
+      </Badge>
+    </motion.div>
   );
 }

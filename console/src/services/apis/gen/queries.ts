@@ -1505,6 +1505,8 @@ export const MessageResponseDtoMessageType = {
 
 export type MessageResponseDtoMetadata = { [key: string]: unknown };
 
+export type MessageResponseDtoPartsItem = { [key: string]: unknown };
+
 export type MessageResponseDto = {
   id: string;
   conversationId: string;
@@ -1512,6 +1514,8 @@ export type MessageResponseDto = {
   content: string;
   messageType: MessageResponseDtoMessageType;
   metadata?: MessageResponseDtoMetadata;
+  /** Chronological parts array preserving the real order of reasoning, tool calls, and text. */
+  parts?: MessageResponseDtoPartsItem[];
   toolCalls?: ToolCallResponseDto[];
   createdAt: string;
 };

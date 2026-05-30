@@ -23,18 +23,17 @@ import { Markdown } from '@/components/common/markdown';
 import type { ToolCallState } from '@/components/common/tool-call-display';
 import { ToolCallDisplay } from '@/components/common/tool-call-display';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { TextUIPart, UIMessage } from 'ai';
 import {
   AlertCircle,
-  Bot,
   CheckIcon,
   CopyIcon,
-  Loader2,
   RefreshCcwIcon,
   ShieldAlert,
   X,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   memo,
   useCallback,
@@ -44,6 +43,10 @@ import {
   useRef,
   useState,
 } from 'react';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface ChatConversationProps {
   messages: UIMessage[];
@@ -67,38 +70,80 @@ interface ChatConversationProps {
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
 }
 
-interface ToolPart {
-  type: string;
-  toolCallId: string;
-  toolName?: string;
-  state?: string;
-  input?: unknown;
-  output?: unknown;
-  isError?: boolean;
-}
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function getToolStatus(state?: string): ToolCallState['status'] {
   if (!state) return 'pending';
   if (state === 'output-available' || state === 'result') return 'completed';
   if (state === 'output-error') return 'error';
-  if (state === 'call' || state === 'input-available' || state === 'input-streaming')
+  if (
+    state === 'call' ||
+    state === 'input-available' ||
+    state === 'input-streaming'
+  )
     return 'executing';
   return 'pending';
 }
 
-const getTextContent = (message: UIMessage): string => {
-  const parts = message.parts;
-  if (!parts || parts.length === 0) return '';
-
-  return parts
+function getTextContent(message: UIMessage): string {
+  const partsText = (message.parts || [])
     .filter((part): part is TextUIPart => part.type === 'text')
     .map((part) => part.text)
     .join('');
-};
-
-function isToolPart(part: unknown): part is ToolPart {
-  return !!part && typeof part === 'object' && 'toolCallId' in part;
+  return partsText || '';
 }
+
+// ---------------------------------------------------------------------------
+// ThinkingLabel — shared between streaming and history
+// ---------------------------------------------------------------------------
+
+function ThinkingLabel({
+  isStreaming,
+  duration,
+}: {
+  isStreaming: boolean;
+  duration?: number;
+}) {
+  if (isStreaming || duration === 0) {
+    return (
+      <span className="inline-flex items-center gap-2 min-w-0">
+        <Shimmer duration={1}>Thinking</Shimmer>
+      </span>
+    );
+  }
+  if (duration === undefined) return <span>Thought for a few seconds</span>;
+  return <span>Thought for {duration} seconds</span>;
+}
+
+// ---------------------------------------------------------------------------
+// TypingDots — animated dots for streaming indicator
+// ---------------------------------------------------------------------------
+
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="size-1 rounded-full bg-muted-foreground"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{
+            duration: 1,
+            repeat: Infinity,
+            delay: i * 0.2,
+            ease: 'easeInOut',
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CopyButton
+// ---------------------------------------------------------------------------
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -125,6 +170,10 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// ChatMessage
+// ---------------------------------------------------------------------------
+
 const ChatMessage = memo(function ChatMessage({
   message,
   idx,
@@ -145,109 +194,320 @@ const ChatMessage = memo(function ChatMessage({
   const isStreamingActive = isLastAssistant && isStreaming;
 
   const parts = message.parts || [];
-
-  const reasoningParts = parts.filter(
-    (part): part is Extract<typeof part, { type: 'reasoning' }> =>
-      part.type === 'reasoning',
-  );
-  const reasoningText = reasoningParts.map((p) => p.text).join('\n\n');
-  const hasReasoning = reasoningParts.length > 0;
   const lastPart = parts.at(-1);
+
+  // Show "Thinking" shimmer when streaming starts but no parts yet
+  const showInitialThinking =
+    isStreamingActive && parts.length === 0;
+
+  // Reasoning is actively streaming if the last part is a reasoning part
   const isReasoningStreaming =
     isStreamingActive && lastPart?.type === 'reasoning';
 
-  const toolPartsMap = new Map<string, ToolPart>();
-  for (const p of parts) {
-    if ((p.type === 'dynamic-tool' || p.type.startsWith('tool-')) && isToolPart(p)) {
-      toolPartsMap.set(p.toolCallId, p);
+  // Show "Generating" when streaming but no text content yet
+  const showGenerating =
+    isStreamingActive &&
+    !hasContent &&
+    !showInitialThinking &&
+    !isReasoningStreaming;
+
+  // Build interleaved render list: group consecutive reasoning parts together,
+  // but keep tool calls and text parts in their actual positions.
+  type RenderItem =
+    | { kind: 'reasoning'; text: string; isStreaming: boolean }
+    | { kind: 'tool'; toolCallId: string; toolName: string; state: string; input?: unknown; output?: unknown }
+    | { kind: 'text'; text: string }
+    | { kind: 'generating' }
+    | { kind: 'initial-thinking' };
+
+  const renderItems: RenderItem[] = [];
+
+  // Group consecutive reasoning parts into a single reasoning block
+  let pendingReasoning = '';
+  const flushReasoning = (streaming: boolean) => {
+    if (pendingReasoning.trim()) {
+      renderItems.push({ kind: 'reasoning', text: pendingReasoning, isStreaming: streaming });
+      pendingReasoning = '';
+    }
+  };
+
+  for (const part of parts) {
+    if (part.type === 'reasoning' && 'text' in part) {
+      pendingReasoning += (pendingReasoning ? '\n\n' : '') + (part as { text: string }).text;
+    } else {
+      // Flush any accumulated reasoning before non-reasoning part
+      flushReasoning(false);
+
+      if (part.type === 'text' && 'text' in part) {
+        const text = (part as { text: string }).text;
+        if (text.trim()) {
+          renderItems.push({ kind: 'text', text });
+        }
+      } else if (
+        part.type === 'dynamic-tool' ||
+        part.type.startsWith('tool-')
+      ) {
+        const tp = part as {
+          toolCallId: string;
+          toolName?: string;
+          state?: string;
+          input?: unknown;
+          output?: unknown;
+        };
+        // ToolUIPart encodes toolName in the type field ('tool-{name}'),
+        // while DynamicToolUIPart has it as a direct field.
+        const effectiveToolName =
+          part.type === 'dynamic-tool'
+            ? tp.toolName || 'dynamic-tool'
+            : part.type.replace(/^tool-/, '');
+        renderItems.push({
+          kind: 'tool',
+          toolCallId: tp.toolCallId,
+          toolName: effectiveToolName,
+          state: getToolStatus(tp.state),
+          input: tp.input,
+          output: tp.output,
+        });
+      }
     }
   }
+  // Flush any trailing reasoning
+  const lastReasoningPart = [...parts].reverse().find((p) => p.type === 'reasoning');
+  const isTrailingReasoning =
+    isReasoningStreaming && lastReasoningPart && pendingReasoning.trim();
+  flushReasoning(!!isTrailingReasoning);
 
-  const toolCallStates: ToolCallState[] = Array.from(toolPartsMap.values()).map(
-    (t) => ({
-      toolCallId: t.toolCallId,
-      toolName:
-        t.type === 'dynamic-tool'
-          ? t.toolName || 'dynamic-tool'
-          : t.type.replace('tool-', ''),
-      status: getToolStatus(t.state),
-      input: t.input as Record<string, unknown>,
-      output: t.output,
-    }),
-  );
-
-  const showInitialThinking =
-    isStreamingActive && !hasContent && !hasReasoning && toolCallStates.length === 0;
-
-  const getThinkingMessage = (s: boolean, d?: number) => {
-    if (s || d === 0) {
-      return (
-        <span className="inline-flex items-center gap-1 min-w-0">
-          <Shimmer duration={1}>Thinking</Shimmer>
-        </span>
-      );
-    }
-    if (d === undefined) return <p>Thought for a few seconds</p>;
-    return <p>Thought for {d} seconds</p>;
-  };
+  // Append streaming indicators
+  if (showInitialThinking) {
+    renderItems.push({ kind: 'initial-thinking' });
+  } else if (showGenerating) {
+    renderItems.push({ kind: 'generating' });
+  }
 
   return (
     <Message from={message.role}>
       <MessageContent expandable={message.role === 'user'}>
         <div className="flex flex-col w-full gap-3">
-          {(hasReasoning || showInitialThinking) && (
-            <Reasoning
-              className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
-              isStreaming={showInitialThinking || isReasoningStreaming}
-            >
-              <ReasoningTrigger getThinkingMessage={getThinkingMessage} />
-              <ReasoningContent>{reasoningText}</ReasoningContent>
-            </Reasoning>
-          )}
-
-          <AnimatePresence mode="popLayout">
-            {toolCallStates.map((state) => (
-              <ToolCallDisplay key={state.toolCallId} toolCall={state} streamEvents={remoteExecuteEvents?.get(state.toolCallId)} />
-            ))}
-          </AnimatePresence>
-
-          {hasContent && (
-            <div className="relative space-y-3 w-full">
-              <Markdown
-                content={textContent}
-                preview={false}
-                className="text-base"
-              />
-              <AnimatePresence>
-                {isStreamingActive && (
-                  <motion.div
-                    key="stream-gradient"
-                    initial={{ opacity: 1 }}
-                    exit={{
-                      opacity: 0,
-                      transition: { duration: 0.6, ease: 'easeOut' },
+          {renderItems.map((item, i) => {
+            switch (item.kind) {
+              case 'reasoning':
+                return (
+                  <Reasoning
+                    key={`reasoning-${i}`}
+                    className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
+                    isStreaming={item.isStreaming}
+                  >
+                    <ReasoningTrigger
+                      getThinkingMessage={(s, d) => (
+                        <ThinkingLabel isStreaming={s} duration={d} />
+                      )}
+                    />
+                    <ReasoningContent>{item.text}</ReasoningContent>
+                  </Reasoning>
+                );
+              case 'tool':
+                return (
+                  <ToolCallDisplay
+                    key={item.toolCallId}
+                    toolCall={{
+                      toolCallId: item.toolCallId,
+                      toolName: item.toolName,
+                      status: item.state as
+                        | 'pending'
+                        | 'executing'
+                        | 'completed'
+                        | 'error',
+                      input: item.input as Record<string, unknown> | undefined,
+                      output: item.output,
                     }}
-                    className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent"
+                    streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
                   />
-                )}
-              </AnimatePresence>
+                );
+              case 'text':
+                return (
+                  <div key={`text-${i}`} className="w-full">
+                    <Markdown
+                      content={item.text}
+                      preview={false}
+                      className="text-base"
+                    />
+                  </div>
+                );
+              case 'generating':
+                return (
+                  <motion.div
+                    key="generating"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center gap-2 text-muted-foreground text-sm select-none"
+                  >
+                    <TypingDots />
+                  </motion.div>
+                );
+              case 'initial-thinking':
+                return (
+                  <Reasoning
+                    key="initial-thinking"
+                    isStreaming
+                    className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
+                  >
+                    <ReasoningTrigger
+                      getThinkingMessage={(s, d) => (
+                        <ThinkingLabel isStreaming={s} duration={d} />
+                      )}
+                    />
+                    <ReasoningContent>{''}</ReasoningContent>
+                  </Reasoning>
+                );
+            }
+          })}
+
+          {/* Streaming indicator — inline dots while generating text */}
+          {isStreamingActive && hasContent && (
+            <div className="flex items-center gap-1.5 text-muted-foreground text-sm select-none">
+              <TypingDots />
             </div>
           )}
         </div>
       </MessageContent>
 
       {/* Copy button — only appears after streaming finishes */}
-      {message.role === 'assistant' &&
-        hasContent &&
-        !isStreamingActive &&
-        message.id !== 'streaming' && (
-          <MessageActions>
-            <CopyButton text={textContent} />
-          </MessageActions>
-        )}
+      {message.role === 'assistant' && hasContent && !isStreamingActive && (
+        <MessageActions>
+          <CopyButton text={textContent} />
+        </MessageActions>
+      )}
     </Message>
   );
 });
+
+// ---------------------------------------------------------------------------
+// Loading skeleton — uses shadcn Skeleton + ai-elements Message structure
+// ---------------------------------------------------------------------------
+
+function UserMessageSkeleton() {
+  return (
+    <Message from="user">
+      <MessageContent>
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+      </MessageContent>
+    </Message>
+  );
+}
+
+function AssistantMessageSkeleton({ delay = 0 }: { delay?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+    >
+      <Message from="assistant">
+        <MessageContent>
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-[90%]" />
+            <Skeleton className="h-4 w-[75%]" />
+            <Skeleton className="h-4 w-[60%]" />
+          </div>
+        </MessageContent>
+      </Message>
+    </motion.div>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <motion.div
+      className="flex flex-col gap-6"
+      initial="hidden"
+      animate="visible"
+      variants={{
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.12 } },
+      }}
+    >
+      <motion.div
+        variants={{
+          hidden: { opacity: 0, y: 8 },
+          visible: { opacity: 1, y: 0 },
+        }}
+        transition={{ duration: 0.3 }}
+      >
+        <UserMessageSkeleton />
+      </motion.div>
+      <AssistantMessageSkeleton delay={0.12} />
+      <motion.div
+        variants={{
+          hidden: { opacity: 0, y: 8 },
+          visible: { opacity: 1, y: 0 },
+        }}
+        transition={{ duration: 0.3 }}
+      >
+        <UserMessageSkeleton />
+      </motion.div>
+      <AssistantMessageSkeleton delay={0.36} />
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// StreamError
+// ---------------------------------------------------------------------------
+
+function StreamError({
+  error,
+  onRetry,
+  onDismiss,
+}: {
+  error: string;
+  onRetry?: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <motion.div
+      className="mx-auto max-w-3xl w-full px-4"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm">
+        <AlertCircle className="size-5 text-destructive shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="font-medium text-destructive">Streaming error</p>
+          <p className="text-muted-foreground mt-1">{error}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+            >
+              <RefreshCcwIcon className="size-3.5" />
+              Retry
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="rounded-md p-1 hover:bg-accent transition-colors"
+            aria-label="Dismiss error"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ChatConversation
+// ---------------------------------------------------------------------------
 
 export const ChatConversation = memo(function ChatConversation({
   messages,
@@ -270,9 +530,7 @@ export const ChatConversation = memo(function ChatConversation({
   remoteExecuteEvents,
 }: ChatConversationProps) {
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
-  const prevStreamingRef = useRef(false);
   const isLoadingMoreRef = useRef(false);
-
   const onLoadMoreRef = useRef(onLoadMore);
   const hasMoreRef = useRef(hasMoreMessages);
 
@@ -340,7 +598,6 @@ export const ChatConversation = memo(function ChatConversation({
     ) {
       const heightDifference =
         container.scrollHeight - prevScrollHeightRef.current;
-
       if (heightDifference > 0) {
         container.scrollTop += heightDifference;
       }
@@ -358,16 +615,11 @@ export const ChatConversation = memo(function ChatConversation({
     }
   }, [messages]);
 
-  useEffect(() => {
-    prevStreamingRef.current = isStreaming;
-  }, [isStreaming]);
-
   const handleRetry = useCallback(() => {
-    if (onRetry) {
-      onRetry();
-    }
+    onRetry?.();
   }, [onRetry]);
 
+  // Check if there's a user message without a response yet
   const hasUnansweredMessage = useMemo(() => {
     if (!isStreaming || messages.length === 0) return false;
     let userCount = 0;
@@ -379,18 +631,6 @@ export const ChatConversation = memo(function ChatConversation({
     return userCount > assistantCount;
   }, [isStreaming, messages]);
 
-  const getSimpleThinkingMessage = useCallback((s: boolean, d?: number) => {
-    if (s || d === 0) {
-      return (
-        <span className="inline-flex items-center gap-1 min-w-0">
-          <Shimmer duration={1}>Thinking</Shimmer>
-        </span>
-      );
-    }
-    if (d === undefined) return <p>Thought for a few seconds</p>;
-    return <p>Thought for {d} seconds</p>;
-  }, []);
-
   const isLoadingHistory = isLoadingMessages && messages.length === 0;
   const isEmpty = !isLoadingMessages && messages.length === 0 && !isStreaming;
 
@@ -399,59 +639,32 @@ export const ChatConversation = memo(function ChatConversation({
       <Conversation className="flex-1">
         <ConversationContent className="max-w-3xl mx-auto w-full p-1 gap-6">
           {isLoadingHistory ? (
-            <div className="space-y-6">
-              <div className="flex justify-end">
-                <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
-                  <div className="space-y-2">
-                    <div className="h-4 w-64 animate-pulse rounded bg-muted-foreground/20" />
-                    <div className="h-4 w-48 animate-pulse rounded bg-muted-foreground/20" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                  <Bot className="size-4 text-muted-foreground" />
-                </div>
-                <div className="flex-1 space-y-3">
-                  <div className="h-4 w-full animate-pulse rounded bg-muted-foreground/20" />
-                  <div className="h-4 w-[90%] animate-pulse rounded bg-muted-foreground/20" />
-                  <div className="h-4 w-[75%] animate-pulse rounded bg-muted-foreground/20" />
-                  <div className="mt-2 h-4 w-[60%] animate-pulse rounded bg-muted-foreground/20" />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
-                  <div className="h-4 w-56 animate-pulse rounded bg-muted-foreground/20" />
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                  <Bot className="size-4 text-muted-foreground" />
-                </div>
-                <div className="flex-1 space-y-3">
-                  <div className="h-4 w-[85%] animate-pulse rounded bg-muted-foreground/20" />
-                  <div className="h-4 w-full animate-pulse rounded bg-muted-foreground/20" />
-                  <div className="h-4 w-[70%] animate-pulse rounded bg-muted-foreground/20" />
-                </div>
-              </div>
-            </div>
+            <LoadingSkeleton />
           ) : isEmpty ? (
-            <ConversationEmptyState
-              icon={<ShieldAlert className="size-12" />}
-              title="Security AI ready"
-              description="Ask anything about vulnerabilities, secure coding, and best practices."
-            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            >
+              <ConversationEmptyState
+                icon={<ShieldAlert className="size-12" />}
+                title="Security AI ready"
+                description="Ask anything about vulnerabilities, secure coding, and best practices."
+              />
+            </motion.div>
           ) : (
             <>
               <div ref={sentinelRef} className="h-px" aria-hidden="true" />
 
               {isLoadingMoreMessages && (
-                <div className="flex justify-center py-2">
-                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                </div>
+                <motion.div
+                  className="flex justify-center py-2"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <TypingDots />
+                </motion.div>
               )}
 
               {messages.map((message, idx) => {
@@ -474,52 +687,35 @@ export const ChatConversation = memo(function ChatConversation({
                 );
               })}
 
+              {/* Show thinking indicator while waiting for first response */}
               {hasUnansweredMessage && (
-                <Reasoning
-                  isStreaming
-                  className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <ReasoningTrigger
-                    getThinkingMessage={getSimpleThinkingMessage}
-                  />
-                  <ReasoningContent>{''}</ReasoningContent>
-                </Reasoning>
+                  <Reasoning
+                    isStreaming
+                    className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
+                  >
+                    <ReasoningTrigger
+                      getThinkingMessage={(s, d) => (
+                        <ThinkingLabel isStreaming={s} duration={d} />
+                      )}
+                    />
+                    <ReasoningContent>{''}</ReasoningContent>
+                  </Reasoning>
+                </motion.div>
               )}
             </>
           )}
 
           {streamError && (
-            <div className="mx-auto max-w-3xl w-full px-4">
-              <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm">
-                <AlertCircle className="size-5 text-destructive shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-medium text-destructive">
-                    Streaming error
-                  </p>
-                  <p className="text-muted-foreground mt-1">{streamError}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {lastUserMessage && (
-                    <button
-                      type="button"
-                      onClick={handleRetry}
-                      className="flex items-center gap-1.5 rounded-md bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
-                    >
-                      <RefreshCcwIcon className="size-3.5" />
-                      Retry
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={onDismissError}
-                    className="rounded-md p-1 hover:bg-accent transition-colors"
-                    aria-label="Dismiss error"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            <StreamError
+              error={streamError}
+              onRetry={lastUserMessage ? handleRetry : () => {}}
+              onDismiss={onDismissError ?? (() => {})}
+            />
           )}
         </ConversationContent>
         <ConversationScrollButton />
@@ -528,7 +724,10 @@ export const ChatConversation = memo(function ChatConversation({
       <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col">
           {todos && todos.length > 0 && (
-            <AgentTodoPanel todos={todos} className="rounded-b-none border-b-0 mx-2" />
+            <AgentTodoPanel
+              todos={todos}
+              className="rounded-b-none border-b-0 mx-2"
+            />
           )}
 
           <AgentPromptInput

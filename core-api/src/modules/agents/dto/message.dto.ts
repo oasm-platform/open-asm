@@ -84,6 +84,17 @@ export class MessageResponseDto {
   @ApiProperty({ required: false })
   metadata?: Record<string, unknown>;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Chronological parts array preserving the real order of reasoning, tool calls, and text.',
+    type: 'array',
+    items: { type: 'object' },
+  })
+  @IsOptional()
+  @IsArray()
+  parts?: Record<string, unknown>[];
+
   @ApiProperty({ required: false, type: [ToolCallResponseDto] })
   @IsOptional()
   @IsArray()

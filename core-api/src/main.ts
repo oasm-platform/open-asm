@@ -53,8 +53,21 @@ async function bootstrap() {
 
   // Configure cookie parser
   app.use(cookieParser());
-  // Compress responses
-  app.use(compression());
+  // Compress responses — skip SSE streams to preserve real-time streaming
+  app.use(
+    compression({
+      filter: (req, res) => {
+        const contentType = res.getHeader('Content-Type');
+        if (
+          contentType &&
+          contentType.toString().includes('text/event-stream')
+        ) {
+          return false;
+        }
+        return compression.filter(req, res);
+      },
+    }),
+  );
   // Configure global validation
   app.useGlobalPipes(
     new ValidationPipe({

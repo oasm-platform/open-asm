@@ -27,7 +27,10 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { AgentMessageToolCall } from './entities/tool-call.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
-import { getLLMProviderConfig } from './llm-provider-supported';
+import {
+  getLLMProviderConfig,
+  getReasoningProviderOptions,
+} from './llm-provider-supported';
 import { TokenCounter } from './shared/token-counter';
 
 export interface StreamMessageResult {
@@ -293,6 +296,7 @@ export class AgentsCompletionsService {
     assistantMsgId: string,
     conversationId: string,
     accumulatedText: string,
+    accumulatedReasoning: string,
     llmConfig: AgentLLMConfig,
     assistantMsgMetadata: Record<string, unknown> | undefined,
   ): Promise<void> {
@@ -389,6 +393,10 @@ export class AgentsCompletionsService {
         messages: [{ role: 'user', content: prompt }],
         tools,
         stopWhen: stepCountIs(10),
+        ...(() => {
+          const opts = getReasoningProviderOptions(llmConfig.provider);
+          return opts ? { providerOptions: opts } : {};
+        })(),
         onChunk: ({ chunk }) => {
           if (chunk.type === 'text-delta') {
             accumulatedText += chunk.text;
@@ -760,9 +768,14 @@ export class AgentsCompletionsService {
 
   /**
    * Retrieves the effective context window for a given LLM config.
-   * Priority: contextWindow column (user override) > OpenRouter cache > default (8192).
+   * Priority: contextWindow column (user override) > default (128k).
+   * The contextWindow column is set by the user when creating/updating
+   * an LLM config. If not set, falls back to the default.
    */
-  private getModelContextWindow(_llmConfig: AgentLLMConfig): number {
+  private getModelContextWindow(llmConfig: AgentLLMConfig): number {
+    if (llmConfig.contextWindow && llmConfig.contextWindow > 0) {
+      return llmConfig.contextWindow;
+    }
     return AgentsCompletionsService.DEFAULT_CONTEXT_WINDOW;
   }
 
@@ -918,8 +931,9 @@ export class AgentsCompletionsService {
       abortSignal,
     } = options;
 
-    // Accumulate text as chunks arrive during streaming
+    // Accumulate text and reasoning as chunks arrive during streaming
     let accumulatedText = '';
+    let accumulatedReasoning = '';
 
     // Use the shared EventEmitter from caller to communicate todo events between tool calls and the stream
     const { todosEmitter } = options;
@@ -946,22 +960,24 @@ export class AgentsCompletionsService {
     // Invoke the AI SDK streamText with all callbacks
     const result = streamText({
       model,
-      // System message containing the assembled context
-      messages: [
-        {
-          role: 'system' as const,
-          content: contextParts.join('\n\n'),
-        },
-        ...modelMessages,
-      ],
+      // System context passed via dedicated option (avoids prompt injection risk)
+      system: contextParts.join('\n\n'),
+      messages: modelMessages,
       // Only include tools if available (models without tool support will error here)
       ...(tools ? { tools, stopWhen: stepCountIs(10) } : {}),
+      // Enable reasoning/thinking via provider-specific options
+      ...(() => {
+        const opts = getReasoningProviderOptions(llmConfig.provider);
+        return opts ? { providerOptions: opts } : {};
+      })(),
       // AGENT mode needs more output tokens for multi-step execution
       ...(maxOutputTokens ? { maxOutputTokens } : {}),
-      // Accumulate text-delta chunks as they arrive
+      // Accumulate text-delta and reasoning chunks as they arrive
       onChunk: ({ chunk }) => {
         if (chunk.type === 'text-delta') {
           accumulatedText += chunk.text;
+        } else if (chunk.type === 'reasoning-delta') {
+          accumulatedReasoning += chunk.text;
         }
       },
       // Handle errors (especially tool-calling errors)
@@ -1043,10 +1059,66 @@ export class AgentsCompletionsService {
           return;
         }
 
+          // Build the chronological parts array from event.steps.
+          // Each step may contain reasoning, tool calls, and text — they are
+          // assembled in the order they actually occurred so the frontend can
+          // render thought → tool call → text → thought → … correctly.
+          // Also fallback to accumulatedReasoning for providers that stream
+          // reasoning-delta chunks but don't populate step.reasoning.
+          try {
+            const parts: Record<string, unknown>[] = [];
+            let hasReasoningPart = false;
+            for (const step of event.steps) {
+              const stepReasoning =
+                typeof step.reasoning === 'string' ? step.reasoning : '';
+              if (stepReasoning.trim()) {
+                parts.push({ type: 'reasoning', text: stepReasoning.trim() });
+                hasReasoningPart = true;
+              }
+              for (const tc of step.toolCalls) {
+                const toolResult = step.toolResults?.find(
+                  (r) => r.toolCallId === tc.toolCallId,
+                );
+                parts.push({
+                  type: 'dynamic-tool',
+                  toolCallId: tc.toolCallId,
+                  toolName: tc.toolName,
+                  state: toolResult
+                    ? 'output-available'
+                    : 'input-available',
+                  input: tc.input,
+                  output: toolResult?.output ?? null,
+                });
+              }
+              const stepText =
+                typeof step.text === 'string' ? step.text : '';
+              if (stepText.trim()) {
+                parts.push({ type: 'text', text: stepText.trim() });
+              }
+            }
+            // Fallback: if no reasoning from steps but we accumulated it during streaming
+            if (!hasReasoningPart && accumulatedReasoning.trim()) {
+              parts.unshift({
+                type: 'reasoning',
+                text: accumulatedReasoning.trim(),
+              });
+            }
+            if (parts.length > 0) {
+            await this.messageRepository.update(
+              { id: assistantMessageId },
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+              { parts: parts as any },
+            );
+          }
+        } catch (err) {
+          this.logger.error('Error saving parts array', err);
+        }
+
         await this.handleStreamFinish(
           assistantMessageId,
           conversationId,
           accumulatedText,
+          accumulatedReasoning,
           llmConfig,
           assistantMessageMetadata,
         ).catch((err) => this.logger.error('Error in handleStreamFinish', err));
@@ -1056,14 +1128,20 @@ export class AgentsCompletionsService {
           return;
         }
 
-        // Auto-complete any todos the LLM left "in_progress" (safety net)
+        // Auto-complete any todos the LLM left "in_progress" (safety net).
+        // Skip in AGENT mode — the continuation loop in createContinuationStream
+        // will call this AFTER all iterations complete, preventing a race condition
+        // where autoCompleteStuckTodos marks in_progress todos as completed before
+        // the continuation loop can detect them as still pending.
         if (isAborted()) {
           await markAborted();
           return;
         }
-        this.autoCompleteStuckTodos(conversationId).catch((err) =>
-          this.logger.error('Error in autoCompleteStuckTodos', err),
-        );
+        if (options.agentMode !== AgentMode.AGENT) {
+          this.autoCompleteStuckTodos(conversationId).catch((err) =>
+            this.logger.error('Error in autoCompleteStuckTodos', err),
+          );
+        }
 
         if (isAborted()) {
           await markAborted();
@@ -1178,31 +1256,41 @@ export class AgentsCompletionsService {
           for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
             if (abortSignal?.aborted || controllerClosed) break;
 
-            // Execute a single streamText iteration
-            const { aiStream } = this.executeStreamText({
-              llmConfig,
-              model,
-              modelMessages: currentModelMessages,
-              contextParts: currentContextParts,
-              assistantMessageId: currentAssistantMessageId,
-              conversationId,
-              assistantMessageMetadata: currentAssistantMetadata,
-              tools: options.tools,
-              todosEmitter,
-              abortSignal,
-              agentMode,
-            });
+            try {
+              // Execute a single streamText iteration
+              const { aiStream } = this.executeStreamText({
+                llmConfig,
+                model,
+                modelMessages: currentModelMessages,
+                contextParts: currentContextParts,
+                assistantMessageId: currentAssistantMessageId,
+                conversationId,
+                assistantMessageMetadata: currentAssistantMetadata,
+                tools: options.tools,
+                todosEmitter,
+                abortSignal,
+                agentMode,
+              });
 
-            // Pump chunks from this iteration's stream
-            const reader = aiStream.getReader();
-            while (true) {
-              if (abortSignal?.aborted || controllerClosed) {
-                await reader.cancel().catch(() => {});
-                break;
+              // Pump chunks from this iteration's stream
+              const reader = aiStream.getReader();
+              while (true) {
+                if (abortSignal?.aborted || controllerClosed) {
+                  await reader.cancel().catch(() => {});
+                  break;
+                }
+                const { done, value } = await reader.read();
+                if (done || controllerClosed) break;
+                controller.enqueue(value);
               }
-              const { done, value } = await reader.read();
-              if (done || controllerClosed) break;
-              controller.enqueue(value);
+            } catch (iterationError) {
+              this.logger.error(
+                `[Continuation] Error in iteration ${iteration} for ${conversationId}`,
+                iterationError,
+              );
+              // Break out of the loop but don't crash — the finally block
+              // will clean up, and autoCompleteStuckTodos runs below.
+              break;
             }
 
             if (abortSignal?.aborted || controllerClosed) break;
@@ -1292,6 +1380,17 @@ export class AgentsCompletionsService {
           }
           todosEmitter.off('todos-updated', onTodosUpdated);
           todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+
+          // Auto-complete stuck in_progress todos AFTER all continuation
+          // iterations are done. This prevents the race condition where
+          // autoCompleteStuckTodos (previously called per-iteration in
+          // onFinish) would mark todos as completed before the continuation
+          // loop could detect them as still pending.
+          if (isAgentMode && !abortSignal?.aborted) {
+            this.autoCompleteStuckTodos(conversationId).catch((err) =>
+              this.logger.error('Error in autoCompleteStuckTodos', err),
+            );
+          }
         }
 
         if (!controllerClosed && !abortSignal?.aborted) {
