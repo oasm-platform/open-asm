@@ -2,15 +2,27 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, MoreThanOrEqual } from 'typeorm';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
+import {
+  DefaultWorkflow,
+  EventTriggerType,
+  NotificationScope,
+  NotificationType,
+} from '@/common/enums/enum';
 import { GeoIp, GeoIpService } from '@/services/geo-ip/geo-ip.service';
+import { RedisService } from '@/services/redis/redis.service';
+import { OnEvent } from '@nestjs/event-emitter';
 import { AssetsService } from '../assets/assets.service';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { AssetTag } from '../assets/entities/asset-tags.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { CreateJobs } from '../jobs-registry/dto/jobs-registry.dto';
+import { Job } from '../jobs-registry/entities/job.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
 import { WorkspaceTarget } from '../targets/entities/workspace-target.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import { WorkspacesService } from '../workspaces/workspaces.service';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import {
   GetStatisticQueryDto,
@@ -32,12 +44,26 @@ interface RawAssetVulCount {
   total: string;
 }
 
+interface StatisticFilter {
+  workspaceIds?: string[];
+  targetId?: string;
+}
+
+interface StatisticSnapshot {
+  hosts: number;
+  ports: number;
+  techs: number;
+}
+
 @Injectable()
 export class StatisticService {
   constructor(
     private readonly dataSource: DataSource,
     private assetService: AssetsService,
     private geoIpService: GeoIpService,
+    private redisService: RedisService,
+    private workspacesService: WorkspacesService,
+    private notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -288,7 +314,8 @@ export class StatisticService {
    * @param workspaceIds An array of workspace IDs.
    * @returns An array of objects containing the workspaceId and asset count.
    */
-  async getAssetCounts(workspaceIds: string[], targetId?: string) {
+  async getAssetCounts(filter: StatisticFilter) {
+    const { workspaceIds, targetId } = filter;
     const query = this.dataSource
       .getRepository(Asset)
       .createQueryBuilder('asset')
@@ -296,8 +323,11 @@ export class StatisticService {
       .leftJoin('target.workspaceTargets', 'wt')
       .select('wt.workspaceId', 'workspaceId')
       .addSelect('COUNT(asset.id)', 'count')
-      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+      .where('1=1');
 
+    if (workspaceIds?.length) {
+      query.andWhere('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+    }
     if (targetId) {
       query.andWhere('target.id = :targetId', { targetId });
     }
@@ -312,15 +342,19 @@ export class StatisticService {
    * @param workspaceIds An array of workspace IDs.
    * @returns An array of objects containing the workspaceId and target count.
    */
-  async getTargetCounts(workspaceIds: string[], targetId?: string) {
+  async getTargetCounts(filter: StatisticFilter) {
+    const { workspaceIds, targetId } = filter;
     const query = this.dataSource
       .getRepository(Target)
       .createQueryBuilder('target')
       .leftJoin('target.workspaceTargets', 'wt')
       .select('wt.workspaceId', 'workspaceId')
       .addSelect('COUNT(target.id)', 'count')
-      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+      .where('1=1');
 
+    if (workspaceIds?.length) {
+      query.andWhere('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+    }
     if (targetId) {
       query.andWhere('target.id = :targetId', { targetId });
     }
@@ -335,7 +369,8 @@ export class StatisticService {
    * @param workspaceIds An array of workspace IDs.
    * @returns An array of objects containing the workspaceId, severity, and vulnerability count.
    */
-  async getVulnerabilityCounts(workspaceIds: string[], targetId?: string) {
+  async getVulnerabilityCounts(filter: StatisticFilter) {
+    const { workspaceIds, targetId } = filter;
     const query = this.dataSource
       .getRepository(Vulnerability)
       .createQueryBuilder('vuln')
@@ -346,9 +381,12 @@ export class StatisticService {
       .select('wt.workspaceId', 'workspaceId')
       .addSelect('vuln.severity', 'severity')
       .addSelect('COUNT(vuln.id)', 'count')
-      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .where('1=1')
       .andWhere('dismissal.vulnerabilityId IS NULL');
 
+    if (workspaceIds?.length) {
+      query.andWhere('wt.workspaceId IN (:...workspaceIds)', { workspaceIds });
+    }
     if (targetId) {
       query.andWhere('target.id = :targetId', { targetId });
     }
@@ -364,7 +402,8 @@ export class StatisticService {
    * @param workspaceIds An array of workspace IDs.
    * @returns An array of objects containing the workspaceId and unique technology count.
    */
-  async getTechCounts(workspaceIds: string[], targetId?: string) {
+  async getTechCounts(filter: StatisticFilter) {
+    const { workspaceIds, targetId } = filter;
     // Subquery to unnest the 'tech' array from latest HttpResponse and link to workspaceId
     const subQuery = this.dataSource
       .createQueryBuilder()
@@ -379,10 +418,15 @@ export class StatisticService {
         'latest_http',
         'latest_http.id = (SELECT hr.id FROM http_responses hr WHERE hr."assetServiceId" = assetService.id ORDER BY hr."createdAt" DESC LIMIT 1)',
       )
-      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .where('1=1')
       .andWhere('assetService.isErrorPage = false')
       .andWhere('latest_http.tech IS NOT NULL');
 
+    if (workspaceIds?.length) {
+      subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
+        workspaceIds,
+      });
+    }
     if (targetId) {
       subQuery.andWhere('target.id = :targetId', { targetId });
     }
@@ -404,7 +448,8 @@ export class StatisticService {
    * @param workspaceIds An array of workspace IDs.
    * @returns An array of objects containing the workspaceId and service count.
    */
-  async getServiceCounts(workspaceIds: string[], targetId?: string) {
+  async getServiceCounts(filter: StatisticFilter) {
+    const { workspaceIds, targetId } = filter;
     // Subquery to get AssetService linked to workspaceId
     const subQuery = this.dataSource
       .createQueryBuilder()
@@ -414,9 +459,14 @@ export class StatisticService {
       .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspaceTargets', 'wt')
-      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .where('1=1')
       .andWhere('"assetService"."isErrorPage" = false');
 
+    if (workspaceIds?.length) {
+      subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
+        workspaceIds,
+      });
+    }
     if (targetId) {
       subQuery.andWhere('target.id = :targetId', { targetId });
     }
@@ -438,7 +488,8 @@ export class StatisticService {
    * @param workspaceIds An array of workspace IDs.
    * @returns An array of objects containing the workspaceId and unique port count.
    */
-  async getPortCounts(workspaceIds: string[], targetId?: string) {
+  async getPortCounts(filter: StatisticFilter) {
+    const { workspaceIds, targetId } = filter;
     // Subquery to unnest the 'ports' array from Port and link to workspaceId
     const subQuery = this.dataSource
       .createQueryBuilder()
@@ -448,9 +499,14 @@ export class StatisticService {
       .leftJoin('assetService.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspaceTargets', 'wt')
-      .where('wt.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .where('1=1')
       .andWhere('"assetService"."isErrorPage" = false');
 
+    if (workspaceIds?.length) {
+      subQuery.andWhere('wt.workspaceId IN (:...workspaceIds)', {
+        workspaceIds,
+      });
+    }
     if (targetId) {
       subQuery.andWhere('target.id = :targetId', { targetId });
     }
@@ -473,7 +529,10 @@ export class StatisticService {
    * @param workspaceIds Array of workspace IDs to calculate statistics for
    * @returns An array of Statistic objects with calculated data
    */
-  async calculateStatistics(workspaceIds: string[], targetId?: string): Promise<Statistic[]> {
+  async calculateStatistics(
+    workspaceIds: string[],
+    targetId?: string,
+  ): Promise<Statistic[]> {
     if (workspaceIds.length === 0) {
       // No workspace IDs provided, no statistics to calculate
       return [];
@@ -488,12 +547,12 @@ export class StatisticService {
       portCounts,
       serviceCounts,
     ] = await Promise.all([
-      this.getAssetCounts(workspaceIds, targetId),
-      this.getTargetCounts(workspaceIds, targetId),
-      this.getVulnerabilityCounts(workspaceIds, targetId),
-      this.getTechCounts(workspaceIds, targetId),
-      this.getPortCounts(workspaceIds, targetId),
-      this.getServiceCounts(workspaceIds, targetId),
+      this.getAssetCounts({ workspaceIds, targetId }),
+      this.getTargetCounts({ workspaceIds, targetId }),
+      this.getVulnerabilityCounts({ workspaceIds, targetId }),
+      this.getTechCounts({ workspaceIds, targetId }),
+      this.getPortCounts({ workspaceIds, targetId }),
+      this.getServiceCounts({ workspaceIds, targetId }),
     ]);
 
     // Initialize a Map to store statistics for each workspace
@@ -659,6 +718,102 @@ export class StatisticService {
     const statistics = await this.calculateStatistics(workspaceIds);
     if (statistics.length > 0) {
       await this.saveStatistics(statistics);
+    }
+  }
+
+  async takeSnapshotStatisticTarget(
+    targetId: string,
+  ): Promise<StatisticSnapshot> {
+    const [hosts, ports, techs] = await Promise.all([
+      this.getAssetCounts({ targetId }).then((res) =>
+        res.length > 0 ? Number(res[0].count) : 0,
+      ),
+      this.getPortCounts({ targetId }).then((res) =>
+        res.length > 0 ? Number(res[0].count) : 0,
+      ),
+      this.getTechCounts({ targetId }).then((res) =>
+        res.length > 0 ? Number(res[0].count) : 0,
+      ),
+    ]);
+
+    return { hosts, ports, techs };
+  }
+
+  @OnEvent(EventTriggerType.WORKFLOW_START)
+  async handleWorkflowStart(job: CreateJobs) {
+    if (
+      [
+        DefaultWorkflow.DOMAIN_DISCOVERY,
+        DefaultWorkflow.IP_ADDRESS_DISCOVERY,
+      ].includes(job.workflow.filePath as DefaultWorkflow) &&
+      job.targetIds
+    ) {
+      //Take snapshot
+      for (const targetId of job.targetIds) {
+        const snapshotPayload =
+          await this.takeSnapshotStatisticTarget(targetId);
+        await this.redisService.setex(
+          `snapshot:${job.workflow.filePath}:${targetId}`,
+          86400,
+          JSON.stringify(snapshotPayload),
+        );
+      }
+    }
+  }
+
+  @OnEvent(EventTriggerType.WORKFLOW_END)
+  async handleWorkflowEnd(job: Job) {
+    if (
+      [
+        DefaultWorkflow.DOMAIN_DISCOVERY,
+        DefaultWorkflow.IP_ADDRESS_DISCOVERY,
+      ].includes(job.jobHistory.workflow.filePath as DefaultWorkflow) &&
+      job.asset.target.id
+    ) {
+      const redisKey = `snapshot:${job.jobHistory.workflow.filePath}:${job.asset.target.id}`;
+
+      const beforeSnapshot = (await this.redisService
+        .get(redisKey)
+        .then((res) => JSON.parse(res || '{}') as StatisticSnapshot));
+      await this.redisService.del(redisKey);
+      const [afterSnapshot] = await Promise.all([
+        this.takeSnapshotStatisticTarget(job.asset.target.id),
+        this.redisService.del(redisKey),
+      ]);
+
+      const diffs: Partial<StatisticSnapshot> = {};
+      for (const key in afterSnapshot) {
+        const k = key as keyof StatisticSnapshot;
+        const before = beforeSnapshot[k] ?? 0;
+        const after = afterSnapshot[k];
+        if (after > before) {
+          diffs[k] = after - before;
+        }
+      }
+      const members = await this.workspacesService.getMemberOfWorkspaceByJobId(
+        job.id,
+      );
+
+      if (Object.keys(diffs).length > 0) {
+        const recipientIds = members.map((m) => m.user.id);
+        const workspaceId = members[0]?.workspace.id;
+
+        if (recipientIds.length > 0) {
+          await this.notificationsService.createNotification({
+            recipients: recipientIds,
+            scope: NotificationScope.GROUP,
+            type: NotificationType.ASSET_NEW_DETECT,
+            metadata: {
+              hosts: String(diffs.hosts ?? 0),
+              ports: String(diffs.ports ?? 0),
+              tech: String(diffs.techs ?? 0),
+              targetValue: job.asset.target.value,
+              targetId: job.asset.target.id,
+            },
+            workspaceId,
+          });
+        }
+      }
     }
   }
 }

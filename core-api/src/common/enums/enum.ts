@@ -147,6 +147,7 @@ export enum NotificationScope {
 export enum NotificationType {
   WORKSPACE_CREATED = 'WORKSPACE_CREATED',
   VULNERABILITY_ANALYSIS_COMPLETED = 'VULNERABILITY_ANALYSIS_COMPLETED',
+  ASSET_NEW_DETECT = 'ASSET_NEW_DETECT',
 }
 
 export enum Language {
@@ -231,4 +232,9 @@ export enum DefaultWorkflow {
   DOMAIN_DISCOVERY = 'domain_discovery.yaml',
   IP_ADDRESS_DISCOVERY = 'ip_address_discovery.yaml',
   VULNERABILITY_SCAN_BASIC = 'vulnerability_scan_basic.yaml',
+}
+
+export enum EventTriggerType {
+  WORKFLOW_START = 'WORKFLOW_START',
+  WORKFLOW_END = 'WORKFLOW_END',
 }
