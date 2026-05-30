@@ -235,7 +235,7 @@ export function useAgentChat({
           lastMessage?.parts
             ?.filter((p) => p.type === 'text')
             .map((p) => ('text' in p ? p.text : ''))
-            .join('') || lastMessage?.content || '';
+            .join('') || '';
 
         const modelInfo = selectedModelRef.current;
         const convId = conversationId;

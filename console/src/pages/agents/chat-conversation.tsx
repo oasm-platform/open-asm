@@ -92,7 +92,7 @@ function getTextContent(message: UIMessage): string {
     .filter((part): part is TextUIPart => part.type === 'text')
     .map((part) => part.text)
     .join('');
-  return partsText || message.content || '';
+  return partsText || '';
 }
 
 // ---------------------------------------------------------------------------
@@ -708,7 +708,7 @@ export const ChatConversation = memo(function ChatConversation({
             <StreamError
               error={streamError}
               onRetry={lastUserMessage ? handleRetry : () => {}}
-              onDismiss={onDismissError}
+              onDismiss={onDismissError ?? (() => {})}
             />
           )}
         </ConversationContent>
