@@ -1166,6 +1166,14 @@ export type TopTagAsset = {
   count: number;
 };
 
+export type TlsStatisticResponseDto = {
+  alreadyExpired: number;
+  expireInAMonth: number;
+  expireIn3Months: number;
+  wontExpireAnytimeSoon: number;
+  newCertificatesDiscovered: number;
+};
+
 export type TopAssetVulnerabilities = {
   /** The number of critical vulnerabilities */
   critical: number;
@@ -1693,6 +1701,7 @@ export type CreateNotificationDtoType =
 export const CreateNotificationDtoType = {
   WORKSPACE_CREATED: 'WORKSPACE_CREATED',
   VULNERABILITY_ANALYSIS_COMPLETED: 'VULNERABILITY_ANALYSIS_COMPLETED',
+  ASSET_NEW_DETECT: 'ASSET_NEW_DETECT',
 } as const;
 
 /**
@@ -15207,6 +15216,162 @@ export function useStatisticControllerGetAssetLocations<
 } {
   const queryOptions =
     getStatisticControllerGetAssetLocationsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Retrieves TLS certificate statistics grouped by expiration status using not_after field, and counts newly discovered certificates within the last 30 days.
+ * @summary Get TLS certificate statistics for a workspace
+ */
+export const statisticControllerGetTlsStatistics = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TlsStatisticResponseDto>(
+    { url: `/api/statistic/tls`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTlsStatisticsQueryKey = () => {
+  return [`/api/statistic/tls`] as const;
+};
+
+export const getStatisticControllerGetTlsStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetTlsStatisticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
+  > = ({ signal }) =>
+    statisticControllerGetTlsStatistics(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTlsStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
+>;
+export type StatisticControllerGetTlsStatisticsQueryError = unknown;
+
+export function useStatisticControllerGetTlsStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTlsStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTlsStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get TLS certificate statistics for a workspace
+ */
+
+export function useStatisticControllerGetTlsStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTlsStatisticsQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

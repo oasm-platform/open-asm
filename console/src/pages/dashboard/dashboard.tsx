@@ -5,7 +5,7 @@ import AssetLocationsMap from './components/asset-locations-map';
 import { AssetTrends } from './components/asset-trends';
 import IssuesTimeline from './components/issues-timeline';
 import Statistic from './components/statistic';
-import TlsExpirationTable from './components/tls-expiration-table';
+import TlsStatistics from './components/tls-statistics';
 import TopAssetsVulnerabilitiesChart from './components/top-assets-vulnerabilities-chart';
 import TopTagsAssets from './components/top-tags-assets';
 import VulnerabilityStatistic from './components/vulnerabilities-statistic';
@@ -24,7 +24,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
               <IssuesTimeline />
               <AssetTrends />
-              <TlsExpirationTable />
+              <TlsStatistics />
               <TopAssetsVulnerabilitiesChart />
             </div>
           </div>

@@ -143,7 +143,7 @@ const TopAssetsVulnerabilitiesTable = () => {
           totalItems={filteredData.length}
           showPagination={false}
           isShowHeader={true}
-          minRows={10}
+          minRows={5}
         />
       </CardContent>
     </Card>
