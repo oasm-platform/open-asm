@@ -1115,7 +1115,7 @@ export class AgentsCompletionsService {
                 hasReasoningPart = true;
               }
               for (const tc of step.toolCalls) {
-                const toolResult = step.toolResults.find(
+                const toolResult = step.toolResults?.find(
                   (r) => r.toolCallId === tc.toolCallId,
                 );
                 parts.push({

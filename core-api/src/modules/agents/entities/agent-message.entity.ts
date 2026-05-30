@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsArray,
   IsEnum,
   IsObject,
   IsOptional,
@@ -53,7 +54,7 @@ export class AgentMessage extends BaseEntity {
       'Chronological parts array preserving the real order of reasoning, tool calls, and text from the AI stream.',
   })
   @IsOptional()
-  @IsObject()
+  @IsArray()
   @Column({ type: 'jsonb', nullable: true })
   parts?: Record<string, unknown>[];
 

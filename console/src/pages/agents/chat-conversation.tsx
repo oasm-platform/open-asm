@@ -88,10 +88,11 @@ function getToolStatus(state?: string): ToolCallState['status'] {
 }
 
 function getTextContent(message: UIMessage): string {
-  return (message.parts || [])
+  const partsText = (message.parts || [])
     .filter((part): part is TextUIPart => part.type === 'text')
     .map((part) => part.text)
     .join('');
+  return partsText || message.content || '';
 }
 
 // ---------------------------------------------------------------------------
@@ -112,8 +113,8 @@ function ThinkingLabel({
       </span>
     );
   }
-  if (duration === undefined) return <p>Thought for a few seconds</p>;
-  return <p>Thought for {duration} seconds</p>;
+  if (duration === undefined) return <span>Thought for a few seconds</span>;
+  return <span>Thought for {duration} seconds</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -706,7 +707,7 @@ export const ChatConversation = memo(function ChatConversation({
           {streamError && (
             <StreamError
               error={streamError}
-              onRetry={lastUserMessage ? handleRetry : undefined}
+              onRetry={lastUserMessage ? handleRetry : () => {}}
               onDismiss={onDismissError}
             />
           )}
