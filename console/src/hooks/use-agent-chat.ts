@@ -47,7 +47,13 @@ interface UseAgentChatReturn {
 
 /**
  * Converts DB messages (with messageType) to UIMessage format.
- * Thinking messages become reasoning parts, text messages become text parts.
+ *
+ * If the message has a stored `parts` array (new format), it is used directly —
+ * this preserves the real chronological order from the AI stream (thought →
+ * tool call → text → thought → …).
+ *
+ * Otherwise falls back to reconstructing parts from content/messageType/toolCalls
+ * (legacy format for old messages).
  */
 function mapDbMessagesToUI(
   pages: Array<{ data?: unknown[]; items?: unknown[]; messages?: unknown[] } | unknown[]>,
@@ -64,16 +70,27 @@ function mapDbMessagesToUI(
 
   return dataArray.map((msg) => {
     const m = msg as Record<string, unknown>;
+    const msgId = String(m.id ?? '');
+    const role = String(m.role ?? 'user').toLowerCase() as 'user' | 'assistant';
+
+    // New format: use stored parts array directly
+    const storedParts = m.parts as Record<string, unknown>[] | undefined;
+    if (Array.isArray(storedParts) && storedParts.length > 0) {
+      return {
+        id: msgId,
+        role,
+        parts: storedParts as UIMessage['parts'],
+        createdAt: m.createdAt ? new Date(String(m.createdAt)) : new Date(),
+      };
+    }
+
+    // Legacy format: reconstruct parts from separate fields
     const parts: UIMessage['parts'] = [];
     const content = String(m.content ?? '');
     const messageType = String(m.messageType ?? 'text');
 
-    if (content) {
-      if (messageType === 'thinking') {
-        parts.push({ type: 'reasoning' as const, text: content });
-      } else {
-        parts.push({ type: 'text' as const, text: content });
-      }
+    if (messageType === 'thinking' && content) {
+      parts.push({ type: 'reasoning' as const, text: content });
     }
 
     const toolCalls = m.toolCalls as
@@ -98,9 +115,13 @@ function mapDbMessagesToUI(
       }
     }
 
+    if (messageType === 'text' && content) {
+      parts.push({ type: 'text' as const, text: content });
+    }
+
     return {
-      id: String(m.id ?? ''),
-      role: String(m.role ?? 'user').toLowerCase() as 'user' | 'assistant',
+      id: msgId,
+      role,
       parts,
       createdAt: m.createdAt ? new Date(String(m.createdAt)) : new Date(),
     };

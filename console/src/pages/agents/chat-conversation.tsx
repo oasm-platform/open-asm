@@ -33,7 +33,7 @@ import {
   ShieldAlert,
   X,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   memo,
   useCallback,
@@ -70,16 +70,6 @@ interface ChatConversationProps {
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
 }
 
-interface ToolPart {
-  type: string;
-  toolCallId: string;
-  toolName?: string;
-  state?: string;
-  input?: unknown;
-  output?: unknown;
-  isError?: boolean;
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -102,42 +92,6 @@ function getTextContent(message: UIMessage): string {
     .filter((part): part is TextUIPart => part.type === 'text')
     .map((part) => part.text)
     .join('');
-}
-
-function isToolPart(part: unknown): part is ToolPart {
-  return !!part && typeof part === 'object' && 'toolCallId' in part;
-}
-
-function extractToolCallStates(parts: UIMessage['parts']): ToolCallState[] {
-  const toolPartsMap = new Map<string, ToolPart>();
-  for (const p of parts) {
-    if (
-      (p.type === 'dynamic-tool' || p.type.startsWith('tool-')) &&
-      isToolPart(p)
-    ) {
-      toolPartsMap.set(p.toolCallId, p);
-    }
-  }
-  return Array.from(toolPartsMap.values()).map((t) => ({
-    toolCallId: t.toolCallId,
-    toolName:
-      t.type === 'dynamic-tool'
-        ? t.toolName || 'dynamic-tool'
-        : t.type.replace('tool-', ''),
-    status: getToolStatus(t.state),
-    input: t.input as Record<string, unknown>,
-    output: t.output,
-  }));
-}
-
-function extractReasoningText(parts: UIMessage['parts']): string {
-  return parts
-    .filter(
-      (p): p is Extract<(typeof parts)[number], { type: 'reasoning' }> =>
-        p.type === 'reasoning',
-    )
-    .map((p) => p.text)
-    .join('\n\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -239,83 +193,169 @@ const ChatMessage = memo(function ChatMessage({
   const isStreamingActive = isLastAssistant && isStreaming;
 
   const parts = message.parts || [];
-  const reasoningText = extractReasoningText(parts);
-  const hasReasoning = reasoningText.length > 0;
-  const toolCallStates = extractToolCallStates(parts);
   const lastPart = parts.at(-1);
 
-  // Show "Thinking" shimmer when streaming starts but no content/reasoning/tools yet
+  // Show "Thinking" shimmer when streaming starts but no parts yet
   const showInitialThinking =
-    isStreamingActive &&
-    !hasContent &&
-    !hasReasoning &&
-    toolCallStates.length === 0;
+    isStreamingActive && parts.length === 0;
 
   // Reasoning is actively streaming if the last part is a reasoning part
   const isReasoningStreaming =
     isStreamingActive && lastPart?.type === 'reasoning';
 
   // Show "Generating" when streaming but no text content yet
-  // (covers: waiting for tools, or tools done but text not started)
   const showGenerating =
     isStreamingActive &&
     !hasContent &&
     !showInitialThinking &&
     !isReasoningStreaming;
 
+  // Build interleaved render list: group consecutive reasoning parts together,
+  // but keep tool calls and text parts in their actual positions.
+  type RenderItem =
+    | { kind: 'reasoning'; text: string; isStreaming: boolean }
+    | { kind: 'tool'; toolCallId: string; toolName: string; state: string; input?: unknown; output?: unknown }
+    | { kind: 'text'; text: string }
+    | { kind: 'generating' }
+    | { kind: 'initial-thinking' };
+
+  const renderItems: RenderItem[] = [];
+
+  // Group consecutive reasoning parts into a single reasoning block
+  let pendingReasoning = '';
+  const flushReasoning = (streaming: boolean) => {
+    if (pendingReasoning.trim()) {
+      renderItems.push({ kind: 'reasoning', text: pendingReasoning, isStreaming: streaming });
+      pendingReasoning = '';
+    }
+  };
+
+  for (const part of parts) {
+    if (part.type === 'reasoning' && 'text' in part) {
+      pendingReasoning += (pendingReasoning ? '\n\n' : '') + (part as { text: string }).text;
+    } else {
+      // Flush any accumulated reasoning before non-reasoning part
+      flushReasoning(false);
+
+      if (part.type === 'text' && 'text' in part) {
+        const text = (part as { text: string }).text;
+        if (text.trim()) {
+          renderItems.push({ kind: 'text', text });
+        }
+      } else if (
+        part.type === 'dynamic-tool' ||
+        part.type.startsWith('tool-')
+      ) {
+        const tp = part as {
+          toolCallId: string;
+          toolName?: string;
+          state?: string;
+          input?: unknown;
+          output?: unknown;
+        };
+        renderItems.push({
+          kind: 'tool',
+          toolCallId: tp.toolCallId,
+          toolName: tp.toolName || 'dynamic-tool',
+          state: getToolStatus(tp.state),
+          input: tp.input,
+          output: tp.output,
+        });
+      }
+    }
+  }
+  // Flush any trailing reasoning
+  const lastReasoningPart = [...parts].reverse().find((p) => p.type === 'reasoning');
+  const isTrailingReasoning =
+    isReasoningStreaming && lastReasoningPart && pendingReasoning.trim();
+  flushReasoning(!!isTrailingReasoning);
+
+  // Append streaming indicators
+  if (showInitialThinking) {
+    renderItems.push({ kind: 'initial-thinking' });
+  } else if (showGenerating) {
+    renderItems.push({ kind: 'generating' });
+  }
+
   return (
     <Message from={message.role}>
       <MessageContent expandable={message.role === 'user'}>
         <div className="flex flex-col w-full gap-3">
-          {/* Reasoning section */}
-          {(hasReasoning || showInitialThinking) && (
-            <Reasoning
-              className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
-              isStreaming={showInitialThinking || isReasoningStreaming}
-            >
-              <ReasoningTrigger
-                getThinkingMessage={(s, d) => (
-                  <ThinkingLabel isStreaming={s} duration={d} />
-                )}
-              />
-              <ReasoningContent>{reasoningText}</ReasoningContent>
-            </Reasoning>
-          )}
+          {renderItems.map((item, i) => {
+            switch (item.kind) {
+              case 'reasoning':
+                return (
+                  <Reasoning
+                    key={`reasoning-${i}`}
+                    className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
+                    isStreaming={item.isStreaming}
+                  >
+                    <ReasoningTrigger
+                      getThinkingMessage={(s, d) => (
+                        <ThinkingLabel isStreaming={s} duration={d} />
+                      )}
+                    />
+                    <ReasoningContent>{item.text}</ReasoningContent>
+                  </Reasoning>
+                );
+              case 'tool':
+                return (
+                  <ToolCallDisplay
+                    key={item.toolCallId}
+                    toolCall={{
+                      toolCallId: item.toolCallId,
+                      toolName: item.toolName,
+                      status: item.state as
+                        | 'pending'
+                        | 'executing'
+                        | 'completed'
+                        | 'error',
+                      input: item.input as Record<string, unknown> | undefined,
+                      output: item.output,
+                    }}
+                    streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
+                  />
+                );
+              case 'text':
+                return (
+                  <div key={`text-${i}`} className="w-full">
+                    <Markdown
+                      content={item.text}
+                      preview={false}
+                      className="text-base"
+                    />
+                  </div>
+                );
+              case 'generating':
+                return (
+                  <motion.div
+                    key="generating"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center gap-2 text-muted-foreground text-sm select-none"
+                  >
+                    <TypingDots />
+                  </motion.div>
+                );
+              case 'initial-thinking':
+                return (
+                  <Reasoning
+                    key="initial-thinking"
+                    isStreaming
+                    className="w-full [&_.italic]:hidden [&_em]:hidden [&_i]:hidden"
+                  >
+                    <ReasoningTrigger
+                      getThinkingMessage={(s, d) => (
+                        <ThinkingLabel isStreaming={s} duration={d} />
+                      )}
+                    />
+                    <ReasoningContent>{''}</ReasoningContent>
+                  </Reasoning>
+                );
+            }
+          })}
 
-          {/* Tool calls */}
-          <AnimatePresence mode="popLayout">
-            {toolCallStates.map((state) => (
-              <ToolCallDisplay
-                key={state.toolCallId}
-                toolCall={state}
-                streamEvents={remoteExecuteEvents?.get(state.toolCallId)}
-              />
-            ))}
-          </AnimatePresence>
-
-          {/* Generating indicator — shown after tools complete, before text arrives */}
-          {showGenerating && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center gap-2 text-muted-foreground text-sm select-none"
-            >
-              <TypingDots />
-            </motion.div>
-          )}
-
-          {/* Text response */}
-          {hasContent && (
-            <div className="w-full">
-              <Markdown
-                content={textContent}
-                preview={false}
-                className="text-base"
-              />
-            </div>
-          )}
-
-          {/* Streaming indicator — inline dots while generating */}
+          {/* Streaming indicator — inline dots while generating text */}
           {isStreamingActive && hasContent && (
             <div className="flex items-center gap-1.5 text-muted-foreground text-sm select-none">
               <TypingDots />
