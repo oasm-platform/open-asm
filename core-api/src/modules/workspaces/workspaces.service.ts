@@ -602,15 +602,11 @@ export class WorkspacesService implements OnModuleInit {
       relations: ['asset'],
     });
 
-    if (!job) {
-      throw new NotFoundException('Job not found');
+    if (!job || !job.asset?.targetId) {
+      return [];
     }
 
     const targetId = job.asset.targetId;
-
-    if (!targetId) {
-      return [];
-    }
 
     const workspaceTargets = await this.workspaceTargetRepository.find({
       where: { target: { id: targetId } },

@@ -171,7 +171,7 @@ export class JobsRegistryService {
         workspaceId,
         assetIds,
         workflow,
-        jobHistory: existingJobHistory,
+        jobHistory,
         priority,
         isSaveRawResult,
         jobName,

@@ -31,9 +31,9 @@ import { ServicesModule } from './services/services.module';
       formatter: icuFormatter,
       loaderOptions: {
         path: path.join(__dirname, '/i18n/'),
-        watch: true,
+        watch: process.env.NODE_ENV !== 'production',
       },
-      logging: true,
+      logging: process.env.NODE_ENV !== 'production',
       resolvers: [
         { use: QueryResolver, options: ['lang'] },
         AcceptLanguageResolver,

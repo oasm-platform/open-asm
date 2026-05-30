@@ -742,6 +742,7 @@ export class StatisticService {
   @OnEvent(EventTriggerType.WORKFLOW_START)
   async handleWorkflowStart(job: CreateJobs) {
     if (
+      job.workflow?.filePath &&
       [
         DefaultWorkflow.DOMAIN_DISCOVERY,
         DefaultWorkflow.IP_ADDRESS_DISCOVERY,
@@ -749,37 +750,37 @@ export class StatisticService {
       job.targetIds
     ) {
       //Take snapshot
-      for (const targetId of job.targetIds) {
-        const snapshotPayload =
-          await this.takeSnapshotStatisticTarget(targetId);
-        await this.redisService.setex(
-          `snapshot:${job.workflow.filePath}:${targetId}`,
-          86400,
-          JSON.stringify(snapshotPayload),
-        );
-      }
+      await Promise.all(
+        job.targetIds.map(async (targetId) => {
+          const snapshotPayload =
+            await this.takeSnapshotStatisticTarget(targetId);
+          await this.redisService.setex(
+            `snapshot:${job.workflow.filePath}:${targetId}`,
+            86400,
+            JSON.stringify(snapshotPayload),
+          );
+        }),
+      );
     }
   }
 
   @OnEvent(EventTriggerType.WORKFLOW_END)
   async handleWorkflowEnd(job: Job) {
     if (
+      job.jobHistory?.workflow?.filePath &&
       [
         DefaultWorkflow.DOMAIN_DISCOVERY,
         DefaultWorkflow.IP_ADDRESS_DISCOVERY,
       ].includes(job.jobHistory.workflow.filePath as DefaultWorkflow) &&
-      job.asset.target.id
+      job.asset?.target?.id
     ) {
       const redisKey = `snapshot:${job.jobHistory.workflow.filePath}:${job.asset.target.id}`;
 
-      const beforeSnapshot = (await this.redisService
+      const beforeSnapshot = await this.redisService
         .get(redisKey)
-        .then((res) => JSON.parse(res || '{}') as StatisticSnapshot));
+        .then((res) => JSON.parse(res || '{}') as StatisticSnapshot);
       await this.redisService.del(redisKey);
-      const [afterSnapshot] = await Promise.all([
-        this.takeSnapshotStatisticTarget(job.asset.target.id),
-        this.redisService.del(redisKey),
-      ]);
+      const afterSnapshot = await this.takeSnapshotStatisticTarget(job.asset.target.id);
 
       const diffs: Partial<StatisticSnapshot> = {};
       for (const key in afterSnapshot) {
