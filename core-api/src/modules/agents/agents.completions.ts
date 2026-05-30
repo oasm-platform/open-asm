@@ -36,6 +36,7 @@ import { TokenCounter } from './shared/token-counter';
  * the output into a consistent `reasoning` part type on the stream.
  */
  
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getReasoningProviderOptions(
   provider: LLMProvider,
 ): Record<string, any> | undefined {
