@@ -22,6 +22,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { In, Repository } from 'typeorm';
+import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
@@ -590,6 +591,37 @@ export class WorkspacesService implements OnModuleInit {
         workspace: { id: workspaceId },
       },
       relations: ['user'],
+    });
+  }
+
+  public async getMemberOfWorkspaceByJobId(
+    jobId: string,
+  ): Promise<WorkspaceMembers[]> {
+    const job = await this.repo.manager.getRepository(Job).findOne({
+      where: { id: jobId },
+      relations: ['asset'],
+    });
+
+    if (!job || !job.asset?.targetId) {
+      return [];
+    }
+
+    const targetId = job.asset.targetId;
+
+    const workspaceTargets = await this.workspaceTargetRepository.find({
+      where: { target: { id: targetId } },
+      relations: ['workspace'],
+    });
+
+    if (workspaceTargets.length === 0) {
+      return [];
+    }
+
+    const workspaceIds = workspaceTargets.map((wt) => wt.workspace.id);
+
+    return this.workspaceMembersRepository.find({
+      where: { workspace: { id: In(workspaceIds) } },
+      relations: ['user', 'workspace'],
     });
   }
 }

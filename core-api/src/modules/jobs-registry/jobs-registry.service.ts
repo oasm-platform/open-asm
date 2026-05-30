@@ -6,6 +6,7 @@ import {
 import {
   BullMQName,
   CATEGORY_DATA_SOURCE_MAP,
+  EventTriggerType,
   JobPriority,
   JobRunType,
   JobStatus,
@@ -24,6 +25,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
@@ -64,6 +66,7 @@ export class JobsRegistryService {
     private storageService: StorageService,
     private redis: RedisService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
+    private eventEmitter: EventEmitter2,
   ) {}
   public async getManyJobs(
     query: GetManyJobsRequestDto,
@@ -162,6 +165,19 @@ export class JobsRegistryService {
         jobHistoryName: jobName,
       });
       await this.jobHistoryRepo.save(jobHistory);
+      this.eventEmitter.emit(EventTriggerType.WORKFLOW_START, {
+        tool,
+        targetIds,
+        workspaceId,
+        assetIds,
+        workflow,
+        jobHistory,
+        priority,
+        isSaveRawResult,
+        jobName,
+        isPublishEvent,
+        jobRunType,
+      });
     }
 
     const jobRepo = this.dataSource.getRepository(Job);
@@ -744,8 +760,6 @@ export class JobsRegistryService {
    * @param jobHistoryId the ID of the job history to mark as completed
    */
   public async markWorkflowDone(jobHistoryId: string): Promise<void> {
-    const logger = new Logger('JobHistoryCompletion');
-
     const pendingExists = await this.repo.exists({
       where: {
         jobHistory: { id: jobHistoryId },
@@ -768,16 +782,21 @@ export class JobsRegistryService {
     );
 
     if (updateResult.affected && updateResult.affected > 0) {
-      const jobHistory = await this.jobHistoryRepo.findOne({
-        where: { id: jobHistoryId },
-        relations: { workflow: true },
+      const lastJob = await this.repo.findOne({
+        where: { jobHistory: { id: jobHistoryId } },
+        order: { createdAt: 'DESC' },
+        relations: {
+          asset: {
+            target: true,
+          },
+          jobHistory: {
+            workflow: true,
+          },
+        },
       });
 
-      if (jobHistory) {
-        logger.log(
-          `🎉 JobHistory ${jobHistoryId} completed! ` +
-            `Workflow: ${jobHistory.workflow?.name || 'Manual'}`,
-        );
+      if (lastJob) {
+        this.eventEmitter.emit(EventTriggerType.WORKFLOW_END, lastJob);
       }
     }
   }

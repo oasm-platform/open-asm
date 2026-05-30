@@ -2,6 +2,7 @@ import { BullMQName, JobStatus } from '@/common/enums/enum';
 import { RedisService } from '@/services/redis/redis.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -106,6 +107,10 @@ describe('JobsRegistryService', () => {
         {
           provide: getQueueToken(BullMQName.JOB_RESULT),
           useValue: { add: jest.fn() },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
         },
         JobsRegistryService,
       ],
