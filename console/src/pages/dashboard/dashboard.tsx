@@ -5,40 +5,44 @@ import AssetLocationsMap from './components/asset-locations-map';
 import { AssetTrends } from './components/asset-trends';
 import IssuesTimeline from './components/issues-timeline';
 import Statistic from './components/statistic';
-import TlsExpirationTable from './components/tls-expiration-table';
+import TlsStatistics from './components/tls-statistics';
 import TopAssetsVulnerabilitiesChart from './components/top-assets-vulnerabilities-chart';
-import TopTagsAssets from './components/top-tags-assets';
 import VulnerabilityStatistic from './components/vulnerabilities-statistic';
 
 export default function Dashboard() {
   const { workspaces, isLoading } = useWorkspaceSelector();
-  if (isLoading) return null;
+
+  if (isLoading) return <Page title="Dashboard" />;
+
+  if (workspaces.length === 0) {
+    return (
+      <Page title="Dashboard">
+        <CreateWorkspace />
+      </Page>
+    );
+  }
+
   return (
     <Page title="Dashboard">
-      {workspaces.length === 0 ? (
-        <CreateWorkspace />
-      ) : (
-        <div className="grid grid-cols-1 2xl:grid-cols-4 gap-4">
-          <div className="col-span-1 2xl:col-span-3 gap-4 space-y-4 2xl:order-1">
-            <Statistic />
-            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
-              <IssuesTimeline />
-              <AssetTrends />
-              <TlsExpirationTable />
-              <TopAssetsVulnerabilitiesChart />
-            </div>
-          </div>
-          <div className="col-span-1 space-y-4 flex flex-col order-first 2xl:order-2">
-            <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-1 gap-4">
-              <VulnerabilityStatistic />
-              <TopTagsAssets />
-            </div>
-          </div>
-          <div className="col-span-1 2xl:col-span-3 space-y-4 min-h-96 order-last">
+      <div className="grid grid-cols-1 2xl:grid-cols-4 gap-4">
+        <div className="col-span-1 2xl:col-span-3 space-y-4 2xl:order-1">
+          <Statistic />
+          <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
+            <IssuesTimeline />
+            <AssetTrends />
+
+            <TopAssetsVulnerabilitiesChart />
             <AssetLocationsMap />
           </div>
         </div>
-      )}
+        <div className="col-span-1 space-y-4 order-first 2xl:order-2">
+          <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-1 gap-4">
+            <VulnerabilityStatistic />
+            <TlsStatistics />
+          </div>
+        </div>
+        <div className="col-span-1 2xl:col-span-3 min-h-96 order-last"></div>
+      </div>
     </Page>
   );
 }

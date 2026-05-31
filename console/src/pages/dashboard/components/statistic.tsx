@@ -139,11 +139,13 @@ export default function Statistic() {
                   margin={{ top: 10, right: 0, left: 0, bottom: 5 }}
                 >
                   <Area
-                    type="natural"
+                    type="basis"
                     dataKey={card.field}
-                    stroke="#a1a1aa"
-                    fill="none"
+                    stroke="hsl(var(--primary))"
+                    fill="hsl(var(--primary) / 0.1)"
                     strokeWidth={2}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
                     isAnimationActive={true}
                   />
                 </AreaChart>

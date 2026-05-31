@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, MoreThanOrEqual } from 'typeorm';
 
+import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
+
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   DefaultWorkflow,
@@ -32,6 +34,14 @@ import { TimelineResponseDto } from './dto/timeline.dto';
 import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { Statistic } from './entities/statistic.entity';
+
+interface RawTlsStatistic {
+  alreadyExpired: string;
+  expireInAMonth: string;
+  expireIn3Months: string;
+  wontExpireAnytimeSoon: string;
+  newCertificatesDiscovered: string;
+}
 
 interface RawAssetVulCount {
   id: string;
@@ -520,6 +530,66 @@ export class StatisticService {
       .setParameters(subQuery.getParameters())
       .groupBy('sq."workspaceId"')
       .getRawMany<{ workspaceId: string; count: string }>();
+  }
+
+  async getTlsStatistics(workspaceId: string): Promise<TlsStatisticResponseDto> {
+    const rawSubQuery = `
+      SELECT DISTINCT ON (hr.tls->>'host', hr."assetServiceId")
+        NULLIF(hr.tls->>'not_after', '')::timestamp AS not_after,
+        hr."createdAt" AS created_at
+      FROM "http_responses" hr
+      INNER JOIN "asset_services" assvc ON assvc.id = hr."assetServiceId"
+      INNER JOIN "assets" a ON a.id = assvc."assetId"
+      INNER JOIN "targets" t ON t.id = a."targetId"
+      INNER JOIN "workspace_targets" wt ON wt."targetId" = t.id
+      WHERE hr.tls IS NOT NULL
+        AND wt."workspaceId" = :workspaceId
+      ORDER BY hr.tls->>'host', hr."assetServiceId", hr."createdAt" DESC
+    `;
+
+    const result = await this.dataSource
+      .createQueryBuilder()
+      .select(
+        `COALESCE(SUM(CASE WHEN sq.not_after < NOW() THEN 1 ELSE 0 END), 0)`,
+        'alreadyExpired',
+      )
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN sq.not_after >= NOW() AND sq.not_after < NOW() + INTERVAL '1 month' THEN 1 ELSE 0 END), 0)`,
+        'expireInAMonth',
+      )
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN sq.not_after >= NOW() + INTERVAL '1 month' AND sq.not_after < NOW() + INTERVAL '3 months' THEN 1 ELSE 0 END), 0)`,
+        'expireIn3Months',
+      )
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN sq.not_after >= NOW() + INTERVAL '3 months' THEN 1 ELSE 0 END), 0)`,
+        'wontExpireAnytimeSoon',
+      )
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN sq.created_at >= NOW() - INTERVAL '30 days' THEN 1 ELSE 0 END), 0)`,
+        'newCertificatesDiscovered',
+      )
+      .from(`(${rawSubQuery})`, 'sq')
+      .setParameter('workspaceId', workspaceId)
+      .getRawOne<RawTlsStatistic>();
+
+    if (!result) {
+      return {
+        alreadyExpired: 0,
+        expireInAMonth: 0,
+        expireIn3Months: 0,
+        wontExpireAnytimeSoon: 0,
+        newCertificatesDiscovered: 0,
+      };
+    }
+
+    return {
+      alreadyExpired: Number(result.alreadyExpired),
+      expireInAMonth: Number(result.expireInAMonth),
+      expireIn3Months: Number(result.expireIn3Months),
+      wontExpireAnytimeSoon: Number(result.wontExpireAnytimeSoon),
+      newCertificatesDiscovered: Number(result.newCertificatesDiscovered),
+    };
   }
 
   /**
