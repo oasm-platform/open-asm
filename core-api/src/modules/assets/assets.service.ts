@@ -157,6 +157,18 @@ export class AssetsService {
       }
     }
 
+    if (query.startDate) {
+      queryBuilder.andWhere('asset_service."createdAt" >= :startDate', {
+        startDate: query.startDate,
+      });
+    }
+
+    if (query.endDate) {
+      queryBuilder.andWhere('asset_service."createdAt" <= :endDate', {
+        endDate: `${query.endDate} 23:59:59.999`,
+      });
+    }
+
     return queryBuilder;
   }
 
@@ -854,6 +866,18 @@ export class AssetsService {
     if (query.hosts && query.hosts.length > 0) {
       qb.andWhere('"tlsAssets"."host" = ANY(:tlsHostFilter)', {
         tlsHostFilter: query.hosts,
+      });
+    }
+
+    // Date filtering on not_after field
+    if (query.startDate) {
+      qb.andWhere('"tlsAssets"."not_after"::timestamp >= :startDate', {
+        startDate: query.startDate,
+      });
+    }
+    if (query.endDate) {
+      qb.andWhere('"tlsAssets"."not_after"::timestamp <= :endDate', {
+        endDate: `${query.endDate} 23:59:59.999`,
       });
     }
 

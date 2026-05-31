@@ -2185,6 +2185,14 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  /**
+   * Filter assets created on or after this date (YYYY-MM-DD)
+   */
+  startDate?: string;
+  /**
+   * Filter assets created on or before this date (YYYY-MM-DD)
+   */
+  endDate?: string;
 };
 
 export type AssetsControllerGetIpAssetsParams = {
@@ -2201,6 +2209,14 @@ export type AssetsControllerGetIpAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  /**
+   * Filter assets created on or after this date (YYYY-MM-DD)
+   */
+  startDate?: string;
+  /**
+   * Filter assets created on or before this date (YYYY-MM-DD)
+   */
+  endDate?: string;
 };
 
 export type AssetsControllerGetHostAssetsParams = {
@@ -2217,6 +2233,14 @@ export type AssetsControllerGetHostAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  /**
+   * Filter assets created on or after this date (YYYY-MM-DD)
+   */
+  startDate?: string;
+  /**
+   * Filter assets created on or before this date (YYYY-MM-DD)
+   */
+  endDate?: string;
 };
 
 export type AssetsControllerGetPortAssetsParams = {
@@ -2233,6 +2257,14 @@ export type AssetsControllerGetPortAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  /**
+   * Filter assets created on or after this date (YYYY-MM-DD)
+   */
+  startDate?: string;
+  /**
+   * Filter assets created on or before this date (YYYY-MM-DD)
+   */
+  endDate?: string;
 };
 
 export type AssetsControllerGetTechnologyAssetsParams = {
@@ -2249,6 +2281,14 @@ export type AssetsControllerGetTechnologyAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  /**
+   * Filter assets created on or after this date (YYYY-MM-DD)
+   */
+  startDate?: string;
+  /**
+   * Filter assets created on or before this date (YYYY-MM-DD)
+   */
+  endDate?: string;
 };
 
 export type AssetsControllerGetStatusCodeAssetsParams = {
@@ -2265,6 +2305,14 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
   techs?: string[];
   statusCodes?: string[];
   tlsHosts?: string[];
+  /**
+   * Filter assets created on or after this date (YYYY-MM-DD)
+   */
+  startDate?: string;
+  /**
+   * Filter assets created on or before this date (YYYY-MM-DD)
+   */
+  endDate?: string;
 };
 
 export type AssetsControllerGetTlsAssetsParams = {
@@ -2275,6 +2323,14 @@ export type AssetsControllerGetTlsAssetsParams = {
   sortOrder?: string;
   hosts?: string[];
   targetIds?: string[];
+  /**
+   * Filter TLS certs with not_after on or after this date (YYYY-MM-DD)
+   */
+  startDate?: string;
+  /**
+   * Filter TLS certs with not_after on or before this date (YYYY-MM-DD)
+   */
+  endDate?: string;
 };
 
 export type WorkersControllerGetWorkersParams = {
