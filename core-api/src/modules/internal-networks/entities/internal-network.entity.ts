@@ -6,9 +6,10 @@ import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { NetworkInterface } from '@/modules/internal-networks/entities/network-interface.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import { Column, Entity, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 
 @Entity('internal_networks')
+@Index('IDX_inetwork_workspaceId', ['workspace'])
 export class InternalNetwork extends BaseEntity {
   @ApiProperty({
     example: 'Internal Network 1',

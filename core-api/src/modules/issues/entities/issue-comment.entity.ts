@@ -6,12 +6,14 @@ import {
   Column,
   DeleteDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
 } from 'typeorm';
 import { Issue } from './issue.entity';
 
 @Entity('issue_comments')
+@Index('IDX_issue_comments_issueId', ['issue', 'createdAt'])
 export class IssueComment extends BaseEntity {
   @ApiProperty()
   @Column()

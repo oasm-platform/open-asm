@@ -45,6 +45,7 @@ export class WorkflowContent {
 
 @Entity('workflows')
 @Index(['filePath', 'workspace'], { unique: true })
+@Index('IDX_workflows_workspaceId', ['workspace'])
 export class Workflow extends BaseEntity {
   @Column()
   name: string;

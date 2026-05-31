@@ -4,11 +4,18 @@ import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { JobErrorLog } from './job-error-log.entity';
 import { JobHistory } from './job-history.entity';
 
 @Entity('jobs')
+@Index('IDX_jobs_status_priority_createdAt', ['status', 'priority', 'createdAt'])
+@Index('IDX_jobs_asset_status', ['asset', 'status'])
+@Index('IDX_jobs_tool', ['tool'])
+@Index('IDX_jobs_workerId_status', ['workerId', 'status'])
+@Index('IDX_jobs_jobHistoryId', ['jobHistory'])
+@Index('IDX_jobs_assetServiceId', ['assetService'])
+@Index('IDX_jobs_category_status', ['category', 'status'])
 export class Job extends BaseEntity {
   /**
    * The asset this job belongs to.

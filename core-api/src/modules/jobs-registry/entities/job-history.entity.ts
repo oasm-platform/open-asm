@@ -4,10 +4,11 @@ import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import { Port } from '@/modules/assets/entities/ports.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
-import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany } from 'typeorm';
 import { Job } from './job.entity';
 
 @Entity('job_histories')
+@Index('IDX_job_histories_workflow', ['workflow'])
 export class JobHistory extends BaseEntity {
   @OneToMany(() => Job, (job) => job.jobHistory, {
     onDelete: 'CASCADE',

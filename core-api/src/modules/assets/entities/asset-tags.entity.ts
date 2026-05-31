@@ -2,10 +2,12 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsNotEmpty, IsString } from 'class-validator';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 
 @Entity('asset_services_tags')
+@Index('IDX_asset_tags_assetServiceId', ['assetServiceId'])
+@Index('IDX_asset_tags_tag', ['tag'])
 export class AssetTag extends BaseEntity {
   @ApiProperty()
   @IsString()

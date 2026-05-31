@@ -1,9 +1,10 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { NotificationScope, NotificationType } from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 
 @Entity('notifications')
+@Index('IDX_notifications_workspaceId', ['workspace'])
 export class Notification extends BaseEntity {
   @Column({ type: 'enum', enum: NotificationScope })
   scope: NotificationScope;

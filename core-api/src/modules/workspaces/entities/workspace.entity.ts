@@ -14,6 +14,7 @@ import {
   Column,
   DeleteDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -22,6 +23,7 @@ import {
 import { WorkspaceMembers } from './workspace-members.entity';
 
 @Entity('workspaces')
+@Index('IDX_workspaces_owner', ['owner'])
 export class Workspace extends BaseEntity {
   @ApiProperty({
     example: 'My Workspace',
