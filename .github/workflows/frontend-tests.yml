@@ -81,7 +81,7 @@ jobs:
 
       - name: Run E2E
         working-directory: console
-        run: npx playwright test
+        run: npm run e2e
         env:
           E2E_BASE_URL: http://localhost:5173
 
