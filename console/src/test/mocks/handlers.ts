@@ -86,6 +86,123 @@ export const handlers = [
     return HttpResponse.json(mockDashboardStats);
   }),
 
+  // Statistics
+  http.get('/api/statistic', () => {
+    return HttpResponse.json({
+      targets: 10,
+      assets: 50,
+      services: 30,
+      techs: 20,
+      vuls: 25,
+      criticalVuls: 5,
+      highVuls: 8,
+      mediumVuls: 7,
+      lowVuls: 3,
+      infoVuls: 2,
+      ports: 80,
+      score: 7.5,
+    });
+  }),
+  http.get('/api/statistic/timeline', () => {
+    return HttpResponse.json({
+      data: [
+        {
+          id: 'timeline-1',
+          targets: 8,
+          assets: 40,
+          services: 25,
+          techs: 15,
+          vuls: 20,
+          criticalVuls: 4,
+          highVuls: 6,
+          mediumVuls: 5,
+          lowVuls: 3,
+          infoVuls: 2,
+          ports: 60,
+          score: 6.5,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+        },
+        {
+          id: 'timeline-2',
+          targets: 10,
+          assets: 50,
+          services: 30,
+          techs: 20,
+          vuls: 25,
+          criticalVuls: 5,
+          highVuls: 8,
+          mediumVuls: 7,
+          lowVuls: 3,
+          infoVuls: 2,
+          ports: 80,
+          score: 7.5,
+          createdAt: '2026-01-02T00:00:00Z',
+          updatedAt: '2026-01-02T00:00:00Z',
+        },
+      ],
+      total: 2,
+    });
+  }),
+  http.get('/api/statistic/issues-timeline', () => {
+    return HttpResponse.json({
+      data: [
+        {
+          id: 'issue-timeline-1',
+          vuls: 20,
+          criticalVuls: 4,
+          highVuls: 6,
+          mediumVuls: 5,
+          lowVuls: 3,
+          infoVuls: 2,
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+        {
+          id: 'issue-timeline-2',
+          vuls: 25,
+          criticalVuls: 5,
+          highVuls: 8,
+          mediumVuls: 7,
+          lowVuls: 3,
+          infoVuls: 2,
+          createdAt: '2026-01-02T00:00:00Z',
+        },
+      ],
+      total: 2,
+    });
+  }),
+  http.get('/api/statistic/top-assets-vulnerabilities', () => {
+    return HttpResponse.json([
+      {
+        id: 'asset-vuln-1',
+        value: 'example.com',
+        critical: 2,
+        high: 3,
+        medium: 4,
+        low: 1,
+        info: 0,
+        total: 10,
+      },
+    ]);
+  }),
+  http.get('/api/statistic/top-tags-assets', () => {
+    return HttpResponse.json([
+      { tag: 'production', count: 15 },
+      { tag: 'web', count: 10 },
+    ]);
+  }),
+  http.get('/api/statistic/asset-locations', () => {
+    return HttpResponse.json([]);
+  }),
+
+  // TLS Assets
+  http.get('/api/assets/tls', () => {
+    return HttpResponse.json({
+      data: [],
+      total: 0,
+    });
+  }),
+
   // Workspaces
   http.get('/api/workspaces', () => {
     return HttpResponse.json({ data: mockWorkspaces });

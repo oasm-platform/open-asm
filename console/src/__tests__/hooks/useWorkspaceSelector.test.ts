@@ -44,7 +44,7 @@ function setupWorkspaceQuery(
     data: data ? { data } : undefined,
     isLoading,
     refetch: vi.fn(),
-  } as ReturnType<typeof useWorkspacesControllerGetWorkspaces>);
+  } as unknown as ReturnType<typeof useWorkspacesControllerGetWorkspaces>);
 }
 
 describe('useWorkspaceState', () => {

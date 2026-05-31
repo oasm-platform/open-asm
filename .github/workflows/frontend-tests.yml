@@ -8,6 +8,9 @@ on:
     branches: [main, develop]
     paths: ['console/**']
 
+permissions:
+  contents: read
+
 jobs:
   unit-integration:
     name: Unit & Integration Tests
@@ -21,7 +24,7 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
-          cache-dependency-path: console/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
       - run: npm run test:run
@@ -63,7 +66,7 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
-          cache-dependency-path: console/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
       - run: npx playwright install --with-deps chromium firefox

@@ -1,4 +1,4 @@
-import { parseCVSS, type CVSSResult } from '@/utils/cvssVectorParser';
+import { parseCVSS } from '@/utils/cvssVectorParser';
 
 describe('parseCVSS', () => {
   it('returns null for non-string input', () => {
