@@ -9,6 +9,15 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "gen:api": "npx orval",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:headed": "playwright test --headed",
+    "e2e:debug": "playwright test --debug",
+    "test:all": "npm run test:run && npm run e2e",
     "prepare": "husky"
   },
   "dependencies": {
@@ -91,13 +100,20 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
-    "@types/node": "^22.0.0",
+    "@playwright/test": "^1.60.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/leaflet": "^1.9.21",
+    "@types/node": "^22.0.0",
     "@types/qs": "^6.14.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@types/react-leaflet": "^2.8.3",
     "@vitejs/plugin-react": "^4.4.1",
+    "@vitest/coverage-v8": "^4.1.7",
+    "@vitest/ui": "^4.1.7",
     "ajv": "^8.18.0",
     "dotenv": "^16.4.7",
     "eslint": "^9.25.0",
@@ -105,10 +121,13 @@
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
     "husky": "^9.1.7",
+    "jsdom": "^26.1.0",
+    "msw": "^2.14.6",
     "tw-animate-css": "^1.3.4",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.30.1",
     "vite": "^6.4.1",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^4.1.7"
   }
 }
