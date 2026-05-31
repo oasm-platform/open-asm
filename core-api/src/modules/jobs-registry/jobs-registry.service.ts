@@ -380,34 +380,41 @@ export class JobsRegistryService {
   public async getNextJob(
     workerId: string,
   ): Promise<GetNextJobResponseDto | null> {
+    // [OPT-2] Fetch worker OUTSIDE transaction to reduce lock hold time
+    const worker = await this.dataSource.getRepository(WorkerInstance).findOne({
+      where: { id: workerId },
+      relations: ['workspace', 'tool'],
+      cache: {
+        id: `workers:${workerId}`,
+        milliseconds: 1000 * 30,
+      },
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker not found');
+    }
+
+    const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const worker = await queryRunner.manager
-        .getRepository(WorkerInstance)
-        .findOne({
-          where: {
-            id: workerId,
-          },
-          relations: ['workspace', 'tool'],
-        });
-
-      if (!worker) {
-        throw new NotFoundException('Worker not found');
-      }
-
-      const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
       const queryBuilder = queryRunner.manager
         .createQueryBuilder(Job, 'jobs')
         .innerJoinAndSelect('jobs.asset', 'asset')
         .innerJoin('asset.target', 'target')
-        .leftJoin('target.workspaceTargets', 'workspace_targets')
-        .leftJoin('workspace_targets.workspace', 'workspaces')
         .leftJoin('jobs.tool', 'tool')
         .where('jobs.status = :status', { status: JobStatus.PENDING })
+        // [OPT-1] Use addOrderBy for compound sort (priority first, then createdAt)
         .orderBy('jobs.priority', 'DESC')
-        .orderBy('jobs.createdAt', 'ASC');
+        .addOrderBy('jobs.createdAt', 'ASC');
+
+      // [OPT-3] Only join workspaceTargets/workspaces when actually needed
+      if (isBuiltInTools && worker.scope !== WorkerScope.CLOUD) {
+        queryBuilder
+          .leftJoin('target.workspaceTargets', 'workspace_targets')
+          .leftJoin('workspace_targets.workspace', 'workspaces');
+      }
 
       if (isBuiltInTools) {
         const builtInToolsName = builtInTools.map((tool) => tool.name);
@@ -430,25 +437,21 @@ export class JobsRegistryService {
         });
       }
 
-      // Determine data source from category mapping and configure query accordingly
       const toolDataSource = worker.tool?.category
         ? CATEGORY_DATA_SOURCE_MAP[worker.tool.category]
         : ToolDataSource.ASSET;
 
       if (toolDataSource === ToolDataSource.ASSET_SERVICE) {
-        // For tools operating on asset services (e.g., HTTP_PROBE, SCREENSHOT)
-        // Join assetService and filter by category
         queryBuilder
           .leftJoinAndSelect('jobs.assetService', 'assetService')
           .andWhere('jobs.category = :category', {
             category: worker.tool?.category,
           });
       } else {
-        // For tools operating on assets (e.g., SUBDOMAINS, PORTS_SCANNER, VULNERABILITIES)
-        // Join assetService without category filter
         queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
       }
 
+      // [OPT-4] SKIP LOCKED avoids workers blocking each other on the same row
       const job = await queryBuilder
         .setLock('pessimistic_write', undefined, ['jobs'])
         .limit(1)
@@ -459,20 +462,21 @@ export class JobsRegistryService {
         return null;
       }
 
-      job.workerId = workerId;
-      job.status = JobStatus.IN_PROGRESS;
-      job.pickJobAt = new Date();
-      await queryRunner.manager.save(job);
-
-      if (isBuiltInTools) {
-        if (!job.command) {
-          await queryRunner.rollbackTransaction();
-          return null;
-        }
+      if (isBuiltInTools && !job.command) {
+        await queryRunner.rollbackTransaction();
+        return null;
       }
+
+      // [OPT-5] Use update() instead of save() — direct SQL, no extra SELECT
+      await queryRunner.manager.update(Job, job.id, {
+        workerId,
+        status: JobStatus.IN_PROGRESS,
+        pickJobAt: new Date(),
+      });
+
       await queryRunner.commitTransaction();
 
-      const response: GetNextJobResponseDto = {
+      return {
         id: job.id,
         category: job.category,
         createdAt: job.createdAt,
@@ -481,8 +485,6 @@ export class JobsRegistryService {
         command: job.command,
         asset: job.asset,
       };
-
-      return response;
     } catch (error) {
       Logger.error(
         'Error in getNextJob',

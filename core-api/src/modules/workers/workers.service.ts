@@ -31,6 +31,7 @@ import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import { AliveStreamManager } from './alive-stream-manager.service';
 import {
   GetManyWorkersDto,
   WorkerAliveDto,
@@ -68,6 +69,8 @@ export class WorkersService {
     private toolsService: ToolsService,
 
     private redisService: RedisService,
+
+    private aliveStreamManager: AliveStreamManager,
   ) {}
 
   /**
@@ -94,24 +97,33 @@ export class WorkersService {
 
   /**
    * Automatically removes any workers that have been offline for at least 1 minute (60 seconds)
-   * from the database. This function is intended to be run periodically (e.g. every 1 minute)
-   * to clean up stale workers that may have disconnected without properly unregistering.
+   * from the database. Uses hybrid approach: checks in-memory gRPC stream state first,
+   * then falls back to DB lastSeenAt timestamp.
    *
+   * - Worker has active gRPC stream → SKIP (connected)
+   * - Worker has no stream BUT lastSeenAt not expired → SKIP (grace period)
+   * - Worker has no stream AND lastSeenAt expired → DELETE
    */
   @Interval(WORKER_TIMEOUT)
   async autoCleanupWorkersAndJobs() {
-    const workers = await this.repo
-      .find({
-        where: {
-          lastSeenAt: LessThan(new Date(Date.now() - WORKER_TIMEOUT)),
-        },
-      })
-      .then((res) => res.map((worker) => worker.id));
+    const staleWorkers = await this.repo.find({
+      where: {
+        lastSeenAt: LessThan(new Date(Date.now() - WORKER_TIMEOUT)),
+      },
+    });
 
-    if (workers.length > 0) {
-      for (const worker of workers) {
-        await this.workerLeave(worker);
+    for (const worker of staleWorkers) {
+      if (this.aliveStreamManager.isActive(worker.id)) {
+        this.logger.debug(
+          `[autoCleanup] Worker ${worker.id} has active stream, skipping deletion`,
+        );
+        continue;
       }
+
+      this.logger.log(
+        `[autoCleanup] Worker ${worker.id} has no active stream and lastSeenAt expired, removing`,
+      );
+      await this.workerLeave(worker.id);
     }
 
     // Update both in_progress jobs with missing workers and failed jobs
@@ -126,14 +138,23 @@ export class WorkersService {
    */
 
   private async workerLeave(id: string) {
+    await this.releaseWorkerJobs(id);
+    return this.repo.delete(id);
+  }
+
+  /**
+   * Releases all IN_PROGRESS jobs held by a worker back to PENDING.
+   * Does NOT delete the worker — used on stream disconnect so other
+   * workers can pick up the freed jobs immediately.
+   */
+  public async releaseWorkerJobs(workerId: string) {
     await this.jobsRegistryService.repo
       .createQueryBuilder('jobs')
       .update()
       .set({ status: JobStatus.PENDING, workerId: undefined })
-      .where('jobs."workerId" = :id', { id })
+      .where('jobs."workerId" = :id', { id: workerId })
       .andWhere('jobs.status = :status', { status: JobStatus.IN_PROGRESS })
       .execute();
-    return this.repo.delete(id);
   }
 
   /**
@@ -228,6 +249,7 @@ export class WorkersService {
           ...worker,
           currentJobsCount: count,
           tools,
+          isOnline: this.aliveStreamManager.isActive(worker.id),
         };
       }),
     );

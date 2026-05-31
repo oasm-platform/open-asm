@@ -1,8 +1,10 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne } from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('sessions')
+@Index('IDX_sessions_userId', ['user'])
+@Index('IDX_sessions_expiresAt', ['expiresAt'])
 export class Session extends BaseEntity {
   @Column('timestamp')
   expiresAt: Date;

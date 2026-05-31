@@ -1,9 +1,10 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne } from 'typeorm';
 import { Workspace } from '../../workspaces/entities/workspace.entity';
 
 @Entity('workspace_statistics')
+@Index('IDX_stats_workspace_createdAt', ['workspace', 'createdAt'])
 export class Statistic extends BaseEntity {
   @ApiProperty({ description: 'Number of assets', default: 0 })
   @Column({ default: 0 })

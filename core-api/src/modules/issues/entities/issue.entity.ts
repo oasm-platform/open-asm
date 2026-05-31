@@ -3,10 +3,11 @@ import { IssueSourceType, IssueStatus } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { IssueComment } from './issue-comment.entity';
 
 @Entity('issues')
+@Index('IDX_issues_workspaceId_status', ['workspace', 'status'])
 export class Issue extends BaseEntity {
   @ApiProperty()
   @Column()

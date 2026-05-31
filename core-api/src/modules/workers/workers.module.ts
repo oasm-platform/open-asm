@@ -7,6 +7,7 @@ import { NetworkInterface } from '../internal-networks/entities/network-interfac
 import { Job } from '../jobs-registry/entities/job.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsModule } from '../tools/tools.module';
+import { AliveStreamManager } from './alive-stream-manager.service';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersController } from './workers.controller';
 import { WorkersService } from './workers.service';
@@ -28,7 +29,17 @@ import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
     forwardRef(() => ToolsModule),
   ],
   controllers: [WorkersController],
-  providers: [WorkersService, RemoteExecuteSubscribeService, GrpcWorkerContext],
-  exports: [WorkersService, RemoteExecuteSubscribeService, GrpcWorkerContext],
+  providers: [
+    WorkersService,
+    RemoteExecuteSubscribeService,
+    GrpcWorkerContext,
+    AliveStreamManager,
+  ],
+  exports: [
+    WorkersService,
+    RemoteExecuteSubscribeService,
+    GrpcWorkerContext,
+    AliveStreamManager,
+  ],
 })
 export class WorkersModule {}

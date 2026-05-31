@@ -6,9 +6,13 @@ import { Tool } from '@/modules/tools/entities/tools.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('workers')
+@Index('IDX_workers_token', ['token'])
+@Index('IDX_workers_workspaceId', ['workspace'])
+@Index('IDX_workers_toolId', ['tool'])
+@Index('IDX_workers_internalNetworkId', ['internalNetwork'])
 export class WorkerInstance extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
@@ -85,4 +89,7 @@ export class WorkerInstance extends BaseEntity {
   @ApiProperty({ required: false })
   @Column({ nullable: true, default: false })
   enabledAgentMode: boolean;
+
+  @ApiProperty({ required: false })
+  isOnline?: boolean;
 }

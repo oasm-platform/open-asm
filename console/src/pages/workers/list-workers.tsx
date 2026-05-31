@@ -102,9 +102,25 @@ const ListWorkers = () => {
                   <div>
                     <span className="text-sm">{worker.name}</span>
                     <div className="flex items-center space-x-2">
-                      {new Date().getTime() -
-                        new Date(worker.lastSeenAt).getTime() <
-                      30000 ? (
+                      {worker.isOnline !== undefined ? (
+                        worker.isOnline ? (
+                          <>
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                            </span>
+                            <span className="text-sm text-green-600">
+                              Online
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            {dayjs(worker.lastSeenAt).fromNow()}
+                          </span>
+                        )
+                      ) : new Date().getTime() -
+                          new Date(worker.lastSeenAt).getTime() <
+                        30000 ? (
                         <>
                           <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
@@ -247,9 +263,23 @@ const ListWorkers = () => {
               <div className="flex items-center justify-between">
                 <Badge variant="outline">Status</Badge>
                 <div className="flex items-center space-x-2">
-                  {new Date().getTime() -
-                    new Date(worker.lastSeenAt).getTime() <
-                  30000 ? (
+                  {worker.isOnline !== undefined ? (
+                    worker.isOnline ? (
+                      <>
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                        <span className="text-sm text-green-600">Online</span>
+                      </>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        {dayjs(worker.lastSeenAt).fromNow()}
+                      </span>
+                    )
+                  ) : new Date().getTime() -
+                      new Date(worker.lastSeenAt).getTime() <
+                    30000 ? (
                     <>
                       <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>

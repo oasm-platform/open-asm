@@ -6,7 +6,7 @@ import { Logger } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { WorkspaceTarget } from './workspace-target.entity';
 
 /**
@@ -19,6 +19,9 @@ export enum TargetType {
 }
 
 @Entity('targets')
+@Index('IDX_targets_value', ['value'])
+@Index('IDX_targets_internalNetworkId', ['internalNetwork'])
+@Index('IDX_targets_scanSchedule_jobId', ['scanSchedule', 'jobId'])
 export class Target extends BaseEntity {
   @ApiProperty({
     example: 'example.com',
