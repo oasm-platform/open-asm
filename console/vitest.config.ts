@@ -11,9 +11,10 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    pool: 'threads',
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
