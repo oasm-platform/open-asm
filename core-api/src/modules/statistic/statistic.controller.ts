@@ -9,6 +9,7 @@ import {
   StatisticResponseDto,
 } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
+import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
 import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { StatisticService } from './statistic.service';
@@ -106,6 +107,24 @@ export class StatisticController {
   @Get('asset-locations')
   getAssetLocations(@WorkspaceId() workspaceId: string) {
     return this.statisticService.getAssetLocations(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get TLS certificate statistics for a workspace',
+    description:
+      'Retrieves TLS certificate statistics grouped by expiration status using not_after field, and counts newly discovered certificates within the last 30 days.',
+    response: {
+      serialization: TlsStatisticResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Get('tls')
+  getTlsStatistics(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<TlsStatisticResponseDto> {
+    return this.statisticService.getTlsStatistics(workspaceId);
   }
 
   @Doc({
