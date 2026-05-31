@@ -27,6 +27,7 @@ import {
   WorkerJoinDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+import { AliveStreamManager } from './alive-stream-manager.service';
 import {
   RemoteExecuteCommand,
   RemoteExecuteSubscribeService,
@@ -45,6 +46,7 @@ export class WorkersController {
     private readonly workersService: WorkersService,
     private readonly remoteExecuteSubscribeService: RemoteExecuteSubscribeService,
     private readonly grpcWorkerContext: GrpcWorkerContext,
+    private readonly aliveStreamManager: AliveStreamManager,
   ) {}
 
   @Doc({
@@ -154,6 +156,8 @@ export class WorkersController {
   }): Observable<{ alive: boolean; lastSeenAt: string; workerId: string }> {
     return new Observable((subscriber) => {
       let intervalId: NodeJS.Timeout;
+      let registeredWorkerId: string | undefined;
+      let streamId: string | undefined;
 
       const updateAlive = async () => {
         try {
@@ -161,6 +165,15 @@ export class WorkersController {
             token: request.workerToken,
           });
           if (worker) {
+            if (!registeredWorkerId) {
+              streamId = this.aliveStreamManager.register(
+                worker.id,
+                request.workerToken,
+              );
+              registeredWorkerId = worker.id;
+            } else {
+              this.aliveStreamManager.updateAlive(registeredWorkerId);
+            }
             subscriber.next({
               alive: true,
               lastSeenAt: worker.lastSeenAt.toISOString(),
@@ -182,6 +195,13 @@ export class WorkersController {
 
       return () => {
         if (intervalId) clearInterval(intervalId);
+        if (registeredWorkerId && streamId) {
+          this.aliveStreamManager.unregister(registeredWorkerId, streamId);
+          this.logger.log(
+            `[grpcAlive] Worker ${registeredWorkerId} stream disconnected, releasing jobs`,
+          );
+          void this.workersService.releaseWorkerJobs(registeredWorkerId);
+        }
       };
     });
   }

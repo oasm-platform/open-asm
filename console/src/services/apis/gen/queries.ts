@@ -968,6 +968,7 @@ export type WorkerInstance = {
   internalNetworkId: string;
   tools: Tool[];
   enabledAgentMode?: boolean;
+  isOnline?: boolean;
 };
 
 export type WorkerMetadataDto = {

@@ -89,4 +89,7 @@ export class WorkerInstance extends BaseEntity {
   @ApiProperty({ required: false })
   @Column({ nullable: true, default: false })
   enabledAgentMode: boolean;
+
+  @ApiProperty({ required: false })
+  isOnline?: boolean;
 }
