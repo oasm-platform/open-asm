@@ -36,7 +36,7 @@ enum ResultEventType {
  * or numeric value (1). Normalize to our numeric enum.
  */
 function normalizeEventType(raw: string | number): ResultEventType {
-  if (typeof raw === 'number') return raw as ResultEventType;
+  if (typeof raw === 'number') return raw;
 
   const map: Record<string, ResultEventType> = {
     REMOTE_EXECUTE_RESULT_STDOUT: ResultEventType.STDOUT,

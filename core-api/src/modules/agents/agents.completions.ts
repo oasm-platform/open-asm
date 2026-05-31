@@ -554,7 +554,7 @@ export class AgentsCompletionsService {
     messages: AgentMessage[],
   ): Array<{ role: 'user' | 'assistant' | 'system'; content: string }> {
     return messages.map((msg) => ({
-      role: msg.role as 'user' | 'assistant' | 'system',
+      role: msg.role,
       content: msg.content,
     }));
   }
@@ -691,7 +691,7 @@ export class AgentsCompletionsService {
         controller.enqueue({
           type: 'data-conversation-created',
           data: { conversationId },
-        } as UIMessageChunk);
+        });
 
         // Get a reader for the AI stream to forward text/tool-call chunks
         const reader = aiStream.getReader();
@@ -1250,7 +1250,7 @@ export class AgentsCompletionsService {
         controller.enqueue({
           type: 'data-conversation-created',
           data: { conversationId },
-        } as UIMessageChunk);
+        });
 
         try {
           for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {

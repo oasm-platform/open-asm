@@ -419,7 +419,7 @@ export class DataAdapterService {
       // Validate data before syncing
       if (syncFunction.validationClass && data !== undefined) {
         const isValid = await this.validateData(
-          data as object | object[],
+          data,
           syncFunction.validationClass,
         );
         if (!isValid) {

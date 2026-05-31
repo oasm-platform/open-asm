@@ -83,15 +83,15 @@ describe('WorkersService', () => {
 
     mockConfigService = {
       get: jest.fn(),
-    } as any;
+    };
 
     mockToolsService = {
       getBuiltInTools: jest.fn().mockResolvedValue({ data: [] }),
-    } as any;
+    };
 
     mockRedisService = {
       publish: jest.fn(),
-    } as any;
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

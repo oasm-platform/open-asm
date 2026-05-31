@@ -42,12 +42,12 @@ describe('SearchService', () => {
 
     mockTargetService = {
       getTargetsInWorkspace: jest.fn(),
-    } as any;
+    };
 
     mockStatisticService = {
       getTotalAssets: jest.fn(),
       getTotalTargets: jest.fn(),
-    } as any;
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

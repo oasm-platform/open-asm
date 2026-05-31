@@ -13,7 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Brackets, DataSource, Repository } from 'typeorm';
 import { Target } from '../targets/entities/target.entity';
-import { TechnologyDetailDTO } from '../technology/dto/technology-detail.dto';
+
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
@@ -375,7 +375,7 @@ export class AssetsService {
       .getRawMany<{ tag: string; id: string }>();
 
     asset.tags = tagsResult.map(
-      (t) => ({ id: t.id, tag: t.tag }) as Partial<AssetTag>,
+      (t) => ({ id: t.id, tag: t.tag }),
     ) as AssetTag[];
 
     asset.ipAddresses = item.asset?.ipAssets
@@ -656,7 +656,7 @@ export class AssetsService {
             categoryNames: [],
             categories: [],
             version,
-          } as TechnologyDetailDTO;
+          };
         }
 
         return obj;
