@@ -11,11 +11,10 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: 'happy-dom',
+    environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
-    pool: 'forks',
-    teardownTimeout: 10000,
+    pool: 'threads',
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
