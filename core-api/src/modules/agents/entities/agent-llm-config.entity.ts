@@ -8,10 +8,12 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { LLMProvider } from '../enums/agent.enums';
 
 @Entity('agent_llm_configs')
+@Index('IDX_llm_config_workspaceId', ['workspace'])
+@Index('IDX_llm_config_workspace_pref', ['workspace', 'isPreferred'])
 export class AgentLLMConfig extends BaseEntity {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()

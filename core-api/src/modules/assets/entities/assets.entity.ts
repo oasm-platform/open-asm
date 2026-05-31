@@ -4,12 +4,14 @@ import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, ManyToOne, OneToMany, Unique } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 import { IpAssetsView } from './ip-assets.entity';
 
 @Entity('assets')
 @Unique(['value', 'target'])
+@Index('IDX_assets_targetId', ['targetId'])
+@Index('IDX_assets_targetId_isEnabled', ['targetId', 'isEnabled'])
 export class Asset extends BaseEntity {
   @ApiProperty()
   @Column()

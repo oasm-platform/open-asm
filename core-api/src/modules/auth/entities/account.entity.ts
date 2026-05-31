@@ -1,8 +1,10 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne } from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('accounts')
+@Index('IDX_accounts_userId', ['user'])
+@Index('IDX_accounts_provider_account', ['providerId', 'accountId'])
 export class Account extends BaseEntity {
   @Column('text')
   accountId: string;

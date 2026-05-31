@@ -1,9 +1,10 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne } from 'typeorm';
 import { Job } from './job.entity';
 
 @Entity()
+@Index('IDX_job_error_logs_jobId', ['jobId'])
 export class JobErrorLog extends BaseEntity {
   @ApiProperty()
   @Column()

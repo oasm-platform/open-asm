@@ -8,12 +8,13 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { MessageRole, MessageType } from '../enums/agent.enums';
 import { AgentConversation } from './agent-conversation.entity';
 import { AgentMessageToolCall } from './tool-call.entity';
 
 @Entity('agent_messages')
+@Index('IDX_agent_msg_conversationId', ['conversation', 'createdAt'])
 export class AgentMessage extends BaseEntity {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()

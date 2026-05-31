@@ -5,6 +5,7 @@ import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import {
   Column,
   Entity,
+  Index,
   OneToMany,
   PrimaryColumn,
   UpdateDateColumn,
@@ -13,6 +14,8 @@ import type { AgentTodoItem } from '../agents.todo';
 import { AgentMessage } from './agent-message.entity';
 
 @Entity('agent_conversations')
+@Index('IDX_agent_conv_workspaceId', ['workspaceId'])
+@Index('IDX_agent_conv_createdBy', ['createdBy'])
 export class AgentConversation {
   @ApiProperty()
   @PrimaryColumn({ type: 'uuid' })

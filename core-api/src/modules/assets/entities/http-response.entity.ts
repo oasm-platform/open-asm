@@ -62,6 +62,8 @@ class KnowledgebaseInfo {
 }
 
 @Entity('http_responses')
+@Index('IDX_http_jobHistoryId', ['jobHistory'])
+@Index('IDX_http_host', ['host'])
 export class HttpResponse extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'timestamp with time zone', nullable: true })
