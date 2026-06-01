@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 
 /**
  * Custom hook for server-side data table with pagination, sorting, and filtering
@@ -29,7 +29,8 @@ export function useServerDataTable({
    */
   isUpdateSearchQueryParam = true,
 } = {}) {
-  const [urlParams, setUrlParams] = useSearchParams();
+  const search = useSearch({ strict: false }) as Record<string, string>;
+  const navigate = useNavigate();
   const [internalParams, setInternalParams] = useState(() => ({
     page: defaultPage,
     pageSize: defaultPageSize,
@@ -37,8 +38,9 @@ export function useServerDataTable({
     sortOrder: defaultSortOrder,
     filter: '',
   }));
+
   const getNumberParam = (key: string, fallback: number) => {
-    const val = parseInt(urlParams.get(key) || '');
+    const val = parseInt(search[key] || '');
     return isNaN(val) ? fallback : val;
   };
 
@@ -49,34 +51,34 @@ export function useServerDataTable({
     ? getNumberParam('pageSize', defaultPageSize)
     : internalParams.pageSize;
   const sortBy = isUpdateSearchQueryParam
-    ? urlParams.get('sortBy') || defaultSortBy
+    ? search.sortBy || defaultSortBy
     : internalParams.sortBy;
   const sortOrder = isUpdateSearchQueryParam
-    ? (urlParams.get('sortOrder') as 'ASC' | 'DESC') || defaultSortOrder
+    ? (search.sortOrder as 'ASC' | 'DESC') || defaultSortOrder
     : internalParams.sortOrder;
   const filter = isUpdateSearchQueryParam
-    ? urlParams.get('filter') || ''
+    ? search.filter || ''
     : internalParams.filter;
 
   const setParams = useCallback(
     (newParams: Partial<typeof internalParams>) => {
       if (isUpdateSearchQueryParam) {
-        setUrlParams(
-          (prev) => {
-            const next = new URLSearchParams(prev);
-
+        navigate({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          search: (prev: any) => {
+            const next = { ...prev };
             Object.entries(newParams).forEach(([key, value]) => {
               if (value === undefined || value === null || value === '') {
-                next.delete(key);
+                delete next[key];
               } else {
-                next.set(key, String(value));
+                next[key] = String(value);
               }
             });
-
             return next;
           },
-          { replace: true },
-        );
+          replace: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
       } else {
         setInternalParams((prev) => ({
           ...prev,
@@ -84,7 +86,7 @@ export function useServerDataTable({
         }));
       }
     },
-    [isUpdateSearchQueryParam, setUrlParams],
+    [isUpdateSearchQueryParam, navigate],
   );
 
   return {

@@ -1,5 +1,5 @@
 import { type ColumnDef } from '@tanstack/react-table';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 import { DataTable } from '@/components/ui/data-table';
 import { useProvidersControllerGetManyProviders } from '@/services/apis/gen/queries';
@@ -103,7 +103,7 @@ export function ListProviders() {
 
   // Handle row click to navigate to provider detail page
   const handleRowClick = (row: ToolProvider) => {
-    navigate(`/providers/${row.id}`);
+    navigate({ to: `/providers/${row.id}` });
   };
 
   return (

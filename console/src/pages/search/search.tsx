@@ -17,7 +17,7 @@ import {
   TargetIcon,
 } from 'lucide-react';
 import * as React from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 
 interface SearchItem {
   id: string;
@@ -70,14 +70,14 @@ function SearchResultSection({
 }
 
 export default function Search() {
-  const [param] = useSearchParams();
+  const search = useSearch({ strict: false }) as Record<string, string>;
   const [page, setPage] = React.useState(1);
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const navigate = useNavigate();
 
-  const searchQuery = param.get('query') as string;
+  const searchQuery = search.query as string;
 
   const { data, isFetching } = useSearchControllerSearchAssetsTargets({
     value: searchQuery,
@@ -126,7 +126,7 @@ export default function Search() {
           label="Targets"
           count={data.data.targets.length}
           items={data.data.targets}
-          onItemClick={(id) => navigate('/targets/' + id)}
+          onItemClick={(id) => navigate({ to: '/targets/' + id })}
         />
       )}
 
@@ -136,7 +136,7 @@ export default function Search() {
           label="Assets"
           count={data.data.assets.length}
           items={data.data.assets}
-          onItemClick={(id) => navigate('/assets/' + id)}
+          onItemClick={(id) => navigate({ to: '/assets/' + id })}
         />
       )}
 

@@ -10,7 +10,7 @@ import {
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import { Bug, Loader2 } from 'lucide-react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import AssetProvider from '../assets/context/asset-context';
 import { ListAssets } from '../assets/list-assets';
@@ -26,11 +26,11 @@ const TABS = [
 ];
 
 export function DetailTarget() {
-  const { id, tab } = useParams<{ id: string; tab: string }>();
-  const [searchParams] = useSearchParams();
+  const { id, tab } = useParams({ strict: false });
+  const search = useSearch({ strict: false }) as Record<string, string>;
   const navigate = useNavigate();
 
-  const animation = searchParams.get('animation') === 'true';
+  const animation = search.animation === 'true';
 
   const {
     data: target,
@@ -46,7 +46,7 @@ export function DetailTarget() {
   const activeTab = TABS.some((t) => t.value === tab) ? tab : 'inventory';
 
   const handleTabChange = (value: string) => {
-    navigate(`/targets/${id}/${value}`);
+    navigate({ to: `/targets/${id}/${value}` });
   };
 
   if (isLoading) {
@@ -65,7 +65,7 @@ export function DetailTarget() {
           The target you're looking for doesn't exist or you don't have
           permission to view it.
         </p>
-        <Button className="mt-4" onClick={() => navigate(-1)}>
+        <Button className="mt-4" onClick={() => window.history.back()}>
           Go back
         </Button>
       </div>
@@ -119,7 +119,7 @@ export function DetailTarget() {
                   {
                     onSuccess: () => {
                       toast.success('Scan started successfully');
-                      navigate(`?tab=vulnerabilities`);
+                      navigate({ to: `/targets/${id}/vulnerabilities` });
                     },
                     onError: () => {
                       toast.error('Failed to start scan');

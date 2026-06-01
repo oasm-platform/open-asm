@@ -1,6 +1,6 @@
 import { Tabs } from '@/components/ui/tabs';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import CreateWorkspace from '../workspaces/create-workspace';
 import AssetTabContent from './components/asset-tab';
 import FilterFormInfinite from './components/filter-form-infinite';
@@ -52,15 +52,13 @@ export function ListAssets() {
   ];
 
   const { workspaces } = useWorkspaceSelector();
-  const [searchParams] = useSearchParams();
-  const tab = searchParams.get('tab') || 'service';
+  const search = useSearch({ strict: false }) as Record<string, string>;
+  const tab = search.tab || 'service';
   const navigate = useNavigate();
 
   const handleTabChange = (value: string) => {
-    const newSearchParams = new URLSearchParams(searchParams);
-    newSearchParams.set('tab', value);
-    newSearchParams.set('page', '1');
-    navigate(`?${newSearchParams.toString()}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    navigate({ search: { tab: value, page: 1 } as any });
   };
 
   if (workspaces.length === 0) return <CreateWorkspace />;

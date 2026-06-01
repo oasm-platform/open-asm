@@ -16,7 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CloudCheck, HistoryIcon, Search, Target, X } from 'lucide-react';
 import * as React from 'react';
 import { useForm, type UseFormSetValue } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { z } from 'zod';
 import { Form, FormField } from './form';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
@@ -37,7 +37,7 @@ export function SearchForm({ ...props }: React.ComponentProps<'form'>) {
   const navigate = useNavigate();
 
   const onSubmit = (formValue: z.infer<typeof formSchema>) => {
-    navigate(`/search?query=${formValue.value}`);
+    navigate({ to: '/search', search: { query: formValue.value } });
   };
 
   return (
@@ -198,7 +198,7 @@ const DropdownCard = React.memo(
                 <div
                   key={item.url}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors group"
-                  onClick={() => navigate(item.url)}
+                  onClick={() => navigate({ to: item.url })}
                 >
                   <span className="size-3 text-gray-400 group-hover:text-gray-600 [&>svg]:size-3">
                     {item.icon}
@@ -219,7 +219,7 @@ const DropdownCard = React.memo(
                 <div
                   key={target.id}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors group"
-                  onClick={() => navigate('targets/' + target.id)}
+                  onClick={() => navigate({ to: 'targets/' + target.id })}
                 >
                   <Target className="size-3 text-gray-400 group-hover:text-gray-600" />
                   <span className="text-gray-700 dark:text-gray-300 text-sm truncate">
@@ -237,7 +237,7 @@ const DropdownCard = React.memo(
               {data.data.assets.map((asset) => (
                 <div
                   key={asset.id}
-                  onClick={() => navigate('assets/' + asset.id)}
+                  onClick={() => navigate({ to: 'assets/' + asset.id })}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors group"
                 >
                   <CloudCheck className="size-3 text-gray-400 group-hover:text-gray-600" />

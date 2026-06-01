@@ -11,7 +11,7 @@ import {
 import { orvalClient } from '@/services/apis/axios-client';
 import { useRemoteExecuteStream } from '@/hooks/use-remote-execute-stream';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 
 interface SelectedModel {
@@ -384,9 +384,10 @@ export function useAgentChat({
         agentModeRef.current = state.agentMode;
       }
       void handleSendMessage(state.pendingMessage);
-      void navigate(location.pathname, {
+      void navigate({
+        to: location.pathname as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic route path
         replace: true,
-        state: null,
+        state: undefined,
       });
     }
   }, [location.state, navigate, location.pathname, handleSendMessage]);

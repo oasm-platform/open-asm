@@ -13,7 +13,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { Check, MoveUpRight, PencilIcon, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from '@tanstack/react-router';
 import remarkGfm from 'remark-gfm';
 
 dayjs.extend(relativeTime);
@@ -23,7 +23,7 @@ dayjs.extend(relativeTime);
  * Features a two-column layout with main content and metadata sidebar.
  */
 const IssueDetail = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const { data: issue, refetch } = useIssuesControllerGetById(id || '');
   const { mutate: updateIssue, isPending } = useIssuesControllerUpdate();
   const [isEditing, setIsEditing] = useState(false);
@@ -147,7 +147,7 @@ const IssueDetail = () => {
           </span>
           {issue.sourceId && (
             <Link
-              to={`/${mapingRouterSourceType(issue.sourceType)}/${issue.sourceId}`}
+              to={`/${mapingRouterSourceType(issue.sourceType)}/${issue.sourceId}` as any} // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic route path
             >
               <Button variant="link" className="capitalize">
                 {issue?.sourceType} <MoveUpRight />

@@ -23,7 +23,7 @@ import type { AxiosError } from 'axios';
 import clsx from 'clsx';
 import { Clock, RefreshCw, Settings, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 const SettingTarget = ({
@@ -157,9 +157,12 @@ const SettingTarget = ({
                           },
                         },
                       );
-                      navigate(
-                        `/targets/${target.id}?animation=true&page=1&pageSize=100`,
-                      );
+                      navigate({
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        to: `/targets/${target.id}` as any,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        search: { animation: true, page: 1, pageSize: 100 } as any,
+                      });
                       setIsSheetOpen(false);
                     }}
                     trigger={
@@ -206,7 +209,7 @@ const SettingTarget = ({
                   id: target.id,
                   workspaceId: selectedWorkspaceId ?? '',
                 });
-                navigate(-1);
+                window.history.back();
               }}
               typeToConfirm={target.value}
               trigger={

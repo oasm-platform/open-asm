@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTlsStatistics } from '@/services/apis/gen/queries';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 const TlsStatistics = () => {
   const navigate = useNavigate();
@@ -16,15 +16,17 @@ const TlsStatistics = () => {
   });
 
   const handleNavigate = (startDate?: Date, endDate?: Date) => {
-    const params = new URLSearchParams({
-      tab: 'tls',
-      page: '1',
-      sortBy: 'not_after',
-      sortOrder: 'ASC',
+    navigate({
+      to: '/assets',
+      search: {
+        tab: 'tls',
+        page: 1,
+        sortBy: 'not_after',
+        sortOrder: 'ASC',
+        ...(startDate ? { startDate: format(startDate, 'yyyy-MM-dd') } : {}),
+        ...(endDate ? { endDate: format(endDate, 'yyyy-MM-dd') } : {}),
+      },
     });
-    if (startDate) params.set('startDate', format(startDate, 'yyyy-MM-dd'));
-    if (endDate) params.set('endDate', format(endDate, 'yyyy-MM-dd'));
-    navigate(`/assets?${params.toString()}`);
   };
 
   if (isLoading) {

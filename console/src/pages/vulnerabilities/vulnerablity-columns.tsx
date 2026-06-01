@@ -12,7 +12,7 @@ import { AnalyzeStatusButton } from '@/components/vulnerabilities/analyze-status
 import type { Vulnerability } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { BellOff, CircleCheck, Info } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 import BadgeList from '../assets/components/badge-list';
 
 export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
@@ -190,7 +190,8 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
         );
       return (
         <div className="min-h-[60px] flex items-center">
-          <Link to={`/tools/${tool.id}`} className="flex items-center gap-2">
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path */}
+          <Link to={`/tools/${tool.id}` as any} className="flex items-center gap-2">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

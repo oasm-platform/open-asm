@@ -5,7 +5,7 @@ import {
   Loader2Icon,
   XCircleIcon,
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { Badge } from './badge';
 
 interface StatusConfig {
@@ -62,18 +62,18 @@ interface JobStatusProps {
 
 const JobStatusBadge = ({ status, onlyIcon = false }: JobStatusProps) => {
   const config = statusConfigs[status] || defaultConfig;
-  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   return (
     <Badge
       variant={config.variant}
       className={config.className + ' h-8 cursor-pointer flex items-center'}
       onClick={() => {
         if (status === JobStatus.pending || status === JobStatus.in_progress) {
-          params.set('animation', 'true');
-          setParams(params);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          navigate({ search: { animation: 'true' } as any, replace: true });
         } else {
-          params.delete('animation');
-          setParams(params);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          navigate({ search: (prev: any) => { const next = { ...prev }; delete next.animation; return next; }, replace: true } as any);
         }
       }}
     >

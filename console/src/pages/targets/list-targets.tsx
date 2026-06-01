@@ -22,7 +22,7 @@ import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { GetManyTargetResponseDto } from '@/services/apis/gen/queries';
 import { Target } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { TargetTypeFilter } from './components/target-type-filter';
 import { ScopeFilter } from './components/scope-filter';
@@ -123,22 +123,22 @@ export function ListTargets() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const search = useSearch({ strict: false }) as Record<string, string>;
 
   // Initialize type filter from URL params
-  const urlType = searchParams.get('type') as TargetType | null;
+  const urlType = search.type as TargetType | undefined;
   const [typeFilter, setTypeFilter] = useState<TargetType | undefined>(
     urlType ?? undefined,
   );
 
   // Initialize status filter from URL params
-  const urlStatus = searchParams.get('status') as JobStatus | null;
+  const urlStatus = search.status as JobStatus | undefined;
   const [statusFilter, setStatusFilter] = useState<JobStatus | undefined>(
     urlStatus ?? undefined,
   );
 
   // Initialize scope filter from URL params
-  const urlScope = searchParams.get('scope') as TargetScopeType | null;
+  const urlScope = search.scope as TargetScopeType | undefined;
   const [scopeFilter, setScopeFilter] = useState<TargetScopeType | undefined>(
     urlScope as TargetScopeType ?? undefined,
   );
@@ -147,39 +147,60 @@ export function ListTargets() {
   const handleTypeFilterChange = (newType: TargetType | undefined) => {
     setTypeFilter(newType);
 
-    const newParams = new URLSearchParams(searchParams);
-    if (newType) {
-      newParams.set('type', newType);
-    } else {
-      newParams.delete('type');
-    }
-    setSearchParams(newParams, { replace: true });
+    navigate({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      search: (prev: any) => {
+        const next = { ...prev };
+        if (newType) {
+          next.type = newType;
+        } else {
+          delete next.type;
+        }
+        return next;
+      },
+      replace: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
   };
 
   /** Sync status filter to URL search params */
   const handleStatusFilterChange = (newStatus: JobStatus | undefined) => {
     setStatusFilter(newStatus);
 
-    const newParams = new URLSearchParams(searchParams);
-    if (newStatus) {
-      newParams.set('status', newStatus);
-    } else {
-      newParams.delete('status');
-    }
-    setSearchParams(newParams, { replace: true });
+    navigate({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      search: (prev: any) => {
+        const next = { ...prev };
+        if (newStatus) {
+          next.status = newStatus;
+        } else {
+          delete next.status;
+        }
+        return next;
+      },
+      replace: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
   };
 
   /** Sync scope filter to URL search params */
   const handleScopeFilterChange = (newValue: TargetScopeType | undefined) => {
     setScopeFilter(newValue);
 
-    const newParams = new URLSearchParams(searchParams);
-    if (newValue) {
-      newParams.set('scope', newValue);
-    } else {
-      newParams.delete('scope');
-    }
-    setSearchParams(newParams, { replace: true });
+    navigate({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      search: (prev: any) => {
+        const next = { ...prev };
+        if (newValue) {
+          next.scope = newValue;
+        } else {
+          delete next.scope;
+        }
+        return next;
+      },
+      replace: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
   };
 
   const {
@@ -227,7 +248,7 @@ export function ListTargets() {
     );
 
   const handleRowClick = (target: GetManyTargetResponseDto) => {
-    navigate(`/targets/${target.id}/asset-services`);
+    navigate({ to: `/targets/${target.id}/asset-services` });
   };
 
   return (
@@ -267,7 +288,7 @@ export function ListTargets() {
         <Button
           variant="outline"
           className="gap-2"
-          onClick={() => navigate('/targets/start-discovery')}
+          onClick={() => navigate({ to: '/targets/start-discovery' })}
         >
           <Target className="shrink-0" />
           <span>Start discovery</span>

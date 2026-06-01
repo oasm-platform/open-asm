@@ -1,6 +1,6 @@
 import Page from '@/components/common/page';
 import { useAgentsControllerCreateLLMConfig } from '@/services/apis/gen/queries';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { AgentForm, type AgentFormData } from './agent-form';
 
@@ -14,7 +14,7 @@ export default function CreateAgentPage() {
       {
         onSuccess: () => {
           toast.success('Provider connected successfully');
-          navigate('/agents');
+          navigate({ to: '/agents' });
         },
         onError: (error) => {
           toast.error('Failed to connect provider');

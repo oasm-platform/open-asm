@@ -1,5 +1,4 @@
 import { ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 
 interface PageProps {
@@ -18,14 +17,12 @@ const Page = ({
   isShowButtonGoBack,
   className,
 }: PageProps) => {
-  const navigate = useNavigate();
-
   return (
     <div className={(className || '') + ' h-full flex flex-col gap-4'}>
       <div className="flex items-center justify-between">
         <div className="flex items-start md:items-center gap-3 mr-3">
           {isShowButtonGoBack && (
-            <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
+            <Button variant="outline" size="icon" onClick={() => window.history.back()}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}

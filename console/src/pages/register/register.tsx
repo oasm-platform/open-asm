@@ -18,7 +18,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { z } from 'zod';
 
 const formSchema = z
@@ -54,7 +54,7 @@ export default function Register() {
       { data: values as CreateFirstAdminDto },
       {
         onSuccess: () => {
-          navigate('/login');
+          navigate({ to: '/login' });
         },
         onError: () => {
           form.setError('email', { message: 'Invalid email or password' });

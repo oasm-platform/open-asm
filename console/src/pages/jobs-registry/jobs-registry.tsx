@@ -12,7 +12,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { Calendar } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 dayjs.extend(duration);
 
 const JobsRegistryPage = () => {
@@ -133,7 +133,7 @@ const JobsRegistryPage = () => {
         }}
         showPagination={true}
         onRowClick={(row) => {
-          navigate(`/jobs/runs/${row.id}`);
+          navigate({ to: `/jobs/runs/${row.id}` });
         }}
       />
     </Page>

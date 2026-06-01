@@ -1,7 +1,7 @@
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useVulnerabilitiesControllerGetVulnerabilitiesStatistics } from '@/services/apis/gen/queries';
 import clsx from 'clsx';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@tanstack/react-router';
 
 interface VulnerabilitiesStatisticProps {
   targetId?: string;

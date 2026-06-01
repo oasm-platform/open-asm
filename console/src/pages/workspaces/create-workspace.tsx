@@ -14,7 +14,7 @@ import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { useWorkspacesControllerCreateWorkspace } from '@/services/apis/gen/queries';
 import { Loader2Icon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 type FormData = {
@@ -48,7 +48,7 @@ const CreateWorkspace = () => {
           refetch().then(() => {
             handleSelectWorkspace(data.id);
             // Redirect to home page after successful workspace creation
-            navigate('/');
+            navigate({ to: '/' });
           });
           reset();
         },

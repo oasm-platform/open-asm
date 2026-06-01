@@ -5,7 +5,7 @@ import { useStatisticControllerGetAssetLocations } from '@/services/apis/gen/que
 import type { LeafletMouseEvent } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 export default function AssetLocationsMap() {
   const navigate = useNavigate();
@@ -63,7 +63,7 @@ export default function AssetLocationsMap() {
                 mouseover: (event: LeafletMouseEvent) =>
                   event.target.openPopup(),
                 mouseout: (event) => event.target.closePopup(),
-                click: () => navigate(`/assets?ipAddresses=${location.query}`),
+                click: () => navigate({ to: '/assets', search: { ipAddresses: location.query } }),
               }}
             >
               <Popup>

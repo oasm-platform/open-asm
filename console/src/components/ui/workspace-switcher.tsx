@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { Separator } from './separator';
 
@@ -82,10 +82,10 @@ export function WorkspaceSwitcher() {
           </div>
         )}
 
-        <DropdownMenuItem onClick={() => navigate('/workspaces')}>
+        <DropdownMenuItem onClick={() => navigate({ to: '/workspaces' })}>
           All workspaces
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate('/workspaces/create')}>
+        <DropdownMenuItem onClick={() => navigate({ to: '/workspaces/create' })}>
           <Plus size={16} className="mr-2" />
           Create workspace
         </DropdownMenuItem>

@@ -1,9 +1,9 @@
 import { useAgentChat } from '@/hooks/use-agent-chat';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@tanstack/react-router';
 import { ChatConversation } from './chat-conversation';
 
 export default function AgentsChatPage() {
-  const { conversationId } = useParams<{ conversationId: string }>();
+  const { conversationId } = useParams({ strict: false });
 
   const {
     messages,

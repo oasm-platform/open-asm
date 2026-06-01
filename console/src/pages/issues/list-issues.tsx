@@ -12,7 +12,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Tag } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -123,7 +123,7 @@ export function ListIssues() {
   const total = data?.total ?? 0;
 
   const handleRowClick = (issue: Issue) => {
-    navigate(`/issues/${issue.id}`);
+    navigate({ to: `/issues/${issue.id}` });
   };
 
   return (

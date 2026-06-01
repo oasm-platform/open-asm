@@ -25,7 +25,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { z } from 'zod';
 
 const formSchema = z.object({
@@ -72,7 +72,7 @@ export function CreateAssetGroupDialog({
         onSuccess: (response: AssetGroup) => {
           setCreateDialogOpen(false);
           onSuccess?.();
-          navigate(`/groups/${response.id}`);
+          navigate({ to: `/groups/${response.id}` });
           form.reset();
         },
       },

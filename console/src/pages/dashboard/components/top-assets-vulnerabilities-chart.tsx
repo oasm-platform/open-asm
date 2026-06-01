@@ -4,7 +4,7 @@ import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 interface VulnerabilityAsset {
   asset: string;
@@ -132,7 +132,7 @@ const TopAssetsVulnerabilitiesTable = () => {
       <CardContent className="p-4 py-0">
         <DataTable
           onRowClick={(row) =>
-            row.asset && navigate(`/assets/?tab=host&hosts=${row.asset}`)
+            row.asset && navigate({ to: '/assets', search: { tab: 'host', hosts: row.asset } })
           }
           isShowBorder={false}
           columns={columns}

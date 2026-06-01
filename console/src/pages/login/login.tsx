@@ -15,7 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from '@tanstack/react-router';
 import { z } from 'zod';
 
 const formSchema = z.object({
