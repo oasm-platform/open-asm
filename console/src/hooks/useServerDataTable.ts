@@ -64,9 +64,8 @@ export function useServerDataTable({
     (newParams: Partial<typeof internalParams>) => {
       if (isUpdateSearchQueryParam) {
         navigate({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          search: (prev: any) => {
-            const next = { ...prev };
+          search: (prev) => {
+            const next = { ...prev } as Record<string, unknown>;
             Object.entries(newParams).forEach(([key, value]) => {
               if (value === undefined || value === null || value === '') {
                 delete next[key];
@@ -77,8 +76,7 @@ export function useServerDataTable({
             return next;
           },
           replace: true,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+        });
       } else {
         setInternalParams((prev) => ({
           ...prev,

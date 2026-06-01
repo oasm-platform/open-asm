@@ -105,16 +105,18 @@ export default function AssetProvider({
 
   const filterHandlers = useCallback(
     (key: string, value: string[]) => {
-      const currentSearch = new URLSearchParams(window.location.search);
-      const next: Record<string, string> = {};
-      currentSearch.forEach((v, k) => {
-        if (k !== key && k !== 'page') next[k] = v;
+      navigate({
+        search: (prev) => {
+          const next = { ...prev, page: 1 };
+          if (value.length > 0) {
+            next[key] = value.join(',');
+          } else {
+            delete next[key];
+          }
+          return next;
+        },
+        replace: true,
       });
-      next.page = '1';
-      if (value.length > 0) {
-        next[key] = value.join(',');
-      }
-      navigate({ search: next as never, replace: true });
     },
     [navigate],
   );
@@ -122,19 +124,15 @@ export default function AssetProvider({
   const handleDateRangeChange = useCallback(
     (date: DateRange | undefined) => {
       setDateRange(date);
-      const currentSearch = new URLSearchParams(window.location.search);
-      const next: Record<string, string> = {};
-      currentSearch.forEach((v, k) => {
-        if (k !== 'startDate' && k !== 'endDate' && k !== 'page') next[k] = v;
+      navigate({
+        search: (prev) => ({
+          ...prev,
+          page: 1,
+          startDate: date?.from ? format(date.from, 'yyyy-MM-dd') : undefined,
+          endDate: date?.to ? format(date.to, 'yyyy-MM-dd') : undefined,
+        }),
+        replace: true,
       });
-      next.page = '1';
-      if (date?.from) {
-        next.startDate = format(date.from, 'yyyy-MM-dd');
-      }
-      if (date?.to) {
-        next.endDate = format(date.to, 'yyyy-MM-dd');
-      }
-      navigate({ search: next as never, replace: true });
     },
     [navigate],
   );

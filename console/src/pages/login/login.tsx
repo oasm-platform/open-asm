@@ -15,7 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useLocation } from '@tanstack/react-router';
+import { Route } from '@/routes/login';
 import { z } from 'zod';
 
 const formSchema = z.object({
@@ -24,9 +24,7 @@ const formSchema = z.object({
 });
 
 export default function Login() {
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.searchStr);
-  const redirectUrl = searchParams.get('redirect');
+  const { redirect: redirectUrl } = Route.useSearch();
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {

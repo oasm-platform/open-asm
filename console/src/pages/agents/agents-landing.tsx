@@ -15,7 +15,8 @@ import {
 } from '@/services/apis/gen/queries';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
+import { Route } from '@/routes/_authed/agents/index';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './agent-icon';
 
@@ -58,7 +59,7 @@ const ALL_QUICK_SUGGESTIONS = [
 
 export default function AgentsLandingPage() {
   const navigate = useNavigate();
-  const search = useSearch({ strict: false }) as Record<string, string>;
+  const { text: queryText } = Route.useSearch();
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
     provider: string;
@@ -109,8 +110,6 @@ export default function AgentsLandingPage() {
     const shuffled = [...ALL_QUICK_SUGGESTIONS].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 5);
   }, []);
-
-  const queryText = search.text;
 
   const handleSendMessage = useCallback(
     (content: string, options?: { agentMode?: string }) => {

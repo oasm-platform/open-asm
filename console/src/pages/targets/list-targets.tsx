@@ -22,7 +22,8 @@ import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { GetManyTargetResponseDto } from '@/services/apis/gen/queries';
 import { Target } from 'lucide-react';
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
+import { Route } from '@/routes/_authed/targets/index';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { TargetTypeFilter } from './components/target-type-filter';
 import { ScopeFilter } from './components/scope-filter';
@@ -122,8 +123,8 @@ export function ListTargets() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
-  const navigate = useNavigate();
-  const search = useSearch({ strict: false }) as Record<string, string>;
+  const navigate = useNavigate({ from: '/_authed/targets/' });
+  const search = Route.useSearch();
 
   // Initialize type filter from URL params
   const urlType = search.type as TargetType | undefined;
@@ -146,43 +147,28 @@ export function ListTargets() {
   /** Sync type filter to URL search params */
   const handleTypeFilterChange = (newType: TargetType | undefined) => {
     setTypeFilter(newType);
-    const currentSearch = new URLSearchParams(window.location.search);
-    const next: Record<string, string> = {};
-    currentSearch.forEach((v, k) => {
-      if (k !== 'type') next[k] = v;
+    navigate({
+      search: (prev) => ({ ...prev, type: newType || undefined }),
+      replace: true,
     });
-    if (newType) {
-      next.type = newType;
-    }
-    navigate({ search: next as never, replace: true });
   };
 
   /** Sync status filter to URL search params */
   const handleStatusFilterChange = (newStatus: JobStatus | undefined) => {
     setStatusFilter(newStatus);
-    const currentSearch = new URLSearchParams(window.location.search);
-    const next: Record<string, string> = {};
-    currentSearch.forEach((v, k) => {
-      if (k !== 'status') next[k] = v;
+    navigate({
+      search: (prev) => ({ ...prev, status: newStatus || undefined }),
+      replace: true,
     });
-    if (newStatus) {
-      next.status = newStatus;
-    }
-    navigate({ search: next as never, replace: true });
   };
 
   /** Sync scope filter to URL search params */
   const handleScopeFilterChange = (newValue: TargetScopeType | undefined) => {
     setScopeFilter(newValue);
-    const currentSearch = new URLSearchParams(window.location.search);
-    const next: Record<string, string> = {};
-    currentSearch.forEach((v, k) => {
-      if (k !== 'scope') next[k] = v;
+    navigate({
+      search: (prev) => ({ ...prev, scope: newValue || undefined }),
+      replace: true,
     });
-    if (newValue) {
-      next.scope = newValue;
-    }
-    navigate({ search: next as never, replace: true });
   };
 
   const {
@@ -230,7 +216,7 @@ export function ListTargets() {
     );
 
   const handleRowClick = (target: GetManyTargetResponseDto) => {
-    navigate({ to: `/targets/${target.id}/asset-services` });
+    navigate({ to: '/_authed/targets/$id/$tab', params: { id: target.id, tab: 'asset-services' } });
   };
 
   return (

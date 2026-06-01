@@ -52,12 +52,12 @@ export function ListAssets() {
   ];
 
   const { workspaces } = useWorkspaceSelector();
-  const search = useSearch({ strict: false }) as Record<string, string>;
-  const tab = search.tab || 'service';
+  const search = useSearch({ strict: false });
+  const tab = (search as Record<string, string>).tab || 'service';
   const navigate = useNavigate();
 
   const handleTabChange = (value: string) => {
-    navigate({ search: { tab: value, page: 1 } as never });
+    navigate({ search: (prev) => ({ ...prev, tab: value, page: 1 }) });
   };
 
   if (workspaces.length === 0) return <CreateWorkspace />;

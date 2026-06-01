@@ -72,7 +72,7 @@ export default function FilterFormInfinite() {
             variant="ghost"
             onClick={() => {
               navigate({
-                search: { page: 1 } as never,
+                search: () => ({ page: 1 }),
               });
               setDateRange(undefined);
             }}

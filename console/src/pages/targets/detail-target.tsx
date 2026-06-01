@@ -10,7 +10,8 @@ import {
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import { Bug, Loader2 } from 'lucide-react';
-import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import { useNavigate, useParams } from '@tanstack/react-router';
+import { Route } from '@/routes/_authed/targets/$id/$tab';
 import { toast } from 'sonner';
 import AssetProvider from '../assets/context/asset-context';
 import { ListAssets } from '../assets/list-assets';
@@ -26,11 +27,9 @@ const TABS = [
 ];
 
 export function DetailTarget() {
-  const { id, tab } = useParams({ strict: false });
-  const search = useSearch({ strict: false }) as Record<string, string>;
-  const navigate = useNavigate();
-
-  const animation = search.animation === 'true';
+  const { id, tab } = useParams({ from: '/_authed/targets/$id/$tab' });
+  const { animation } = Route.useSearch();
+  const navigate = useNavigate({ from: '/_authed/targets/$id/$tab' });
 
   const {
     data: target,
@@ -46,7 +45,7 @@ export function DetailTarget() {
   const activeTab = TABS.some((t) => t.value === tab) ? tab : 'inventory';
 
   const handleTabChange = (value: string) => {
-    navigate({ to: `/targets/${id}/${value}` });
+    navigate({ to: '/_authed/targets/$id/$tab', params: { id, tab: value } });
   };
 
   if (isLoading) {
@@ -119,7 +118,7 @@ export function DetailTarget() {
                   {
                     onSuccess: () => {
                       toast.success('Scan started successfully');
-                      navigate({ to: `/targets/${id}/vulnerabilities` });
+                      navigate({ to: '/_authed/targets/$id/$tab', params: { id: id!, tab: 'vulnerabilities' } });
                     },
                     onError: () => {
                       toast.error('Failed to start scan');

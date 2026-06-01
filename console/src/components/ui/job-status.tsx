@@ -68,15 +68,14 @@ const JobStatusBadge = ({ status, onlyIcon = false }: JobStatusProps) => {
       variant={config.variant}
       className={config.className + ' h-8 cursor-pointer flex items-center'}
       onClick={() => {
-        const currentSearch = new URLSearchParams(window.location.search);
-        const next: Record<string, string> = {};
-        currentSearch.forEach((v, k) => {
-          if (k !== 'animation') next[k] = v;
+        const showAnimation = status === JobStatus.pending || status === JobStatus.in_progress;
+        navigate({
+          search: (prev) => ({
+            ...prev,
+            animation: showAnimation ? 'true' : undefined,
+          }),
+          replace: true,
         });
-        if (status === JobStatus.pending || status === JobStatus.in_progress) {
-          next.animation = 'true';
-        }
-        navigate({ search: next as never, replace: true });
       }}
     >
       <span className="flex items-center">
