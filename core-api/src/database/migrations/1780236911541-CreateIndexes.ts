@@ -4,7 +4,6 @@ export class CreateIndexes1780236911541 implements MigrationInterface {
     name = 'CreateIndexes1780236911541'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "vulnerabilities" DROP COLUMN "lastDetected"`);
         await queryRunner.query(`ALTER TABLE "agent_mcp_configs" ALTER COLUMN "configJson" SET DEFAULT '{"mcpServers":{}}'`);
         await queryRunner.query(`CREATE INDEX "IDX_asset_tags_tag" ON "asset_services_tags" ("tag") `);
         await queryRunner.query(`CREATE INDEX "IDX_asset_tags_assetServiceId" ON "asset_services_tags" ("assetServiceId") `);
@@ -128,7 +127,6 @@ export class CreateIndexes1780236911541 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX "public"."IDX_asset_tags_assetServiceId"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_asset_tags_tag"`);
         await queryRunner.query(`ALTER TABLE "agent_mcp_configs" ALTER COLUMN "configJson" SET DEFAULT '{"mcpServers": {}}'`);
-        await queryRunner.query(`ALTER TABLE "vulnerabilities" ADD "lastDetected" TIMESTAMP WITH TIME ZONE`);
     }
 
 }
