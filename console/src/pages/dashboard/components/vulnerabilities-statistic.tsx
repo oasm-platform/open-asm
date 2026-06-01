@@ -3,6 +3,7 @@ import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import Score from './score';
 
@@ -101,9 +102,8 @@ export default function VulnerabilityStatistic() {
         </CardHeader>
         <CardContent className="grid grid-cols-3 gap-4">
           {vulnerabilityStats.map((stat, index) => (
-            <>
+            <React.Fragment key={stat.severity}>
               <div
-                key={stat.severity}
                 className={`text-center ${index % 3 === 2 ? 'pl-4' : index % 3 === 0 ? 'pr-4 border-r' : 'px-4 border-r'}`}
               >
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
@@ -118,7 +118,7 @@ export default function VulnerabilityStatistic() {
               {index === 2 && (
                 <div className="col-span-3 border-b pb-2 mb-2"></div>
               )}
-            </>
+            </React.Fragment>
           ))}
         </CardContent>
       </Card>

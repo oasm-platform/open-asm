@@ -369,7 +369,7 @@ export class IssuesService {
         type:
           issue.status === IssueStatus.OPEN
             ? IssueCommentType.OPEN
-            : (IssueCommentType.CLOSED as IssueCommentType),
+            : (IssueCommentType.CLOSED),
       });
 
       await this.issueCommentsRepository.save(comment);

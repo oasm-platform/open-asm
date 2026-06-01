@@ -80,3 +80,9 @@ core-api/public/tools/*
 worker/.configs.json
 worker/agent-sessions/*
 console/sw.js
+
+# Test coverage
+console/coverage/
+console/e2e/playwright-report/
+console/e2e/test-results/
+console/e2e/.auth/

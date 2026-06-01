@@ -21,6 +21,6 @@
     "shadcn": "^4.1.2"
   },
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky || true"
   }
 }
