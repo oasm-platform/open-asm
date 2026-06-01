@@ -120,13 +120,15 @@ export default function AgentsLandingPage() {
 
       // Generate UUID v7 for new conversation and navigate immediately
       const newConversationId = uuidv7();
+      const navState: Record<string, unknown> = {
+        pendingMessage: content.trim(),
+        ...(selectedModel && { selectedModel }),
+        agentMode: options?.agentMode ?? agentMode,
+      };
       void navigate({
-        to: `/agents/conversations/${newConversationId}` as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic route path
-        state: {
-          pendingMessage: content.trim(),
-          ...(selectedModel && { selectedModel }),
-          agentMode: options?.agentMode ?? agentMode,
-        } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        to: '/agents/conversations/$conversationId',
+        params: { conversationId: newConversationId },
+        state: navState,
       });
     },
     [isSending, navigate, selectedModel, agentMode],

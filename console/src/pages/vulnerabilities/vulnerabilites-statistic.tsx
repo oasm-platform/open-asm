@@ -13,7 +13,7 @@ const VulnerabilitiesStatistic = ({
   const location = useLocation();
 
   // Extract targetId from URL search params if present
-  const urlParams = new URLSearchParams(location.search);
+  const urlParams = new URLSearchParams(location.searchStr);
   const urlTargetId = urlParams.get('targetId') || undefined;
 
   // Use targetId from props if provided, otherwise use from URL

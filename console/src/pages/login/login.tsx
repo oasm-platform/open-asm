@@ -25,7 +25,7 @@ const formSchema = z.object({
 
 export default function Login() {
   const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
+  const searchParams = new URLSearchParams(location.searchStr);
   const redirectUrl = searchParams.get('redirect');
   const form = useForm({
     resolver: zodResolver(formSchema),

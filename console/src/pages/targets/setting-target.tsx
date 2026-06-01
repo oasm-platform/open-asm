@@ -158,10 +158,9 @@ const SettingTarget = ({
                         },
                       );
                       navigate({
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        to: `/targets/${target.id}` as any,
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        search: { animation: true, page: 1, pageSize: 100 } as any,
+                        to: '/targets/$id/$tab',
+                        params: { id: target.id, tab: 'inventory' },
+                        search: { animation: true, page: 1, pageSize: 100 },
                       });
                       setIsSheetOpen(false);
                     }}

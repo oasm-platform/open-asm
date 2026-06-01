@@ -105,19 +105,16 @@ export default function AssetProvider({
 
   const filterHandlers = useCallback(
     (key: string, value: string[]) => {
-      navigate({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        search: (prev: any) => {
-          const next = { ...prev, page: '1' };
-          delete next[key];
-          if (value.length > 0) {
-            next[key] = value;
-          }
-          return next;
-        },
-        replace: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+      const currentSearch = new URLSearchParams(window.location.search);
+      const next: Record<string, string> = {};
+      currentSearch.forEach((v, k) => {
+        if (k !== key && k !== 'page') next[k] = v;
+      });
+      next.page = '1';
+      if (value.length > 0) {
+        next[key] = value.join(',');
+      }
+      navigate({ search: next as never, replace: true });
     },
     [navigate],
   );
@@ -125,23 +122,19 @@ export default function AssetProvider({
   const handleDateRangeChange = useCallback(
     (date: DateRange | undefined) => {
       setDateRange(date);
-      navigate({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        search: (prev: any) => {
-          const next = { ...prev, page: '1' };
-          delete next.startDate;
-          delete next.endDate;
-          if (date?.from) {
-            next.startDate = format(date.from, 'yyyy-MM-dd');
-          }
-          if (date?.to) {
-            next.endDate = format(date.to, 'yyyy-MM-dd');
-          }
-          return next;
-        },
-        replace: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+      const currentSearch = new URLSearchParams(window.location.search);
+      const next: Record<string, string> = {};
+      currentSearch.forEach((v, k) => {
+        if (k !== 'startDate' && k !== 'endDate' && k !== 'page') next[k] = v;
+      });
+      next.page = '1';
+      if (date?.from) {
+        next.startDate = format(date.from, 'yyyy-MM-dd');
+      }
+      if (date?.to) {
+        next.endDate = format(date.to, 'yyyy-MM-dd');
+      }
+      navigate({ search: next as never, replace: true });
     },
     [navigate],
   );

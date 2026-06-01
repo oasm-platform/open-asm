@@ -72,19 +72,8 @@ export default function FilterFormInfinite() {
             variant="ghost"
             onClick={() => {
               navigate({
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                search: (prev: any) => {
-                  const next = { ...prev };
-                  for (const facet of facets) {
-                    delete next[facet];
-                  }
-                  delete next.startDate;
-                  delete next.endDate;
-                  next.page = '1';
-                  return next;
-                },
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              } as any);
+                search: { page: 1 } as never,
+              });
               setDateRange(undefined);
             }}
             className="h-8 px-2 lg:px-3"

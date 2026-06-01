@@ -5,6 +5,7 @@ export const Route = createFileRoute('/_authed/targets/$id/')({
     throw redirect({
       to: '/targets/$id/$tab',
       params: { id: params.id, tab: 'inventory' },
+      search: {},
     });
   },
 });

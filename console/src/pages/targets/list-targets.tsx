@@ -146,61 +146,43 @@ export function ListTargets() {
   /** Sync type filter to URL search params */
   const handleTypeFilterChange = (newType: TargetType | undefined) => {
     setTypeFilter(newType);
-
-    navigate({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      search: (prev: any) => {
-        const next = { ...prev };
-        if (newType) {
-          next.type = newType;
-        } else {
-          delete next.type;
-        }
-        return next;
-      },
-      replace: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    const currentSearch = new URLSearchParams(window.location.search);
+    const next: Record<string, string> = {};
+    currentSearch.forEach((v, k) => {
+      if (k !== 'type') next[k] = v;
+    });
+    if (newType) {
+      next.type = newType;
+    }
+    navigate({ search: next as never, replace: true });
   };
 
   /** Sync status filter to URL search params */
   const handleStatusFilterChange = (newStatus: JobStatus | undefined) => {
     setStatusFilter(newStatus);
-
-    navigate({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      search: (prev: any) => {
-        const next = { ...prev };
-        if (newStatus) {
-          next.status = newStatus;
-        } else {
-          delete next.status;
-        }
-        return next;
-      },
-      replace: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    const currentSearch = new URLSearchParams(window.location.search);
+    const next: Record<string, string> = {};
+    currentSearch.forEach((v, k) => {
+      if (k !== 'status') next[k] = v;
+    });
+    if (newStatus) {
+      next.status = newStatus;
+    }
+    navigate({ search: next as never, replace: true });
   };
 
   /** Sync scope filter to URL search params */
   const handleScopeFilterChange = (newValue: TargetScopeType | undefined) => {
     setScopeFilter(newValue);
-
-    navigate({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      search: (prev: any) => {
-        const next = { ...prev };
-        if (newValue) {
-          next.scope = newValue;
-        } else {
-          delete next.scope;
-        }
-        return next;
-      },
-      replace: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    const currentSearch = new URLSearchParams(window.location.search);
+    const next: Record<string, string> = {};
+    currentSearch.forEach((v, k) => {
+      if (k !== 'scope') next[k] = v;
+    });
+    if (newValue) {
+      next.scope = newValue;
+    }
+    navigate({ search: next as never, replace: true });
   };
 
   const {

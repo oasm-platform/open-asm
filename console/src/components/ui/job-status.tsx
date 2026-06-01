@@ -68,13 +68,15 @@ const JobStatusBadge = ({ status, onlyIcon = false }: JobStatusProps) => {
       variant={config.variant}
       className={config.className + ' h-8 cursor-pointer flex items-center'}
       onClick={() => {
+        const currentSearch = new URLSearchParams(window.location.search);
+        const next: Record<string, string> = {};
+        currentSearch.forEach((v, k) => {
+          if (k !== 'animation') next[k] = v;
+        });
         if (status === JobStatus.pending || status === JobStatus.in_progress) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          navigate({ search: { animation: 'true' } as any, replace: true });
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          navigate({ search: (prev: any) => { const next = { ...prev }; delete next.animation; return next; }, replace: true } as any);
+          next.animation = 'true';
         }
+        navigate({ search: next as never, replace: true });
       }}
     >
       <span className="flex items-center">

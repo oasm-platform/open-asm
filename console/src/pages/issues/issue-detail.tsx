@@ -70,14 +70,8 @@ const IssueDetail = () => {
     return null;
   }
 
-  const mapingRouterSourceType = (sourceType: string): string | null => {
-    switch (sourceType) {
-      case 'vulnerability':
-        return 'vulnerabilities';
-      default:
-        return null;
-    }
-  };
+  const isValidSourceType = (sourceType: string): sourceType is 'vulnerability' =>
+    sourceType === 'vulnerability';
 
   return (
     <Page className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 mx-auto">
@@ -145,9 +139,10 @@ const IssueDetail = () => {
             </span>{' '}
             opened this issue {dayjs(issue.createdAt).fromNow()}
           </span>
-          {issue.sourceId && (
+          {issue.sourceId && isValidSourceType(issue.sourceType) && (
             <Link
-              to={`/${mapingRouterSourceType(issue.sourceType)}/${issue.sourceId}` as any} // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic route path
+              to="/vulnerabilities/$id"
+              params={{ id: issue.sourceId }}
             >
               <Button variant="link" className="capitalize">
                 {issue?.sourceType} <MoveUpRight />

@@ -99,7 +99,7 @@ export default function Runs() {
         <div className="min-h-[60px] flex items-center">
           {row.original.tool ? (
             <Link
-              to={`/tools/${row.original.tool.id}` as any} // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic route path
+              to="/tools/$id" params={{ id: row.original.tool.id }}
               className="flex items-center gap-2"
             >
               <Image
@@ -348,7 +348,7 @@ export default function Runs() {
               return (
                 <div key={tool.id} className="flex items-center gap-2">
                   <Link
-                    to={`/tools/${tool.id}` as any} // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic route path
+                    to="/tools/$id" params={{ id: tool.id }}
                     className="flex items-center gap-2 hover:opacity-80"
                   >
                     <Image

@@ -190,8 +190,7 @@ export const vulnerabilityColumns: ColumnDef<Vulnerability, unknown>[] = [
         );
       return (
         <div className="min-h-[60px] flex items-center">
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path */}
-          <Link to={`/tools/${tool.id}` as any} className="flex items-center gap-2">
+          <Link to="/tools/$id" params={{ id: tool.id }} className="flex items-center gap-2">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

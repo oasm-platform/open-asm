@@ -112,8 +112,7 @@ export default function ToolDetail() {
                     {(isInstalled || tool.isInstalled) &&
                       tool.type !==
                         ToolsControllerGetManyToolsType.built_in && (
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
-                        <Link to={`/assets/groups?toolId=${tool.id}` as any}>
+                        <Link to="/assets" search={{ toolId: tool.id }}>
                           <Button>
                             <Group /> Add to group
                           </Button>
