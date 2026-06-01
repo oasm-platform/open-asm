@@ -152,7 +152,7 @@ describe('WorkspacesService', () => {
       save: jest.fn(),
       findOne: jest.fn(),
       find: jest.fn(),
-    } as any;
+    };
 
     mockWorkspaceTargetRepository = {
       createQueryBuilder: jest.fn().mockReturnThis(),
@@ -165,13 +165,13 @@ describe('WorkspacesService', () => {
     mockApiKeysService = {
       create: jest.fn(),
       getCurrentApiKey: jest.fn(),
-    } as any;
+    };
 
     mockNotificationsService = {
       createNotification: jest.fn(),
-    } as any;
+    };
 
-    mockDataSource = {} as any;
+    mockDataSource = {};
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

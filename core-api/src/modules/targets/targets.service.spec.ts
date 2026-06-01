@@ -59,15 +59,15 @@ describe('TargetsService', () => {
     mockWorkspacesService = {
       getWorkspaceByIdAndOwner: jest.fn(),
       getWorkspaceConfigValue: jest.fn(),
-    } as any;
+    };
 
     mockAssetsService = {
       createPrimaryAsset: jest.fn(),
-    } as any;
+    };
 
     mockEventEmitter = {
       emit: jest.fn(),
-    } as any;
+    };
 
     mockQueue = {
       add: jest.fn(),

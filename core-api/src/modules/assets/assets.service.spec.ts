@@ -30,7 +30,7 @@ describe('AssetsService', () => {
       findOne: jest.fn(),
       save: jest.fn(),
       update: jest.fn(),
-    } as any;
+    };
 
     mockAssetServiceRepository = {
       find: jest.fn(),
@@ -55,20 +55,20 @@ describe('AssetsService', () => {
     mockTargetRepository = {
       findOne: jest.fn(),
       update: jest.fn(),
-    } as any;
+    };
 
     mockEventEmitter = {
       emit: jest.fn(),
-    } as any;
+    };
 
     mockTechnologyForwarderService = {
       enrichTechnologies: jest.fn(),
-    } as any;
+    };
 
     mockWorkspacesService = {
       getWorkspaceIdByTargetId: jest.fn(),
       getWorkspaceConfigValue: jest.fn(),
-    } as any;
+    };
 
     mockGeoIpService = {
       lookup: jest.fn(),
