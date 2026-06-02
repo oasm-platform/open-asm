@@ -121,6 +121,7 @@ export class RemoteExecuteService {
   async waitForResult(
     command: string,
     sessionId: string,
+    conversationId: string,
     timeoutMs = 60_000,
     onEvent?: (event: { type: ResultEventType; data: string; exitCode: number }) => void,
   ): Promise<RemoteCommandResult> {
@@ -198,7 +199,8 @@ export class RemoteExecuteService {
     this.logger.log(`[waitForResult] Subscription confirmed, pushing command`);
 
     const pushResult =
-      this.remoteExecuteSubscribeService.pushCommandWithSession(
+      await this.remoteExecuteSubscribeService.pushCommandWithConversation(
+        conversationId,
         sessionId,
         command,
       );

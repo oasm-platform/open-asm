@@ -1509,6 +1509,7 @@ export class AgentsCompletionsService {
         workspaceId,
         agentMode,
         todosEmitter,
+        conversation.id,
       ) as ToolSet),
       ...(this.agentTool.getTodoTools(
         conversation.id,
