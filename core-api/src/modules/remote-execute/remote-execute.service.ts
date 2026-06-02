@@ -177,6 +177,8 @@ export class RemoteExecuteService {
             `[waitForResult] Command finished, type=${event.type}`,
           );
 
+          this.remoteExecuteSubscribeService.removeSession(sessionId);
+
           this.redisService
             .unsubscribe(channel)
             .catch((err) => {
@@ -199,6 +201,7 @@ export class RemoteExecuteService {
     const pushResult =
       await this.remoteExecuteSubscribeService.pushCommandWithConversation(
         conversationId,
+        sessionId,
         command,
       );
 

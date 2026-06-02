@@ -149,10 +149,11 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
 
   async pushCommandWithConversation(
     conversationId: string,
+    sessionId: string,
     command: string,
   ): Promise<RemoteExecuteCommand | null> {
     if (!conversationId) {
-      return this.pushCommandWithSession(nanoid(), command);
+      return this.pushCommandWithSession(sessionId, command);
     }
 
     const conversation = await this.conversationRepo.findOne({
@@ -166,7 +167,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       );
       return this.pushCommand(
         conversation.workerId,
-        `conv:${conversationId}`,
+        sessionId,
         command,
       );
     }
@@ -191,7 +192,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     this.logger.log(
       `[StickyWorker] Assigned worker ${workerId} to conversation ${conversationId}`,
     );
-    return this.pushCommand(workerId, conversationId, command);
+    return this.pushCommand(workerId, sessionId, command);
   }
 
   removeSession(sessionId: string): void {
