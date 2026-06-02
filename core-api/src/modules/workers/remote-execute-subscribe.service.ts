@@ -1,6 +1,15 @@
-import { forwardRef, Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { AgentConversation } from '@/modules/agents/entities/agent-conversation.entity';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { nanoid } from 'nanoid';
 import { finalize, ReplaySubject } from 'rxjs';
+import { Repository } from 'typeorm';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
 
@@ -31,6 +40,8 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   constructor(
     @Inject(forwardRef(() => WorkersService))
     private readonly workersService: WorkersService,
+    @InjectRepository(AgentConversation)
+    private readonly conversationRepo: Repository<AgentConversation>,
   ) {}
 
   registerWorker(worker: WorkerInstance): WorkerRegistration {
@@ -134,6 +145,53 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     }
 
     return this.pushCommand(workerId, sessionId, command);
+  }
+
+  async pushCommandWithConversation(
+    conversationId: string,
+    command: string,
+  ): Promise<RemoteExecuteCommand | null> {
+    if (!conversationId) {
+      return this.pushCommandWithSession(nanoid(), command);
+    }
+
+    const conversation = await this.conversationRepo.findOne({
+      where: { id: conversationId },
+      select: ['id', 'workerId'],
+    });
+
+    if (conversation?.workerId && this.isWorkerAlive(conversation.workerId)) {
+      this.logger.verbose(
+        `[StickyWorker] Using pinned worker ${conversation.workerId} for conversation ${conversationId}`,
+      );
+      return this.pushCommand(
+        conversation.workerId,
+        `conv:${conversationId}`,
+        command,
+      );
+    }
+
+    const workerId = this.getNextAvailableWorker();
+    if (!workerId) {
+      return null;
+    }
+
+    if (conversation) {
+      await this.conversationRepo
+        .createQueryBuilder()
+        .update(AgentConversation)
+        .set({ workerId })
+        .where('id = :id AND ("workerId" IS NULL OR "workerId" != :workerId)', {
+          id: conversationId,
+          workerId,
+        })
+        .execute();
+    }
+
+    this.logger.log(
+      `[StickyWorker] Assigned worker ${workerId} to conversation ${conversationId}`,
+    );
+    return this.pushCommand(workerId, conversationId, command);
   }
 
   removeSession(sessionId: string): void {

@@ -348,7 +348,7 @@ export class AgentTool {
     };
   }
 
-  remoteExecuteTool(workspaceId: string, emitter?: EventEmitter): ToolType {
+  remoteExecuteTool(workspaceId: string, conversationId: string, emitter?: EventEmitter): ToolType {
     const toolConfig: any = {
       description: [
         'Execute arbitrary shell commands on remote worker nodes (nmap, curl, dig, etc.).',
@@ -370,6 +370,7 @@ export class AgentTool {
         return this.remoteExecuteService.waitForResult(
           command,
           sessionId,
+          conversationId,
           60_000,
           (event) => {
             if (emitter) {
@@ -467,6 +468,7 @@ export class AgentTool {
     workspaceId: string,
     agentMode: AgentMode,
     emitter?: EventEmitter,
+    conversationId?: string,
   ): Record<string, ToolType> {
     const { AGENT, ASK } = AgentMode;
     const tools: Record<string, { method: ToolType; permissions: AgentMode[] }> = {
@@ -486,7 +488,7 @@ export class AgentTool {
       display_available_tools: { method: this.listToolsTool(workspaceId), permissions: [AGENT, ASK] },
       list_active_workers: { method: this.listWorkersTool(workspaceId), permissions: [AGENT, ASK] },
       review_jobs: { method: this.listJobsTool(workspaceId), permissions: [AGENT, ASK] },
-      execute_remote_command: { method: this.remoteExecuteTool(workspaceId, emitter), permissions: [AGENT] },
+      execute_remote_command: { method: this.remoteExecuteTool(workspaceId, conversationId ?? '', emitter), permissions: [AGENT] },
     };
 
     return Object.fromEntries(

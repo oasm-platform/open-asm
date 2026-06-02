@@ -121,6 +121,7 @@ export class RemoteExecuteService {
   async waitForResult(
     command: string,
     sessionId: string,
+    conversationId: string,
     timeoutMs = 60_000,
     onEvent?: (event: { type: ResultEventType; data: string; exitCode: number }) => void,
   ): Promise<RemoteCommandResult> {
@@ -176,8 +177,6 @@ export class RemoteExecuteService {
             `[waitForResult] Command finished, type=${event.type}`,
           );
 
-          this.remoteExecuteSubscribeService.removeSession(sessionId);
-
           this.redisService
             .unsubscribe(channel)
             .catch((err) => {
@@ -198,8 +197,8 @@ export class RemoteExecuteService {
     this.logger.log(`[waitForResult] Subscription confirmed, pushing command`);
 
     const pushResult =
-      this.remoteExecuteSubscribeService.pushCommandWithSession(
-        sessionId,
+      await this.remoteExecuteSubscribeService.pushCommandWithConversation(
+        conversationId,
         command,
       );
 
