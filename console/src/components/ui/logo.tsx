@@ -1,5 +1,3 @@
-import { Radar } from 'lucide-react';
-
 interface LogoProps {
   width?: number;
   height?: number;
@@ -11,7 +9,7 @@ export default function Logo({ width = 16, height = 16, logoPath }: LogoProps) {
       {logoPath ? (
         <img src={logoPath} alt="logo" className="w-13 rounded-md" />
       ) : (
-        <Radar width={width} height={height} />
+        <img src="/logo.png" alt="logo" className="w-7 h-7 rounded-md" />
       )}
     </>
   );
