@@ -123,7 +123,7 @@ export function ListTargets() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
-  const navigate = useNavigate({ from: '/_authed/targets/' });
+  const navigate = useNavigate({ from: '/targets/$id/$tab' });
   const search = Route.useSearch();
 
   // Initialize type filter from URL params
@@ -141,7 +141,7 @@ export function ListTargets() {
   // Initialize scope filter from URL params
   const urlScope = search.scope as TargetScopeType | undefined;
   const [scopeFilter, setScopeFilter] = useState<TargetScopeType | undefined>(
-    urlScope as TargetScopeType ?? undefined,
+    (urlScope as TargetScopeType) ?? undefined,
   );
 
   /** Sync type filter to URL search params */
@@ -216,7 +216,10 @@ export function ListTargets() {
     );
 
   const handleRowClick = (target: GetManyTargetResponseDto) => {
-    navigate({ to: '/_authed/targets/$id/$tab', params: { id: target.id, tab: 'asset-services' } });
+    navigate({
+      to: '/targets/$id/$tab',
+      params: { id: target.id, tab: 'asset-services' },
+    });
   };
 
   return (

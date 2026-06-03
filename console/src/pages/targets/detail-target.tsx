@@ -29,7 +29,7 @@ const TABS = [
 export function DetailTarget() {
   const { id, tab } = useParams({ from: '/_authed/targets/$id/$tab' });
   const { animation } = Route.useSearch();
-  const navigate = useNavigate({ from: '/_authed/targets/$id/$tab' });
+  const navigate = useNavigate({ from: '/targets/$id/$tab' });
 
   const {
     data: target,
@@ -45,7 +45,7 @@ export function DetailTarget() {
   const activeTab = TABS.some((t) => t.value === tab) ? tab : 'inventory';
 
   const handleTabChange = (value: string) => {
-    navigate({ to: '/_authed/targets/$id/$tab', params: { id, tab: value } });
+    navigate({ to: '/targets/$id/$tab', params: { id, tab: value } });
   };
 
   if (isLoading) {
@@ -118,7 +118,10 @@ export function DetailTarget() {
                   {
                     onSuccess: () => {
                       toast.success('Scan started successfully');
-                      navigate({ to: '/_authed/targets/$id/$tab', params: { id: id!, tab: 'vulnerabilities' } });
+                      navigate({
+                        to: '/targets/$id/$tab',
+                        params: { id: id!, tab: 'vulnerabilities' },
+                      });
                     },
                     onError: () => {
                       toast.error('Failed to start scan');
