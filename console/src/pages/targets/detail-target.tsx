@@ -29,7 +29,7 @@ const TABS = [
 export function DetailTarget() {
   const { id, tab } = useParams({ from: '/_authed/targets/$id/$tab' });
   const { animation } = Route.useSearch();
-  const navigate = useNavigate({ from: '/targets/$id/$tab' });
+  const navigate = useNavigate({ from: '/_authed/targets/$id/$tab' });
 
   const {
     data: target,

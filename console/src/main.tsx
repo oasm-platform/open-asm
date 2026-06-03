@@ -10,17 +10,19 @@ import { router } from './router';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
-    <TanStackDevtools
-      plugins={[
-        {
-          name: 'TanStack Query',
-          render: <ReactQueryDevtoolsPanel client={queryClient} />,
-        },
-        {
-          name: 'TanStack Router',
-          render: <TanStackRouterDevtoolsPanel router={router} />,
-        },
-      ]}
-    />
+    {import.meta.env.DEV && (
+      <TanStackDevtools
+        plugins={[
+          {
+            name: 'TanStack Query',
+            render: <ReactQueryDevtoolsPanel client={queryClient} />,
+          },
+          {
+            name: 'TanStack Router',
+            render: <TanStackRouterDevtoolsPanel router={router} />,
+          },
+        ]}
+      />
+    )}
   </StrictMode>,
 );

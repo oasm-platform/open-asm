@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
-      devtools(),
+      ...(mode === 'development' ? [devtools()] : []),
       tanstackRouter({
         target: 'react',
         autoCodeSplitting: true,

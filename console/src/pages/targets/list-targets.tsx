@@ -123,7 +123,7 @@ export function ListTargets() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
-  const navigate = useNavigate({ from: '/targets/$id/$tab' });
+  const navigate = useNavigate({ from: '/_authed/targets/' });
   const search = Route.useSearch();
 
   // Initialize type filter from URL params

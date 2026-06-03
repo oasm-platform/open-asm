@@ -92,7 +92,7 @@ export default function AssetProvider({
 
   const toArray = (value: string | string[] | undefined): string[] => {
     if (Array.isArray(value)) return value;
-    if (value) return [value];
+    if (value) return value.split(',');
     return [];
   };
 
@@ -109,7 +109,7 @@ export default function AssetProvider({
         search: (prev) => {
           const next = { ...prev, page: 1 };
           if (value.length > 0) {
-            next[key] = value.join(',');
+            next[key] = value;
           } else {
             delete next[key];
           }

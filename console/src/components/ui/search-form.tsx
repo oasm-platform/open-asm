@@ -219,7 +219,7 @@ const DropdownCard = React.memo(
                 <div
                   key={target.id}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors group"
-                  onClick={() => navigate({ to: 'targets/' + target.id })}
+                  onClick={() => navigate({ to: '/_authed/targets/$id/$tab', params: { id: target.id, tab: 'inventory' } })}
                 >
                   <Target className="size-3 text-gray-400 group-hover:text-gray-600" />
                   <span className="text-gray-700 dark:text-gray-300 text-sm truncate">
@@ -237,7 +237,7 @@ const DropdownCard = React.memo(
               {data.data.assets.map((asset) => (
                 <div
                   key={asset.id}
-                  onClick={() => navigate({ to: 'assets/' + asset.id })}
+                  onClick={() => navigate({ to: '/_authed/assets/$id', params: { id: asset.id } })}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors group"
                 >
                   <CloudCheck className="size-3 text-gray-400 group-hover:text-gray-600" />
