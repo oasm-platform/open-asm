@@ -112,7 +112,7 @@ export default function ToolDetail() {
                     {(isInstalled || tool.isInstalled) &&
                       tool.type !==
                         ToolsControllerGetManyToolsType.built_in && (
-                        <Link to="/assets" search={{ toolId: tool.id }}>
+                        <Link to="/assets" search={{ filter: tool.id }}>
                           <Button>
                             <Group /> Add to group
                           </Button>

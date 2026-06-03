@@ -123,7 +123,7 @@ export function ListTargets() {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
-  const navigate = useNavigate({ from: '/_authed/targets/' });
+  const navigate = useNavigate({ from: '/targets/' });
   const search = Route.useSearch();
 
   // Initialize type filter from URL params
@@ -148,7 +148,7 @@ export function ListTargets() {
   const handleTypeFilterChange = (newType: TargetType | undefined) => {
     setTypeFilter(newType);
     navigate({
-      search: (prev) => ({ ...prev, type: newType || undefined }),
+      search: ((prev: Record<string, unknown>) => ({ ...prev, type: newType || undefined })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       replace: true,
     });
   };
@@ -157,7 +157,7 @@ export function ListTargets() {
   const handleStatusFilterChange = (newStatus: JobStatus | undefined) => {
     setStatusFilter(newStatus);
     navigate({
-      search: (prev) => ({ ...prev, status: newStatus || undefined }),
+      search: ((prev: Record<string, unknown>) => ({ ...prev, status: newStatus || undefined })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       replace: true,
     });
   };
@@ -166,7 +166,7 @@ export function ListTargets() {
   const handleScopeFilterChange = (newValue: TargetScopeType | undefined) => {
     setScopeFilter(newValue);
     navigate({
-      search: (prev) => ({ ...prev, scope: newValue || undefined }),
+      search: ((prev: Record<string, unknown>) => ({ ...prev, scope: newValue || undefined })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       replace: true,
     });
   };

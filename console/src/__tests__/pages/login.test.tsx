@@ -15,16 +15,26 @@ vi.mock('@/utils/authClient', () => ({
   },
 }));
 
+vi.mock('@/routes/login', () => ({
+  Route: {
+    useSearch: () => ({ redirect: undefined }),
+  },
+}));
+
+vi.mock('@/components/common/layout/auth-layout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <div data-testid="auth-layout">{children}</div>,
+}));
+
 describe('Login Page', () => {
   beforeEach(() => {
     mockSignInEmail.mockReset();
     mockSignInEmail.mockResolvedValue({});
   });
 
-  it('renders login form with email and password fields', () => {
+  it('renders login form with email and password fields', async () => {
     renderWithProviders(<Login />);
 
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /sign in/i })
@@ -35,6 +45,7 @@ describe('Login Page', () => {
     const user = userEvent.setup();
     renderWithProviders(<Login />);
 
+    await screen.findByLabelText(/email/i);
     await user.type(screen.getByLabelText(/email/i), 'not-an-email');
     await user.type(screen.getByLabelText(/password/i), 'validpassword');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
@@ -48,6 +59,7 @@ describe('Login Page', () => {
     const user = userEvent.setup();
     renderWithProviders(<Login />);
 
+    await screen.findByLabelText(/email/i);
     await user.type(screen.getByLabelText(/email/i), 'test@example.com');
     await user.type(screen.getByLabelText(/password/i), 'short');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
@@ -67,6 +79,7 @@ describe('Login Page', () => {
     const user = userEvent.setup();
     renderWithProviders(<Login />);
 
+    await screen.findByLabelText(/email/i);
     await user.type(screen.getByLabelText(/email/i), 'test@example.com');
     await user.type(screen.getByLabelText(/password/i), 'wrongpassword');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
@@ -87,6 +100,7 @@ describe('Login Page', () => {
     const user = userEvent.setup();
     renderWithProviders(<Login />);
 
+    await screen.findByLabelText(/email/i);
     await user.type(screen.getByLabelText(/email/i), 'test@example.com');
     await user.type(screen.getByLabelText(/password/i), 'validpassword');
     await user.click(screen.getByRole('button', { name: /sign in/i }));

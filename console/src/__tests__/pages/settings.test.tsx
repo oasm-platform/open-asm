@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
 import Settings from '@/pages/settings/settings';
-import { useParams } from 'react-router-dom';
+import { useParams } from '@tanstack/react-router';
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual('@tanstack/react-router');
   return {
     ...actual,
     useParams: vi.fn(() => ({ tab: 'general' })),

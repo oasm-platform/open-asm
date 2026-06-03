@@ -57,7 +57,7 @@ export function ListAssets() {
   const navigate = useNavigate();
 
   const handleTabChange = (value: string) => {
-    navigate({ search: (prev) => ({ ...prev, tab: value, page: 1 }) });
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, tab: value, page: 1 })) as any }); // eslint-disable-line @typescript-eslint/no-explicit-any
   };
 
   if (workspaces.length === 0) return <CreateWorkspace />;

@@ -160,7 +160,7 @@ const SettingTarget = ({
                       navigate({
                         to: '/targets/$id/$tab',
                         params: { id: target.id, tab: 'inventory' },
-                        search: { animation: true, page: 1, pageSize: 100 },
+                        search: { animation: 'true', page: 1, pageSize: 100 },
                       });
                       setIsSheetOpen(false);
                     }}

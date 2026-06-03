@@ -70,10 +70,10 @@ const JobStatusBadge = ({ status, onlyIcon = false }: JobStatusProps) => {
       onClick={() => {
         const showAnimation = status === JobStatus.pending || status === JobStatus.in_progress;
         navigate({
-          search: (prev) => ({
+          search: ((prev: Record<string, unknown>) => ({
             ...prev,
             animation: showAnimation ? 'true' : undefined,
-          }),
+          })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
           replace: true,
         });
       }}

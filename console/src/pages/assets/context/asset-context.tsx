@@ -106,15 +106,15 @@ export default function AssetProvider({
   const filterHandlers = useCallback(
     (key: string, value: string[]) => {
       navigate({
-        search: (prev) => {
-          const next = { ...prev, page: 1 };
+        search: ((prev: Record<string, unknown>) => {
+          const next = { ...prev, page: 1 } as Record<string, unknown>;
           if (value.length > 0) {
             next[key] = value;
           } else {
             delete next[key];
           }
           return next;
-        },
+        }) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         replace: true,
       });
     },
@@ -125,12 +125,12 @@ export default function AssetProvider({
     (date: DateRange | undefined) => {
       setDateRange(date);
       navigate({
-        search: (prev) => ({
+        search: ((prev: Record<string, unknown>) => ({
           ...prev,
           page: 1,
           startDate: date?.from ? format(date.from, 'yyyy-MM-dd') : undefined,
           endDate: date?.to ? format(date.to, 'yyyy-MM-dd') : undefined,
-        }),
+        })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         replace: true,
       });
     },

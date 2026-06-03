@@ -72,7 +72,7 @@ export default function FilterFormInfinite() {
             variant="ghost"
             onClick={() => {
               navigate({
-                search: () => ({ page: 1 }),
+                search: (() => ({ page: 1 })) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
               });
               setDateRange(undefined);
             }}
