@@ -4,7 +4,7 @@ import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 import Score from './score';
 
 export default function VulnerabilityStatistic() {

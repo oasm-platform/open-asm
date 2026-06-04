@@ -17,7 +17,7 @@ import {
 import { authClient } from '@/utils/authClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { LogOut, Settings } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 
 interface NavUserProps {
   isOnlyAvatar?: boolean;
@@ -89,7 +89,7 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <DropdownMenuItem onClick={() => navigate({ to: '/settings' })}>
                 <Settings />
                 Settings
               </DropdownMenuItem>

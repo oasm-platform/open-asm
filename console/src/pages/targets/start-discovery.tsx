@@ -11,7 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
@@ -208,7 +208,7 @@ export default function StartDiscovery() {
             queryClient.refetchQueries({
               queryKey: ['targets'],
             });
-            navigate(`/targets?page=1&pageSize=100`);
+            navigate({ to: '/targets', search: { page: 1, pageSize: 100 } });
           }
 
           if (res.totalSkipped > 0) {
@@ -344,7 +344,7 @@ export default function StartDiscovery() {
               <Button
                 variant="outline"
                 type="button"
-                onClick={() => navigate('/targets')}
+                onClick={() => navigate({ to: '/targets' })}
               >
                 Cancel
               </Button>

@@ -9,7 +9,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCheck } from 'lucide-react';
 import { memo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 
 interface NotificationItemProps {
   notification: NotificationResponseDto;

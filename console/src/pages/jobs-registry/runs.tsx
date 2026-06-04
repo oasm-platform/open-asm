@@ -1,5 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from '@tanstack/react-router';
 
 import { CodeBlock } from '@/components/common/code-block';
 import Page from '@/components/common/page';
@@ -40,7 +40,7 @@ import {
 import { useMemo, useState } from 'react';
 
 export default function Runs() {
-  const { id: jobHistoryId } = useParams<{ id: string }>();
+  const { id: jobHistoryId } = useParams({ strict: false });
   const [jobError, setJobError] = useState<Job | null>();
   const queryClient = useQueryClient();
   const { data: jobHistoryDetail } =
@@ -99,7 +99,7 @@ export default function Runs() {
         <div className="min-h-[60px] flex items-center">
           {row.original.tool ? (
             <Link
-              to={`/tools/${row.original.tool.id}`}
+              to="/tools/$id" params={{ id: row.original.tool.id }}
               className="flex items-center gap-2"
             >
               <Image
@@ -348,7 +348,7 @@ export default function Runs() {
               return (
                 <div key={tool.id} className="flex items-center gap-2">
                   <Link
-                    to={`/tools/${tool.id}`}
+                    to="/tools/$id" params={{ id: tool.id }}
                     className="flex items-center gap-2 hover:opacity-80"
                   >
                     <Image
@@ -393,10 +393,11 @@ export default function Runs() {
             setJobError(row);
             return;
           }
-          const redirect = row.assetServiceId
-            ? `/assets/${row.assetServiceId}`
-            : `/assets?filter=${row?.asset?.value}`;
-          navigate(redirect);
+          if (row.assetServiceId) {
+            navigate({ to: `/assets/${row.assetServiceId}` });
+          } else {
+            navigate({ to: '/assets', search: { filter: row?.asset?.value } });
+          }
         }}
       />
       <Dialog open={!!jobError} onOpenChange={() => setJobError(null)}>

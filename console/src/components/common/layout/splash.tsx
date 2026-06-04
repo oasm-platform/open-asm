@@ -1,7 +1,7 @@
 import Logo from '@/components/ui/logo';
 import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
 import { useEffect, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from '@tanstack/react-router';
 import type { JSX } from 'react/jsx-runtime';
 
 interface SplashProps {

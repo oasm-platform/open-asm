@@ -8,14 +8,18 @@ vi.mock('@/hooks/useWorkspaceSelector', () => ({
   })),
 }));
 
-vi.mock('@/services/apis/gen/queries', () => ({
-  useAgentsControllerGetConversations: vi.fn(() => ({
-    data: { data: [] },
-  })),
-  useAgentsControllerGetLLMConfigs: vi.fn(() => ({
-    data: [],
-  })),
-}));
+vi.mock('@/services/apis/gen/queries', async () => {
+  const actual = await vi.importActual('@/services/apis/gen/queries');
+  return {
+    ...actual,
+    useAgentsControllerGetConversations: vi.fn(() => ({
+      data: { data: [] },
+    })),
+    useAgentsControllerGetLLMConfigs: vi.fn(() => ({
+      data: [],
+    })),
+  };
+});
 
 vi.mock('@/components/llm-connect', () => ({
   default: () => <div data-testid="llm-connect">LlmConnect</div>,

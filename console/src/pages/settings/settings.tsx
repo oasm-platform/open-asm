@@ -1,6 +1,6 @@
 import { useSession } from '@/utils/authClient';
 import { useEffect, useMemo, type JSX } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import ApiKeysSettings from './components/api-keys-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
 import GetAboutProject from './components/get-about-project';
@@ -148,7 +148,7 @@ export function filterTabGroups(
 export const settingsTabs = settingsTabGroups.flatMap((group) => group.tabs);
 
 const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
-  const { tab } = useParams<{ tab?: string }>();
+  const { tab } = useParams({ strict: false });
   const navigate = useNavigate();
   const { data } = useSession();
 
@@ -162,7 +162,7 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
 
   useEffect(() => {
     if (!tab && defaultTab) {
-      navigate(`/settings/${defaultTab}`, { replace: true });
+      navigate({ to: `/settings/${defaultTab}`, replace: true });
     }
   }, [tab, defaultTab, navigate]);
 

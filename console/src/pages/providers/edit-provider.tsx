@@ -1,12 +1,12 @@
 import Page from "@/components/common/page";
 import { useProvidersControllerGetProvider, useProvidersControllerUpdateProvider, type UpdateProviderDto } from "@/services/apis/gen/queries";
 import { Loader2 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ProviderForm } from "./provider-form";
 
 export default function EditProviderPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const navigate = useNavigate();
 
   const { data: provider, isLoading } = useProvidersControllerGetProvider(id || '', {
@@ -23,7 +23,7 @@ export default function EditProviderPage() {
       onSuccess: () => {
         toast.success("Provider updated successfully");
         // Navigate back to the provider detail page
-        navigate(`/providers/${id}`);
+        navigate({ to: `/providers/${id}` });
       },
       onError: (error) => {
         toast.error("Failed to update provider");
@@ -49,7 +49,7 @@ export default function EditProviderPage() {
         </p>
         <button
           className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded"
-          onClick={() => navigate(-1)}
+          onClick={() => window.history.back()}
         >
           Go back
         </button>

@@ -17,7 +17,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { MoveUpRight, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 export default function AssetGroupWorkflow({

@@ -21,7 +21,7 @@ import {
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 // Define columns for tools table
@@ -97,7 +97,7 @@ const toolColumns: ColumnDef<Tool>[] = [
 ];
 
 export function DetailProvider() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const navigate = useNavigate();
 
   const {
@@ -137,7 +137,7 @@ export function DetailProvider() {
       {
         onSuccess: () => {
           toast.success('Provider deleted successfully');
-          navigate('/providers');
+          navigate({ to: '/providers' });
         },
         onError: (error) => {
           toast.error('Failed to delete provider');
@@ -149,7 +149,7 @@ export function DetailProvider() {
 
   // Handle provider edit
   const handleEditProvider = () => {
-    navigate(`/providers/${id}/edit`);
+    navigate({ to: `/providers/${id}/edit` });
   };
 
   if (isLoading) {
@@ -168,7 +168,7 @@ export function DetailProvider() {
           The provider you're looking for doesn't exist or you don't have
           permission to view it.
         </p>
-        <Button className="mt-4" onClick={() => navigate(-1)}>
+        <Button className="mt-4" onClick={() => window.history.back()}>
           Go back
         </Button>
       </div>

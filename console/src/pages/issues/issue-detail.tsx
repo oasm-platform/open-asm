@@ -13,7 +13,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { Check, MoveUpRight, PencilIcon, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from '@tanstack/react-router';
 import remarkGfm from 'remark-gfm';
 
 dayjs.extend(relativeTime);
@@ -23,7 +23,7 @@ dayjs.extend(relativeTime);
  * Features a two-column layout with main content and metadata sidebar.
  */
 const IssueDetail = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams({ strict: false });
   const { data: issue, refetch } = useIssuesControllerGetById(id || '');
   const { mutate: updateIssue, isPending } = useIssuesControllerUpdate();
   const [isEditing, setIsEditing] = useState(false);
@@ -70,14 +70,8 @@ const IssueDetail = () => {
     return null;
   }
 
-  const mapingRouterSourceType = (sourceType: string): string | null => {
-    switch (sourceType) {
-      case 'vulnerability':
-        return 'vulnerabilities';
-      default:
-        return null;
-    }
-  };
+  const isValidSourceType = (sourceType: string): sourceType is 'vulnerability' =>
+    sourceType === 'vulnerability';
 
   return (
     <Page className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 mx-auto">
@@ -145,9 +139,10 @@ const IssueDetail = () => {
             </span>{' '}
             opened this issue {dayjs(issue.createdAt).fromNow()}
           </span>
-          {issue.sourceId && (
+          {issue.sourceId && isValidSourceType(issue.sourceType) && (
             <Link
-              to={`/${mapingRouterSourceType(issue.sourceType)}/${issue.sourceId}`}
+              to="/vulnerabilities/$id"
+              params={{ id: issue.sourceId }}
             >
               <Button variant="link" className="capitalize">
                 {issue?.sourceType} <MoveUpRight />

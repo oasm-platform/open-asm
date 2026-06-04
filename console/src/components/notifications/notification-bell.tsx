@@ -14,7 +14,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 import { NotificationList } from './notification-list';
 
 export function NotificationBell() {

@@ -4,7 +4,7 @@ import { filterTabGroups, settingsTabGroups } from '@/pages/settings/settings';
 import { useSession } from '@/utils/authClient';
 import { ArrowLeft, Menu } from 'lucide-react';
 import type { JSX, ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from '@tanstack/react-router';
 
 interface SettingsLayoutProps {
   children: ReactNode;
