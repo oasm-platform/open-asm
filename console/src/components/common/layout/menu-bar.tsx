@@ -49,101 +49,101 @@ interface NavGroup {
 }
 
 export const menu: NavGroup[] = [
-    {
-      title: 'Overview',
-      url: '#',
-      items: [
-        {
-          title: 'Dashboard',
-          icon: <LayoutDashboard />,
-          url: '/',
-        },
-        {
-          title: 'Agents',
-          icon: <Sparkles />,
-          url: '/agents',
-          isNew: true,
-        },
-      ],
-    },
-    {
-      title: 'Admin',
-      url: '#',
-      roles: ['admin'],
-      items: [
-        {
-          title: 'Users',
-          icon: <User />,
-          url: '/admin/users',
-        },
-      ],
-    },
-    {
-      title: 'Attack surface',
-      url: '#',
-      items: [
-        {
-          title: 'Targets',
-          icon: <Target />,
-          url: '/targets',
-        },
-        {
-          title: 'Groups',
-          icon: <Group />,
-          url: '/groups',
-          isNew: false,
-        },
-        {
-          title: 'Assets',
-          icon: <CloudCheck />,
-          url: '/assets',
-        },
-        // {
-        //   title: 'Internal networks',
-        //   icon: <GlobeLock />,
-        //   url: '/internal-networks',
-        // },
-      ],
-    },
-    {
-      title: 'Security',
-      url: '#',
-      items: [
-        {
-          title: 'Vulnerabilities',
-          icon: <Bug />,
-          url: '/vulnerabilities',
-        },
-        {
-          title: 'Issues',
-          icon: <CircleDot />,
-          url: '/issues',
-        },
-      ],
-    },
+  {
+    title: 'Overview',
+    url: '#',
+    items: [
+      {
+        title: 'Dashboard',
+        icon: <LayoutDashboard />,
+        url: '/',
+      },
+      {
+        title: 'Agents',
+        icon: <Sparkles />,
+        url: '/agents',
+        isNew: true,
+      },
+    ],
+  },
+  {
+    title: 'Admin',
+    url: '#',
+    roles: ['admin'],
+    items: [
+      {
+        title: 'Users',
+        icon: <User />,
+        url: '/admin/users',
+      },
+    ],
+  },
+  {
+    title: 'Attack surface',
+    url: '#',
+    items: [
+      {
+        title: 'Targets',
+        icon: <Target />,
+        url: '/targets',
+      },
+      {
+        title: 'Groups',
+        icon: <Group />,
+        url: '/groups',
+        isNew: false,
+      },
+      {
+        title: 'Assets',
+        icon: <CloudCheck />,
+        url: '/assets',
+      },
+      // {
+      //   title: 'Internal networks',
+      //   icon: <GlobeLock />,
+      //   url: '/internal-networks',
+      // },
+    ],
+  },
+  {
+    title: 'Security',
+    url: '#',
+    items: [
+      {
+        title: 'Vulnerabilities',
+        icon: <Bug />,
+        url: '/vulnerabilities',
+      },
+      {
+        title: 'Issues',
+        icon: <CircleDot />,
+        url: '/issues',
+      },
+    ],
+  },
 
-    {
-      title: 'Management',
-      url: '#',
-      items: [
-        {
-          title: 'Tools',
-          icon: <Cpu />,
-          url: '/tools',
-        },
-        {
-          title: 'Workers',
-          icon: <Server />,
-          url: '/workers',
-        },
-        {
-          title: 'Jobs Registry',
-          icon: <CirclePlay />,
-          url: '/jobs',
-        },
-      ],
-    },
-  ];
+  {
+    title: 'Management',
+    url: '#',
+    items: [
+      {
+        title: 'Tools',
+        icon: <Cpu />,
+        url: '/tools',
+      },
+      {
+        title: 'Workers',
+        icon: <Server />,
+        url: '/workers',
+      },
+      {
+        title: 'Jobs Registry',
+        icon: <CirclePlay />,
+        url: '/jobs',
+      },
+    ],
+  },
+];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();

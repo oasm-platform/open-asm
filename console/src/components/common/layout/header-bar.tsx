@@ -6,6 +6,7 @@ import { NavUser } from '@/components/ui/nav-user';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { SearchForm } from '../../ui/search-form';
+import { ThemeSwitch } from '@/components/ui/theme-switch-icon';
 
 export function HeaderBar() {
   const { isMobile } = useSidebar();
@@ -16,13 +17,14 @@ export function HeaderBar() {
       {isHasWorkspace ? (
         <div className="flex w-full items-center justify-between">
           <div className="mr-auto flex gap-3 items-center">
-            <SidebarTrigger />
+            <SidebarTrigger className="max-md:scale-125" />
             {isMobile && <AppLogo type="small" />}
           </div>
           <div className="w-full flex justify-center">
             <SearchForm className="w-1/2" />
           </div>
           <div className="ml-auto flex gap-3 items-center">
+            <ThemeSwitch />
             <NotificationBell />
           </div>
         </div>
