@@ -19,7 +19,7 @@ export default function AppLogo({ type }: AppLogoProps) {
     },
   });
   return (
-    <Link to={'/'} className="flex h-13 justify-start items-center gap-2">
+    <Link to={'/'} className="flex h-13 justify-start items-center gap-2 shrink-0">
       <Logo
         logoPath={metadata?.logoPath as string}
         width={type === 'small' ? 25 : 30}
