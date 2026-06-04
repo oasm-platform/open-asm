@@ -3,14 +3,16 @@ import {
   useRootControllerGetMetadata,
 } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
+import * as React from 'react';
 import Logo from './logo';
-import { useSidebar } from './sidebar';
+import { SidebarContext } from './sidebar';
 
 interface AppLogoProps {
   type: 'small' | 'large';
 }
 export default function AppLogo({ type }: AppLogoProps) {
-  const { state, isMobile } = useSidebar();
+  const sidebar = React.useContext(SidebarContext);
+  const showName = !sidebar || sidebar.state === 'expanded' || sidebar.isMobile;
   const { data: metadata } = useRootControllerGetMetadata({
     query: {
       queryKey: getRootControllerGetMetadataQueryKey(),
@@ -23,18 +25,7 @@ export default function AppLogo({ type }: AppLogoProps) {
         width={type === 'small' ? 25 : 30}
         height={type === 'small' ? 25 : 30}
       />
-      {/* {metadata?.logoPath ? (
-        <img
-          src={metadata?.logoPath}
-          alt={metadata?.name || 'OASM'}
-          className="h-13 w-13 rounded-md"
-        />
-      ) : (
-        <Radar size={type === 'small' ? 25 : 30} />
-      )} */}
-      {(state === 'expanded' || isMobile) && (
-        <b className="text-xl truncate">{metadata?.name || 'OASM'}</b>
-      )}
+      {showName && <b className="text-xl truncate">{metadata?.name || 'OASM'}</b>}
     </Link>
   );
 }
