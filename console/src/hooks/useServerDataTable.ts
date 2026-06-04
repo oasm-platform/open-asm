@@ -70,7 +70,7 @@ export function useServerDataTable({
               if (value === undefined || value === null || value === '') {
                 delete next[key];
               } else {
-                next[key] = String(value);
+                next[key] = value;
               }
             });
             return next;
