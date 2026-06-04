@@ -3,7 +3,6 @@ import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
 import { useTimelineTrend } from '@/hooks/useTimelineTrend';
 import { Bug, TrendingDown, TrendingUp } from 'lucide-react';
-import React from 'react';
 import { Link } from '@tanstack/react-router';
 import Score from './score';
 
@@ -100,25 +99,16 @@ export default function VulnerabilityStatistic() {
           </div>
           <Bug />
         </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4">
-          {vulnerabilityStats.map((stat, index) => (
-            <React.Fragment key={stat.severity}>
-              <div
-                className={`text-center ${index % 3 === 2 ? 'pl-4' : index % 3 === 0 ? 'pr-4 border-r' : 'px-4 border-r'}`}
+        <CardContent className="grid grid-cols-3 gap-4 -mt-2">
+          {vulnerabilityStats.map((stat) => (
+            <div key={stat.severity} className="text-center px-4 py-2">
+              <p className="text-sm text-muted-foreground">{stat.label}</p>
+              <p
+                className={`text-2xl font-bold font-mono ${stat.colorClass}`}
               >
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-                <div className="flex items-baseline justify-center gap-1">
-                  <p
-                    className={`text-2xl font-bold font-mono min-w-[3rem] ${stat.colorClass}`}
-                  >
-                    <NumberAnimate value={stat.count} />
-                  </p>
-                </div>
-              </div>
-              {index === 2 && (
-                <div className="col-span-3 border-b pb-2 mb-2"></div>
-              )}
-            </React.Fragment>
+                <NumberAnimate value={stat.count} />
+              </p>
+            </div>
           ))}
         </CardContent>
       </Card>

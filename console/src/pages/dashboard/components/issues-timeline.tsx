@@ -71,7 +71,7 @@ export default function IssuesTimeline() {
         <ChartContainer
           config={chartConfig}
           className={clsx(
-            'w-full min-h-[250px]',
+            'w-full h-[300px]',
             !hasData && 'opacity-20 grayscale',
           )}
         >
