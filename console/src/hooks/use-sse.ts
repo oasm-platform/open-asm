@@ -15,7 +15,9 @@ export function useSse<T>(url: string, onMessage: (data: T) => void) {
 
     eventSource.onerror = (error) => {
       console.error('SSE Error:', error);
-      eventSource.close();
+      if (eventSource.readyState === EventSource.CLOSED) {
+        eventSource.close();
+      }
     };
 
     return () => {
