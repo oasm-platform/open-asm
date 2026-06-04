@@ -2,9 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/services/apis/gen/queries';
+import { useNavigate } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
-import { useNavigate } from '@tanstack/react-router';
 
 interface VulnerabilityAsset {
   asset: string;
@@ -51,11 +51,11 @@ const TopAssetsVulnerabilitiesTable = () => {
         const total = row.original.total || 0;
 
         if (total === 0) {
-          return <div className="h-8 flex items-center"></div>;
+          return <div className="h-5 flex items-center"></div>;
         }
 
         return (
-          <div className="h-8 flex items-center w-full">
+          <div className="h-5 flex items-center w-full">
             <div className="flex w-40 h-4 rounded-xl overflow-hidden">
               {severityOrder.map((severity) => {
                 const count = row.original[severity] || 0;
@@ -77,7 +77,7 @@ const TopAssetsVulnerabilitiesTable = () => {
       accessorKey: 'asset',
       header: 'Asset',
       cell: ({ row }) => (
-        <div className="font-medium h-8 flex items-center">
+        <div className="font-medium h-5 flex items-center">
           {row.getValue('asset') || ''}
         </div>
       ),
@@ -89,7 +89,7 @@ const TopAssetsVulnerabilitiesTable = () => {
       cell: ({ row }) => {
         const total = row.getValue('total') as number;
         return (
-          <div className="font-semibold h-8 flex items-center text-center">
+          <div className="font-semibold h-5 flex items-center text-center">
             {total > 0 ? total : ''}
           </div>
         );
@@ -132,7 +132,11 @@ const TopAssetsVulnerabilitiesTable = () => {
       <CardContent className="p-4 py-0">
         <DataTable
           onRowClick={(row) =>
-            row.asset && navigate({ to: '/assets', search: { tab: 'host', hosts: row.asset } })
+            row.asset &&
+            navigate({
+              to: '/assets',
+              search: { tab: 'host', hosts: row.asset },
+            })
           }
           isShowBorder={false}
           columns={columns}
