@@ -81,7 +81,7 @@ export function AssetTrends() {
         <CardDescription>Trend overtime</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig}>
+        <ChartContainer config={chartConfig} className="w-full h-[300px]">
           <LineChart
             accessibilityLayer
             data={chartData}

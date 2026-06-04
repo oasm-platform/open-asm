@@ -14,7 +14,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { authClient } from '@/utils/authClient';
+import { authClient, SESSION_QUERY_KEY } from '@/utils/authClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { LogOut, Settings } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
@@ -35,8 +35,9 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
     return <></>;
   }
 
-  const handleLogout = () => {
-    signOut();
+  const handleLogout = async () => {
+    await signOut();
+    queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
     queryClient.clear();
   };
   return (

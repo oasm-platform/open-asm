@@ -133,7 +133,12 @@ export default function Statistic() {
             </div>
 
             <div className="h-[60px] w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 320, height: 60 }}
+                minHeight={60}
+              >
                 <AreaChart
                   data={chartData}
                   margin={{ top: 10, right: 0, left: 0, bottom: 5 }}

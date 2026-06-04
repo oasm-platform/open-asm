@@ -41,7 +41,6 @@ export default function Dashboard() {
             <TlsStatistics />
           </div>
         </div>
-        <div className="col-span-1 2xl:col-span-3 min-h-96 order-last"></div>
       </div>
     </Page>
   );
