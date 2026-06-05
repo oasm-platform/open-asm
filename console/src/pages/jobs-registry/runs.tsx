@@ -44,12 +44,6 @@ export default function Runs() {
   const { id: jobHistoryId } = useParams({ strict: false });
   const [jobError, setJobError] = useState<Job | null>();
   const queryClient = useQueryClient();
-  const { data: jobHistoryDetail } =
-    useJobsRegistryControllerGetJobHistoryDetail(jobHistoryId || '', {
-      query: {
-        refetchInterval: 1000,
-      },
-    });
 
   const { mutate: deleteJobMutate } = useJobsRegistryControllerDeleteJob();
   const { mutate: cancelJobMutate } = useJobsRegistryControllerCancelJob();
@@ -62,6 +56,23 @@ export default function Runs() {
     isUpdateSearchQueryParam: false,
   });
 
+  const { data: jobHistoryDetail } =
+    useJobsRegistryControllerGetJobHistoryDetail(jobHistoryId || '', {
+      query: {
+        refetchInterval: 1000,
+      },
+    });
+
+  // Check if any jobs are still in progress (pending or in_progress)
+  const hasActiveJobs = useMemo(() => {
+    const jobs = jobHistoryDetail?.jobs || [];
+    return jobs.some(
+      (job) =>
+        job.status === JobStatus.pending ||
+        job.status === JobStatus.in_progress,
+    );
+  }, [jobHistoryDetail?.jobs]);
+
   const { data: paginatedJobsData } =
     useJobsRegistryControllerGetManyJobs({
       page: tableParams.page,
@@ -69,6 +80,10 @@ export default function Runs() {
       sortBy: tableParams.sortBy,
       sortOrder: tableParams.sortOrder,
       jobHistoryId: jobHistoryId || '',
+    }, {
+      query: {
+        refetchInterval: hasActiveJobs ? 1000 : false,
+      },
     });
 
   // Memoize jobs grouped by tool ID for efficient lookups
