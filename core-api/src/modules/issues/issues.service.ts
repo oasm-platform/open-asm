@@ -200,6 +200,9 @@ export class IssuesService {
     sourceType: IssueSourceType,
     workspaceId: string,
   ): Promise<Issue | null> {
+    if (!workspaceId) {
+      return null;
+    }
     return this.issuesRepository.findOne({
       where: {
         sourceId,
@@ -240,23 +243,40 @@ export class IssuesService {
     );
 
     return new Promise<Issue>((resolve, reject) => {
+      let isFinished = false;
+
       const timeout = setTimeout(() => {
+        isFinished = true;
         reject(new Error('Issue creation timed out'));
       }, 30000);
 
       const checkJob = () => {
+        if (isFinished) {
+          return;
+        }
+
         this.issueCreationQueue
           .getJob(job.id!)
           .then(async (updatedJob) => {
+            if (isFinished) {
+              return;
+            }
+
             if (!updatedJob) {
               clearTimeout(timeout);
+              isFinished = true;
               reject(new Error('Job not found'));
               return;
             }
 
             const state = await updatedJob.getState();
+            if (isFinished) {
+              return;
+            }
+
             if (state === 'completed') {
               clearTimeout(timeout);
+              isFinished = true;
               const result = updatedJob.returnvalue as
                 | { id?: string }
                 | undefined;
@@ -287,13 +307,18 @@ export class IssuesService {
               }
             } else if (state === 'failed') {
               clearTimeout(timeout);
+              isFinished = true;
               reject(new Error('Issue creation failed'));
             } else {
               setTimeout(checkJob, 100);
             }
           })
           .catch((err: unknown) => {
+            if (isFinished) {
+              return;
+            }
             clearTimeout(timeout);
+            isFinished = true;
             reject(
               err instanceof Error
                 ? err

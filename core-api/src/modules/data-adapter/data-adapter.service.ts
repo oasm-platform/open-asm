@@ -1,7 +1,7 @@
 import { BOT_ID } from '@/common/constants/app.constants';
 import { ScreenshotPayload } from '@/common/interfaces/app.interface';
 import { JobDataResultType } from '@/common/types/app.types';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as crypto from 'crypto';
@@ -23,6 +23,8 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import { DataAdapterInput } from './data-adapter.interface';
 @Injectable()
 export class DataAdapterService {
+  private readonly logger = new Logger(DataAdapterService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private workspaceService: WorkspacesService,
@@ -278,6 +280,13 @@ export class DataAdapterService {
 
       if (vulsForAlert.length > 0) {
         const workspaceId = job.jobHistory.workflow?.workspace.id;
+
+        if (!workspaceId) {
+          this.logger.warn(
+            'Workspace ID is missing from job history workflow, skipping issue creation',
+          );
+          return;
+        }
 
         const vulnsWithoutExistingIssue = await Promise.all(
           vulsForAlert.map(async (v) => {
