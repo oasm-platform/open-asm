@@ -392,7 +392,7 @@ export default function Runs() {
       }
     >
       {/* Tools Section */}
-      {jobHistoryDetail?.tools && jobHistoryDetail.tools.length > 0 ? (
+      {!!jobHistoryDetail?.tools?.length && (
         <div className="mb-6 p-4 border rounded-lg bg-card">
           <h3 className="text-lg font-semibold mb-4">Pipeline</h3>
           <div className="flex items-center gap-4 flex-wrap">
@@ -430,15 +430,15 @@ export default function Runs() {
             })}
           </div>
         </div>
-      ) : null}
+      )}
 
-      {jobsError && (
+      {!!jobsError && (
         <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
           Failed to load jobs. Please try again.
         </div>
       )}
 
-      {allJobsError && (
+      {!!allJobsError && (
         <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
           Failed to load pipeline status. Please try again.
         </div>

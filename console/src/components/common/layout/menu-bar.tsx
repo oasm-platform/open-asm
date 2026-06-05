@@ -178,7 +178,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     // Ensure all URLs are absolute for comparison
                     const toUrl = item.url;
                     const isActive =
-                      `/${location.pathname.split('/')[1]}` === toUrl;
+                      toUrl === '/'
+                        ? location.pathname === '/'
+                        : location.pathname === toUrl ||
+                          location.pathname.startsWith(toUrl + '/');
                     return (
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton
