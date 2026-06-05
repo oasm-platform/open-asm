@@ -125,7 +125,7 @@ const TopAssetsVulnerabilitiesTable = () => {
   }
 
   return (
-    <Card className="py-3 pt-6">
+    <Card className="py-3 pt-6 h-full">
       <CardHeader>
         <CardTitle>Top assets with most vulnerabilities</CardTitle>
       </CardHeader>
