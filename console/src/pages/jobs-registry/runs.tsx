@@ -19,12 +19,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Image from '@/components/ui/image';
 import JobStatusBadge from '@/components/ui/job-status';
+import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { Job } from '@/services/apis/gen/queries';
 import {
   JobStatus,
   useJobsRegistryControllerCancelJob,
   useJobsRegistryControllerDeleteJob,
   useJobsRegistryControllerGetJobHistoryDetail,
+  useJobsRegistryControllerGetManyJobs,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -53,13 +55,28 @@ export default function Runs() {
   const { mutate: deleteJobMutate } = useJobsRegistryControllerDeleteJob();
   const { mutate: cancelJobMutate } = useJobsRegistryControllerCancelJob();
 
+  const { tableParams, tableHandlers } = useServerDataTable({
+    defaultPage: 1,
+    defaultPageSize: 10,
+    defaultSortBy: 'createdAt',
+    defaultSortOrder: 'DESC',
+    isUpdateSearchQueryParam: false,
+  });
+
+  const { data: paginatedJobsData } =
+    useJobsRegistryControllerGetManyJobs({
+      page: tableParams.page,
+      limit: tableParams.pageSize,
+      sortBy: tableParams.sortBy,
+      sortOrder: tableParams.sortOrder,
+      jobHistoryId: jobHistoryId || '',
+    });
+
   // Memoize jobs grouped by tool ID for efficient lookups
   const jobsByToolId = useMemo(() => {
-    if (!jobHistoryDetail?.jobs) return new Map<string, Job[]>();
-    return jobHistoryDetail.jobs.reduce((acc, job) => {
-      // Check if job.tool exists before accessing its id property
+    const jobs = paginatedJobsData?.data || [];
+    return jobs.reduce((acc, job) => {
       if (!job.tool) {
-        console.warn(`Job ${job.id} has no tool assigned:`, job);
         return acc;
       }
       const toolId = job.tool.id;
@@ -69,7 +86,7 @@ export default function Runs() {
       acc.get(toolId)!.push(job);
       return acc;
     }, new Map<string, Job[]>());
-  }, [jobHistoryDetail?.jobs]);
+  }, [paginatedJobsData?.data]);
 
   const getTitle = (row: Job) => {
     const value = row?.assetService
@@ -206,6 +223,9 @@ export default function Runs() {
                                 jobHistoryId,
                               ],
                             });
+                            queryClient.invalidateQueries({
+                              queryKey: ['JobsRegistryControllerGetManyJobs'],
+                            });
                           },
                         },
                       )
@@ -230,6 +250,9 @@ export default function Runs() {
                               'JobsRegistryControllerGetJobHistoryDetail',
                               jobHistoryId,
                             ],
+                          });
+                          queryClient.invalidateQueries({
+                            queryKey: ['JobsRegistryControllerGetManyJobs'],
                           });
                         },
                       },
@@ -317,17 +340,6 @@ export default function Runs() {
     };
   }, [jobHistoryDetail?.tools, jobsByToolId]);
 
-  // Memoize sorted jobs to avoid sorting on every render
-  const sortedJobs = useMemo(() => {
-    // Use .slice() to create a shallow copy before sorting to avoid mutating the original array
-    return (jobHistoryDetail?.jobs || [])
-      .slice()
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-  }, [jobHistoryDetail?.jobs]);
-
   const navigate = useNavigate();
   return (
     <Page
@@ -382,12 +394,14 @@ export default function Runs() {
       <DataTable
         isShowHeader={false}
         columns={columns}
-        data={sortedJobs}
+        data={paginatedJobsData?.data || []}
         showColumnVisibility={true}
-        showPagination={false}
-        page={1}
-        pageSize={jobHistoryDetail?.jobs?.length || 0}
-        totalItems={jobHistoryDetail?.jobs?.length || 0}
+        showPagination={true}
+        page={paginatedJobsData?.page || 1}
+        pageSize={paginatedJobsData?.limit || 10}
+        totalItems={paginatedJobsData?.total || 0}
+        onPageChange={tableHandlers.setPage}
+        onPageSizeChange={tableHandlers.setPageSize}
         onRowClick={(row) => {
           if (row.status === JobStatus.failed) {
             setJobError(row);
