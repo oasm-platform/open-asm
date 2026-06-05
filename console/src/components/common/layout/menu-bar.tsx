@@ -1,5 +1,5 @@
-import * as React from 'react';
 import { Link, useLocation } from '@tanstack/react-router';
+import * as React from 'react';
 
 import AppLogo from '@/components/ui/app-logo';
 import {
@@ -62,7 +62,6 @@ export const menu: NavGroup[] = [
         title: 'Agents',
         icon: <Sparkles />,
         url: '/agents',
-        isNew: true,
       },
     ],
   },
