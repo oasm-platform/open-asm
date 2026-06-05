@@ -73,8 +73,9 @@ export default function Runs() {
     });
 
   // Memoize jobs grouped by tool ID for efficient lookups
+  // Uses full unpaginated list from jobHistoryDetail for correct pipeline indicators
   const jobsByToolId = useMemo(() => {
-    const jobs = paginatedJobsData?.data || [];
+    const jobs = jobHistoryDetail?.jobs || [];
     return jobs.reduce((acc, job) => {
       if (!job.tool) {
         return acc;
@@ -86,7 +87,7 @@ export default function Runs() {
       acc.get(toolId)!.push(job);
       return acc;
     }, new Map<string, Job[]>());
-  }, [paginatedJobsData?.data]);
+  }, [jobHistoryDetail?.jobs]);
 
   const getTitle = (row: Job) => {
     const value = row?.assetService
