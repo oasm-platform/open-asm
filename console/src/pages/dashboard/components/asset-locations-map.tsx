@@ -22,7 +22,7 @@ export default function AssetLocationsMap() {
     });
 
   return (
-    <div className="h-[450px] xl:h-full w-full relative rounded-lg overflow-hidden border">
+    <div className="min-h-[450px] h-full w-full relative rounded-lg overflow-hidden border">
       <div className="absolute top-0 z-2 left-0 p-3">
         <div className="bg-background/30 p-2 rounded">
           <CardTitle>Asset locations</CardTitle>
@@ -97,6 +97,14 @@ export default function AssetLocationsMap() {
             </CircleMarker>
           ))}
       </MapContainer>
+      <div
+        className="absolute inset-0 z-1 pointer-events-none"
+        style={{
+          background: theme === 'dark' ? '#1e3a5f' : '#3b5bdb',
+          opacity: theme === 'dark' ? 0.3 : 0.1,
+          mixBlendMode: 'color',
+        }}
+      />
       <style>{`
                 .blink-marker {
                     animation: blink-animation 1.5s infinite;

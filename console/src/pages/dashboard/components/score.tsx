@@ -15,13 +15,13 @@ export default function Score() {
     }
   }, [statistics, isLoading]);
 
-  // Function to get color based on score (red -> yellow -> green)
+  // Function to get color based on score (matches severity palette)
   const getColor = (score: number) => {
-    if (score <= 2) return '#ef4444'; // red-500
-    if (score <= 4) return '#f97316'; // orange-500
-    if (score <= 6) return '#eab308'; // yellow-500
-    if (score <= 8) return '#84cc16'; // lime-500
-    return '#22c55e'; // green-500
+    if (score <= 2) return 'var(--chart-5)';
+    if (score <= 4) return 'var(--chart-3)';
+    if (score <= 6) return 'var(--chart-2)';
+    if (score <= 8) return 'var(--chart-4)';
+    return 'var(--chart-4)';
   };
 
   // Calculate stroke dasharray values for the circular progress
@@ -34,8 +34,8 @@ export default function Score() {
     <div className="flex items-center justify-center flex-grow">
       {isLoading ? (
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-500">Loading...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
         </div>
       ) : (
         <div className="relative">
@@ -50,7 +50,7 @@ export default function Score() {
               cx="85"
               cy="85"
               r={radius}
-              stroke="#e5e7eb"
+              stroke="var(--border)"
               strokeWidth="8"
               fill="transparent"
             />

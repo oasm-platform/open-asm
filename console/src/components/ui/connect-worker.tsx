@@ -85,19 +85,19 @@ export function ConnectWorker({ networkId }: ConnectWorkerProps) {
                             <Copy size={16} />
                         </Button>
                     </div> */}
-          <div className="relative bg-black text-white font-mono rounded-md p-4 text-sm">
-            <pre className="whitespace-pre-wrap">{rawCommand}</pre>
+          <div className="relative bg-muted text-foreground font-mono rounded-md p-4 text-sm">
+            <pre className="whitespace-pre-wrap break-all">{rawCommand}</pre>
             <Button
               onClick={handleCopyCommand}
               size="icon"
               variant="ghost"
-              className="absolute top-2 right-2 text-white hover:text-gray-300"
+              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
             >
               <Copy size={16} />
             </Button>
           </div>
         </div>
-        <DialogFooter className="flex justify-between items-center gap-2">
+        <DialogFooter className="!flex-row !flex-nowrap justify-between items-center gap-2">
           <ConfirmDialog
             title="Rotate API key"
             description="Are you sure you want to rotate the API key?"

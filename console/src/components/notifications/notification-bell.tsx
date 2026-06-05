@@ -52,11 +52,7 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="lg"
-          className="relative rounded-full md:rounded-lg w-10 h-10"
-        >
+        <Button variant="ghost" size="icon" className="scale-95 rounded-full">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">

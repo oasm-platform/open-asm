@@ -134,7 +134,7 @@ const IssueDetail = () => {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <StatusBadge status={issue.status} />
           <span>
-            <span className="font-medium text-foreground">
+            <span className="font-medium">
               {issue.createdBy?.name || 'Unknown'}
             </span>{' '}
             opened this issue {dayjs(issue.createdAt).fromNow()}

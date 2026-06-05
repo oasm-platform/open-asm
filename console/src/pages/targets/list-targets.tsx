@@ -29,9 +29,9 @@ import { TargetTypeFilter } from './components/target-type-filter';
 import { ScopeFilter } from './components/scope-filter';
 
 const targetTypeColor: Record<string, string> = {
-  DOMAIN: 'border-blue-500 text-blue-500',
-  CIDR: 'border-green-500 text-green-500',
-  IP: 'border-orange-500 text-orange-500',
+  DOMAIN: 'border-blue-400 text-blue-400',
+  CIDR: 'border-emerald-400 text-emerald-400',
+  IP: 'border-amber-400 text-amber-400',
 };
 
 const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
@@ -67,8 +67,8 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     cell: ({ row }) => {
       const value: string = row.getValue('totalAssetServices');
       return (
-        <div>
-          <b>{value}</b> services
+        <div className="text-muted-foreground font-medium">
+          {value} services
         </div>
       );
     },
@@ -103,7 +103,7 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     cell: ({ row }) => {
       const value: string = row.getValue('lastDiscoveredAt');
       return (
-        <div className="text-gray-400 font-semibold">
+        <div className="text-muted-foreground font-medium">
           {dayjs(value).fromNow()}
         </div>
       );
